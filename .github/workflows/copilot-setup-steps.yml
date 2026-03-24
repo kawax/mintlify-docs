@@ -24,3 +24,10 @@ jobs:
         uses: github/gh-aw-actions/setup-cli@9128d2542bbf1bdfec94dabeaf3e1d3c0d402577 # v0.63.0
         with:
           version: v0.63.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts
+
+      - run: npm i -g mint
