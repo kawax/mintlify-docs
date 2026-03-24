@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "luma",
   "name": "Knowledge of Laravel",
   "colors": {
     "primary": "#16A34A",
