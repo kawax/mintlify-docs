@@ -23,7 +23,7 @@ This is a Mintlify documentation site. Pages are MDX files with YAML frontmatter
 
 - 初級：基本的なチュートリアルとガイド
 - 中級：[公式ドキュメント](https://github.com/laravel/docs) の範囲のガイド
-- 上級：[GitHub](https://github.com/laravel) のコードまで見ないと分からない機能のガイド
+- 上級：[GitHub](https://github.com/laravel) のコードまで見ないと分からない機能のガイド。フレームワーク本体だけでなく公式パッケージも対象。
 
 ## ディレクトリ構造
 
