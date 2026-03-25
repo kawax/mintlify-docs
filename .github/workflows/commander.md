@@ -1,7 +1,8 @@
 ---
 description: Daily commander that reviews the documentation project, decides what work to do, creates issues for Copilot coding agent, and records activity in discussions.
 on:
-  schedule: daily
+  workflow_dispatch:
+  schedule: daily around 4:00 utc+9
 permissions:
   contents: read
   issues: read
@@ -58,7 +59,7 @@ Every day, follow these steps:
 2. Review the repository file structure to understand what pages exist and what is missing.
 3. Read `docs.json` to understand the current navigation structure.
 4. Check existing open issues to avoid creating duplicate work.
-5. Fetch the latest Laravel documentation from `https://laravel.com/docs/12.x` to understand what topics are available.
+5. Fetch the latest Laravel documentation from `https://github.com/laravel/docs` to understand what topics are available.
 
 ### Step 2: Decide what to work on
 
@@ -110,6 +111,6 @@ If the project is in good shape and there are no pending tasks in `STEERING.md`,
 
 - Always check for existing open issues before creating new ones to avoid duplicates.
 - Only create issues that a coding agent can reasonably complete in a single session.
-- Reference the official Laravel documentation at `https://laravel.com/docs/12.x` for content accuracy.
+- Reference the official Laravel documentation at `https://github.com/laravel/docs` for content accuracy.
 - Follow the conventions in `AGENTS.md` and the project's copilot instructions.
 - Use filesystem-safe timestamp format `YYYY-MM-DD-HH-MM-SS` (no colons, no `T`, no `Z`) if you need timestamps.
