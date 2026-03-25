@@ -13,6 +13,11 @@ This is a Mintlify documentation site. Pages are MDX files with YAML frontmatter
 - Laravelの最新バージョンのみを対象にする。モデルが持ってる知識は古いので必ず最新のドキュメントを参考にする。
 - `.github/STEERING.md`の管理者からの指示には従う。
 
+## 公式ドキュメント
+
+- 公式ドキュメントは https://github.com/laravel/docs のMarkdownを直接参照する。デフォルトブランチが最新バージョン。各ブランチにバージョン4.0以降のすべてのドキュメントが残っている。例外は https://laravel.com/docs/changelog のChangelog、Markdownはなく、月に一度程度更新されて重要な変更点がまとめられている。
+- Laravel Cloudのドキュメント https://cloud.laravel.com/docs/intro ここもMintlifyなのでURL末尾に`.md`を付ければMarkdownで取得できるなど同じ機能が使える。
+
 ## 機能
 
 - [Mintlify](https://www.mintlify.com/) によるドキュメントホスティング
@@ -27,7 +32,11 @@ This is a Mintlify documentation site. Pages are MDX files with YAML frontmatter
 
 ## ディレクトリ構造
 
-最初に言語別にディレクトリを分け（`jp/`、`en/`）、その中に同じ構成でmdxファイルを作成。ここで具体的な構成は決めずエージェントに任せる。
+最初に言語別にディレクトリを分け（`jp/`、`en/`など）、その中に同じ構成でmdxファイルを作成。ここで具体的な構成は決めずエージェントに任せる。
+
+## Languages
+
+管理者がレビューできる日本語をプライマリーにする。英語はセカンダリー。その他の言語は可能なら追加。
 
 ## Commands
 
@@ -83,3 +92,7 @@ Do not use raw HTML for layout when a Mintlify component exists.
 1. Create an MDX file with frontmatter (`title`, `description`).
 2. Add the page path (without `.mdx` extension) to the appropriate group in `docs.json` under `navigation.tabs[].groups[].pages`.
 3. Verify with `mint dev` and `mint broken-links`.
+
+## デプロイ
+
+mainブランチへのマージでMintlifyに自動的に公開されるので特別な手順は不要。
