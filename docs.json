@@ -28,6 +28,12 @@
               "jp/tutorial/views",
               "jp/tutorial/blade"
             ]
+          },
+          {
+            "group": "コントローラー",
+            "pages": [
+              "jp/tutorial/controllers"
+            ]
           }
         ]
       }
