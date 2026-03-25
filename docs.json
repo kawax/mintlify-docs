@@ -11,58 +11,22 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "入門チュートリアル",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "はじめに",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "jp/tutorial/introduction",
+              "jp/tutorial/installation",
+              "jp/tutorial/directory-structure"
             ]
           },
           {
-            "group": "Customization",
+            "group": "基本",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "API reference",
-        "groups": [
-          {
-            "group": "API documentation",
-            "pages": [
-              "api-reference/introduction"
-            ]
-          },
-          {
-            "group": "Endpoint examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "jp/tutorial/routing",
+              "jp/tutorial/views",
+              "jp/tutorial/blade"
             ]
           }
         ]

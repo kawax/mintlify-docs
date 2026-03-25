@@ -1,0 +1,150 @@
+---
+title: "インストール"
+description: "LaravelのインストールとPHP環境のセットアップ方法を解説します。"
+---
+
+## 必要な環境
+
+Laravelを始める前に、以下の環境が必要です。
+
+- **PHP 8.2以上**
+- **Composer**（PHPのパッケージマネージャー）
+- **Laravelインストーラー**（任意だが推奨）
+
+<Info>
+  Node.js/npmまたはBunも、フロントエンドアセットをコンパイルするために必要です。
+</Info>
+
+## PHPとLaravelインストーラーのインストール
+
+PHPとComposerとLaravelインストーラーをまとめてインストールする最も簡単な方法は、OSに合わせた次のコマンドを実行することです。
+
+<CodeGroup>
+
+```shell macOS
+/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.4)"
+```
+
+```powershell Windows (管理者として実行)
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.4'))
+```
+
+```shell Linux
+/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.4)"
+```
+
+</CodeGroup>
+
+コマンドを実行後、ターミナルセッションを再起動してください。
+PHPやComposerをすでにインストール済みの場合は、Composerを使ってLaravelインストーラーだけをインストールできます。
+
+```shell
+composer global require laravel/installer
+```
+
+<Tip>
+  グラフィカルなPHP管理ツールを求めるなら、[Laravel Herd](#laravel-herd-を使ったインストール)も確認してください。
+</Tip>
+
+## 新しいLaravelアプリケーションの作成
+
+PHPとComposerとLaravelインストーラーの準備ができたら、新しいLaravelアプリケーションを作成します。
+インストーラーがテストフレームワーク・データベース・スターターキットの選択を促します。
+
+```shell
+laravel new example-app
+```
+
+アプリケーションが作成されたら、`dev` Composerスクリプトで開発サーバーを起動します。
+
+```shell
+cd example-app
+npm install && npm run build
+composer run dev
+```
+
+開発サーバーが起動したら、ブラウザで [http://localhost:8000](http://localhost:8000) にアクセスします。
+
+<Info>
+  スターターキット（Breeze、Jetstream）を使うと、認証機能を含むベースの足場が自動生成されます。
+</Info>
+
+## Laravel Herd を使ったインストール
+
+[Laravel Herd](https://herd.laravel.com) は、macOSとWindows向けのネイティブなLaravel/PHP開発環境です。
+PHP・Nginx・Laravel CLIをまとめてインストールできます。
+
+### macOS
+
+1. [Herdのウェブサイト](https://herd.laravel.com)からインストーラーをダウンロードします。
+2. インストーラーを実行するとPHPが自動的に設定されます。
+3. `~/Herd` ディレクトリがパークディレクトリとして設定されます。
+
+```shell
+cd ~/Herd
+laravel new my-app
+cd my-app
+herd open
+```
+
+### Windows
+
+1. [Herdのウェブサイト](https://herd.laravel.com/windows)からWindowsインストーラーをダウンロードします。
+2. インストール後、Herdを起動してオンボーディングを完了させます。
+3. `%USERPROFILE%\Herd` がパークディレクトリになります。
+
+```shell
+cd ~\Herd
+laravel new my-app
+cd my-app
+herd open
+```
+
+## 初期設定
+
+### 環境設定
+
+Laravelの設定値の多くは、環境によって異なる場合があります。
+そのため、アプリケーションのルートにある `.env` ファイルで重要な設定値を管理します。
+
+<Warning>
+  `.env` ファイルはソースコントロールにコミットしないでください。
+  機密情報が漏れるリスクがあります。
+</Warning>
+
+### データベースの設定
+
+デフォルトでは、LaravelはSQLiteを使用するように設定されています。
+MySQLやPostgreSQLを使う場合は、`.env` ファイルを更新してください。
+
+```ini
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=laravel
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+SQLite以外のデータベースを使う場合は、マイグレーションを実行してテーブルを作成します。
+
+```shell
+php artisan migrate
+```
+
+## IDEサポート
+
+<AccordionGroup>
+  <Accordion title="VS Code / Cursor">
+    公式の[Laravel VS Code Extension](https://marketplace.visualstudio.com/items?itemName=laravel.vscode-laravel)をインストールすると、シンタックスハイライト・スニペット・Artisanコマンド統合・EloquentモデルのスマートオートコンプリートなどのLaravelサポートが利用できます。
+  </Accordion>
+  <Accordion title="PhpStorm">
+    [PhpStorm](https://www.jetbrains.com/phpstorm/laravel/)はLaravelフレームワークの組み込みサポートを持ち、Bladeテンプレート・Eloquentモデル・ルート・ビュー・翻訳のスマートオートコンプリートを提供します。
+  </Accordion>
+</AccordionGroup>
+
+## 次のステップ
+
+<Card title="ディレクトリ構造" icon="folder-open" href="/jp/tutorial/directory-structure">
+  Laravelプロジェクトの主要なディレクトリとファイルを理解します。
+</Card>

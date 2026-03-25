@@ -1,0 +1,368 @@
+---
+title: "Bladeテンプレート"
+description: "Laravelのテンプレートエンジン「Blade」の基本構文、条件分岐、ループ、レイアウト継承を解説します。"
+---
+
+## はじめに
+
+BladeはLaravelに含まれるシンプルかつ強力なテンプレートエンジンです。
+PHPのテンプレートエンジンの一部と異なり、Bladeはテンプレート内で素のPHPコードの使用を制限しません。
+すべてのBladeテンプレートはPHPコードにコンパイルされてキャッシュされるため、Bladeはアプリケーションにほとんどオーバーヘッドを加えません。
+
+Bladeテンプレートファイルは `.blade.php` 拡張子を使い、通常は `resources/views` ディレクトリに格納されます。
+
+```php
+Route::get('/', function () {
+    return view('greeting', ['name' => '太郎']);
+});
+```
+
+## データの表示
+
+Bladeビューに渡されたデータを表示するには、変数を二重の波括弧で囲みます。
+
+```blade
+こんにちは、{{ $name }}。
+```
+
+<Info>
+  Bladeの `{{ }}` は自動的にPHPの `htmlspecialchars` 関数を通してXSS攻撃を防ぎます。
+</Info>
+
+変数だけでなく、PHP関数の結果も表示できます。
+
+```blade
+現在のUNIXタイムスタンプ: {{ time() }}
+```
+
+### エスケープしないデータの表示
+
+エスケープを省略したい場合は `{!! !!}` 構文を使います。
+
+```blade
+こんにちは、{!! $name !!}。
+```
+
+<Warning>
+  ユーザーが入力したデータを表示するときは、必ず `{{ }}` を使って自動エスケープを有効にしてください。
+  `{!! !!}` を信頼できない入力に使うとXSS脆弱性につながります。
+</Warning>
+
+### JavaScriptフレームワークとの共存
+
+JavaScriptフレームワークも波括弧を使う場合は、`@` シンボルでBladeのレンダリングをスキップさせます。
+
+```blade
+<h1>Laravel</h1>
+
+こんにちは、@{{ name }}。
+```
+
+この場合、`@` はBladeによって除去されますが、`{{ name }}` はそのままブラウザに送られてJavaScriptフレームワークによってレンダリングされます。
+
+## Bladeディレクティブ
+
+### 条件分岐（if文）
+
+```blade
+@if (count($records) === 1)
+    レコードが1件あります。
+@elseif (count($records) > 1)
+    複数のレコードがあります。
+@else
+    レコードがありません。
+@endif
+```
+
+`@unless` で「〜でなければ」という条件も書けます。
+
+```blade
+@unless (Auth::check())
+    ログインしていません。
+@endunless
+```
+
+変数が定義されているか・nullでないかを確認するには `@isset` と `@empty` を使います。
+
+```blade
+@isset($records)
+    // $records が定義済みかつnullでない場合
+@endisset
+
+@empty($records)
+    // $records が「空」の場合
+@endempty
+```
+
+### 認証ディレクティブ
+
+```blade
+@auth
+    // 認証済みユーザー向けのコンテンツ
+@endauth
+
+@guest
+    // 未認証ユーザー向けのコンテンツ
+@endguest
+```
+
+### Switch文
+
+```blade
+@switch($i)
+    @case(1)
+        最初のケース...
+        @break
+
+    @case(2)
+        2番目のケース...
+        @break
+
+    @default
+        デフォルトのケース...
+@endswitch
+```
+
+### ループ
+
+Bladeはループを扱うための便利なディレクティブを提供します。
+
+```blade
+@for ($i = 0; $i < 10; $i++)
+    現在の値: {{ $i }}
+@endfor
+
+@foreach ($users as $user)
+    <p>ユーザー: {{ $user->name }}</p>
+@endforeach
+
+@forelse ($users as $user)
+    <li>{{ $user->name }}</li>
+@empty
+    <p>ユーザーがいません</p>
+@endforelse
+
+@while (true)
+    <p>永久にループします。</p>
+@endwhile
+```
+
+ループ内では `@break` と `@continue` を使ってループを制御できます。
+
+```blade
+@foreach ($users as $user)
+    @if ($user->type == 1)
+        @continue
+    @endif
+
+    <li>{{ $user->name }}</li>
+
+    @if ($user->number == 5)
+        @break
+    @endif
+@endforeach
+```
+
+条件を直接ディレクティブに渡すこともできます。
+
+```blade
+@foreach ($users as $user)
+    @continue($user->type == 1)
+
+    <li>{{ $user->name }}</li>
+
+    @break($user->number == 5)
+@endforeach
+```
+
+### ループ変数
+
+`@foreach` ループ内では、`$loop` 変数を使ってループに関する情報を取得できます。
+
+```blade
+@foreach ($users as $user)
+    @if ($loop->first)
+        最初の繰り返しです。
+    @endif
+
+    @if ($loop->last)
+        最後の繰り返しです。
+    @endif
+
+    <p>ユーザー: {{ $user->name }}</p>
+@endforeach
+```
+
+| プロパティ | 説明 |
+|---|---|
+| `$loop->index` | 現在のループインデックス（0始まり） |
+| `$loop->iteration` | 現在のループ反復回数（1始まり） |
+| `$loop->remaining` | 残りの反復回数 |
+| `$loop->count` | 配列の要素数 |
+| `$loop->first` | 最初の繰り返しか |
+| `$loop->last` | 最後の繰り返しか |
+| `$loop->even` | 偶数番目の繰り返しか |
+| `$loop->odd` | 奇数番目の繰り返しか |
+| `$loop->depth` | 現在のループのネスト深度 |
+| `$loop->parent` | ネストしたループの場合、親ループの変数 |
+
+## コメント
+
+Bladeコメントはレンダリングされたページに含まれません。
+
+```blade
+{{-- このコメントはレンダリングされたHTMLに含まれません --}}
+```
+
+## レイアウト
+
+### コンポーネントを使ったレイアウト
+
+Laravelのレイアウト構築には、Bladeコンポーネントを使う方法が推奨されます。
+
+まずレイアウトコンポーネントを作成します。
+
+```blade
+<!-- resources/views/components/layout.blade.php -->
+<html>
+    <head>
+        <title>{{ $title ?? 'アプリ名' }}</title>
+    </head>
+    <body>
+        <header>
+            <nav>
+                <!-- ナビゲーション -->
+            </nav>
+        </header>
+
+        <main>
+            {{ $slot }}
+        </main>
+    </body>
+</html>
+```
+
+次にこのレイアウトを使うビューを作ります。
+
+```blade
+<!-- resources/views/dashboard.blade.php -->
+<x-layout>
+    <x-slot:title>ダッシュボード</x-slot>
+
+    <h1>ダッシュボード</h1>
+    <p>ようこそ！</p>
+</x-layout>
+```
+
+### テンプレート継承を使ったレイアウト
+
+古典的な方法として、`@extends`・`@section`・`@yield` を使ったテンプレート継承があります。
+
+**親レイアウトの定義:**
+
+```blade
+<!-- resources/views/layouts/app.blade.php -->
+<html>
+    <head>
+        <title>アプリ名 - @yield('title')</title>
+    </head>
+    <body>
+        @section('sidebar')
+            デフォルトのサイドバー
+        @show
+
+        <div class="container">
+            @yield('content')
+        </div>
+    </body>
+</html>
+```
+
+**子ビューでのレイアウト継承:**
+
+```blade
+<!-- resources/views/child.blade.php -->
+@extends('layouts.app')
+
+@section('title', '子ページ')
+
+@section('sidebar')
+    @parent
+
+    <p>サイドバーに追加されるコンテンツ</p>
+@endsection
+
+@section('content')
+    <p>コンテンツ本体</p>
+@endsection
+```
+
+<Info>
+  `@parent` を使うと、親レイアウトの `@section` の内容を維持しながら追記できます。
+</Info>
+
+## サブビューのインクルード
+
+`@include` ディレクティブを使うと、Bladeビューを別のビューに埋め込めます。
+親ビューで利用可能なすべての変数は、インクルードされたビューでも利用できます。
+
+```blade
+<div>
+    @include('shared.errors')
+
+    <form>
+        <!-- フォームのコンテンツ -->
+    </form>
+</div>
+```
+
+変数を追加で渡すこともできます。
+
+```blade
+@include('view.name', ['status' => 'complete'])
+```
+
+## フォームのCSRF保護
+
+`web` ルートファイルで `POST`・`PUT`・`PATCH`・`DELETE` リクエストを送るHTMLフォームには、必ず `@csrf` ディレクティブを含めてください。
+
+```blade
+<form method="POST" action="/profile">
+    @csrf
+
+    <!-- フォームフィールド -->
+</form>
+```
+
+`PUT`・`PATCH`・`DELETE` リクエストをフォームから送る場合は `@method` ディレクティブを使います。
+
+```blade
+<form method="POST" action="/post/1">
+    @csrf
+    @method('DELETE')
+
+    <button type="submit">削除</button>
+</form>
+```
+
+## まとめ
+
+Bladeテンプレートエンジンの主な機能をまとめます。
+
+<AccordionGroup>
+  <Accordion title="データの表示">
+    `{{ $variable }}` でエスケープ付き表示、`{!! $variable !!}` でエスケープなし表示。
+  </Accordion>
+  <Accordion title="条件分岐">
+    `@if`・`@elseif`・`@else`・`@endif`、`@unless`、`@isset`、`@empty`、`@auth`、`@guest`。
+  </Accordion>
+  <Accordion title="ループ">
+    `@for`・`@foreach`・`@forelse`・`@while` と `$loop` 変数を使った制御。
+  </Accordion>
+  <Accordion title="レイアウト">
+    コンポーネントベース（`<x-layout>` と `{{ $slot }}`）またはテンプレート継承（`@extends`・`@section`・`@yield`）。
+  </Accordion>
+  <Accordion title="サブビュー">
+    `@include` でビューを再利用可能なパーツとして埋め込み。
+  </Accordion>
+</AccordionGroup>
