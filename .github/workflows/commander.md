@@ -25,7 +25,6 @@ safe-outputs:
   create-discussion:
     max: 1
     category: "copilot"
-    close-older-discussions: true
     title-prefix: "[Commander] "
   noop:
 ---
