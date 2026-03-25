@@ -15,7 +15,7 @@ This is a Mintlify documentation site. Pages are MDX files with YAML frontmatter
 
 ## 公式ドキュメント
 
-- 公式ドキュメントは https://github.com/laravel/docs のMarkdownを直接参照する。デフォルトブランチが最新バージョン。各ブランチにバージョン4.0以降のすべてのドキュメントが残っている。例外は https://laravel.com/docs/changelog のChangelog、Markdownはなく、月に一度程度更新されて重要な変更点がまとめられている。
+- 公式ドキュメントは https://github.com/laravel/docs のMarkdownを直接参照する。デフォルトブランチが最新バージョン。`master`ブランチは次期バージョン用だけどリリース直前にならないと更新されないので参照しない。。各ブランチにバージョン4.0以降のすべてのドキュメントが残っている。例外は https://laravel.com/docs/changelog のChangelog、Markdownはなく、月に一度程度更新されて重要な変更点がまとめられている。
 - Laravel Cloudのドキュメント https://cloud.laravel.com/docs/intro ここもMintlifyなのでURL末尾に`.md`を付ければMarkdownで取得できるなど同じ機能が使える。
 
 ## 機能
