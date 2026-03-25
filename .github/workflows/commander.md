@@ -112,5 +112,4 @@ If the project is in good shape and there are no pending tasks in `STEERING.md`,
 - Always check for existing open issues before creating new ones to avoid duplicates.
 - Only create issues that a coding agent can reasonably complete in a single session.
 - Reference the official Laravel documentation at `https://github.com/laravel/docs` for content accuracy.
-- Follow the conventions in `AGENTS.md` and the project's copilot instructions.
 - Use filesystem-safe timestamp format `YYYY-MM-DD-HH-MM-SS` (no colons, no `T`, no `Z`) if you need timestamps.
