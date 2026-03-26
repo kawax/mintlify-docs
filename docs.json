@@ -34,6 +34,13 @@
             "pages": [
               "jp/tutorial/controllers"
             ]
+          },
+          {
+            "group": "リクエスト処理",
+            "pages": [
+              "jp/tutorial/middleware",
+              "jp/tutorial/requests"
+            ]
           }
         ]
       }
