@@ -58,6 +58,12 @@
             "pages": [
               "jp/tutorial/authentication"
             ]
+          },
+          {
+            "group": "テストとデプロイ",
+            "pages": [
+              "jp/tutorial/testing"
+            ]
           }
         ]
       }

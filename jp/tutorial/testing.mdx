@@ -1,0 +1,331 @@
+---
+title: "テスト入門"
+description: "PestとPHPUnitを使ったLaravelアプリケーションのテストの書き方"
+---
+
+## テストとは
+
+テストとは、コードが期待どおりに動作するかを自動的に検証する仕組みです。
+テストを書くことで、機能追加や修正をしたときに既存の動作が壊れていないかを素早く確認できます。
+チームでの開発では、テストがあることで安心してコードを変更・レビューできます。
+
+Laravelは最初からテストのサポートが組み込まれており、[Pest](https://pestphp.com) と [PHPUnit](https://phpunit.de) の両方が使えます。
+新規インストール時には `phpunit.xml` 設定ファイルと `tests/` ディレクトリが自動的に用意されています。
+
+<Tip>
+  PestはPHPUnitをベースに構築されており、より簡潔で読みやすい構文でテストを書けます。これからテストを始める場合はPestを選ぶのがおすすめです。
+</Tip>
+
+## `tests/` ディレクトリの構成
+
+```
+tests/
+├── Feature/      # 機能テスト
+│   └── ExampleTest.php
+├── Unit/         # ユニットテスト
+│   └── ExampleTest.php
+└── TestCase.php
+```
+
+- **`Feature/`** — 機能テストを置きます。HTTPリクエストを含む大きな単位のテストに使います。複数のオブジェクトが連携する動作やAPIエンドポイントの検証など、アプリケーション全体に近いテストです。**ほとんどのテストはここに置くことになります。**
+- **`Unit/`** — ユニットテストを置きます。単一のクラスやメソッドなど、小さな単位のテストに使います。Laravelアプリケーションは起動しないため、データベースや他のフレームワーク機能は使えません。
+
+## テストの作成
+
+`make:test` Artisanコマンドで新しいテストクラスを生成します。
+
+```shell
+# Feature テストを作成する（デフォルト）
+php artisan make:test TodoTest
+
+# Unit テストを作成する
+php artisan make:test TodoTest --unit
+```
+
+`tests/Feature/TodoTest.php` が生成されます。
+
+## テストの実行
+
+`php artisan test` コマンドでテストを実行します。
+
+```shell
+php artisan test
+```
+
+`vendor/bin/pest` や `vendor/bin/phpunit` を直接実行しても同じ結果が得られますが、`php artisan test` のほうが見やすい出力が得られるため推奨します。
+
+特定のテストスイートだけを実行したいときはオプションを使います。
+
+```shell
+# Feature テストのみ実行する
+php artisan test --testsuite=Feature
+
+# 失敗したらすぐ止める
+php artisan test --stop-on-failure
+```
+
+## 基本的なテストの書き方
+
+シンプルなアサーションの例です。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('trueはtrueである', function () {
+    expect(true)->toBeTrue();
+});
+
+test('文字列が含まれているか確認する', function () {
+    $message = 'Hello, Laravel!';
+
+    expect($message)->toContain('Laravel');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Unit;
+
+use PHPUnit\Framework\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_true_is_true(): void
+    {
+        $this->assertTrue(true);
+    }
+
+    public function test_string_contains_laravel(): void
+    {
+        $message = 'Hello, Laravel!';
+
+        $this->assertStringContainsString('Laravel', $message);
+    }
+}
+```
+</CodeGroup>
+
+### よく使うアサーション
+
+| Pest | PHPUnit | 説明 |
+| --- | --- | --- |
+| `expect($x)->toBe($y)` | `$this->assertSame($y, $x)` | 厳密に等しい |
+| `expect($x)->toEqual($y)` | `$this->assertEquals($y, $x)` | 等しい（型は問わない） |
+| `expect($x)->toBeTrue()` | `$this->assertTrue($x)` | `true` である |
+| `expect($x)->toBeFalse()` | `$this->assertFalse($x)` | `false` である |
+| `expect($x)->toBeNull()` | `$this->assertNull($x)` | `null` である |
+| `expect($x)->toContain($y)` | `$this->assertStringContainsString($y, $x)` | 文字列を含む |
+| `expect($x)->toHaveCount($n)` | `$this->assertCount($n, $x)` | 要素数が一致する |
+
+## HTTPテスト
+
+LaravelのHTTPテストでは、実際のHTTPサーバーを立てることなく、ルートへのリクエストをシミュレートできます。
+`Feature/` ディレクトリのテストクラスで使える強力な機能です。
+
+### ページの表示を確認する
+
+`get()` メソッドでGETリクエストを送り、レスポンスを検証します。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('トップページが表示される', function () {
+    $response = $this->get('/');
+
+    $response->assertStatus(200);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_top_page_is_displayed(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+}
+```
+</CodeGroup>
+
+### ToDoアプリのHTTPテスト例
+
+`Todo` モデルがあるアプリケーションを例に、CRUDの各操作をテストします。
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Models\Todo;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+test('ToDoの一覧ページが表示される', function () {
+    Todo::factory()->count(3)->create();
+
+    $response = $this->get('/todos');
+
+    $response->assertStatus(200);
+    $response->assertSee('一覧');
+});
+
+test('ToDoを新規作成できる', function () {
+    $response = $this->post('/todos', [
+        'title' => 'Laravelを学ぶ',
+    ]);
+
+    $response->assertRedirect('/todos');
+    $this->assertDatabaseHas('todos', ['title' => 'Laravelを学ぶ']);
+});
+
+test('ToDoを削除できる', function () {
+    $todo = Todo::factory()->create();
+
+    $response = $this->delete("/todos/{$todo->id}");
+
+    $response->assertRedirect('/todos');
+    $this->assertDatabaseMissing('todos', ['id' => $todo->id]);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Todo;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class TodoTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_todo_list_is_displayed(): void
+    {
+        Todo::factory()->count(3)->create();
+
+        $response = $this->get('/todos');
+
+        $response->assertStatus(200);
+        $response->assertSee('一覧');
+    }
+
+    public function test_todo_can_be_created(): void
+    {
+        $response = $this->post('/todos', [
+            'title' => 'Laravelを学ぶ',
+        ]);
+
+        $response->assertRedirect('/todos');
+        $this->assertDatabaseHas('todos', ['title' => 'Laravelを学ぶ']);
+    }
+
+    public function test_todo_can_be_deleted(): void
+    {
+        $todo = Todo::factory()->create();
+
+        $response = $this->delete("/todos/{$todo->id}");
+
+        $response->assertRedirect('/todos');
+        $this->assertDatabaseMissing('todos', ['id' => $todo->id]);
+    }
+}
+```
+</CodeGroup>
+
+### よく使うレスポンスのアサーション
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertStatus(200)` | レスポンスのHTTPステータスコードを確認する |
+| `assertOk()` | ステータスコードが200であることを確認する |
+| `assertRedirect('/path')` | 指定URLへのリダイレクトを確認する |
+| `assertSee('テキスト')` | レスポンス本文にテキストが含まれるか確認する |
+| `assertDontSee('テキスト')` | レスポンス本文にテキストが含まれないか確認する |
+| `assertJson([...])` | JSONレスポンスのデータを確認する |
+| `assertDatabaseHas('table', [...])` | データベースにレコードが存在するか確認する |
+| `assertDatabaseMissing('table', [...])` | データベースにレコードが存在しないか確認する |
+
+<Info>
+  `RefreshDatabase` トレイトを使うと、各テストの実行後にデータベースをリセットします。テスト間でデータが干渉しないようにするために使います。
+</Info>
+
+## テスト環境
+
+### `phpunit.xml` の設定
+
+プロジェクトルートの `phpunit.xml` でテスト環境の設定を行います。
+デフォルトではセッションとキャッシュが `array` ドライバーに設定されており、テスト実行中にデータが残りません。
+
+```xml
+<env name="APP_ENV" value="testing"/>
+<env name="CACHE_STORE" value="array"/>
+<env name="SESSION_DRIVER" value="array"/>
+```
+
+データベースには、ファイルを残さないSQLiteのインメモリデータベースを使うのが一般的です。
+
+```xml
+<env name="DB_CONNECTION" value="sqlite"/>
+<env name="DB_DATABASE" value=":memory:"/>
+```
+
+### `.env.testing` ファイル
+
+プロジェクトルートに `.env.testing` ファイルを作成すると、テスト実行時に `.env` の代わりに読み込まれます。
+テスト専用のデータベース接続や外部サービスの設定を分けたい場合に使います。
+
+```ini
+APP_ENV=testing
+DB_CONNECTION=sqlite
+DB_DATABASE=:memory:
+```
+
+<Warning>
+  設定をキャッシュしている場合、`php artisan config:clear` を実行してからテストを実行してください。古いキャッシュが使われて設定が反映されないことがあります。
+</Warning>
+
+## 並列テスト実行
+
+テスト数が増えてくると実行時間が長くなります。
+`--parallel` オプションを使うと、複数のプロセスでテストを同時実行して時間を短縮できます。
+
+まず `brianium/paratest` パッケージをインストールします。
+
+```shell
+composer require brianium/paratest --dev
+```
+
+その後、`--parallel` オプションを付けて実行します。
+
+```shell
+php artisan test --parallel
+```
+
+デフォルトではCPUのコア数分のプロセスが立ち上がります。プロセス数を指定するには `--processes` オプションを使います。
+
+```shell
+php artisan test --parallel --processes=4
+```
+
+<Tip>
+  並列テストを使うときは、各プロセスが独立したデータベースを使う必要があります。`RefreshDatabase` トレイトと `phpunit.xml` のインメモリSQLite設定を組み合わせると問題なく動作します。
+</Tip>
+
+## 次のステップ
+
+<Card title="HTTPテスト" icon="arrow-right" href="https://laravel.com/docs/http-tests">
+  リクエストのシミュレーション、認証付きテスト、JSONアサーションなど、より詳しいHTTPテストの方法は公式ドキュメントで確認できます。
+</Card>
