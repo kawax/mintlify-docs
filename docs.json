@@ -14,6 +14,9 @@
         "tab": "中級",
         "groups": [
           {
+            "group": "非同期処理",
+            "pages": [
+              "jp/intermediate/queues"
             "group": "メールと通知",
             "pages": [
               "jp/intermediate/mail",
