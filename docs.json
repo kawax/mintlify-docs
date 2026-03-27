@@ -108,6 +108,12 @@
             "pages": [
               "jp/intermediate/cache"
             ]
+          },
+          {
+            "group": "外部通信",
+            "pages": [
+              "jp/intermediate/http-client"
+            ]
           }
         ]
       }
