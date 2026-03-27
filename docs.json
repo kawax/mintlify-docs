@@ -96,6 +96,12 @@
             "pages": [
               "jp/intermediate/events"
             ]
+          },
+          {
+            "group": "キャッシュと最適化",
+            "pages": [
+              "jp/intermediate/cache"
+            ]
           }
         ]
       }
