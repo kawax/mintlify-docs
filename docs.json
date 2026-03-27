@@ -41,7 +41,8 @@
               "jp/tutorial/middleware",
               "jp/tutorial/requests",
               "jp/tutorial/validation",
-              "jp/tutorial/responses"
+              "jp/tutorial/responses",
+              "jp/tutorial/session"
             ]
           },
           {
