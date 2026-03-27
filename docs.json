@@ -114,6 +114,12 @@
             "pages": [
               "jp/intermediate/http-client"
             ]
+          },
+          {
+            "group": "デバッグと監視",
+            "pages": [
+              "jp/intermediate/logging"
+            ]
           }
         ]
       }

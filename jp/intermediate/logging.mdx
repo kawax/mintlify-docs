@@ -1,0 +1,400 @@
+---
+title: "ロギング"
+description: "Laravelのロギングシステムを使って、アプリケーションの動作をファイル・Slack・外部サービスへ記録する方法を学びます。"
+---
+
+## ロギングとは
+
+Laravelのロギングは**チャンネル**という概念を軸に設計されています。
+チャンネルとはログの書き込み先と方法を定義した設定の単位で、ファイル、Slack、syslog などさまざまな出力先を組み合わせられます。
+
+内部では [Monolog](https://github.com/Seldaek/monolog) ライブラリを使用しており、豊富なハンドラーとフォーマッターを活用できます。
+
+<Info>
+  デフォルトでは `stack` チャンネルが使われます。`stack` は複数のチャンネルをまとめて扱う親チャンネルです。
+</Info>
+
+## 設定
+
+ロギングの設定は `config/logging.php` に集中しています。環境変数 `LOG_CHANNEL` でデフォルトチャンネルを切り替えます。
+
+```php
+// config/logging.php
+'default' => env('LOG_CHANNEL', 'stack'),
+```
+
+### 利用可能なチャンネルドライバ
+
+| ドライバ      | 説明                                                     |
+| ------------- | -------------------------------------------------------- |
+| `single`      | 1つのファイルにすべてのログを書き込む                    |
+| `daily`       | 日付ごとにファイルを分けて書き込む（ローテーション付き） |
+| `slack`       | Slack の Incoming Webhook にメッセージを送る             |
+| `stack`       | 複数チャンネルをまとめる親チャンネル                     |
+| `syslog`      | システムのsyslogに書き込む                               |
+| `errorlog`    | PHPのエラーログに書き込む                                |
+| `monolog`     | Monologのハンドラーを直接指定する                        |
+| `custom`      | ファクトリクラスでチャンネルを完全カスタマイズする       |
+
+### ログレベル
+
+Laravelは [RFC 5424](https://tools.ietf.org/html/rfc5424) で定義された8段階のログレベルをサポートしています。
+深刻度の高い順に並んでいます。
+
+| レベル        | 用途の例                                                     |
+| ------------- | ------------------------------------------------------------ |
+| `emergency`   | システム全体が使用不能。即時対応が必要                       |
+| `alert`       | 即座に人間が対応しなければならない状態（DB接続断絶など）     |
+| `critical`    | アプリの主要機能が停止している重大な障害                     |
+| `error`       | 実行時エラー。対応が必要だが即時ではない場合も多い           |
+| `warning`     | 潜在的な問題。非推奨APIの使用、予期しないデータなど          |
+| `notice`      | 正常動作だが注目すべき情報                                   |
+| `info`        | ユーザーログインや注文確定など、通常の操作ログ               |
+| `debug`       | 開発中の詳細なデバッグ情報                                   |
+
+チャンネルの `level` 設定は**最低ログレベル**を意味します。
+たとえば `level` が `error` なら、`error` 以上（`critical`、`alert`、`emergency`）のみが書き込まれます。
+
+## 基本的な使い方
+
+### Log ファサード
+
+`Illuminate\Support\Facades\Log` ファサードを使って各レベルのメッセージを書き込みます。
+
+```php
+use Illuminate\Support\Facades\Log;
+
+Log::emergency('システムが停止しています。');
+Log::alert('データベース接続が切断されました。');
+Log::critical('決済サービスが応答しません。');
+Log::error('ユーザーのデータ更新に失敗しました。');
+Log::warning('非推奨のメソッドが呼ばれました。');
+Log::notice('設定ファイルが再読み込みされました。');
+Log::info('ユーザーがログインしました。');
+Log::debug('クエリの実行時間: 42ms');
+```
+
+コントローラーでの使用例です。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
+
+class UserController extends Controller
+{
+    public function show(string $id): View
+    {
+        Log::info('ユーザープロフィールを表示します。', ['user_id' => $id]);
+
+        return view('user.profile', [
+            'user' => User::findOrFail($id),
+        ]);
+    }
+}
+```
+
+### log() ヘルパー関数
+
+`log()` ヘルパーを使うと `Log` ファサードを import せずに書けます。
+
+```php
+log('ヘルパーからのログです。');
+
+// レベルとコンテキストも指定できます
+log('ユーザーを作成しました。', 'info', ['user_id' => $user->id]);
+```
+
+### コンテキスト情報の追加
+
+メッセージと一緒にコンテキスト（配列）を渡すと、関連する情報をまとめて記録できます。
+
+```php
+Log::info('ログイン失敗。', [
+    'user_id' => $user->id,
+    'ip'      => $request->ip(),
+    'reason'  => 'パスワード不一致',
+]);
+```
+
+#### withContext() — チャンネル全体に共通コンテキストを付与
+
+特定のチャンネルに対して、以降のすべてのログエントリに共通の情報を付与したい場合は `withContext()` を使います。
+リクエストIDのようにすべてのログに含めたい情報に向いています。
+
+```php
+Log::withContext(['request-id' => (string) Str::uuid()]);
+
+// 以降のすべてのログに request-id が自動的に含まれる
+Log::info('処理を開始します。');
+Log::error('エラーが発生しました。');
+```
+
+#### shareContext() — すべてのチャンネルに共通コンテキストを付与
+
+`withContext()` は対象チャンネルのみに効果が限られますが、`shareContext()` はすべてのチャンネルに共通のコンテキストを付与します。
+
+```php
+Log::shareContext(['app-version' => config('app.version')]);
+```
+
+## チャンネルの設定
+
+### stack チャンネル — 複数チャンネルへの同時書き込み
+
+`stack` チャンネルを使うと、1回のログ呼び出しで複数のチャンネルに書き込めます。
+
+```php
+// config/logging.php
+'channels' => [
+    'stack' => [
+        'driver'   => 'stack',
+        'channels' => ['daily', 'slack'],
+    ],
+
+    'daily' => [
+        'driver' => 'daily',
+        'path'   => storage_path('logs/laravel.log'),
+        'level'  => env('LOG_LEVEL', 'debug'),
+        'days'   => 14,
+    ],
+
+    'slack' => [
+        'driver'   => 'slack',
+        'url'      => env('LOG_SLACK_WEBHOOK_URL'),
+        'username' => env('LOG_SLACK_USERNAME', 'Laravel Log'),
+        'emoji'    => env('LOG_SLACK_EMOJI', ':boom:'),
+        'level'    => 'critical',
+    ],
+],
+```
+
+この設定では `debug` 以上のすべてのログが `daily`（ファイル）に書き込まれ、`critical` 以上のみ `slack` にも送信されます。
+
+<Tip>
+  本番環境では `slack` チャンネルのレベルを `error` か `critical` に設定するのがおすすめです。
+  軽微なログまで Slack に流すと通知が大量になり、重要なアラートが埋もれてしまいます。
+</Tip>
+
+### daily チャンネル — ログローテーション
+
+`daily` チャンネルは日付ごとにファイルを分けて、古いファイルを自動削除します。
+
+```php
+'daily' => [
+    'driver' => 'daily',
+    'path'   => storage_path('logs/laravel.log'),
+    'level'  => env('LOG_LEVEL', 'debug'),
+    'days'   => env('LOG_DAILY_DAYS', 14), // 14日分保持
+],
+```
+
+<Warning>
+  `days` を小さくすると古いログが早く削除されます。
+  本番環境での障害調査に備えて、十分な保持期間を確保してください。
+</Warning>
+
+### Slack へのエラー通知
+
+Slack の [Incoming Webhook URL](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks) を取得し、`.env` に設定します。
+
+```ini
+LOG_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz
+```
+
+```php
+// config/logging.php
+'slack' => [
+    'driver'   => 'slack',
+    'url'      => env('LOG_SLACK_WEBHOOK_URL'),
+    'username' => 'Laravel Error Bot',
+    'emoji'    => ':fire:',
+    'level'    => 'error',
+],
+```
+
+`stack` チャンネルに `slack` を含め、`LOG_CHANNEL=stack` を設定すればエラー発生時に自動通知されます。
+
+### 特定のチャンネルにログを書き込む
+
+`Log::channel()` で対象チャンネルを明示的に指定できます。
+
+```php
+// slack チャンネルだけに書き込む
+Log::channel('slack')->error('決済サービスが応答しません。');
+
+// 複数チャンネルに同時書き込み
+Log::stack(['daily', 'slack'])->critical('データベースへの接続が失敗しました。');
+```
+
+## オンデマンドチャンネル
+
+`Log::build()` を使うと、設定ファイルに定義せずにその場でカスタムチャンネルを作れます。
+テストや一時的な出力先への書き込みに便利です。
+
+```php
+use Illuminate\Support\Facades\Log;
+
+$channel = Log::build([
+    'driver' => 'single',
+    'path'   => storage_path('logs/import-' . now()->format('Ymd') . '.log'),
+]);
+
+Log::stack([$channel])->info('CSVインポートを開始します。');
+```
+
+## 実践的なユースケース
+
+### ミドルウェアでリクエストIDを付与する
+
+すべてのログに共通のリクエストIDを付与すると、ログから特定リクエストの流れを追いやすくなります。
+
+<Steps>
+  <Step title="ミドルウェアを作成する">
+    ```shell
+    php artisan make:middleware AssignRequestId
+    ```
+  </Step>
+
+  <Step title="handle() メソッドを実装する">
+    ```php
+    <?php
+
+    namespace App\Http\Middleware;
+
+    use Closure;
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\Log;
+    use Illuminate\Support\Str;
+    use Symfony\Component\HttpFoundation\Response;
+
+    class AssignRequestId
+    {
+        public function handle(Request $request, Closure $next): Response
+        {
+            $requestId = (string) Str::uuid();
+
+            Log::withContext(['request-id' => $requestId]);
+
+            $response = $next($request);
+
+            $response->headers->set('X-Request-Id', $requestId);
+
+            return $response;
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="ミドルウェアを登録する">
+    `bootstrap/app.php` でグローバルミドルウェアとして登録します。
+
+    ```php
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->append(\App\Http\Middleware\AssignRequestId::class);
+    })
+    ```
+  </Step>
+</Steps>
+
+この設定後、すべてのログに `request-id` が自動的に付与されます。
+
+```
+[2026-03-01 12:00:00] local.INFO: ユーザーがログインしました。 {"request-id":"550e8400-...","user_id":1}
+[2026-03-01 12:00:00] local.INFO: ダッシュボードを表示します。 {"request-id":"550e8400-..."}
+```
+
+### 非推奨警告のログ記録
+
+PHP や Laravel の非推奨機能を使った際の警告をログに残せます。
+
+```php
+// config/logging.php
+'deprecations' => [
+    'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
+    'trace'   => env('LOG_DEPRECATIONS_TRACE', false),
+],
+```
+
+`.env` でチャンネルを指定します。
+
+```ini
+LOG_DEPRECATIONS_CHANNEL=daily
+```
+
+## Laravel Pail — リアルタイムログ監視
+
+[Laravel Pail](https://github.com/laravel/pail) はターミナルでアプリケーションのログをリアルタイムに確認できる開発ツールです。
+
+<Info>
+  Pail の実行には PHP の [PCNTL](https://www.php.net/manual/ja/book.pcntl.php) 拡張が必要です。
+</Info>
+
+### インストール
+
+```shell
+composer require --dev laravel/pail
+```
+
+### 基本的な使い方
+
+```shell
+# ログを流し見する
+php artisan pail
+
+# 詳細表示（省略なし）
+php artisan pail -v
+
+# スタックトレースも表示
+php artisan pail -vv
+```
+
+### ログのフィルタリング
+
+```shell
+# キーワードで絞り込む
+php artisan pail --filter="QueryException"
+
+# メッセージのみで絞り込む
+php artisan pail --message="ログイン"
+
+# ログレベルで絞り込む
+php artisan pail --level=error
+
+# 特定ユーザーのログのみ表示
+php artisan pail --user=1
+```
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="ログレベルの選び方">
+    | レベル      | 使うタイミング                               |
+    | ----------- | -------------------------------------------- |
+    | `emergency` | システム全体が停止するような致命的な障害      |
+    | `alert`     | 即座に人が介入しなければならない状態          |
+    | `critical`  | 主要機能が動かない重大な障害                  |
+    | `error`     | 予期しない実行時エラー。対応が必要            |
+    | `warning`   | 非推奨の使用や予期しないデータなど注意すべき状態 |
+    | `notice`    | 正常だが記録しておきたい重要な操作            |
+    | `info`      | ユーザー操作やビジネスイベントの記録          |
+    | `debug`     | 開発中の詳細なデバッグ情報（本番では不要）    |
+  </Accordion>
+
+  <Accordion title="チャンネル選択のガイド">
+    - **開発環境**: `single` や `daily` でファイルに書き込む
+    - **本番環境**: `stack` で `daily`（ファイル保存）と `slack`（エラー通知）を組み合わせる
+    - **特定処理のログ**: `Log::build()` でオンデマンドチャンネルを作成して独立したファイルに書き込む
+    - **リアルタイム監視**: `php artisan pail` でターミナルから確認する
+  </Accordion>
+
+  <Accordion title="本番環境での注意点">
+    - `debug` ログには機密情報が含まれる場合があります。本番環境では `LOG_LEVEL=error` 以上を推奨します。
+    - ログファイルは定期的にローテーションしてディスクを圧迫しないようにしてください（`daily` チャンネルの `days` 設定）。
+    - Slack などの外部サービスへの通知はレートリミットに注意してください。重大なエラーのみ通知するようレベルを設定してください。
+  </Accordion>
+</AccordionGroup>
