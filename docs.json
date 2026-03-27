@@ -17,6 +17,10 @@
             "group": "非同期処理",
             "pages": [
               "jp/intermediate/queues"
+            "group": "メールと通知",
+            "pages": [
+              "jp/intermediate/mail",
+              "jp/intermediate/notifications"
             ]
           }
         ]
@@ -75,6 +79,18 @@
             "group": "テストとデプロイ",
             "pages": [
               "jp/tutorial/testing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "中級",
+        "groups": [
+          {
+            "group": "アーキテクチャ",
+            "pages": [
+              "jp/intermediate/service-container",
+              "jp/intermediate/service-providers"
             ]
           }
         ]

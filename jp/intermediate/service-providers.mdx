@@ -1,0 +1,284 @@
+---
+title: "サービスプロバイダ"
+description: "Laravelのサービスプロバイダを使ってアプリケーションのサービスを登録・起動する方法を解説します。"
+---
+
+## サービスプロバイダとは
+
+サービスプロバイダは、Laravelアプリケーション全体のブートストラップの中心となる場所です。あなた自身のアプリケーションも、Laravelのすべてのコアサービスも、サービスプロバイダを通じてブートストラップされます。
+
+「ブートストラップ」とは、サービスコンテナへのバインディング、イベントリスナー、ミドルウェア、ルートの登録など、さまざまなものを**登録**することを意味します。サービスプロバイダはアプリケーションの設定を行う中心的な場所です。
+
+Laravelは内部的に、メーラー、キュー、キャッシュなどのコアサービスをブートストラップするために多くのサービスプロバイダを使用しています。これらのプロバイダの多くは「遅延」プロバイダで、すべてのリクエストでロードされるのではなく、提供するサービスが実際に必要になった時だけロードされます。
+
+ユーザー定義のサービスプロバイダはすべて `bootstrap/providers.php` ファイルで登録します。
+
+<Info>
+  Laravelがリクエストをどのように処理するかについて詳しく知りたい場合は、[リクエストライフサイクル](https://laravel.com/docs/lifecycle)のドキュメントを参照してください。
+</Info>
+
+## サービスプロバイダを書く
+
+すべてのサービスプロバイダは `Illuminate\Support\ServiceProvider` クラスを継承します。ほとんどのサービスプロバイダには `register` メソッドと `boot` メソッドが含まれます。
+
+新しいプロバイダを生成するには、`make:provider` Artisanコマンドを使います。Laravelは自動的に新しいプロバイダを `bootstrap/providers.php` に登録します。
+
+```shell
+php artisan make:provider RiakServiceProvider
+```
+
+### registerメソッド
+
+`register` メソッド内では、[サービスコンテナ](/jp/intermediate/service-container)へのバインディングのみを行ってください。イベントリスナー、ルート、その他の機能を `register` メソッド内で登録しようとしないでください。まだロードされていないサービスプロバイダが提供するサービスを誤って使用してしまう可能性があります。
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Services\Riak\Connection;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\ServiceProvider;
+
+class RiakServiceProvider extends ServiceProvider
+{
+    /**
+     * アプリケーションサービスを登録する
+     */
+    public function register(): void
+    {
+        $this->app->singleton(Connection::class, function (Application $app) {
+            return new Connection(config('riak'));
+        });
+    }
+}
+```
+
+サービスプロバイダのメソッド内では、常に `$this->app` プロパティを通じてサービスコンテナにアクセスできます。
+
+#### bindingsプロパティとsingletonsプロパティ
+
+多くのシンプルなバインディングを登録する場合、各バインディングを手動で登録する代わりに、`bindings` プロパティと `singletons` プロパティを使うことができます。フレームワークがサービスプロバイダをロードすると、これらのプロパティを自動的にチェックしてバインディングを登録します。
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Contracts\DowntimeNotifier;
+use App\Contracts\ServerProvider;
+use App\Services\DigitalOceanServerProvider;
+use App\Services\PingdomDowntimeNotifier;
+use App\Services\ServerToolsProvider;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * 登録するすべてのコンテナバインディング
+     *
+     * @var array
+     */
+    public $bindings = [
+        ServerProvider::class => DigitalOceanServerProvider::class,
+    ];
+
+    /**
+     * 登録するすべてのコンテナシングルトン
+     *
+     * @var array
+     */
+    public $singletons = [
+        DowntimeNotifier::class => PingdomDowntimeNotifier::class,
+        ServerProvider::class => ServerToolsProvider::class,
+    ];
+}
+```
+
+### bootメソッド
+
+サービスプロバイダ内で[ビューコンポーザー](https://laravel.com/docs/views#view-composers)を登録する場合は `boot` メソッドで行います。**このメソッドは他のすべてのサービスプロバイダが登録された後に呼び出されます**。つまり、フレームワークが登録した他のすべてのサービスにアクセスできます。
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
+
+class ComposerServiceProvider extends ServiceProvider
+{
+    /**
+     * アプリケーションサービスを起動する
+     */
+    public function boot(): void
+    {
+        View::composer('view', function () {
+            // ...
+        });
+    }
+}
+```
+
+<Warning>
+  `register` メソッドと `boot` メソッドの役割を混同しないでください。`register` はバインディングの登録のみ、`boot` はサービスの初期化やその他のセットアップに使います。
+</Warning>
+
+#### bootメソッドの依存性注入
+
+`boot` メソッドでも型ヒントを使って依存を注入できます。[サービスコンテナ](/jp/intermediate/service-container)が必要な依存を自動的に注入します。
+
+```php
+use Illuminate\Contracts\Routing\ResponseFactory;
+
+/**
+ * アプリケーションサービスを起動する
+ */
+public function boot(ResponseFactory $response): void
+{
+    $response->macro('serialized', function (mixed $value) {
+        // ...
+    });
+}
+```
+
+## サービスプロバイダの登録方法
+
+すべてのサービスプロバイダは `bootstrap/providers.php` ファイルで登録します。このファイルはアプリケーションのサービスプロバイダのクラス名の配列を返します。
+
+```php
+<?php
+
+return [
+    App\Providers\AppServiceProvider::class,
+];
+```
+
+<Info>
+  Laravel 13では、`config/app.php` の `providers` 配列ではなく、`bootstrap/providers.php` でサービスプロバイダを登録します。`make:provider` コマンドを使うと自動的に追加されます。
+</Info>
+
+`make:provider` Artisanコマンドを実行すると、Laravelは自動的にファイルへプロバイダを追加します。手動でプロバイダクラスを作成した場合は、手動でクラスを配列に追加してください。
+
+```php
+<?php
+
+return [
+    App\Providers\AppServiceProvider::class,
+    App\Providers\ComposerServiceProvider::class,
+];
+```
+
+## カスタムサービスプロバイダの作成
+
+実際にカスタムサービスプロバイダを作成してみましょう。
+
+<Steps>
+  <Step title="プロバイダを生成する">
+    Artisanコマンドでサービスプロバイダを生成します。
+
+    ```shell
+    php artisan make:provider PaymentServiceProvider
+    ```
+  </Step>
+  <Step title="registerメソッドでバインドする">
+    生成されたプロバイダの `register` メソッドにバインディングを記述します。
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Contracts\PaymentGateway;
+    use App\Services\StripePaymentGateway;
+    use Illuminate\Contracts\Foundation\Application;
+    use Illuminate\Support\ServiceProvider;
+
+    class PaymentServiceProvider extends ServiceProvider
+    {
+        /**
+         * アプリケーションサービスを登録する
+         */
+        public function register(): void
+        {
+            $this->app->singleton(PaymentGateway::class, function (Application $app) {
+                return new StripePaymentGateway(
+                    config('services.stripe.secret')
+                );
+            });
+        }
+
+        /**
+         * アプリケーションサービスを起動する
+         */
+        public function boot(): void
+        {
+            // 起動時の処理があればここに書く
+        }
+    }
+    ```
+  </Step>
+  <Step title="bootstrap/providers.phpに登録する">
+    `make:provider` を使った場合は自動登録されます。手動の場合は追加してください。
+
+    ```php
+    <?php
+
+    return [
+        App\Providers\AppServiceProvider::class,
+        App\Providers\PaymentServiceProvider::class,
+    ];
+    ```
+  </Step>
+</Steps>
+
+## 遅延プロバイダ（Deferred Providers）
+
+プロバイダがサービスコンテナへのバインディングのみを登録している場合、登録されたバインディングが実際に必要になるまでその登録を遅延させることができます。このような遅延プロバイダのロードを遅らせることで、すべてのリクエストでファイルシステムからロードされなくなり、アプリケーションのパフォーマンスが向上します。
+
+遅延プロバイダを作成するには、`\Illuminate\Contracts\Support\DeferrableProvider` インターフェースを実装し、`provides` メソッドを定義します。`provides` メソッドはプロバイダが登録するサービスコンテナのバインディングを返します。
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Services\Riak\Connection;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Support\DeferrableProvider;
+use Illuminate\Support\ServiceProvider;
+
+class RiakServiceProvider extends ServiceProvider implements DeferrableProvider
+{
+    /**
+     * アプリケーションサービスを登録する
+     */
+    public function register(): void
+    {
+        $this->app->singleton(Connection::class, function (Application $app) {
+                return new Connection(config('riak'));
+            });
+    }
+
+    /**
+     * プロバイダが提供するサービスを取得する
+     *
+     * @return array<int, string>
+     */
+    public function provides(): array
+    {
+        return [Connection::class];
+    }
+}
+```
+
+<Tip>
+  遅延プロバイダは、アプリケーション全体ではなく特定の機能でのみ使うサービスに適しています。不必要なサービスのロードを避けることでパフォーマンスを最適化できます。
+</Tip>
+
+## 次のステップ
+
+<Card title="サービスコンテナ" icon="box" href="/jp/intermediate/service-container">
+  サービスコンテナの仕組みとバインディングの詳細を確認します。
+</Card>

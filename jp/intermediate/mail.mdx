@@ -1,0 +1,331 @@
+---
+title: "メール送信"
+description: "LaravelのMailableクラスを使ったメール送信の基本から、Markdownメール・キュー送信まで解説します。"
+---
+
+## Laravelのメール機能とは
+
+Laravelのメール機能は [Symfony Mailer](https://symfony.com/doc/current/mailer.html) をベースに構築されており、SMTP・Mailgun・Postmark・Resend・Amazon SES・sendmailなどのドライバーに対応しています。
+
+<Info>
+  以前のLaravelで使われていたSwiftMailerは廃止されています。Laravel 9以降はSymfony Mailerを使います。
+</Info>
+
+メール設定は `config/mail.php` で管理します。`.env` ファイルで使用するドライバーを切り替えることができます。
+
+```ini
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=your-username
+MAIL_PASSWORD=your-password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+## Mailableクラスの作成
+
+Laravelでは、アプリケーションが送信する各メールを「Mailable」クラスとして表現します。`make:mail` Artisanコマンドでクラスを生成します。
+
+```shell
+php artisan make:mail OrderShipped
+```
+
+生成されたクラスは `app/Mail/` ディレクトリに配置されます。
+
+## Mailableの設定
+
+生成されたMailableクラスには `envelope()`、`content()`、`attachments()` の3つのメソッドがあります。
+
+```php
+<?php
+
+namespace App\Mail;
+
+use App\Models\Order;
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\SerializesModels;
+
+class OrderShipped extends Mailable
+{
+    use Queueable, SerializesModels;
+
+    public function __construct(
+        public Order $order,
+    ) {}
+
+    public function envelope(): Envelope
+    {
+        return new Envelope(
+            subject: '注文が発送されました',
+        );
+    }
+
+    public function content(): Content
+    {
+        return new Content(
+            view: 'mail.orders.shipped',
+        );
+    }
+
+    public function attachments(): array
+    {
+        return [];
+    }
+}
+```
+
+### 送信者の設定
+
+`envelope()` メソッドで送信者を指定できます。
+
+```php
+use Illuminate\Mail\Mailables\Address;
+use Illuminate\Mail\Mailables\Envelope;
+
+public function envelope(): Envelope
+{
+    return new Envelope(
+        from: new Address('shop@example.com', 'Shop Support'),
+        subject: '注文が発送されました',
+    );
+}
+```
+
+`config/mail.php` にグローバルな送信者アドレスを設定しておくと、個別のMailableでの指定を省略できます。
+
+```php
+'from' => [
+    'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
+    'name' => env('MAIL_FROM_NAME', 'Example'),
+],
+```
+
+### メール本文の設定
+
+`content()` メソッドでBladeテンプレートを指定します。コンストラクターで `public` プロパティに設定したデータは、自動的にテンプレートで利用できます。
+
+```php
+public function content(): Content
+{
+    return new Content(
+        view: 'mail.orders.shipped',
+    );
+}
+```
+
+対応するBladeテンプレート (`resources/views/mail/orders/shipped.blade.php`) を作成します。
+
+```blade
+<!DOCTYPE html>
+<html>
+<body>
+    <h1>ご注文が発送されました</h1>
+    <p>注文番号: {{ $order->id }}</p>
+    <p>合計金額: ¥{{ number_format($order->total) }}</p>
+    <p>ご注文いただきありがとうございました。</p>
+</body>
+</html>
+```
+
+データを `with` パラメーターで明示的に渡すこともできます。この場合はプロパティを `protected` または `private` にします。
+
+```php
+public function __construct(
+    protected Order $order,
+) {}
+
+public function content(): Content
+{
+    return new Content(
+        view: 'mail.orders.shipped',
+        with: [
+            'orderId' => $this->order->id,
+            'total' => $this->order->total,
+        ],
+    );
+}
+```
+
+## メールの送信
+
+`Mail` ファサードの `to()` メソッドで宛先を指定し、`send()` でメールを送信します。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Mail\OrderShipped;
+use App\Models\Order;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+
+class OrderShipmentController extends Controller
+{
+    public function store(Request $request): RedirectResponse
+    {
+        $order = Order::findOrFail($request->order_id);
+
+        Mail::to($request->user())->send(new OrderShipped($order));
+
+        return redirect('/orders');
+    }
+}
+```
+
+CC・BCCも指定できます。
+
+```php
+Mail::to($request->user())
+    ->cc($ccUsers)
+    ->bcc($bccUsers)
+    ->send(new OrderShipped($order));
+```
+
+特定のメーラーを使って送信するには `mailer()` メソッドを使います。
+
+```php
+Mail::mailer('postmark')
+    ->to($request->user())
+    ->send(new OrderShipped($order));
+```
+
+## キューを使ったメール送信
+
+メール送信はレスポンスタイムに影響するため、キューを使ってバックグラウンドで送信することを推奨します。
+
+```php
+Mail::to($request->user())->queue(new OrderShipped($order));
+```
+
+<Warning>
+  キューを使うには、事前にキューの設定とワーカーの起動が必要です。
+</Warning>
+
+遅延送信も可能です。
+
+```php
+Mail::to($request->user())
+    ->later(now()->plus(minutes: 10), new OrderShipped($order));
+```
+
+Mailableクラスに `ShouldQueue` を実装すると、`send()` を呼び出しても常にキューに入るようになります。
+
+```php
+use Illuminate\Contracts\Queue\ShouldQueue;
+
+class OrderShipped extends Mailable implements ShouldQueue
+{
+    // ...
+}
+```
+
+## Markdown Mailの作成
+
+Markdown形式のメールを使うと、Laravelが提供する美しいレスポンシブなHTMLテンプレートを活用できます。
+
+### Markdown Mailableの生成
+
+`--markdown` オプションを付けてMailableを生成します。
+
+```shell
+php artisan make:mail OrderShipped --markdown=mail.orders.shipped
+```
+
+`content()` メソッドで `markdown` パラメーターを使います。
+
+```php
+use Illuminate\Mail\Mailables\Content;
+
+public function content(): Content
+{
+    return new Content(
+        markdown: 'mail.orders.shipped',
+        with: [
+            'url' => route('orders.show', $this->order),
+        ],
+    );
+}
+```
+
+### Markdownテンプレートの記述
+
+Laravelが提供するBladeコンポーネントを使ってメール本文を作成します。
+
+```blade
+<x-mail::message>
+# ご注文が発送されました
+
+ご注文が発送されましたのでお知らせします。
+
+<x-mail::button :url="$url">
+注文を確認する
+</x-mail::button>
+
+ご利用ありがとうございます。<br>
+{{ config('app.name') }}
+</x-mail::message>
+```
+
+利用可能なコンポーネントは次のとおりです。
+
+| コンポーネント | 説明 |
+| --- | --- |
+| `<x-mail::button>` | ボタンリンク (`color` に `primary`・`success`・`error` を指定可能) |
+| `<x-mail::panel>` | 目立つパネルエリア |
+| `<x-mail::table>` | Markdown形式のテーブル |
+
+<Tip>
+  Markdownメールは、同時にプレーンテキスト版も自動生成されます。HTMLメールに対応していないメールクライアントでも読めます。
+</Tip>
+
+## メールのプレビュー
+
+ルートでMailableインスタンスを返すと、ブラウザでメールをプレビューできます。開発中の確認に便利です。
+
+```php
+// routes/web.php
+Route::get('/mailable', function () {
+    $order = App\Models\Order::first();
+    return new App\Mail\OrderShipped($order);
+});
+```
+
+## ローカル開発でのメール
+
+本番環境でメールを誤送信しないよう、ローカル開発では [Mailpit](https://github.com/axllent/mailpit) などのツールを使うと便利です。
+
+```ini
+# .env (Mailpit)
+MAIL_MAILER=smtp
+MAIL_HOST=127.0.0.1
+MAIL_PORT=1025
+```
+
+`Laragon` や `Laravel Herd` では Mailpit がデフォルトで含まれています。
+
+<Info>
+  `log` ドライバーを使うとメールの内容がログファイルに記録されます。メール送信の確認だけであれば最も手軽な方法です。
+</Info>
+
+```ini
+MAIL_MAILER=log
+```
+
+## まとめ
+
+| やりたいこと | 方法 |
+| --- | --- |
+| Mailableを作成する | `php artisan make:mail ClassName` |
+| 送信者を設定する | `envelope()` の `from` パラメーター |
+| Bladeテンプレートを使う | `content()` の `view` パラメーター |
+| Markdownテンプレートを使う | `content()` の `markdown` パラメーター |
+| メールを送信する | `Mail::to()->send()` |
+| キューで送信する | `Mail::to()->queue()` |
+| 遅延送信する | `Mail::to()->later()` |
