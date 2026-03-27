@@ -9,185 +9,213 @@
   },
   "favicon": "/favicon.svg",
   "navigation": {
-    "tabs": [
+    "languages": [
       {
-        "tab": "入門チュートリアル",
-        "groups": [
+        "language": "jp",
+        "tabs": [
           {
-            "group": "はじめに",
-            "pages": [
-              "jp/tutorial/introduction",
-              "jp/tutorial/installation",
-              "jp/tutorial/directory-structure"
+            "tab": "入門チュートリアル",
+            "groups": [
+              {
+                "group": "はじめに",
+                "pages": [
+                  "jp/tutorial/introduction",
+                  "jp/tutorial/installation",
+                  "jp/tutorial/directory-structure"
+                ]
+              },
+              {
+                "group": "基本",
+                "pages": [
+                  "jp/tutorial/routing",
+                  "jp/tutorial/views",
+                  "jp/tutorial/blade"
+                ]
+              },
+              {
+                "group": "コントローラー",
+                "pages": [
+                  "jp/tutorial/controllers"
+                ]
+              },
+              {
+                "group": "リクエスト処理",
+                "pages": [
+                  "jp/tutorial/middleware",
+                  "jp/tutorial/requests",
+                  "jp/tutorial/validation",
+                  "jp/tutorial/responses",
+                  "jp/tutorial/session"
+                ]
+              },
+              {
+                "group": "データベース",
+                "pages": [
+                  "jp/tutorial/migrations",
+                  "jp/tutorial/eloquent",
+                  "jp/tutorial/eloquent-relationships"
+                ]
+              },
+              {
+                "group": "認証",
+                "pages": [
+                  "jp/tutorial/authentication",
+                  "jp/tutorial/starter-kits"
+                ]
+              },
+              {
+                "group": "テストとデプロイ",
+                "pages": [
+                  "jp/tutorial/testing"
+                ]
+              }
             ]
           },
           {
-            "group": "基本",
-            "pages": [
-              "jp/tutorial/routing",
-              "jp/tutorial/views",
-              "jp/tutorial/blade"
+            "tab": "中級",
+            "groups": [
+              {
+                "group": "アーキテクチャ",
+                "pages": [
+                  "jp/intermediate/service-container",
+                  "jp/intermediate/service-providers",
+                  "jp/intermediate/facades",
+                  "jp/intermediate/contracts"
+                ]
+              },
+              {
+                "group": "セキュリティ",
+                "pages": [
+                  "jp/intermediate/authorization"
+                ]
+              },
+              {
+                "group": "メールと通知",
+                "pages": [
+                  "jp/intermediate/mail",
+                  "jp/intermediate/notifications"
+                ]
+              },
+              {
+                "group": "非同期処理",
+                "pages": [
+                  "jp/intermediate/queues",
+                  "jp/intermediate/concurrency"
+                ]
+              },
+              {
+                "group": "スケジューリング",
+                "pages": [
+                  "jp/intermediate/scheduling"
+                ]
+              },
+              {
+                "group": "イベント",
+                "pages": [
+                  "jp/intermediate/events"
+                ]
+              },
+              {
+                "group": "キャッシュと最適化",
+                "pages": [
+                  "jp/intermediate/cache"
+                ]
+              },
+              {
+                "group": "コレクション",
+                "pages": [
+                  "jp/intermediate/collections"
+                ]
+              },
+              {
+                "group": "国際化",
+                "pages": [
+                  "jp/intermediate/localization"
+                ]
+              },
+              {
+                "group": "外部通信",
+                "pages": [
+                  "jp/intermediate/http-client"
+                ]
+              },
+              {
+                "group": "ファイルとストレージ",
+                "pages": [
+                  "jp/intermediate/filesystem"
+                ]
+              },
+              {
+                "group": "デバッグと監視",
+                "pages": [
+                  "jp/intermediate/error-handling",
+                  "jp/intermediate/logging"
+                ]
+              },
+              {
+                "group": "コンソールとCLI",
+                "pages": [
+                  "jp/intermediate/artisan"
+                ]
+              },
+              {
+                "group": "フロントエンド",
+                "pages": [
+                  "jp/intermediate/vite"
+                ]
+              },
+              {
+                "group": "リアルタイム通信",
+                "pages": [
+                  "jp/intermediate/broadcasting"
+                ]
+              }
             ]
           },
           {
-            "group": "コントローラー",
-            "pages": [
-              "jp/tutorial/controllers"
+            "tab": "上級",
+            "groups": [
+              {
+                "group": "デザインパターン",
+                "pages": [
+                  "jp/advanced/pipeline",
+                  "jp/advanced/macroable"
+                ]
+              }
             ]
           },
           {
-            "group": "リクエスト処理",
-            "pages": [
-              "jp/tutorial/middleware",
-              "jp/tutorial/requests",
-              "jp/tutorial/validation",
-              "jp/tutorial/responses",
-              "jp/tutorial/session"
-            ]
-          },
-          {
-            "group": "データベース",
-            "pages": [
-              "jp/tutorial/migrations",
-              "jp/tutorial/eloquent",
-              "jp/tutorial/eloquent-relationships"
-            ]
-          },
-          {
-            "group": "認証",
-            "pages": [
-              "jp/tutorial/authentication",
-              "jp/tutorial/starter-kits"
-            ]
-          },
-          {
-            "group": "テストとデプロイ",
-            "pages": [
-              "jp/tutorial/testing"
+            "tab": "ブログ",
+            "groups": [
+              {
+                "group": "アップグレードガイド",
+                "pages": [
+                  "jp/blog/upgrade-12-to-13"
+                ]
+              }
             ]
           }
         ]
       },
       {
-        "tab": "上級",
-        "groups": [
+        "language": "en",
+        "tabs": [
           {
-            "group": "デザインパターン",
-            "pages": [
-              "jp/advanced/pipeline",
-              "jp/advanced/macroable"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "中級",
-        "groups": [
-          {
-            "group": "アーキテクチャ",
-            "pages": [
-              "jp/intermediate/service-container",
-              "jp/intermediate/service-providers",
-              "jp/intermediate/facades",
-              "jp/intermediate/contracts"
-            ]
-          },
-          {
-            "group": "セキュリティ",
-            "pages": [
-              "jp/intermediate/authorization"
-            ]
-          },
-          {
-            "group": "メールと通知",
-            "pages": [
-              "jp/intermediate/mail",
-              "jp/intermediate/notifications"
-            ]
-          },
-          {
-            "group": "非同期処理",
-            "pages": [
-              "jp/intermediate/queues",
-              "jp/intermediate/concurrency"
-            ]
-          },
-          {
-            "group": "スケジューリング",
-            "pages": [
-              "jp/intermediate/scheduling"
-              ]
-          },
-          {
-            "group": "イベント",
-            "pages": [
-              "jp/intermediate/events"
-            ]
-          },
-          {
-            "group": "キャッシュと最適化",
-            "pages": [
-              "jp/intermediate/cache"
-            ]
-          },
-          {
-            "group": "コレクション",
-            "pages": [
-              "jp/intermediate/collections"
-            ]
-          },
-          {
-            "group": "国際化",
-            "pages": [
-              "jp/intermediate/localization"
-            ]
-          },
-          {
-            "group": "外部通信",
-            "pages": [
-              "jp/intermediate/http-client"
-            ]
-          },
-          {
-            "group": "ファイルとストレージ",
-            "pages": [
-              "jp/intermediate/filesystem"
-            ]
-          },
-          {
-            "group": "デバッグと監視",
-            "pages": [
-              "jp/intermediate/error-handling",
-              "jp/intermediate/logging"
-            ]
-          },
-          {
-            "group": "コンソールとCLI",
-            "pages": [
-              "jp/intermediate/artisan"
-            ]
-          },
-          {
-            "group": "フロントエンド",
-            "pages": [
-              "jp/intermediate/vite"
-            ]
-          },
-          {
-            "group": "リアルタイム通信",
-            "pages": [
-              "jp/intermediate/broadcasting"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "ブログ",
-        "groups": [
-          {
-            "group": "アップグレードガイド",
-            "pages": [
-              "jp/blog/upgrade-12-to-13"
+            "tab": "Tutorial",
+            "groups": [
+              {
+                "group": "Getting Started",
+                "pages": [
+                  "en/tutorial/installation"
+                ]
+              },
+              {
+                "group": "Basics",
+                "pages": [
+                  "en/tutorial/routing",
+                  "en/tutorial/blade"
+                ]
+              }
             ]
           }
         ]
