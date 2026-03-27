@@ -90,6 +90,12 @@
             "pages": [
               "jp/intermediate/queues"
             ]
+          },
+          {
+            "group": "イベント",
+            "pages": [
+              "jp/intermediate/events"
+            ]
           }
         ]
       }
