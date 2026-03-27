@@ -1,0 +1,638 @@
+---
+title: "エラーハンドリング"
+description: "Laravelの例外処理の仕組みを学びます。例外のレポート・レンダリング・カスタムエラーページ・HTTPエラーレスポンスの生成まで包括的に解説します。"
+---
+
+## 概要
+
+Laravel プロジェクトを作成すると、エラーと例外の処理はあらかじめ設定された状態で用意されています。
+カスタマイズは `bootstrap/app.php` の `withExceptions` メソッドで行います。
+
+```php
+// bootstrap/app.php
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withExceptions(function (Exceptions $exceptions): void {
+        // 例外の報告・レンダリングをここで設定する
+    })->create();
+```
+
+`withExceptions` クロージャに渡される `$exceptions` オブジェクトは `Illuminate\Foundation\Configuration\Exceptions` のインスタンスで、アプリケーション全体の例外ハンドリングを管理します。
+
+### デバッグ設定
+
+`config/app.php` の `debug` オプションがエラー情報の表示量を制御します。
+デフォルトでは `.env` の `APP_DEBUG` 環境変数の値が使われます。
+
+```ini
+# ローカル開発
+APP_DEBUG=true
+
+# 本番環境
+APP_DEBUG=false
+```
+
+<Warning>
+  本番環境では `APP_DEBUG` を必ず `false` にしてください。`true` のままにすると、機密情報がエンドユーザーに露出するリスクがあります。
+</Warning>
+
+## 例外のレポート
+
+例外のレポートとは、例外をログに記録したり [Sentry](https://github.com/getsentry/sentry-laravel) や [Flare](https://flareapp.io) などの外部サービスに送信したりする処理です。
+デフォルトでは `config/logging.php` の設定に基づいてログに記録されます。
+
+### カスタムレポートコールバック
+
+例外の種類によって異なるレポート処理をしたい場合は `report` メソッドにクロージャを渡します。
+Laravelはクロージャの型ヒントから例外の種類を判断します。
+
+```php
+use App\Exceptions\InvalidOrderException;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->report(function (InvalidOrderException $e) {
+        // 外部サービスへの通知など
+    });
+})
+```
+
+カスタムコールバックを登録してもデフォルトのログ記録は継続されます。
+デフォルトへの伝播を止めたい場合は `stop()` を呼ぶか、`false` を返します。
+
+```php
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->report(function (InvalidOrderException $e) {
+        // ...
+    })->stop();
+})
+```
+
+### `report()` ヘルパー
+
+エラーページを表示せずに例外だけを報告したい場合は `report()` ヘルパーを使います。
+
+```php
+public function isValid(string $value): bool
+{
+    try {
+        // バリデーション処理...
+    } catch (Throwable $e) {
+        report($e);
+
+        return false;
+    }
+}
+```
+
+<Tip>
+  `report()` ヘルパーはユーザーへのレスポンスを中断せずにエラーを記録できます。バックグラウンドジョブや非重要な処理の例外処理に便利です。
+</Tip>
+
+### 重複レポートの防止
+
+同じ例外インスタンスが複数回 `report()` に渡されると、ログに重複エントリが作成されることがあります。
+`dontReportDuplicates()` を設定すると、同じインスタンスは最初の1回だけ記録されます。
+
+```php
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->dontReportDuplicates();
+})
+```
+
+```php
+$original = new RuntimeException('Whoops!');
+
+report($original); // 記録される
+
+try {
+    throw $original;
+} catch (Throwable $caught) {
+    report($caught); // 無視される（同じインスタンス）
+}
+```
+
+### グローバルログコンテキスト
+
+すべての例外ログに共通の情報を付与したい場合は `context` メソッドを使います。
+利用可能であれば現在のユーザーIDは自動的に付与されます。
+
+```php
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->context(fn () => [
+        'app_version' => config('app.version'),
+    ]);
+})
+```
+
+### 例外クラスへの `context()` メソッド追加
+
+例外クラス自身に `context()` メソッドを定義すると、その例外に固有のコンテキスト情報をログに含められます。
+
+```php
+<?php
+
+namespace App\Exceptions;
+
+use Exception;
+
+class InvalidOrderException extends Exception
+{
+    public function __construct(
+        private readonly int $orderId,
+        string $message = '',
+    ) {
+        parent::__construct($message);
+    }
+
+    /**
+     * 例外のコンテキスト情報を返す
+     *
+     * @return array<string, mixed>
+     */
+    public function context(): array
+    {
+        return ['order_id' => $this->orderId];
+    }
+}
+```
+
+### ログレベルの変更
+
+特定の例外を特定のログレベルで記録したい場合は `level` メソッドを使います。
+
+```php
+use PDOException;
+use Psr\Log\LogLevel;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->level(PDOException::class, LogLevel::CRITICAL);
+})
+```
+
+### 例外レポートのスロットリング
+
+大量の例外が発生する場合、`throttle` メソッドでレポート数を制御できます。
+
+```php
+use Illuminate\Support\Lottery;
+use Throwable;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    // 1000回に1回だけランダムにレポート
+    $exceptions->throttle(function (Throwable $e) {
+        return Lottery::odds(1, 1000);
+    });
+})
+```
+
+1分あたりの件数で制限したい場合は `Limit` を使います。
+
+```php
+use Illuminate\Broadcasting\BroadcastException;
+use Illuminate\Cache\RateLimiting\Limit;
+use Throwable;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->throttle(function (Throwable $e) {
+        if ($e instanceof BroadcastException) {
+            return Limit::perMinute(300);
+        }
+    });
+})
+```
+
+## 例外のレンダリング
+
+レンダリングとは、例外を HTTP レスポンスに変換する処理です。
+デフォルトでは Laravel が自動的に適切なレスポンスを生成しますが、カスタマイズも可能です。
+
+### カスタムレンダリングコールバック
+
+`render` メソッドにクロージャを渡して例外をレスポンスに変換します。
+
+```php
+use App\Exceptions\InvalidOrderException;
+use Illuminate\Http\Request;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->render(function (InvalidOrderException $e, Request $request) {
+        return response()->view('errors.invalid-order', status: 500);
+    });
+})
+```
+
+組み込みの例外（`NotFoundHttpException` など）のレンダリングも上書きできます。
+クロージャが値を返さない場合は、デフォルトのレンダリングが使われます。
+
+```php
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+        if ($request->is('api/*')) {
+            return response()->json([
+                'message' => 'Record not found.',
+            ], 404);
+        }
+        // null を返すとデフォルトの404ページが表示される
+    });
+})
+```
+
+### JSON / HTML の自動判定
+
+Laravel はリクエストの `Accept` ヘッダーに基づいて HTML と JSON のどちらで返すかを自動判定します。
+この判定ロジックをカスタマイズしたい場合は `shouldRenderJsonWhen` を使います。
+
+```php
+use Illuminate\Http\Request;
+use Throwable;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {
+        if ($request->is('admin/*')) {
+            return true; // 管理画面は常にJSONで返す
+        }
+
+        return $request->expectsJson();
+    });
+})
+```
+
+### レスポンス全体のカスタマイズ
+
+`respond` メソッドを使うと、生成されたレスポンスをさらに加工できます。
+
+```php
+use Symfony\Component\HttpFoundation\Response;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->respond(function (Response $response) {
+        if ($response->getStatusCode() === 419) {
+            return back()->with([
+                'message' => 'ページの有効期限が切れました。もう一度お試しください。',
+            ]);
+        }
+
+        return $response;
+    });
+})
+```
+
+## カスタム例外クラス
+
+`app/Exceptions/` ディレクトリに独自の例外クラスを作成できます。
+`report()` メソッドと `render()` メソッドを定義すると、`bootstrap/app.php` に設定を書かなくても自動的に呼ばれます。
+
+### 例外クラスの作成
+
+<Steps>
+  <Step title="例外クラスを作成する">
+    ```shell
+    php artisan make:exception InvalidOrderException
+    ```
+  </Step>
+
+  <Step title="report() と render() を実装する">
+    ```php
+    <?php
+
+    namespace App\Exceptions;
+
+    use Exception;
+    use Illuminate\Http\Request;
+    use Illuminate\Http\Response;
+
+    class InvalidOrderException extends Exception
+    {
+        public function __construct(
+            private readonly int $orderId,
+            string $message = 'Invalid order.',
+        ) {
+            parent::__construct($message);
+        }
+
+        /**
+         * 例外をレポートする
+         */
+        public function report(): void
+        {
+            // 外部サービスへの通知など
+        }
+
+        /**
+         * 例外を HTTP レスポンスに変換する
+         */
+        public function render(Request $request): Response
+        {
+            return response()->view('errors.invalid-order', [
+                'orderId' => $this->orderId,
+            ], 422);
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  `report()` メソッドには型ヒントで依存性注入が使えます。Laravel のサービスコンテナが自動的に解決します。
+</Info>
+
+### `ShouldntReport` インターフェース
+
+レポート不要な例外には `ShouldntReport` インターフェースを実装します。
+このインターフェースを実装した例外は一切レポートされません。
+
+```php
+<?php
+
+namespace App\Exceptions;
+
+use Exception;
+use Illuminate\Contracts\Debug\ShouldntReport;
+
+class PodcastProcessingException extends Exception implements ShouldntReport
+{
+    //
+}
+```
+
+## 例外のスロー
+
+### `abort()` ヘルパー
+
+アプリケーションのどこからでも HTTP エラーレスポンスを発生させられます。
+
+```php
+// 404 Not Found
+abort(404);
+
+// メッセージ付き
+abort(403, 'この操作を行う権限がありません。');
+```
+
+### `abort_if()` / `abort_unless()`
+
+条件付きで例外をスローするヘルパーです。
+
+```php
+// $condition が true のときに abort する
+abort_if(! $user->isAdmin(), 403);
+
+// $condition が false のときに abort する
+abort_unless($user->hasPermission('edit'), 403, 'Permission denied.');
+```
+
+<Tip>
+  コントローラーやミドルウェアで権限チェックをするときに便利です。ゲートやポリシーと組み合わせて使われることも多いです。
+</Tip>
+
+## 例外のグローバルな制御
+
+### 特定の例外を無視する
+
+報告しない例外を `dontReport` で指定します。レンダリングのカスタムロジックは引き続き機能します。
+
+```php
+use App\Exceptions\InvalidOrderException;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->dontReport([
+        InvalidOrderException::class,
+    ]);
+})
+```
+
+条件付きで無視したい場合は `dontReportWhen` にクロージャを渡します。
+
+```php
+use Throwable;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->dontReportWhen(function (Throwable $e) {
+        return $e instanceof PodcastProcessingException &&
+               $e->reason() === 'Subscription expired';
+    });
+})
+```
+
+<Info>
+  Laravel はデフォルトで、404エラーや CSRF トークン不正 (419)、オリジン不一致 (403) などの一部の例外を自動的に無視しています。
+</Info>
+
+### Laravel が無視している例外を有効にする
+
+デフォルトで無視されている例外をレポート対象に戻すには `stopIgnoring` を使います。
+
+```php
+use Symfony\Component\HttpKernel\Exception\HttpException;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->stopIgnoring(HttpException::class);
+})
+```
+
+## HTTPエラーページ
+
+Laravel では HTTP ステータスコードごとにカスタムエラービューを定義できます。
+
+### カスタムエラービューの作成
+
+`resources/views/errors/` ディレクトリに、ステータスコードをファイル名としたBladeテンプレートを作成します。
+
+```
+resources/
+└── views/
+    └── errors/
+        ├── 404.blade.php
+        ├── 403.blade.php
+        └── 500.blade.php
+```
+
+ビュー内では `$exception` 変数を使ってエラー情報にアクセスできます。
+
+```blade
+{{-- resources/views/errors/404.blade.php --}}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ページが見つかりません</title>
+</head>
+<body>
+    <h1>404 - ページが見つかりません</h1>
+    <p>{{ $exception->getMessage() }}</p>
+    <a href="{{ url('/') }}">トップページへ戻る</a>
+</body>
+</html>
+```
+
+### デフォルトのエラーテンプレートを公開する
+
+Laravel 標準のエラーページをカスタマイズの出発点として使いたい場合は `vendor:publish` で取得します。
+
+```shell
+php artisan vendor:publish --tag=laravel-errors
+```
+
+### フォールバックエラーページ
+
+特定のステータスコードに対応するビューがない場合のフォールバックとして、`4xx.blade.php` と `5xx.blade.php` を作成できます。
+
+```
+resources/
+└── views/
+    └── errors/
+        ├── 4xx.blade.php  # 400番台のフォールバック
+        └── 5xx.blade.php  # 500番台のフォールバック
+```
+
+<Warning>
+  `404`、`500`、`503` については Laravel がデフォルトのエラーページを用意しています。これらをカスタマイズするには、フォールバックではなく個別のファイル（`404.blade.php` など）を作成してください。
+</Warning>
+
+## 実践例: API 例外ハンドラー
+
+API を提供するアプリケーションでは、例外を常に JSON で返す必要があります。
+以下は `bootstrap/app.php` でAPIエラーを一元管理する実装例です。
+
+```php
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    // API リクエストには常にJSONで返す
+    $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+        if ($request->is('api/*')) {
+            return response()->json([
+                'message' => 'リソースが見つかりません。',
+            ], 404);
+        }
+    });
+
+    $exceptions->render(function (AuthenticationException $e, Request $request) {
+        if ($request->is('api/*')) {
+            return response()->json([
+                'message' => '認証が必要です。',
+            ], 401);
+        }
+    });
+
+    $exceptions->render(function (ValidationException $e, Request $request) {
+        if ($request->is('api/*')) {
+            return response()->json([
+                'message' => 'バリデーションエラー。',
+                'errors'  => $e->errors(),
+            ], 422);
+        }
+    });
+})
+```
+
+### カスタム API 例外クラスの実装
+
+API 専用の基底例外クラスを作ると、各エンドポイントで統一したエラーレスポンスを返せます。
+
+```php
+<?php
+
+namespace App\Exceptions;
+
+use Exception;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class ApiException extends Exception
+{
+    public function __construct(
+        string $message = 'An error occurred.',
+        private readonly int $statusCode = 500,
+        private readonly array $errors = [],
+    ) {
+        parent::__construct($message);
+    }
+
+    public function render(Request $request): JsonResponse
+    {
+        $data = ['message' => $this->getMessage()];
+
+        if (! empty($this->errors)) {
+            $data['errors'] = $this->errors;
+        }
+
+        return response()->json($data, $this->statusCode);
+    }
+}
+```
+
+コントローラーでの使用例です。
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Exceptions\ApiException;
+use App\Models\Order;
+
+class OrderController extends Controller
+{
+    public function show(int $id): JsonResponse
+    {
+        $order = Order::find($id);
+
+        if (! $order) {
+            throw new ApiException('注文が見つかりません。', 404);
+        }
+
+        if ($order->isCancelled()) {
+            throw new ApiException('この注文はキャンセル済みです。', 422);
+        }
+
+        return response()->json($order);
+    }
+}
+```
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="例外レポートのまとめ">
+    | 方法 | 用途 |
+    | ---- | ---- |
+    | `$exceptions->report()` | 例外の種類別にカスタムレポートロジックを登録 |
+    | `$exceptions->context()` | すべての例外ログに共通情報を付与 |
+    | `context()` メソッド | 例外クラス自身に固有のコンテキストを持たせる |
+    | `report()` ヘルパー | レスポンスを中断せず例外だけを報告 |
+    | `dontReportDuplicates()` | 同じインスタンスの重複レポートを防止 |
+    | `ShouldntReport` インターフェース | 一切レポートしない例外クラスを作成 |
+  </Accordion>
+
+  <Accordion title="例外レンダリングのまとめ">
+    | 方法 | 用途 |
+    | ---- | ---- |
+    | `$exceptions->render()` | 例外の種類別にカスタムレスポンスを返す |
+    | `render()` メソッド | 例外クラス自身にレンダリングロジックを持たせる |
+    | `shouldRenderJsonWhen()` | JSON/HTML の判定ロジックをカスタマイズ |
+    | `respond()` | 生成されたレスポンスをさらに加工 |
+  </Accordion>
+
+  <Accordion title="HTTP エラーページのまとめ">
+    - `resources/views/errors/404.blade.php` などのファイルを作るだけで自動的に使われる
+    - `$exception` 変数でエラーの詳細にアクセスできる
+    - `php artisan vendor:publish --tag=laravel-errors` でデフォルトテンプレートを取得できる
+    - `4xx.blade.php` / `5xx.blade.php` でフォールバックページを定義できる
+  </Accordion>
+
+  <Accordion title="本番環境でのベストプラクティス">
+    - `APP_DEBUG=false` を必ず設定し、スタックトレースをユーザーに見せない
+    - Sentry や Flare などの外部エラー追跡サービスと連携してエラーを一元管理する
+    - `throttle()` を使って大量の例外が発生した際のログ溢れを防ぐ
+    - API エンドポイントでは一貫したJSONエラーレスポンス形式を維持する
+  </Accordion>
+</AccordionGroup>
