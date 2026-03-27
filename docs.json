@@ -96,7 +96,8 @@
           {
             "group": "非同期処理",
             "pages": [
-              "jp/intermediate/queues"
+              "jp/intermediate/queues",
+              "jp/intermediate/concurrency"
             ]
           },
           {
