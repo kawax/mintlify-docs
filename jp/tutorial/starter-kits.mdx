@@ -1,0 +1,277 @@
+---
+title: "スターターキット"
+description: "Laravelのスターターキットを使って認証・UIを素早くセットアップする方法"
+---
+
+## スターターキットとは
+
+スターターキットは、Laravelアプリケーションの出発点として用意された公式のスキャフォールディングです。
+ログイン・登録・パスワードリセット・メール確認といった認証機能と、それに対応するUIを一括でセットアップできます。
+
+`laravel new` でアプリケーションを作成する際にスターターキットを選ぶだけで、認証まわりのルート・コントローラー・ビュー・フロントエンドコードがすべて自動で生成されます。
+生成されたコードはすべて自分のアプリケーション内に存在するため、自由にカスタマイズできます。
+
+<Warning>
+  Laravel 13では、従来の **Breeze** と **Jetstream** は廃止されました。
+  新しいプロジェクトでは以下で紹介するスターターキットを使用してください。
+  既存のBreezeやJetstreamを使ったプロジェクトはそのまま動作しますが、新規開発には推奨されません。
+</Warning>
+
+## 利用可能なスターターキット
+
+Laravel 13では、以下の4種類のスターターキットが提供されています。
+
+<CardGroup cols={2}>
+  <Card title="React" icon="react">
+    React 19・TypeScript・Tailwind 4・[shadcn/ui](https://ui.shadcn.com) を使ったモダンなSPA。
+    [Inertia.js](https://inertiajs.com) によりサーバーサイドルーティングを維持しながらReactを使用できます。
+  </Card>
+  <Card title="Vue" icon="vuejs">
+    Vue 3 Composition API・TypeScript・Tailwind・[shadcn-vue](https://www.shadcn-vue.com/) を採用。
+    Reactと同じくInertia.jsでサーバーサイドと連携します。
+  </Card>
+  <Card title="Livewire" icon="bolt">
+    PHPだけで動的UIを構築できる [Livewire](https://livewire.laravel.com)。
+    Bladeテンプレート中心のチームや、JavaScriptフレームワークを使わずに済ませたい場合に最適です。[Flux UI](https://fluxui.dev) を採用。
+  </Card>
+  <Card title="Svelte" icon="s">
+    Svelte 5・TypeScript・Tailwind・[shadcn-svelte](https://www.shadcn-svelte.com/) を使ったSPA。
+    Inertia.jsと組み合わせてモダンなフロントエンドを構築できます。
+  </Card>
+</CardGroup>
+
+### どれを選ぶべきか
+
+| スターターキット | 向いているチーム |
+| --- | --- |
+| React | ReactエコシステムやTypeScriptに慣れているチーム |
+| Vue | VueやNuxtの経験があるチーム |
+| Livewire | PHPとBladeを中心に開発したいチーム |
+| Svelte | SvelteやSvelteKitの経験があるチーム |
+
+<Tip>
+  どれを選んでも認証機能はまったく同じです。チームが最も慣れているフロントエンド技術を選んでください。
+</Tip>
+
+## インストール方法
+
+スターターキットはプロジェクト作成時に選択します。`laravel new` コマンドを実行すると、対話形式でスターターキットを選べます。
+
+<Steps>
+  <Step title="Laravelインストーラーをインストールする">
+    まだインストールしていない場合は、ComposerでLaravelインストーラーを取得します。
+
+    ```bash
+    composer global require laravel/installer
+    ```
+  </Step>
+
+  <Step title="新しいアプリケーションを作成する">
+    `laravel new` コマンドを実行します。スターターキットの選択を含む対話的プロンプトが表示されます。
+
+    ```bash
+    laravel new my-app
+    ```
+
+    プロンプトで **React**、**Vue**、**Livewire**、**Svelte** のいずれかを選択します。
+    認証プロバイダーとして標準の Laravel 認証か WorkOS AuthKit かも選択できます。
+  </Step>
+
+  <Step title="フロントエンドの依存関係をインストールする">
+    ```bash
+    cd my-app
+    npm install && npm run build
+    ```
+  </Step>
+
+  <Step title="データベースを準備する">
+    `.env` ファイルのデータベース設定を確認してからマイグレーションを実行します。
+
+    ```bash
+    php artisan migrate
+    ```
+  </Step>
+
+  <Step title="開発サーバーを起動する">
+    ```bash
+    composer run dev
+    ```
+
+    ブラウザで `http://localhost:8000` にアクセスすると、ナビゲーションに「Register」と「Log in」リンクが表示されます。
+  </Step>
+</Steps>
+
+スターターキットをインストールすると、以下の認証機能がすぐに使えます。
+
+| 機能 | URL |
+| --- | --- |
+| ユーザー登録 | `/register` |
+| ログイン | `/login` |
+| パスワードリセット | `/forgot-password` |
+| メール確認 | `/email/verify` |
+| プロフィール編集 | `/settings/profile` |
+
+## スターターキットのカスタマイズ
+
+生成されたコードはすべて自分のアプリケーション内にあるので、自由に変更できます。
+フロントエンドのコードの大半は `resources/js`(LivewireはBladeなので `resources/views`)ディレクトリにあります。
+
+### レイアウトの切り替え
+
+各スターターキットには「サイドバー」と「ヘッダー」の2種類のレイアウトが用意されています。
+デフォルトはサイドバーレイアウトです。
+
+<Tabs>
+  <Tab title="React">
+    `resources/js/layouts/app-layout.tsx` を編集します。
+
+    ```tsx
+    // サイドバーレイアウト（デフォルト）
+    import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
+
+    // ヘッダーレイアウトに変更する場合
+    import AppLayoutTemplate from '@/layouts/app/app-header-layout';
+    ```
+  </Tab>
+  <Tab title="Vue">
+    `resources/js/layouts/AppLayout.vue` を編集します。
+
+    ```js
+    // サイドバーレイアウト（デフォルト）
+    import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
+
+    // ヘッダーレイアウトに変更する場合
+    import AppLayout from '@/layouts/app/AppHeaderLayout.vue';
+    ```
+  </Tab>
+  <Tab title="Livewire">
+    `resources/views/layouts/app.blade.php` を編集します。
+
+    ```blade
+    {{-- ヘッダーレイアウトに変更する場合 --}}
+    <x-layouts::app.header>
+        <flux:main container>
+            {{ $slot }}
+        </flux:main>
+    </x-layouts::app.header>
+    ```
+  </Tab>
+  <Tab title="Svelte">
+    `resources/js/layouts/AppLayout.svelte` を編集します。
+
+    ```js
+    // サイドバーレイアウト（デフォルト）
+    import AppLayout from '@/layouts/app/AppSidebarLayout.svelte';
+
+    // ヘッダーレイアウトに変更する場合
+    import AppLayout from '@/layouts/app/AppHeaderLayout.svelte';
+    ```
+  </Tab>
+</Tabs>
+
+### 認証ページのレイアウト変更
+
+ログインや登録ページも「simple」「card」「split」の3種類のレイアウトから選べます。
+
+<Tabs>
+  <Tab title="React">
+    `resources/js/layouts/auth-layout.tsx` を編集します。
+
+    ```tsx
+    // シンプルレイアウト（デフォルト）
+    import AuthLayoutTemplate from '@/layouts/auth/auth-simple-layout';
+
+    // 分割レイアウトに変更する場合
+    import AuthLayoutTemplate from '@/layouts/auth/auth-split-layout';
+    ```
+  </Tab>
+  <Tab title="Vue">
+    `resources/js/layouts/AuthLayout.vue` を編集します。
+
+    ```js
+    import AuthLayout from '@/layouts/auth/AuthSimpleLayout.vue';
+
+    // 分割レイアウトに変更する場合
+    import AuthLayout from '@/layouts/auth/AuthSplitLayout.vue';
+    ```
+  </Tab>
+  <Tab title="Livewire">
+    `resources/views/layouts/auth.blade.php` を編集します。
+
+    ```blade
+    <x-layouts::auth.split>
+        {{ $slot }}
+    </x-layouts::auth.split>
+    ```
+  </Tab>
+  <Tab title="Svelte">
+    `resources/js/layouts/AuthLayout.svelte` を編集します。
+
+    ```js
+    import AuthLayout from '@/layouts/auth/AuthSimpleLayout.svelte';
+
+    // 分割レイアウトに変更する場合
+    import AuthLayout from '@/layouts/auth/AuthSplitLayout.svelte';
+    ```
+  </Tab>
+</Tabs>
+
+### ユーザー登録ロジックのカスタマイズ
+
+スターターキットはユーザー登録やパスワードリセットの処理に `app/Actions/Fortify` ディレクトリのアクションクラスを使います。
+たとえば登録時に電話番号フィールドを追加するには `CreateNewUser.php` を編集します。
+
+```php
+public function create(array $input): User
+{
+    Validator::make($input, [
+        'name' => ['required', 'string', 'max:255'],
+        'email' => ['required', 'email', 'max:255', 'unique:users'],
+        'phone' => ['required', 'string', 'max:20'],
+        'password' => $this->passwordRules(),
+    ])->validate();
+
+    return User::create([
+        'name' => $input['name'],
+        'email' => $input['email'],
+        'phone' => $input['phone'],
+        'password' => Hash::make($input['password']),
+    ]);
+}
+```
+
+## WorkOS AuthKit 認証
+
+`laravel new` 実行時に認証プロバイダーとして **WorkOS AuthKit** を選ぶこともできます。
+WorkOS AuthKitを使うと、以下の機能が追加されます。
+
+- ソーシャル認証(Google・Microsoft・GitHub・Apple)
+- パスキー認証
+- メールによる「Magic Auth」
+- SSO(シングルサインオン)
+
+<Info>
+  WorkOS AuthKitの利用にはWorkOSアカウントが必要です。月間アクティブユーザー100万人までは無料で利用できます。
+</Info>
+
+WorkOSを選択した場合は、`.env` ファイルに以下の環境変数を設定します。
+
+```ini
+WORKOS_CLIENT_ID=your-client-id
+WORKOS_API_KEY=your-api-key
+WORKOS_REDIRECT_URL="${APP_URL}/authenticate"
+```
+
+## 注意点
+
+<Warning>
+  スターターキットは**プロジェクト作成時**に選択するものです。
+  既存のプロジェクトに後から追加することはできません。
+  認証UIが必要な場合は、新規プロジェクトでスターターキットを選択するか、手動で認証機能を実装してください。
+</Warning>
+
+## 次のステップ
+
+<Card title="認証入門" icon="lock" href="/jp/tutorial/authentication">
+  `Auth` ファサードの使い方やルートの保護など、Laravelの認証機能をさらに詳しく学びます。
+</Card>
