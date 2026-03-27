@@ -8,4 +8,8 @@
 - [x] `jp/tutorial/installation.mdx`は`スターターキット（Breeze、Jetstream）`もモデルの古い知識で書いて間違っていた。Laravel12リリースと同時にBreeze、Jetstreamではなく完全に新しいスターターキットが導入されている。詳細はdocsの`starter-kits.md`
 - [x] Mintlifyのデフォルトページは削除済み
 - [ ] 現在は月末でCopilotのプレミアムリクエストが余っているのでしばらく手動でCommanderを実行してページを増やしていく。同時に複数のissueを作ってもいいので積極的に稼働。
-- [ ] Commanderにより中級ページの追加開始
+- [x] Commanderにより中級ページの追加開始
+- [ ] Commanderにより上級ページの追加開始
+- [ ] Commanderによりブログページの追加開始
+- [ ] Commanderにより英語ページの追加開始。
+- [x] docs.json: navigation.languages内で言語別にページを定義する形式に変更。
