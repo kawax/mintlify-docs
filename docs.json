@@ -41,6 +41,13 @@
               "jp/tutorial/middleware",
               "jp/tutorial/requests"
             ]
+          },
+          {
+            "group": "データベース",
+            "pages": [
+              "jp/tutorial/migrations",
+              "jp/tutorial/eloquent"
+            ]
           }
         ]
       }
