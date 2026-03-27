@@ -1,0 +1,598 @@
+---
+title: "HTTPクライアント"
+description: "LaravelのHTTPクライアントを使って外部APIにリクエストを送る方法を解説します。認証・タイムアウト・リトライ・テストまで網羅します。"
+---
+
+## HTTPクライアントとは
+
+LaravelのHTTPクライアントは、[Guzzle](https://docs.guzzlephp.org/en/stable/) をラップした使いやすいAPIです。
+`Http` ファサードを通じて、外部のWebサービスやAPIへのHTTPリクエストを簡潔に記述できます。
+
+```php
+use Illuminate\Support\Facades\Http;
+
+$response = Http::get('https://api.example.com/users');
+```
+
+<Info>
+  Guzzleは事前にインストールされているため、追加の設定なしにすぐ使い始められます。
+</Info>
+
+## 基本的なリクエスト
+
+### GETリクエスト
+
+```php
+use Illuminate\Support\Facades\Http;
+
+$response = Http::get('https://api.example.com/users');
+```
+
+クエリパラメータは配列で渡せます。
+
+```php
+$response = Http::get('https://api.example.com/users', [
+    'page' => 1,
+    'per_page' => 20,
+]);
+```
+
+### POSTリクエスト
+
+データはデフォルトで `application/json` として送信されます。
+
+```php
+$response = Http::post('https://api.example.com/users', [
+    'name' => '山田 太郎',
+    'email' => 'taro@example.com',
+]);
+```
+
+### PUT / PATCH / DELETE
+
+```php
+// PUTリクエスト
+$response = Http::put('https://api.example.com/users/1', [
+    'name' => '山田 花子',
+]);
+
+// PATCHリクエスト
+$response = Http::patch('https://api.example.com/users/1', [
+    'email' => 'hanako@example.com',
+]);
+
+// DELETEリクエスト
+$response = Http::delete('https://api.example.com/users/1');
+```
+
+## レスポンスの処理
+
+`Http::get()` などのメソッドは `Illuminate\Http\Client\Response` インスタンスを返します。
+このオブジェクトにはレスポンスを検査するための多数のメソッドが用意されています。
+
+```php
+$response = Http::get('https://api.example.com/users/1');
+
+// レスポンスボディ
+$response->body();        // 文字列で取得
+$response->json();        // 配列に変換
+$response->json('name');  // JSONの特定キーを取得
+$response->object();      // stdClassオブジェクトとして取得
+$response->collect();     // Collectionとして取得
+
+// ステータス
+$response->status();      // ステータスコード（例: 200）
+$response->successful();  // 200番台なら true
+$response->failed();      // 400番台以上なら true
+$response->clientError(); // 400番台なら true
+$response->serverError(); // 500番台なら true
+
+// よく使うステータスコードの判定
+$response->ok();           // 200
+$response->created();      // 201
+$response->noContent();    // 204
+$response->notFound();     // 404
+$response->unauthorized(); // 401
+$response->forbidden();    // 403
+$response->unprocessableEntity(); // 422
+$response->tooManyRequests();     // 429
+```
+
+JSONレスポンスは配列アクセスでも取得できます。
+
+```php
+$name = Http::get('https://api.example.com/users/1')['name'];
+```
+
+## リクエストオプション
+
+### ヘッダーの設定
+
+```php
+$response = Http::withHeaders([
+    'X-Api-Version' => '2',
+    'Accept-Language' => 'ja',
+])->get('https://api.example.com/users');
+```
+
+`application/json` を受け入れることを示す場合は `acceptJson()` が便利です。
+
+```php
+$response = Http::acceptJson()->get('https://api.example.com/users');
+```
+
+### 認証
+
+**Bearer トークン認証**（最も一般的）:
+
+```php
+$response = Http::withToken($token)->get('https://api.example.com/me');
+```
+
+**Basic認証**:
+
+```php
+$response = Http::withBasicAuth('user@example.com', 'password')
+    ->get('https://api.example.com/private');
+```
+
+### ベースURLの設定
+
+同じホストへのリクエストが多い場合、`baseUrl()` でまとめられます。
+
+```php
+$response = Http::baseUrl('https://api.example.com')
+    ->withToken($token)
+    ->get('/users/1');
+```
+
+### フォームデータの送信
+
+`application/x-www-form-urlencoded` で送信したい場合は `asForm()` を使います。
+
+```php
+$response = Http::asForm()->post('https://api.example.com/login', [
+    'username' => 'taro',
+    'password' => 'secret',
+]);
+```
+
+### タイムアウト
+
+```php
+// レスポンスタイムアウト（デフォルトは30秒）
+$response = Http::timeout(10)->get('https://api.example.com/slow-endpoint');
+
+// 接続タイムアウト（デフォルトは10秒）
+$response = Http::connectTimeout(5)->get('https://api.example.com/endpoint');
+```
+
+<Warning>
+  タイムアウトを超えた場合、`Illuminate\Http\Client\ConnectionException` がスローされます。
+  外部APIの呼び出しには必ずタイムアウトを設定することを推奨します。
+</Warning>
+
+### リトライ
+
+一時的なネットワーク障害やサーバーエラーに対して、自動リトライを設定できます。
+
+```php
+// 最大3回、100ミリ秒間隔でリトライ
+$response = Http::retry(3, 100)->post('https://api.example.com/orders', $data);
+```
+
+条件付きリトライ（接続エラーのときだけリトライするなど）:
+
+```php
+use Illuminate\Http\Client\PendingRequest;
+use Throwable;
+use Illuminate\Http\Client\ConnectionException;
+
+$response = Http::retry(3, 100, function (Throwable $exception, PendingRequest $request) {
+    return $exception instanceof ConnectionException;
+})->post('https://api.example.com/orders', $data);
+```
+
+## エラーハンドリング
+
+### 手動でエラーを確認する
+
+LaravelのHTTPクライアントは、デフォルトでは400・500番台のレスポンスに対して例外をスローしません。
+`failed()` や `clientError()` などで明示的に確認します。
+
+```php
+$response = Http::get('https://api.example.com/users/999');
+
+if ($response->notFound()) {
+    // 404 の処理
+}
+
+if ($response->failed()) {
+    // エラーログを記録するなど
+    logger()->error('API request failed', ['status' => $response->status()]);
+}
+```
+
+### 例外をスローする
+
+`throw()` を使うと、エラー時に `Illuminate\Http\Client\RequestException` をスローします。
+
+```php
+// エラーレスポンス（4xx/5xx）なら例外をスロー
+$response = Http::post('https://api.example.com/users', $data)->throw();
+
+// throwIf(): 条件が true のときにスロー（下記は独立した使用例）
+$response = Http::get('https://api.example.com/users/1');
+$response->throwIf($response->status() === 422);
+
+// throwUnlessStatus(): 指定ステータスコード以外でスロー（下記も独立した使用例）
+$response = Http::post('https://api.example.com/orders', $data);
+$response->throwUnlessStatus(201);
+```
+
+`throw()` はレスポンスインスタンスを返すため、メソッドチェーンで書けます。
+
+```php
+$user = Http::post('https://api.example.com/users', $data)
+    ->throw()
+    ->json();
+```
+
+例外をキャッチして処理する場合:
+
+```php
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\ConnectionException;
+
+try {
+    $response = Http::timeout(5)
+        ->post('https://api.example.com/users', $data)
+        ->throw();
+} catch (ConnectionException $e) {
+    // タイムアウトや接続エラー
+    logger()->error('Connection failed: ' . $e->getMessage());
+} catch (RequestException $e) {
+    // 4xx / 5xx エラー
+    logger()->error('API error', ['status' => $e->response->status()]);
+}
+```
+
+## 並行リクエスト
+
+複数のAPIを同時に呼び出したい場合、`pool()` で並行実行できます。
+
+```php
+use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\Http;
+
+$responses = Http::pool(fn (Pool $pool) => [
+    $pool->as('users')->get('https://api.example.com/users'),
+    $pool->as('posts')->get('https://api.example.com/posts'),
+    $pool->as('comments')->get('https://api.example.com/comments'),
+]);
+
+$users    = $responses['users']->json();
+$posts    = $responses['posts']->json();
+$comments = $responses['comments']->json();
+```
+
+<Tip>
+  順番に実行するより大幅に高速化できます。外部APIを複数呼び出すダッシュボードなどに有効です。
+</Tip>
+
+## テスト
+
+### Http::fake() によるモック
+
+テストでは `Http::fake()` を使って実際のHTTPリクエストを送らずにレスポンスをシミュレートします。
+
+```php
+use Illuminate\Support\Facades\Http;
+
+Http::fake();
+
+// すべてのリクエストに200を返す
+$response = Http::get('https://api.example.com/users');
+$response->successful(); // true
+```
+
+特定のURLに対してレスポンスを設定する場合:
+
+```php
+Http::fake([
+    'api.example.com/users/*' => Http::response(['id' => 1, 'name' => '山田 太郎'], 200),
+    'api.example.com/posts/*' => Http::response(['error' => 'Not Found'], 404),
+    '*' => Http::response('OK', 200),  // それ以外のすべて
+]);
+```
+
+レスポンスのシーケンス（複数回呼ばれたときに順番にレスポンスを返す）:
+
+```php
+Http::fake([
+    // 1回目: 200、2回目: 200、3回目: 429 を返す
+    // シーケンスが尽きると以降のリクエストで例外がスローされる
+    'api.example.com/*' => Http::sequence()
+        ->push(['id' => 1], 200)
+        ->push(['id' => 2], 200)
+        ->pushStatus(429),
+]);
+```
+
+### リクエストの検証
+
+`Http::assertSent()` でリクエストの内容を検証できます。
+
+```php
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
+
+Http::fake();
+
+Http::withToken('my-token')->post('https://api.example.com/users', [
+    'name' => '山田 太郎',
+]);
+
+Http::assertSent(function (Request $request) {
+    return $request->url() === 'https://api.example.com/users'
+        && $request->hasHeader('Authorization', 'Bearer my-token')
+        && $request['name'] === '山田 太郎';
+});
+
+// 送信されていないことを確認
+Http::assertNotSent(function (Request $request) {
+    return $request->url() === 'https://api.example.com/admin';
+});
+
+// リクエストが1件だけ送られたことを確認
+Http::assertSentCount(1);
+```
+
+<Tip>
+  テストでは必ず `Http::fake()` を先頭で呼び出しましょう。
+  呼び出し忘れると実際の外部APIにリクエストが飛んでしまいます。
+  `Http::preventStrayRequests()` を使うと、フェイクしていないURLへのリクエストで例外をスローさせることができます。
+</Tip>
+
+### Strayリクエストの防止
+
+```php
+Http::preventStrayRequests();
+
+Http::fake([
+    'api.example.com/*' => Http::response(['ok' => true]),
+]);
+
+// フェイクされていないURLへのリクエストは例外になる
+Http::get('https://other.example.com/endpoint'); // 例外スロー
+```
+
+## 実践例: 外部APIを呼び出すサービスクラス
+
+実際のプロジェクトでは、HTTPクライアントのロジックをサービスクラスにまとめるのがベストプラクティスです。
+
+<Steps>
+  <Step title="サービスクラスを作成する">
+    ```php
+    <?php
+
+    namespace App\Services;
+
+    use Illuminate\Http\Client\RequestException;
+    use Illuminate\Http\Client\ConnectionException;
+    use Illuminate\Support\Facades\Http;
+
+    class GitHubService
+    {
+        private string $baseUrl = 'https://api.github.com';
+
+        public function __construct(
+            private readonly string $token,
+        ) {}
+
+        /**
+         * ユーザー情報を取得する
+         *
+         * @throws ConnectionException
+         * @throws RequestException
+         */
+        public function getUser(string $username): array
+        {
+            return Http::baseUrl($this->baseUrl)
+                ->withToken($this->token)
+                ->acceptJson()
+                ->timeout(10)
+                ->get("/users/{$username}")
+                ->throw()
+                ->json();
+        }
+
+        /**
+         * リポジトリの一覧を取得する
+         *
+         * @throws ConnectionException
+         * @throws RequestException
+         */
+        public function getRepositories(string $username, int $page = 1): array
+        {
+            return Http::baseUrl($this->baseUrl)
+                ->withToken($this->token)
+                ->acceptJson()
+                ->timeout(10)
+                ->retry(2, 500)
+                ->get("/users/{$username}/repos", [
+                    'page' => $page,
+                    'per_page' => 30,
+                    'sort' => 'updated',
+                ])
+                ->throw()
+                ->json();
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="サービスプロバイダーで登録する">
+    ```php
+    // app/Providers/AppServiceProvider.php
+
+    use App\Services\GitHubService;
+
+    public function register(): void
+    {
+        $this->app->singleton(GitHubService::class, function () {
+            return new GitHubService(
+                token: config('services.github.token'),
+            );
+        });
+    }
+    ```
+
+    ```php
+    // config/services.php
+    'github' => [
+        'token' => env('GITHUB_TOKEN'),
+    ],
+    ```
+  </Step>
+
+  <Step title="コントローラーから利用する">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use App\Services\GitHubService;
+    use Illuminate\Http\Client\RequestException;
+    use Illuminate\Http\Client\ConnectionException;
+    use Illuminate\Http\JsonResponse;
+
+    class GitHubController extends Controller
+    {
+        public function __construct(
+            private readonly GitHubService $github,
+        ) {}
+
+        public function show(string $username): JsonResponse
+        {
+            try {
+                $user = $this->github->getUser($username);
+                return response()->json($user);
+            } catch (ConnectionException) {
+                return response()->json(['error' => 'GitHub APIに接続できませんでした。'], 503);
+            } catch (RequestException $e) {
+                $status = $e->response->status();
+                if ($status === 404) {
+                    return response()->json(['error' => 'ユーザーが見つかりません。'], 404);
+                }
+                return response()->json(['error' => 'GitHub APIでエラーが発生しました。'], 502);
+            }
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="テストを書く">
+    ```php
+    <?php
+
+    namespace Tests\Unit\Services;
+
+    use App\Services\GitHubService;
+    use Illuminate\Http\Client\ConnectionException;
+    use Illuminate\Http\Client\RequestException;
+    use Illuminate\Support\Facades\Http;
+    use Tests\TestCase;
+
+    class GitHubServiceTest extends TestCase
+    {
+        private GitHubService $service;
+
+        protected function setUp(): void
+        {
+            parent::setUp();
+
+            Http::fake([
+                'api.github.com/users/octocat' => Http::response([
+                    'login' => 'octocat',
+                    'name' => 'The Octocat',
+                    'public_repos' => 8,
+                ], 200),
+                'api.github.com/users/notfound' => Http::response(
+                    ['message' => 'Not Found'],
+                    404
+                ),
+            ]);
+
+            $this->service = new GitHubService(token: 'test-token');
+        }
+
+        public function test_ユーザー情報を取得できる(): void
+        {
+            $user = $this->service->getUser('octocat');
+
+            $this->assertEquals('octocat', $user['login']);
+            $this->assertEquals('The Octocat', $user['name']);
+
+            Http::assertSent(function ($request) {
+                return $request->url() === 'https://api.github.com/users/octocat'
+                    && $request->hasHeader('Authorization', 'Bearer test-token');
+            });
+        }
+
+        public function test_存在しないユーザーは例外がスローされる(): void
+        {
+            $this->expectException(RequestException::class);
+
+            $this->service->getUser('notfound');
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="よく使うメソッド一覧">
+    | メソッド | 用途 |
+    | --- | --- |
+    | `Http::get($url, $query)` | GETリクエスト |
+    | `Http::post($url, $data)` | POSTリクエスト（JSON）|
+    | `Http::put($url, $data)` | PUTリクエスト |
+    | `Http::patch($url, $data)` | PATCHリクエスト |
+    | `Http::delete($url)` | DELETEリクエスト |
+    | `->withToken($token)` | Bearer認証 |
+    | `->withHeaders($headers)` | カスタムヘッダー |
+    | `->timeout($seconds)` | タイムアウト設定 |
+    | `->retry($times, $sleep)` | 自動リトライ |
+    | `->throw()` | エラー時に例外をスロー |
+    | `Http::fake()` | テスト用モック |
+    | `Http::pool($callback)` | 並行リクエスト |
+  </Accordion>
+
+  <Accordion title="レスポンス判定メソッド一覧">
+    | メソッド | 説明 |
+    | --- | --- |
+    | `successful()` | 200番台 |
+    | `failed()` | 400番台以上 |
+    | `clientError()` | 400番台 |
+    | `serverError()` | 500番台 |
+    | `ok()` | 200 |
+    | `created()` | 201 |
+    | `notFound()` | 404 |
+    | `unauthorized()` | 401 |
+    | `forbidden()` | 403 |
+    | `unprocessableEntity()` | 422 |
+    | `tooManyRequests()` | 429 |
+  </Accordion>
+
+  <Accordion title="外部API連携のベストプラクティス">
+    - HTTPクライアントのロジックはサービスクラスにまとめる
+    - 必ずタイムアウトを設定する（`timeout()` と `connectTimeout()`）
+    - 一時的な障害に対してリトライを設定する（`retry()`）
+    - テストでは `Http::fake()` を必ず使用し、外部APIを実際に叩かない
+    - `Http::preventStrayRequests()` をテストのセットアップに加えると安心
+    - APIのトークンや認証情報は環境変数と `config/services.php` で管理する
+  </Accordion>
+</AccordionGroup>
