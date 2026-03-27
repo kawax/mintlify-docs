@@ -75,7 +75,9 @@
             "group": "アーキテクチャ",
             "pages": [
               "jp/intermediate/service-container",
-              "jp/intermediate/service-providers"
+              "jp/intermediate/service-providers",
+              "jp/intermediate/facades",
+              "jp/intermediate/contracts"
             ]
           },
           {
