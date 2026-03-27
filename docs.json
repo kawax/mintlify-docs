@@ -49,6 +49,12 @@
               "jp/tutorial/migrations",
               "jp/tutorial/eloquent"
             ]
+          },
+          {
+            "group": "認証",
+            "pages": [
+              "jp/tutorial/authentication"
+            ]
           }
         ]
       }
