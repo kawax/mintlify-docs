@@ -180,6 +180,17 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "ブログ",
+        "groups": [
+          {
+            "group": "アップグレードガイド",
+            "pages": [
+              "jp/blog/upgrade-12-to-13"
+            ]
+          }
+        ]
       }
     ],
     "global": {
