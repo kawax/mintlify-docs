@@ -153,6 +153,12 @@
             "pages": [
               "jp/intermediate/artisan"
             ]
+          },
+          {
+            "group": "リアルタイム通信",
+            "pages": [
+              "jp/intermediate/broadcasting"
+            ]
           }
         ]
       }
