@@ -79,6 +79,12 @@
             ]
           },
           {
+            "group": "セキュリティ",
+            "pages": [
+              "jp/intermediate/authorization"
+            ]
+          },
+          {
             "group": "メールと通知",
             "pages": [
               "jp/intermediate/mail",
