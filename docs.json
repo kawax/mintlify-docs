@@ -122,6 +122,12 @@
             ]
           },
           {
+            "group": "国際化",
+            "pages": [
+              "jp/intermediate/localization"
+            ]
+          },
+          {
             "group": "外部通信",
             "pages": [
               "jp/intermediate/http-client"
