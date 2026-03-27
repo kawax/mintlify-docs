@@ -11,24 +11,6 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "中級",
-        "groups": [
-          {
-            "group": "メールと通知",
-            "pages": [
-              "jp/intermediate/mail",
-              "jp/intermediate/notifications"
-            ]
-          },
-          {
-            "group": "非同期処理",
-            "pages": [
-              "jp/intermediate/queues"
-            ]
-          }
-        ]
-      },
-      {
         "tab": "入門チュートリアル",
         "groups": [
           {
@@ -94,6 +76,19 @@
             "pages": [
               "jp/intermediate/service-container",
               "jp/intermediate/service-providers"
+            ]
+          },
+          {
+            "group": "メールと通知",
+            "pages": [
+              "jp/intermediate/mail",
+              "jp/intermediate/notifications"
+            ]
+          },
+          {
+            "group": "非同期処理",
+            "pages": [
+              "jp/intermediate/queues"
             ]
           }
         ]
