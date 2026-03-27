@@ -1,0 +1,485 @@
+---
+title: "コレクション"
+description: "LaravelのCollectionクラスを使ってデータを効率的に操作する方法を解説します。"
+---
+
+## コレクションとは
+
+`Illuminate\Support\Collection` クラスは、配列データを操作するための流暢なラッパーです。
+PHPの標準的な配列関数を個別に呼び出す代わりに、メソッドチェーンで直感的にデータを加工できます。
+
+```php
+// 通常の配列操作
+$names = array_filter(
+    array_map(fn ($user) => $user['name'], $users),
+    fn ($name) => $name !== null
+);
+
+// コレクションを使うと
+$names = collect($users)
+    ->pluck('name')
+    ->filter()
+    ->values();
+```
+
+<Info>
+  コレクションは**イミュータブル**（不変）です。各メソッドは元のコレクションを変更せず、新しいコレクションインスタンスを返します。元のデータを保持しながら安全に操作できます。
+</Info>
+
+## コレクションの作成
+
+### `collect()` ヘルパー
+
+最もよく使われる方法です。配列を渡してコレクションを生成します。
+
+```php
+use Illuminate\Support\Collection;
+
+// 配列からコレクションを作成
+$users = collect([
+    ['name' => '山田太郎', 'age' => 28, 'role' => 'admin'],
+    ['name' => '鈴木花子', 'age' => 34, 'role' => 'editor'],
+    ['name' => '佐藤次郎', 'age' => 22, 'role' => 'viewer'],
+]);
+
+// ネストした配列もOK
+$products = collect([
+    ['name' => 'ノートPC', 'price' => 120000, 'stock' => 5],
+    ['name' => 'マウス', 'price' => 3500, 'stock' => 20],
+    ['name' => 'キーボード', 'price' => 8000, 'stock' => 12],
+]);
+```
+
+### `Collection::make()`
+
+`collect()` と同等です。ファサードスタイルで書きたい場合に使います。
+
+```php
+$collection = Collection::make([1, 2, 3]);
+```
+
+### `Collection::fromJson()`
+
+JSON文字列からコレクションを作成します。外部APIのレスポンスを処理する場合に便利です。
+
+```php
+$collection = Collection::fromJson('[{"name":"山田太郎"},{"name":"鈴木花子"}]');
+```
+
+## よく使うメソッド
+
+### `map` — 各要素を変換する
+
+コレクションの各要素に処理を適用し、変換された新しいコレクションを返します。
+
+```php
+$users = collect([
+    ['name' => '山田太郎', 'email' => 'yamada@example.com'],
+    ['name' => '鈴木花子', 'email' => 'suzuki@example.com'],
+]);
+
+// メールアドレスをマスクして表示用に変換
+$masked = $users->map(function (array $user) {
+    $parts = explode('@', $user['email']);
+    return [
+        'name' => $user['name'],
+        'email' => substr($parts[0], 0, 2) . '***@' . $parts[1],
+    ];
+});
+
+// [['name' => '山田太郎', 'email' => 'ya***@example.com'], ...]
+```
+
+### `filter` / `reject` — 条件で絞り込む
+
+`filter()` は条件を満たす要素だけを残し、`reject()` は条件を満たす要素を除外します。
+
+```php
+$products = collect([
+    ['name' => 'ノートPC', 'price' => 120000, 'in_stock' => true],
+    ['name' => 'マウス', 'price' => 3500, 'in_stock' => false],
+    ['name' => 'キーボード', 'price' => 8000, 'in_stock' => true],
+]);
+
+// 在庫ありの商品だけ取得
+$inStock = $products->filter(fn ($product) => $product['in_stock']);
+
+// 在庫なしの商品を除外（reject は filter の反転）
+$available = $products->reject(fn ($product) => ! $product['in_stock']);
+
+// 引数なしの filter() は falsy な値を除去
+$names = collect(['山田', '', null, '鈴木', false])->filter()->values();
+// ['山田', '鈴木']
+```
+
+<Tip>
+  `filter()` 後はインデックスが歯抜けになります。`values()` を呼ぶと0始まりの連番に振り直されます。
+</Tip>
+
+### `first` / `last` — 要素を1件取得する
+
+条件を満たす最初または最後の要素を返します。
+
+```php
+$orders = collect([
+    ['id' => 1, 'status' => 'shipped', 'amount' => 5000],
+    ['id' => 2, 'status' => 'pending', 'amount' => 12000],
+    ['id' => 3, 'status' => 'pending', 'amount' => 3500],
+]);
+
+// 最初の未処理注文を取得
+$nextOrder = $orders->first(fn ($order) => $order['status'] === 'pending');
+// ['id' => 2, 'status' => 'pending', 'amount' => 12000]
+
+// 条件に一致しない場合のデフォルト値
+$order = $orders->first(fn ($order) => $order['status'] === 'cancelled', null);
+
+// 最後の要素
+$latest = $orders->last();
+```
+
+### `pluck` — 特定のキーの値だけ取り出す
+
+ネストした配列やモデルから特定のフィールドだけを抜き出します。
+
+```php
+$users = collect([
+    ['id' => 1, 'name' => '山田太郎', 'department' => '開発部'],
+    ['id' => 2, 'name' => '鈴木花子', 'department' => '営業部'],
+    ['id' => 3, 'name' => '佐藤次郎', 'department' => '開発部'],
+]);
+
+// 名前だけ取り出す
+$names = $users->pluck('name');
+// ['山田太郎', '鈴木花子', '佐藤次郎']
+
+// id をキーにしてマッピング
+$nameById = $users->pluck('name', 'id');
+// [1 => '山田太郎', 2 => '鈴木花子', 3 => '佐藤次郎']
+```
+
+### `groupBy` — 特定のキーでグループ化する
+
+```php
+$users = collect([
+    ['name' => '山田太郎', 'department' => '開発部'],
+    ['name' => '鈴木花子', 'department' => '営業部'],
+    ['name' => '佐藤次郎', 'department' => '開発部'],
+    ['name' => '田中美咲', 'department' => '営業部'],
+]);
+
+$byDepartment = $users->groupBy('department');
+// [
+//   '開発部' => [['name' => '山田太郎', ...], ['name' => '佐藤次郎', ...]],
+//   '営業部' => [['name' => '鈴木花子', ...], ['name' => '田中美咲', ...]],
+// ]
+
+// クロージャでグループキーを動的に指定
+$byFirstChar = $users->groupBy(fn ($user) => mb_substr($user['name'], 0, 1));
+```
+
+### `sortBy` / `sortByDesc` — 並び替える
+
+```php
+$products = collect([
+    ['name' => 'ノートPC', 'price' => 120000],
+    ['name' => 'マウス', 'price' => 3500],
+    ['name' => 'キーボード', 'price' => 8000],
+]);
+
+// 価格の昇順
+$cheapFirst = $products->sortBy('price');
+
+// 価格の降順
+$expensiveFirst = $products->sortByDesc('price');
+
+// 複数キーで並び替え
+$sorted = $products->sortBy([
+    ['price', 'asc'],
+    ['name', 'asc'],
+]);
+```
+
+### `each` — 各要素に処理を実行する
+
+副作用のある処理（ログ出力、メール送信など）に使います。コレクション自体は変更しません。
+
+```php
+$orders = collect([
+    ['id' => 1, 'user_id' => 10, 'amount' => 5000],
+    ['id' => 2, 'user_id' => 11, 'amount' => 12000],
+]);
+
+$orders->each(function (array $order) {
+    \Log::info("注文 #{$order['id']} を処理中", ['amount' => $order['amount']]);
+    // 通知送信やキューへのディスパッチなど
+});
+
+// false を返すと途中で処理を抜けられる
+$orders->each(function (array $order) {
+    if ($order['amount'] > 10000) {
+        return false; // ループを抜ける
+    }
+    // ...
+});
+```
+
+### `flatMap` — マップ後に1段階フラット化する
+
+各要素を配列に変換し、全体を1次元に平坦化します。
+
+```php
+$users = collect([
+    ['name' => '山田太郎', 'tags' => ['php', 'laravel']],
+    ['name' => '鈴木花子', 'tags' => ['javascript', 'vue']],
+]);
+
+// 全ユーザーのタグをフラットなリストに
+$allTags = $users->flatMap(fn ($user) => $user['tags']);
+// ['php', 'laravel', 'javascript', 'vue']
+```
+
+### `reduce` — 集計する
+
+コレクション全体を1つの値に畳み込みます。
+
+```php
+$orders = collect([
+    ['product' => 'ノートPC', 'quantity' => 1, 'price' => 120000],
+    ['product' => 'マウス', 'quantity' => 2, 'price' => 3500],
+    ['product' => 'キーボード', 'quantity' => 1, 'price' => 8000],
+]);
+
+// 合計金額を計算
+$total = $orders->reduce(
+    fn ($carry, $order) => $carry + ($order['price'] * $order['quantity']),
+    0
+);
+// 135000
+```
+
+<Tip>
+  単純な合計なら `sum()` が使えます: `$orders->sum(fn ($o) => $o['price'] * $o['quantity'])`
+</Tip>
+
+### `chunk` — 分割する
+
+大きなコレクションを指定サイズに分割します。バッチ処理や画面表示で便利です。
+
+```php
+$users = collect(range(1, 100))->map(fn ($i) => ['id' => $i, 'name' => "ユーザー{$i}"]);
+
+// 10件ずつに分割
+$chunks = $users->chunk(10);
+// $chunks->count() === 10
+
+// バッチごとに処理
+$chunks->each(function (\Illuminate\Support\Collection $batch) {
+    // バッチごとのDB操作やメール送信など
+});
+```
+
+## メソッドチェーン
+
+コレクションの真価はメソッドチェーンにあります。複数の操作をつなげて、複雑なデータ変換を1つの式で表現できます。
+
+```php
+$orders = collect([
+    ['customer' => '山田太郎', 'status' => 'completed', 'amount' => 5000, 'category' => '電子機器'],
+    ['customer' => '鈴木花子', 'status' => 'pending',   'amount' => 12000, 'category' => '電子機器'],
+    ['customer' => '佐藤次郎', 'status' => 'completed', 'amount' => 3500, 'category' => '文具'],
+    ['customer' => '田中美咲', 'status' => 'completed', 'amount' => 8000, 'category' => '電子機器'],
+    ['customer' => '伊藤健一', 'status' => 'cancelled', 'amount' => 2000, 'category' => '文具'],
+]);
+
+// 完了済みの電子機器注文を金額降順で取得し、顧客名と金額だけ抽出する
+$result = $orders
+    ->filter(fn ($order) => $order['status'] === 'completed')
+    ->filter(fn ($order) => $order['category'] === '電子機器')
+    ->sortByDesc('amount')
+    ->map(fn ($order) => [
+        'customer' => $order['customer'],
+        'amount'   => number_format($order['amount']) . '円',
+    ])
+    ->values();
+
+// [
+//   ['customer' => '田中美咲', 'amount' => '8,000円'],
+//   ['customer' => '山田太郎', 'amount' => '5,000円'],
+// ]
+```
+
+## Eloquentとの連携
+
+Eloquentクエリの結果は常に `Illuminate\Database\Eloquent\Collection` インスタンスとして返されます。
+これは基本の `Collection` を継承しており、上記のメソッドがすべて使えます。
+
+```php
+use App\Models\User;
+use App\Models\Order;
+
+// get() の結果はコレクション
+$users = User::where('is_active', true)->get(); // Collection
+
+// コレクションのメソッドをそのまま使える
+$adminEmails = User::all()
+    ->filter(fn ($user) => $user->role === 'admin')
+    ->pluck('email');
+
+// リレーションのロード済みデータもコレクション操作できる
+$orders = Order::with('items')->where('status', 'completed')->get();
+
+$summary = $orders->map(fn ($order) => [
+    'id'         => $order->id,
+    'customer'   => $order->user->name,
+    'item_count' => $order->items->count(),
+    'total'      => $order->items->sum('price'),
+]);
+```
+
+<Warning>
+  データベースで処理できるフィルタリングや並び替えは、コレクション操作ではなくクエリビルダ（`where`、`orderBy` など）で行いましょう。コレクションへの変換後にフィルタリングすると、不要なデータをすべてメモリに読み込んでしまいます。
+</Warning>
+
+### Eloquent固有のコレクションメソッド
+
+`Eloquent\Collection` には追加のメソッドがあります。
+
+```php
+$users = User::all();
+
+// モデルをIDで検索
+$user = $users->find(1);
+
+// 主キーのコレクションを取得
+$ids = $users->modelKeys(); // [1, 2, 3, ...]
+
+// リレーションをまとめてロード
+$users->load('orders', 'profile');
+
+// 差集合・積集合
+$diff = $users->diff($otherUsers);
+$intersect = $users->intersect($otherUsers);
+```
+
+## Lazy Collections
+
+通常のコレクションはデータ全体をメモリに読み込みますが、`LazyCollection` はPHPのジェネレーターを活用し、データを1件ずつ処理します。
+数万件以上の大量データを扱う場合に、メモリを節約できます。
+
+```php
+use Illuminate\Support\LazyCollection;
+
+// 通常のコレクション: 全データをメモリに読み込む
+$users = User::all(); // 10万件あれば10万件がメモリに乗る
+
+// LazyCollection: 1件ずつ処理
+User::cursor()->each(function (User $user) {
+    // ユーザーを1件ずつ処理
+    // メモリに保持するのは常に1件分だけ
+});
+```
+
+### LazyCollectionの作成
+
+```php
+use Illuminate\Support\LazyCollection;
+
+// クロージャ（ジェネレーター）から作成
+$lazy = LazyCollection::make(function () {
+    $handle = fopen('large-file.csv', 'r');
+
+    while (($line = fgetcsv($handle)) !== false) {
+        yield $line;
+    }
+
+    fclose($handle);
+});
+
+// Eloquentの cursor() メソッドが LazyCollection を返す
+$lazy = User::where('is_active', true)->cursor();
+```
+
+### 大量データのバッチ処理
+
+```php
+use App\Models\Order;
+
+// 全注文を1件ずつ処理（メモリ効率が良い）
+Order::cursor()
+    ->filter(fn ($order) => $order->amount > 10000)
+    ->each(fn ($order) => $order->sendConfirmationEmail());
+
+// cursor() で全件を1件ずつフェッチしつつ filter/each でパイプライン処理
+Order::where('status', 'completed')
+    ->cursor()
+    ->filter(fn ($order) => $order->amount > 10000)
+    ->each(fn ($order) => $order->sendConfirmationEmail());
+```
+
+<Info>
+  `cursor()` はデータベースから1件ずつフェッチするため、大量のレコードを処理する際にメモリを大幅に節約できます。ただし、データベース接続は処理の完了まで維持されます。
+</Info>
+
+### `take` と `skip` でページング
+
+```php
+$lazy = LazyCollection::make(function () {
+    foreach (range(1, 1000000) as $i) {
+        yield $i;
+    }
+});
+
+// 最初の1000件をスキップして、次の100件を取得
+$page = $lazy->skip(1000)->take(100)->values();
+```
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="よく使うメソッドまとめ">
+    | メソッド | 説明 |
+    | --- | --- |
+    | `collect($array)` | コレクションを作成する |
+    | `map($callback)` | 各要素を変換する |
+    | `filter($callback)` | 条件で絞り込む |
+    | `reject($callback)` | 条件に合う要素を除外する |
+    | `first($callback)` | 条件を満たす最初の要素を取得 |
+    | `pluck($key)` | 特定キーの値を抜き出す |
+    | `groupBy($key)` | 特定キーでグループ化 |
+    | `sortBy($key)` | 昇順で並び替え |
+    | `sortByDesc($key)` | 降順で並び替え |
+    | `each($callback)` | 各要素に処理を実行（副作用） |
+    | `flatMap($callback)` | マップ後にフラット化 |
+    | `reduce($callback, $initial)` | 集計して1つの値にする |
+    | `chunk($size)` | 指定サイズに分割 |
+    | `values()` | インデックスを振り直す |
+    | `sum($key)` | 合計値を計算 |
+    | `count()` | 件数を取得 |
+  </Accordion>
+
+  <Accordion title="コレクション vs 配列関数">
+    コレクションは配列関数よりもはるかに可読性が高くなります。
+
+    ```php
+    // 配列関数を使った場合
+    $result = array_values(array_filter(
+        array_map(fn ($u) => $u['name'], $users),
+        fn ($name) => strlen($name) > 2
+    ));
+
+    // コレクションを使った場合
+    $result = collect($users)
+        ->pluck('name')
+        ->filter(fn ($name) => strlen($name) > 2)
+        ->values()
+        ->all();
+    ```
+  </Accordion>
+
+  <Accordion title="通常のコレクション vs LazyCollection">
+    - **通常のコレクション**: 数百〜数千件程度のデータ。シンプルで直感的。
+    - **LazyCollection**: 数万件以上の大量データ。メモリを節約したい場合。`cursor()` と組み合わせると効果的。
+    - Eloquentの `get()` は通常のコレクション、`cursor()` は LazyCollection を返します。
+  </Accordion>
+</AccordionGroup>
