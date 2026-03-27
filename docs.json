@@ -11,6 +11,18 @@
   "navigation": {
     "tabs": [
       {
+        "tab": "中級",
+        "groups": [
+          {
+            "group": "メールと通知",
+            "pages": [
+              "jp/intermediate/mail",
+              "jp/intermediate/notifications"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "入門チュートリアル",
         "groups": [
           {
