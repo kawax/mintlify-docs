@@ -42,6 +42,13 @@
               "jp/tutorial/requests",
               "jp/tutorial/validation"
             ]
+          },
+          {
+            "group": "データベース",
+            "pages": [
+              "jp/tutorial/migrations",
+              "jp/tutorial/eloquent"
+            ]
           }
         ]
       }
