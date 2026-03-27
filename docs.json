@@ -90,6 +90,12 @@
             "pages": [
               "jp/intermediate/queues"
             ]
+          },
+          {
+            "group": "キャッシュと最適化",
+            "pages": [
+              "jp/intermediate/cache"
+            ]
           }
         ]
       }
