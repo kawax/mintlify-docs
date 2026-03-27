@@ -90,6 +90,12 @@
             "pages": [
               "jp/intermediate/queues"
             ]
+          },
+          {
+            "group": "スケジューリング",
+            "pages": [
+              "jp/intermediate/scheduling"
+            ]
           }
         ]
       }
