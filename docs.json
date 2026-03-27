@@ -40,7 +40,8 @@
             "pages": [
               "jp/tutorial/middleware",
               "jp/tutorial/requests",
-              "jp/tutorial/validation"
+              "jp/tutorial/validation",
+              "jp/tutorial/responses"
             ]
           },
           {
