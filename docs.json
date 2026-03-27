@@ -56,7 +56,8 @@
           {
             "group": "認証",
             "pages": [
-              "jp/tutorial/authentication"
+              "jp/tutorial/authentication",
+              "jp/tutorial/starter-kits"
             ]
           },
           {
