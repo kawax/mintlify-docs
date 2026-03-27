@@ -67,6 +67,18 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "中級",
+        "groups": [
+          {
+            "group": "アーキテクチャ",
+            "pages": [
+              "jp/intermediate/service-container",
+              "jp/intermediate/service-providers"
+            ]
+          }
+        ]
       }
     ],
     "global": {
