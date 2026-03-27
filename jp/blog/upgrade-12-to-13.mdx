@@ -1,0 +1,487 @@
+---
+title: "Laravel 12 から 13 へのアップグレードガイド"
+description: "Laravel 12 から Laravel 13 へのアップグレード手順、破壊的変更、非推奨機能、および新機能のハイライトを解説します。"
+---
+
+## はじめに
+
+Laravel 13 は 2026年3月にリリースされました。このガイドでは Laravel 12.x から 13.x へのアップグレード手順を説明します。
+
+<Info>
+  アップグレードに必要な推定時間は **約10分** です。ただし、破壊的変更がアプリケーションに与える影響は規模や使用している機能によって異なります。
+</Info>
+
+### AIを使ったアップグレード
+
+[Laravel Boost](https://github.com/laravel/boost) を使ってアップグレードを自動化することもできます。Boost はファーストパーティの MCP サーバーで、AI アシスタントに段階的なアップグレードプロンプトを提供します。Laravel 12 アプリケーションにインストール後、Claude Code、Cursor、OpenCode、Gemini、VS Code で `/upgrade-laravel-v13` スラッシュコマンドを使用して Laravel 13 へのアップグレードを開始できます。このコマンドには `laravel/boost ^2.0` が必要です。
+
+---
+
+## 影響度別の変更点
+
+### 影響度: 高
+
+- 依存関係の更新
+- Laravel インストーラーの更新
+- リクエスト偽造防止 (CSRF)
+
+### 影響度: 中
+
+- キャッシュ `serializable_classes` 設定
+
+### 影響度: 低
+
+- キャッシュプレフィックスとセッション Cookie 名
+- コレクションモデルのシリアライゼーション
+- `Container::call` と Nullable クラスデフォルト
+- ドメインルート登録の優先順位
+- `JobAttempted` イベントの例外ペイロード
+- Manager `extend` コールバックのバインディング
+- MySQL `DELETE` クエリ (JOIN / ORDER BY / LIMIT)
+- ページネーション Bootstrap ビュー名
+- ポリモーフィックピボットテーブル名の生成
+- `QueueBusy` イベントのプロパティ名変更
+- `Str` ファクトリのテスト間リセット
+
+---
+
+## アップグレード手順
+
+### 依存関係の更新
+
+**影響度: 高**
+
+`composer.json` の以下の依存関係を更新してください。
+
+```json
+{
+  "require": {
+    "laravel/framework": "^13.0",
+    "laravel/tinker": "^3.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^12.0",
+    "pestphp/pest": "^4.0"
+  }
+}
+```
+
+Laravel Boost を使用している場合は合わせて更新します。
+
+```json
+{
+  "require": {
+    "laravel/boost": "^2.0"
+  }
+}
+```
+
+更新後、以下のコマンドで依存関係をインストールします。
+
+```shell
+composer update
+```
+
+---
+
+### Laravel インストーラーの更新
+
+**影響度: 高**
+
+Laravel インストーラー CLI を使って新しい Laravel アプリケーションを作成する場合は、Laravel 13.x 対応のバージョンに更新してください。
+
+`composer global require` でインストールした場合:
+
+```shell
+composer global update laravel/installer
+```
+
+[Laravel Herd](https://herd.laravel.com) のバンドル版を使用している場合は、Herd 自体を最新リリースに更新してください。
+
+---
+
+## 破壊的変更 (Breaking Changes)
+
+### セキュリティ
+
+#### リクエスト偽造防止
+
+**影響度: 高**
+
+Laravel の CSRF ミドルウェアが `VerifyCsrfToken` から `PreventRequestForgery` にリネームされました。また、`Sec-Fetch-Site` ヘッダーを使ったリクエスト発信元の検証が追加されています。
+
+`VerifyCsrfToken` と `ValidateCsrfToken` は非推奨のエイリアスとして残っていますが、直接参照している箇所はすべて `PreventRequestForgery` に更新する必要があります。特にテストやルート定義でミドルウェアを除外している場合は注意が必要です。
+
+```php
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+
+// Laravel <= 12.x
+->withoutMiddleware([VerifyCsrfToken::class]);
+
+// Laravel >= 13.x
+->withoutMiddleware([PreventRequestForgery::class]);
+```
+
+ミドルウェア設定 API でも `preventRequestForgery(...)` が使用可能になりました。
+
+---
+
+### キャッシュ
+
+#### キャッシュプレフィックスとセッション Cookie 名
+
+**影響度: 低**
+
+Laravel のデフォルトのキャッシュおよび Redis キープレフィックスがハイフン区切りのサフィックスを使用するようになりました。また、デフォルトのセッション Cookie 名が `Str::snake(...)` を使用するようになりました。
+
+多くのアプリケーションでは設定ファイルで明示的に値を設定しているため、この変更の影響を受けません。フレームワークのフォールバック設定に依存しているアプリケーションのみ影響を受けます。
+
+```php
+// Laravel <= 12.x
+Str::slug((string) env('APP_NAME', 'laravel'), '_').'_cache_';
+Str::slug((string) env('APP_NAME', 'laravel'), '_').'_database_';
+Str::slug((string) env('APP_NAME', 'laravel'), '_').'_session';
+
+// Laravel >= 13.x
+Str::slug((string) env('APP_NAME', 'laravel')).'-cache-';
+Str::slug((string) env('APP_NAME', 'laravel')).'-database-';
+Str::snake((string) env('APP_NAME', 'laravel')).'_session';
+```
+
+以前の動作を維持するには、`.env` ファイルで明示的に設定してください。
+
+```ini
+CACHE_PREFIX=myapp_cache_
+REDIS_PREFIX=myapp_database_
+SESSION_COOKIE=myapp_session
+```
+
+#### キャッシュ `serializable_classes` 設定
+
+**影響度: 中**
+
+デフォルトの `cache` 設定に `serializable_classes` オプションが追加され、デフォルトは `false` になりました。これにより、`APP_KEY` が漏洩した場合の PHP デシリアライゼーションガジェットチェーン攻撃を防ぎます。
+
+アプリケーションが意図的にキャッシュに PHP オブジェクトを保存している場合、デシリアライズを許可するクラスを明示的にリストアップする必要があります。
+
+```php
+// config/cache.php
+'serializable_classes' => [
+    App\Data\CachedDashboardStats::class,
+    App\Support\CachedPricingSnapshot::class,
+],
+```
+
+任意のキャッシュオブジェクトをデシリアライズしていた場合は、明示的なクラス許可リストまたは非オブジェクトのキャッシュペイロード（配列など）に移行する必要があります。
+
+---
+
+### コンテナ
+
+#### `Container::call` と Nullable クラスデフォルト
+
+**影響度: 低**
+
+`Container::call` が、バインディングが存在しない場合に nullable クラスパラメータのデフォルト値を尊重するようになりました（Laravel 12 でコンストラクタインジェクションに導入された動作と一致します）。
+
+```php
+$container->call(function (?Carbon $date = null) {
+    return $date;
+});
+
+// Laravel <= 12.x: Carbon インスタンスを返す
+// Laravel >= 13.x: null を返す
+```
+
+---
+
+### データベース
+
+#### MySQL `DELETE` クエリ
+
+**影響度: 低**
+
+Laravel が MySQL 文法で `ORDER BY` と `LIMIT` を含む完全な `DELETE ... JOIN` クエリをコンパイルするようになりました。
+
+以前のバージョンでは、JOIN を伴う DELETE で `ORDER BY` / `LIMIT` 句が無視されることがありました。Laravel 13 ではこれらの句が生成される SQL に含まれます。その結果、この構文をサポートしない一部のデータベースエンジンで `QueryException` が発生する可能性があります。
+
+---
+
+### Eloquent
+
+#### ポリモーフィックピボットテーブル名の生成
+
+**影響度: 低**
+
+カスタムピボットモデルクラスを使用するポリモーフィックピボットモデルのテーブル名が推測される際、Laravel が複数形の名前を生成するようになりました。
+
+以前の単数形の推測名に依存していた場合は、ピボットモデルでテーブル名を明示的に定義してください。
+
+```php
+class RoleUser extends MorphPivot
+{
+    protected $table = 'role_user'; // 明示的に指定
+}
+```
+
+#### コレクションモデルのシリアライゼーション
+
+**影響度: 低**
+
+Eloquent モデルコレクションがシリアライズおよびリストア（キュー投入されたジョブなど）される際、Eager ロードされたリレーションがモデルのために復元されるようになりました。
+
+デシリアライゼーション後にリレーションが存在しないことに依存していたコードがある場合は、修正が必要です。
+
+---
+
+### キュー
+
+#### `JobAttempted` イベントの例外ペイロード
+
+**影響度: 低**
+
+`Illuminate\Queue\Events\JobAttempted` イベントが、以前の boolean の `$exceptionOccurred` プロパティに代わって、例外オブジェクト（または `null`）を `$exception` で公開するようになりました。
+
+```php
+// Laravel <= 12.x
+if ($event->exceptionOccurred) {
+    // 例外が発生した
+}
+
+// Laravel >= 13.x
+if ($event->exception !== null) {
+    // 例外が発生した
+    $exception = $event->exception;
+}
+```
+
+#### `QueueBusy` イベントのプロパティ名変更
+
+**影響度: 低**
+
+`Illuminate\Queue\Events\QueueBusy` イベントのプロパティ `$connection` が、他のキューイベントとの一貫性のために `$connectionName` にリネームされました。
+
+```php
+// Laravel <= 12.x
+$event->connection;
+
+// Laravel >= 13.x
+$event->connectionName;
+```
+
+---
+
+### ルーティング
+
+#### ドメインルート登録の優先順位
+
+**影響度: 低**
+
+明示的なドメインを持つルートが、ルートマッチングで非ドメインルートよりも優先されるようになりました。
+
+これにより、キャッチオールのサブドメインルートが、非ドメインルートが先に登録されている場合でも一貫して動作するようになります。
+
+---
+
+### サポート
+
+#### Manager `extend` コールバックのバインディング
+
+**影響度: 低**
+
+Manager の `extend` メソッドで登録されたカスタムドライバーのクロージャが、マネージャーインスタンスにバインドされるようになりました。
+
+以前はこれらのコールバック内で別のオブジェクト（サービスプロバイダーインスタンスなど）が `$this` として参照されていた場合、`use (...)` で値をクロージャキャプチャに移動する必要があります。
+
+```php
+// Laravel <= 12.x
+Manager::extend('custom', function ($app) {
+    return $this->createCustomDriver($app); // $this はサービスプロバイダー
+});
+
+// Laravel >= 13.x
+$provider = $this;
+Manager::extend('custom', function ($app) use ($provider) {
+    return $provider->createCustomDriver($app);
+});
+```
+
+#### `Str` ファクトリのテスト間リセット
+
+**影響度: 低**
+
+Laravel がテストのティアダウン時にカスタム `Str` ファクトリをリセットするようになりました。
+
+カスタム UUID / ULID / ランダム文字列ファクトリがテストメソッド間で持続することに依存していた場合は、関連する各テストまたはセットアップフックで設定するようにしてください。
+
+---
+
+### ビュー
+
+#### ページネーション Bootstrap ビュー名
+
+**影響度: 低**
+
+Bootstrap 3 デフォルトの内部ページネーションビュー名が明示的になりました。
+
+```php
+// Laravel <= 12.x
+pagination::default
+pagination::simple-default
+
+// Laravel >= 13.x
+pagination::bootstrap-3
+pagination::simple-bootstrap-3
+```
+
+古いページネーションビュー名を直接参照している場合は、更新してください。
+
+---
+
+## 非推奨になった機能
+
+| 機能 | 代替手段 |
+|------|----------|
+| `VerifyCsrfToken` ミドルウェア | `PreventRequestForgery` |
+| `ValidateCsrfToken` ミドルウェア | `PreventRequestForgery` |
+| `JobAttempted::$exceptionOccurred` | `JobAttempted::$exception` |
+| `QueueBusy::$connection` | `QueueBusy::$connectionName` |
+
+---
+
+## コントラクトの追加
+
+**影響度: 非常に低**
+
+カスタム実装を持つ場合のみ影響があります。
+
+### `Dispatcher` コントラクト
+
+`Illuminate\Contracts\Bus\Dispatcher` コントラクトに `dispatchAfterResponse($command, $handler = null)` メソッドが追加されました。
+
+### `ResponseFactory` コントラクト
+
+`Illuminate\Contracts\Routing\ResponseFactory` コントラクトに `eventStream` シグネチャが追加されました。
+
+### `MustVerifyEmail` コントラクト
+
+`Illuminate\Contracts\Auth\MustVerifyEmail` コントラクトに `markEmailAsUnverified()` が追加されました。
+
+### `Queue` コントラクト
+
+`Illuminate\Contracts\Queue\Queue` コントラクトに以下のキューサイズ検査メソッドが追加されました（以前はドックブロックのみで宣言されていました）。
+
+- `pendingSize`
+- `delayedSize`
+- `reservedSize`
+- `creationTimeOfOldestPendingJob`
+
+### `Store` / `Repository` コントラクト
+
+キャッシュコントラクトに TTL 延長のための `touch` メソッドが追加されました。
+
+```php
+// Illuminate\Contracts\Cache\Store
+public function touch($key, $seconds);
+```
+
+---
+
+## 新機能のハイライト
+
+### AIアシストアップグレード (Laravel Boost)
+
+Laravel Boost は公式の MCP サーバーです。AI エディターと連携して `/upgrade-laravel-v13` コマンドでアップグレードを半自動化できます。
+
+### `Sec-Fetch-Site` ヘッダーによるリクエスト発信元検証
+
+`PreventRequestForgery` ミドルウェアが `Sec-Fetch-Site` ヘッダーを使った追加のオリジン検証を行います。これにより CSRF 保護が強化されています。
+
+### キャッシュの安全なデシリアライゼーション
+
+`serializable_classes` 設定により、許可するクラスのみがデシリアライズされるようになりました。PHP デシリアライゼーション攻撃に対するセキュリティが向上しています。
+
+### SSE (Server-Sent Events) の `eventStream`
+
+`ResponseFactory` コントラクトに `eventStream` が追加され、Server-Sent Events のサポートが改善されました。
+
+### キュー可視性の向上
+
+`Queue` コントラクトの `pendingSize`、`delayedSize`、`reservedSize` などのメソッドによって、キューの状態をより細かく監視できるようになりました。
+
+---
+
+## よくある移行時の問題と解決策
+
+### 問題: CSRF 関連のテストが失敗する
+
+**症状:** `VerifyCsrfToken` を参照しているテストがクラスが見つからないエラーで失敗する。
+
+**解決策:** すべての参照を `PreventRequestForgery` に更新してください。
+
+```php
+// Before
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+->withoutMiddleware([VerifyCsrfToken::class]);
+
+// After
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+->withoutMiddleware([PreventRequestForgery::class]);
+```
+
+### 問題: キャッシュからオブジェクトが復元できない
+
+**症状:** キャッシュから取得したデータが `null` になる、または `UnserializationFailedException` が発生する。
+
+**解決策:** `config/cache.php` で `serializable_classes` に使用するクラスを追加するか、キャッシュする値を配列に変換してください。
+
+```php
+'serializable_classes' => [
+    App\Models\User::class,
+    App\Data\SomeData::class,
+],
+```
+
+### 問題: `JobAttempted` リスナーが機能しない
+
+**症状:** `$event->exceptionOccurred` が `null` や未定義エラーになる。
+
+**解決策:** `$event->exception !== null` に変更してください。
+
+```php
+// Before
+if ($event->exceptionOccurred) { ... }
+
+// After
+if ($event->exception !== null) { ... }
+```
+
+### 問題: セッションが無効化される
+
+**症状:** アップグレード後にユーザーがログアウトされる。
+
+**解決策:** デフォルトのセッション Cookie 名が変更されています。`.env` で `SESSION_COOKIE` を明示的に設定して以前の値を維持してください。
+
+```ini
+SESSION_COOKIE=laravel_session
+```
+
+### 問題: キャッシュキーが見つからない
+
+**症状:** アップグレード後にキャッシュミスが増加する。
+
+**解決策:** キャッシュプレフィックスが変更されています。`.env` で `CACHE_PREFIX` を設定するか、キャッシュをクリアしてください。
+
+```shell
+php artisan cache:clear
+```
+
+---
+
+## 参考資料
+
+- [公式アップグレードガイド (英語)](https://laravel.com/docs/13.x/upgrade)
+- [laravel/laravel リポジトリの差分 (12.x → 13.x)](https://github.com/laravel/laravel/compare/12.x...13.x)
+- [Laravel Shift](https://laravelshift.com) — アップグレードを自動化するコミュニティサービス
+- [Laravel Boost](https://github.com/laravel/boost) — AI アシストアップグレード用 MCP サーバー
