@@ -132,6 +132,12 @@
             "pages": [
               "jp/intermediate/logging"
             ]
+          },
+          {
+            "group": "コンソールとCLI",
+            "pages": [
+              "jp/intermediate/artisan"
+            ]
           }
         ]
       }
