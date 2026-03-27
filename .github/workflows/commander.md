@@ -20,8 +20,10 @@ network:
 safe-outputs:
   create-issue:
     max: 3
-    assignees: [copilot]
     labels: [commander]
+  assign-to-agent:
+    max: 3
+    allowed: [copilot]
   create-discussion:
     max: 1
     category: "copilot"
@@ -87,7 +89,7 @@ Create **one** GitHub issue describing the work. The issue should include:
 - Content guidelines or references (e.g., which Laravel docs page to reference)
 - Acceptance criteria — what does "done" look like?
 
-The issue will be automatically assigned to Copilot for execution by a coding agent.
+Use `temporary_id` (format: `aw_` + 3-8 alphanumeric chars) when creating the issue, then call `assign-to-agent` with the same temporary_id to assign the Copilot coding agent to the issue.
 
 Write the issue body in Japanese since the primary maintainer is Japanese-speaking.
 
