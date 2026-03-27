@@ -136,6 +136,7 @@
           {
             "group": "デバッグと監視",
             "pages": [
+              "jp/intermediate/error-handling",
               "jp/intermediate/logging"
             ]
           },
