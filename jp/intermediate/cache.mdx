@@ -1,0 +1,609 @@
+---
+title: "キャッシュ"
+description: "Laravelのキャッシュシステムを使ってアプリケーションのパフォーマンスを向上させる方法を学びます。"
+---
+
+## キャッシュとは
+
+データベースへの問い合わせや外部APIの呼び出しは、CPUやネットワークのコストが高く、処理に数秒かかることがあります。
+同じデータを何度も取得する場合、結果を**キャッシュ**に保存しておくことで、次回以降のリクエストを高速に処理できます。
+
+Laravelは Memcached、Redis、DynamoDB、データベースなど、さまざまなキャッシュバックエンドに対応した統一されたAPIを提供しています。
+
+<Info>
+  デフォルトでは `database` ドライバが設定されています。Redis や Memcached に切り替えることで、さらに高速なキャッシュを実現できます。
+</Info>
+
+## キャッシュの設定
+
+### config/cache.php
+
+キャッシュの設定は `config/cache.php` に集約されています。
+`CACHE_STORE` 環境変数でデフォルトのドライバを切り替えます。
+
+```php
+// config/cache.php
+'default' => env('CACHE_STORE', 'database'),
+```
+
+### 利用可能なドライバ
+
+<AccordionGroup>
+  <Accordion title="database（デフォルト）">
+    シリアライズされたキャッシュデータをデータベーステーブルに保存します。
+    Laravel 11以降の新規プロジェクトには最初からマイグレーションが含まれています。
+
+    ```ini
+    CACHE_STORE=database
+    ```
+
+    マイグレーションが含まれていない場合は Artisan コマンドで作成します。
+
+    ```shell
+    php artisan make:cache-table
+    php artisan migrate
+    ```
+  </Accordion>
+
+  <Accordion title="file">
+    キャッシュデータをファイルシステムに保存します。
+    追加のセットアップは不要で、小規模なアプリケーションに向いています。
+
+    ```ini
+    CACHE_STORE=file
+    ```
+  </Accordion>
+
+  <Accordion title="redis">
+    インメモリで動作する高速なキャッシュドライバです。
+    本番環境で最もよく使われます。PhpRedis PHP 拡張または `predis/predis` パッケージが必要です。
+
+    ```ini
+    CACHE_STORE=redis
+    REDIS_HOST=127.0.0.1
+    REDIS_PORT=6379
+    ```
+  </Accordion>
+
+  <Accordion title="memcached">
+    Memcached PECL パッケージが必要です。
+    `config/cache.php` でサーバーを設定します。
+
+    ```php
+    'memcached' => [
+        'servers' => [
+            [
+                'host' => env('MEMCACHED_HOST', '127.0.0.1'),
+                'port' => env('MEMCACHED_PORT', 11211),
+                'weight' => 100,
+            ],
+        ],
+    ],
+    ```
+  </Accordion>
+
+  <Accordion title="dynamodb">
+    AWS DynamoDB をキャッシュストアとして使います。
+    事前に DynamoDB テーブルを作成し、AWS SDK をインストールします。
+
+    ```shell
+    composer require aws/aws-sdk-php
+    ```
+
+    ```ini
+    CACHE_STORE=dynamodb
+    DYNAMODB_CACHE_TABLE=cache
+    AWS_DEFAULT_REGION=us-east-1
+    AWS_ACCESS_KEY_ID=your-key-id
+    AWS_SECRET_ACCESS_KEY=your-secret-key
+    ```
+  </Accordion>
+
+  <Accordion title="array / null（テスト用）">
+    `array` はリクエスト内でのみ有効なインメモリキャッシュです。
+    `null` はすべての操作を無視します。どちらも自動テストで便利です。
+
+    ```ini
+    CACHE_STORE=array
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## 基本的な操作
+
+### Cache ファサードの取得
+
+`Cache` ファサードを使ってキャッシュを操作します。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Support\Facades\Cache;
+
+class UserController extends Controller
+{
+    public function index(): array
+    {
+        $value = Cache::get('key');
+
+        return [
+            // ...
+        ];
+    }
+}
+```
+
+複数のキャッシュストアを使い分けるには `store()` メソッドを使います。
+
+```php
+$value = Cache::store('file')->get('foo');
+
+Cache::store('redis')->put('bar', 'baz', 600); // 10分間保存
+```
+
+### データの取得: `Cache::get()`
+
+`get()` メソッドでキャッシュからデータを取得します。
+キャッシュが存在しない場合は `null` を返します。デフォルト値を指定することもできます。
+
+```php
+$value = Cache::get('key');
+
+// デフォルト値を指定する
+$value = Cache::get('key', 'default');
+
+// クロージャでデフォルト値を遅延取得する
+$value = Cache::get('key', function () {
+    return DB::table('settings')->get();
+});
+```
+
+### データの保存: `Cache::put()`
+
+`put()` メソッドでデータをキャッシュに保存します。第3引数に有効期限（秒）を指定します。
+
+```php
+// 10秒間保存
+Cache::put('key', 'value', 10);
+
+// Carbon インスタンスで有効期限を指定
+Cache::put('key', 'value', now()->plus(minutes: 10));
+
+// 有効期限なし（永続保存）
+Cache::put('key', 'value');
+```
+
+キャッシュが存在しない場合のみ保存する `add()` メソッドもあります。
+
+```php
+// 存在しない場合のみ追加（アトミック操作）
+Cache::add('key', 'value', $seconds);
+```
+
+永続的に保存するには `forever()` を使います。
+
+```php
+Cache::forever('key', 'value');
+```
+
+### 取得または保存: `Cache::remember()`
+
+**最もよく使われる操作**です。キャッシュにデータが存在すればそれを返し、なければクロージャを実行してその結果を保存します。
+
+```php
+$users = Cache::remember('users', 3600, function () {
+    return DB::table('users')->get();
+});
+```
+
+<Tip>
+  `Cache::remember()` を使うことで、「キャッシュの確認 → なければ取得 → キャッシュに保存」という3ステップを1行で書けます。データベースクエリ結果や外部APIレスポンスのキャッシュに最適です。
+</Tip>
+
+永続保存バージョンの `rememberForever()` もあります。
+
+```php
+$value = Cache::rememberForever('users', function () {
+    return DB::table('users')->get();
+});
+```
+
+#### Stale While Revalidate（柔軟なキャッシュ更新）
+
+`Cache::flexible()` はキャッシュが「新鮮な期間」と「古くなっても使える期間」を配列で指定します。
+古くなったデータをユーザーに返しながら、バックグラウンドでキャッシュを更新するパターンです。
+
+```php
+// [新鮮な期間(秒), 古くても使える期間(秒)]
+$value = Cache::flexible('users', [5, 10], function () {
+    return DB::table('users')->get();
+});
+```
+
+### 存在確認: `Cache::has()`
+
+```php
+if (Cache::has('key')) {
+    // キャッシュが存在する場合の処理
+}
+```
+
+### 値のインクリメント / デクリメント
+
+整数値のカウンターを操作できます。
+
+```php
+// 値が存在しない場合は初期化
+Cache::add('key', 0, now()->addHours(4));
+
+// インクリメント / デクリメント
+Cache::increment('key');
+Cache::increment('key', $amount);
+Cache::decrement('key');
+Cache::decrement('key', $amount);
+```
+
+### 取得と削除: `Cache::pull()`
+
+取得後にキャッシュから削除します。ワンタイムデータの管理に便利です。
+
+```php
+$value = Cache::pull('key');
+```
+
+### データの削除: `Cache::forget()`
+
+```php
+// 特定のキーを削除
+Cache::forget('key');
+
+// キャッシュ全体をクリア
+Cache::flush();
+```
+
+<Warning>
+  `Cache::flush()` はキャッシュの「プレフィックス」設定に関係なく、すべてのエントリを削除します。複数のアプリケーションで共有しているキャッシュの場合は注意してください。
+</Warning>
+
+### TTL の延長: `Cache::touch()`
+
+既存のキャッシュアイテムの有効期限を延長します。
+
+```php
+// 秒数で指定
+Cache::touch('key', 3600);
+
+// Carbon インスタンスで指定
+Cache::touch('key', now()->addHours(2));
+```
+
+## キャッシュメモ化
+
+`memo` ドライバを使うと、同一リクエスト内でのキャッシュアクセスをメモリにキャッシュします。
+同じキーへの繰り返しアクセスが多い場合に、キャッシュストアへのラウンドトリップを削減できます。
+
+```php
+use Illuminate\Support\Facades\Cache;
+
+// デフォルトストアをメモ化
+$value = Cache::memo()->get('key');
+
+// Redis ストアをメモ化
+$value = Cache::memo('redis')->get('key');
+```
+
+```php
+// 最初のアクセスはキャッシュストアにアクセス
+$value = Cache::memo()->get('key');
+
+// 2回目以降はメモリから返す（ストアにアクセスしない）
+$value = Cache::memo()->get('key');
+```
+
+## キャッシュタグ
+
+関連するキャッシュアイテムをタグでグループ化し、まとめて削除できます。
+
+<Warning>
+  キャッシュタグは `file`、`dynamodb`、`database` ドライバでは使用できません。`redis` や `memcached` ドライバが必要です。
+</Warning>
+
+### タグ付きキャッシュの保存と取得
+
+```php
+use Illuminate\Support\Facades\Cache;
+
+// タグ付きで保存
+Cache::tags(['people', 'artists'])->put('John', $john, $seconds);
+Cache::tags(['people', 'authors'])->put('Anne', $anne, $seconds);
+
+// タグを指定して取得
+$john = Cache::tags(['people', 'artists'])->get('John');
+$anne = Cache::tags(['people', 'authors'])->get('Anne');
+```
+
+### タグ付きキャッシュの削除
+
+```php
+// 'people' と 'authors' タグを持つすべてのキャッシュを削除（JohnもAnneも削除）
+Cache::tags(['people', 'authors'])->flush();
+
+// 'authors' タグのみ削除（Anneだけ削除。Johnは残る）
+Cache::tags('authors')->flush();
+```
+
+<Tip>
+  ユーザーごとや記事ごとなど、グループ単位でキャッシュを無効化したい場合にタグが役立ちます。
+  例: `Cache::tags(['user', "user:{$userId}"])->flush()` でそのユーザーに関するすべてのキャッシュをクリアできます。
+</Tip>
+
+## アトミック操作（ロック）
+
+`Cache::lock()` を使うと分散ロックを実装でき、複数のプロセスや並列リクエストからの競合状態を防ぎます。
+
+<Info>
+  この機能は `memcached`、`redis`、`dynamodb`、`database`、`file`、`array` キャッシュドライバで利用できます。すべてのサーバーが同じ中央キャッシュサーバーと通信している必要があります。
+</Info>
+
+### 基本的なロック
+
+```php
+use Illuminate\Support\Facades\Cache;
+
+$lock = Cache::lock('foo', 10);
+
+if ($lock->get()) {
+    // ロック取得成功（10秒間有効）
+
+    // 何らかの排他処理を行う
+
+    $lock->release();
+}
+```
+
+クロージャを渡すと、処理完了後に自動でロックを解放します。
+
+```php
+Cache::lock('foo', 10)->get(function () {
+    // ロックを自動解放
+});
+```
+
+### ロック待機
+
+ロックが取得できるまで最大で指定秒数待機します。タイムアウトすると `LockTimeoutException` が投げられます。
+
+```php
+use Illuminate\Contracts\Cache\LockTimeoutException;
+
+$lock = Cache::lock('foo', 10);
+
+try {
+    $lock->block(5); // 最大5秒待機
+
+    // ロック取得後の処理
+
+} catch (LockTimeoutException $e) {
+    // ロック取得失敗
+} finally {
+    $lock->release();
+}
+```
+
+クロージャを使うとシンプルに書けます。
+
+```php
+Cache::lock('foo', 10)->block(5, function () {
+    // 最大5秒待機してロックを取得し、完了後に自動解放
+});
+```
+
+### 重複実行の防止: `withoutOverlapping()`
+
+同一処理の多重実行を防ぐシンプルな方法です。
+
+```php
+Cache::withoutOverlapping('foo', function () {
+    // 同時に1つだけ実行される
+});
+
+// 待機時間とロック保持時間をカスタマイズ
+Cache::withoutOverlapping('foo', function () {
+    // ...
+}, lockFor: 120, waitFor: 5);
+```
+
+### 同時実行数の制限: `funnel()`
+
+同時に実行できる処理数を制限します。
+
+```php
+Cache::funnel('foo')
+    ->limit(3)          // 最大3つの並列実行を許可
+    ->releaseAfter(60)  // 60秒後に自動解放
+    ->block(10)         // 最大10秒待機
+    ->then(function () {
+        // 同時実行枠を確保できた場合の処理
+    }, function () {
+        // 枠を確保できなかった場合の処理
+    });
+```
+
+### プロセス間でのロック引き渡し
+
+Webリクエストでロックを取得し、キュージョブで解放するケースです。
+
+```php
+// リクエストでロックを取得してジョブをディスパッチ
+$lock = Cache::lock('processing', 120);
+
+if ($lock->get()) {
+    ProcessPodcast::dispatch($podcast, $lock->owner());
+}
+
+// キュージョブ内でロックを解放
+Cache::restoreLock('processing', $this->owner)->release();
+```
+
+## キャッシュヘルパー
+
+`cache()` ヘルパー関数を使うと、`Cache` ファサードと同じ操作をよりシンプルに書けます。
+
+```php
+// 値を取得
+$value = cache('key');
+
+// 値を保存（有効期限付き）
+cache(['key' => 'value'], $seconds);
+cache(['key' => 'value'], now()->addMinutes(10));
+
+// 引数なしでファサードと同じインスタンスを取得
+cache()->remember('users', $seconds, function () {
+    return DB::table('users')->get();
+});
+```
+
+## 実践例
+
+### データベースクエリ結果のキャッシュ
+
+<Steps>
+  <Step title="コントローラでクエリ結果をキャッシュする">
+    ```php
+    use Illuminate\Support\Facades\Cache;
+    use Illuminate\Support\Facades\DB;
+
+    public function index(): array
+    {
+        $users = Cache::remember('all-users', 3600, function () {
+            return DB::table('users')->orderBy('name')->get();
+        });
+
+        return compact('users');
+    }
+    ```
+  </Step>
+
+  <Step title="データが更新されたらキャッシュを削除する">
+    ```php
+    public function store(Request $request): RedirectResponse
+    {
+        User::create($request->validated());
+
+        // キャッシュを削除して次回アクセス時に再取得
+        Cache::forget('all-users');
+
+        return redirect()->route('users.index');
+    }
+    ```
+  </Step>
+</Steps>
+
+### Eloquent モデルのキャッシュ
+
+```php
+use App\Models\Product;
+use Illuminate\Support\Facades\Cache;
+
+// カテゴリ別商品一覧を1時間キャッシュ
+public function byCategory(int $categoryId): array
+{
+    $products = Cache::remember(
+        "products:category:{$categoryId}",
+        3600,
+        fn () => Product::where('category_id', $categoryId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+    );
+
+    return compact('products');
+}
+```
+
+### APIレスポンスのキャッシュ
+
+```php
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+
+public function getWeather(string $city): array
+{
+    return Cache::remember(
+        "weather:{$city}",
+        1800, // 30分間キャッシュ
+        function () use ($city) {
+            $response = Http::get('https://api.weather.example.com/current', [
+                'city' => $city,
+            ]);
+
+            return $response->json();
+        }
+    );
+}
+```
+
+### キャッシュタグを使ったグループ管理
+
+```php
+use Illuminate\Support\Facades\Cache;
+
+class ArticleController extends Controller
+{
+    public function show(Article $article): array
+    {
+        $data = Cache::tags(['articles', "article:{$article->id}"])
+            ->remember("article:{$article->id}:detail", 3600, function () use ($article) {
+                return $article->load(['author', 'tags', 'comments']);
+            });
+
+        return compact('data');
+    }
+
+    public function update(Request $request, Article $article): RedirectResponse
+    {
+        $article->update($request->validated());
+
+        // この記事に関するすべてのキャッシュをクリア
+        Cache::tags(["article:{$article->id}"])->flush();
+
+        return redirect()->route('articles.show', $article);
+    }
+}
+```
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="よく使うメソッドまとめ">
+    | メソッド | 説明 |
+    | --- | --- |
+    | `Cache::get('key')` | キャッシュを取得する |
+    | `Cache::put('key', $value, $ttl)` | キャッシュを保存する |
+    | `Cache::remember('key', $ttl, fn)` | 取得または保存する（最重要） |
+    | `Cache::forget('key')` | キャッシュを削除する |
+    | `Cache::has('key')` | キャッシュの存在確認 |
+    | `Cache::flush()` | すべてのキャッシュをクリア |
+    | `Cache::forever('key', $value)` | 永続保存する |
+    | `Cache::pull('key')` | 取得してから削除する |
+    | `Cache::increment('key')` | 数値をインクリメント |
+    | `Cache::tags([...])->flush()` | タグ付きキャッシュをクリア |
+  </Accordion>
+
+  <Accordion title="ドライバの選び方">
+    - **開発・小規模**: `file` または `database`
+    - **本番・高トラフィック**: `redis`（Laravel Horizon と組み合わせると監視も容易）
+    - **AWS 環境**: `dynamodb`
+    - **テスト**: `array` または `null`
+  </Accordion>
+
+  <Accordion title="キャッシュのベストプラクティス">
+    - キャッシュキーはアプリ全体でユニークになるよう命名する（例: `users:1:profile`）
+    - データが更新されたら `Cache::forget()` または `Cache::tags()->flush()` でキャッシュを無効化する
+    - キャッシュの TTL は短すぎず長すぎず、データの更新頻度に合わせて設定する
+    - `Cache::remember()` を使うことでキャッシュのミス時の処理を簡潔に書ける
+    - 本番環境では Redis を使い、フェイルオーバー設定も検討する
+  </Accordion>
+</AccordionGroup>
