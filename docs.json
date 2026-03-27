@@ -153,6 +153,12 @@
             "pages": [
               "jp/intermediate/artisan"
             ]
+          },
+          {
+            "group": "フロントエンド",
+            "pages": [
+              "jp/intermediate/vite"
+            ]
           }
         ]
       }
