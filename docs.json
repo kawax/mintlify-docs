@@ -47,7 +47,8 @@
             "group": "データベース",
             "pages": [
               "jp/tutorial/migrations",
-              "jp/tutorial/eloquent"
+              "jp/tutorial/eloquent",
+              "jp/tutorial/eloquent-relationships"
             ]
           }
         ]
