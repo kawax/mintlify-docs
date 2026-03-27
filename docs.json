@@ -39,7 +39,8 @@
             "group": "リクエスト処理",
             "pages": [
               "jp/tutorial/middleware",
-              "jp/tutorial/requests"
+              "jp/tutorial/requests",
+              "jp/tutorial/validation"
             ]
           }
         ]
@@ -64,19 +65,18 @@
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg"
   },
-  "navbar": {
-  },
+  "navbar": {},
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {
