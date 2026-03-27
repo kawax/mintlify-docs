@@ -110,6 +110,12 @@
             ]
           },
           {
+            "group": "コレクション",
+            "pages": [
+              "jp/intermediate/collections"
+            ]
+          },
+          {
             "group": "外部通信",
             "pages": [
               "jp/intermediate/http-client"
