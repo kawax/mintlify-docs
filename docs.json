@@ -258,6 +258,9 @@
       "github": "https://github.com/invokable"
     }
   },
+  "styling": {
+    "eyebrows": "breadcrumbs"
+  },
   "metadata": {
     "timestamp": true
   }
