@@ -69,6 +69,24 @@
         ]
       },
       {
+        "tab": "Tutorial (English)",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "en/tutorial/installation"
+            ]
+          },
+          {
+            "group": "Basics",
+            "pages": [
+              "en/tutorial/routing",
+              "en/tutorial/blade"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "中級",
         "groups": [
           {
