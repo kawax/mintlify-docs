@@ -19,6 +19,8 @@ This is a Mintlify documentation site. Pages are MDX files with YAML frontmatter
 
 GitHub MCPで https://github.com/laravel/framework のリリース情報を取得して調べる。
 
+- 現在のバージョンはLaravel 13。2026年3月リリース。
+
 ## 公式ドキュメント
 
 - 公式ドキュメントは https://github.com/laravel/docs のMarkdownを直接参照する。デフォルトブランチが最新バージョン。`master`ブランチは次期バージョン用だけどリリース直前にならないと更新されないので参照しない。各ブランチにバージョン4.0以降のすべてのドキュメントが残っている。例外は https://laravel.com/docs/changelog のChangelog、Markdownはなく、月に一度程度更新されて重要な変更点がまとめられている。
