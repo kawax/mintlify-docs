@@ -120,6 +120,12 @@
             "pages": [
               "jp/intermediate/filesystem"
             ]
+          },
+          {
+            "group": "デバッグと監視",
+            "pages": [
+              "jp/intermediate/logging"
+            ]
           }
         ]
       }
