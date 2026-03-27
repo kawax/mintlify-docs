@@ -66,8 +66,27 @@ composer run dev
 開発サーバーが起動したら、ブラウザで [http://localhost:8000](http://localhost:8000) にアクセスします。
 
 <Info>
-  スターターキット（Breeze、Jetstream）を使うと、認証機能を含むベースの足場が自動生成されます。
+  スターターキットを使うと、認証機能を含むベースの足場が自動生成されます。Laravel 12では、React・Vue・Svelte・Livewireの4種類から選択できます。
 </Info>
+
+### スターターキットの選択肢
+
+`laravel new` コマンドを実行すると、以下のスターターキットからいずれかを選択できます。
+
+<AccordionGroup>
+  <Accordion title="React">
+    [Inertia](https://inertiajs.com) を使ったReactフロントエンドのスターターキットです。React 19・TypeScript・Tailwind・[shadcn/ui](https://ui.shadcn.com) を採用しており、SPAとサーバーサイドルーティングを組み合わせたモダンな構成を提供します。
+  </Accordion>
+  <Accordion title="Vue">
+    [Inertia](https://inertiajs.com) を使ったVueフロントエンドのスターターキットです。Vue Composition API・TypeScript・Tailwind・[shadcn-vue](https://www.shadcn-vue.com/) を採用しています。
+  </Accordion>
+  <Accordion title="Svelte">
+    [Inertia](https://inertiajs.com) を使ったSvelteフロントエンドのスターターキットです。Svelte 5・TypeScript・Tailwind・[shadcn-svelte](https://www.shadcn-svelte.com/) を採用しています。
+  </Accordion>
+  <Accordion title="Livewire">
+    [Laravel Livewire](https://livewire.laravel.com) を使ったスターターキットです。PHPだけで動的なUIを構築でき、Bladeテンプレートを主に使うチームに最適です。Tailwind・[Flux UI](https://fluxui.dev) を採用しています。
+  </Accordion>
+</AccordionGroup>
 
 ## Laravel Herd を使ったインストール
 
