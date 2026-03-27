@@ -257,5 +257,8 @@
     "socials": {
       "github": "https://github.com/invokable"
     }
+  },
+  "metadata": {
+    "timestamp": true
   }
 }
