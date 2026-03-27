@@ -11,6 +11,17 @@
   "navigation": {
     "tabs": [
       {
+        "tab": "中級",
+        "groups": [
+          {
+            "group": "非同期処理",
+            "pages": [
+              "jp/intermediate/queues"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "入門チュートリアル",
         "groups": [
           {
