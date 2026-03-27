@@ -1,0 +1,388 @@
+---
+title: "Macroableトレイト"
+description: "Illuminate\\Support\\Traits\\Macroable トレイトを使って、既存のLaravelクラスに独自メソッドを追加する方法を解説します。"
+---
+
+## Macroableトレイトとは
+
+`Macroable` トレイトは、クラスを変更せずに後からメソッドを動的に追加できる仕組みです。Laravelのコアクラスの多くがこのトレイトを使っているため、コアコードに手を加えることなく機能を拡張できます。
+
+トレイトの実体は `Illuminate\Support\Traits\Macroable` にあります。内部的には、登録されたマクロを静的プロパティ `$macros` に格納し、`__call` / `__callStatic` マジックメソッドを通じて呼び出します。
+
+## Macroableを使っているクラス
+
+Laravelには多くのMacroable対応クラスがあります。
+
+| クラス | 用途 |
+|---|---|
+| `Illuminate\Support\Collection` | コレクション操作 |
+| `Illuminate\Support\Str` | 文字列操作 |
+| `Illuminate\Support\Arr` | 配列操作 |
+| `Illuminate\Http\Request` | HTTPリクエスト |
+| `Illuminate\Http\Response` | HTTPレスポンス |
+| `Illuminate\Routing\Router` | ルーター |
+| `Illuminate\Routing\ResponseFactory` | レスポンスファクトリ |
+| `Illuminate\Database\Schema\Blueprint` | スキーマビルダー |
+| `Illuminate\Pipeline\Pipeline` | パイプライン |
+| `Illuminate\Testing\TestResponse` | テストレスポンス |
+
+## macro() — メソッドを追加する
+
+`macro()` の第一引数にメソッド名、第二引数にクロージャを渡します。
+
+```php
+use Illuminate\Support\Collection;
+
+Collection::macro('toSentence', function (string $separator = '、') {
+    /** @var Collection $this */
+    return $this->implode($separator);
+});
+
+$result = collect(['りんご', 'みかん', 'ぶどう'])->toSentence();
+// 'りんご、みかん、ぶどう'
+```
+
+クロージャ内の `$this` はマクロを呼び出したインスタンスにバインドされます。これにより、クラスのプロパティやメソッドに直接アクセスできます。
+
+## mixin() — 複数メソッドをまとめて追加する
+
+多くのマクロをまとめて登録したい場合は `mixin()` を使います。ミックスインクラスの `public` / `protected` メソッドがすべてマクロとして登録されます。
+
+```php
+namespace App\Mixins;
+
+class CollectionMixin
+{
+    public function toCsv(): Closure
+    {
+        return function (string $separator = ',') {
+            /** @var \Illuminate\Support\Collection $this */
+            return $this->map(function ($item) use ($separator) {
+                return is_array($item) ? implode($separator, $item) : $item;
+            })->implode("\n");
+        };
+    }
+
+    public function filterEmpty(): Closure
+    {
+        return function () {
+            /** @var \Illuminate\Support\Collection $this */
+            return $this->filter(fn ($item) => ! empty($item))->values();
+        };
+    }
+
+    public function groupByFirst(): Closure
+    {
+        return function (string $key) {
+            /** @var \Illuminate\Support\Collection $this */
+            return $this->groupBy(fn ($item) => $item[$key][0] ?? '');
+        };
+    }
+}
+```
+
+<Info>
+  `mixin()` のメソッドは、マクロとして登録されるクロージャを返す必要があります。メソッド自体の戻り値がマクロの実装になります。
+</Info>
+
+## サービスプロバイダーへの登録
+
+マクロはアプリケーション起動時に登録する必要があります。`AppServiceProvider` の `boot()` メソッドが適切な場所です。
+
+```php
+namespace App\Providers;
+
+use App\Mixins\CollectionMixin;
+use Illuminate\Support\Collection;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
+use Illuminate\Http\Request;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        // 単一マクロを登録
+        Collection::macro('toSentence', function (string $separator = '、') {
+            return $this->implode($separator);
+        });
+
+        // ミックスインをまとめて登録
+        Collection::mixin(new CollectionMixin);
+
+        // Strへのマクロ
+        Str::macro('initials', function (string $name) {
+            return collect(explode(' ', $name))
+                ->map(fn ($word) => strtoupper($word[0]))
+                ->implode('');
+        });
+    }
+}
+```
+
+## 実践的なユースケース
+
+### コレクションの拡張
+
+コレクションへのカスタムメソッド追加は最も一般的な使用例です。
+
+```php
+// 数値コレクションの統計メソッド
+Collection::macro('median', function () {
+    $sorted = $this->sort()->values();
+    $count = $sorted->count();
+
+    if ($count === 0) {
+        return null;
+    }
+
+    $middle = (int) floor($count / 2);
+
+    if ($count % 2 === 0) {
+        return ($sorted->get($middle - 1) + $sorted->get($middle)) / 2;
+    }
+
+    return $sorted->get($middle);
+});
+
+$median = collect([3, 1, 4, 1, 5, 9, 2, 6])->median();
+// 3.5
+
+// ページネーション情報を付与したコレクションを返すマクロ
+Collection::macro('paginateArray', function (int $perPage = 15, int $page = 1) {
+    return $this->slice(($page - 1) * $perPage, $perPage)->values();
+});
+```
+
+### Strクラスの拡張
+
+```php
+// 日本語の文字数カウント（マルチバイト対応）
+Str::macro('mbLength', function (string $value) {
+    return mb_strlen($value, 'UTF-8');
+});
+
+// スネークケースをドット記法に変換
+Str::macro('toDotNotation', function (string $value) {
+    return str_replace('_', '.', $value);
+});
+
+$length = Str::mbLength('こんにちは'); // 5
+$dot = Str::toDotNotation('user_profile_name'); // 'user.profile.name'
+```
+
+### Requestクラスの拡張
+
+```php
+use Illuminate\Http\Request;
+
+Request::macro('isFromMobile', function () {
+    /** @var Request $this */
+    $userAgent = $this->userAgent() ?? '';
+
+    return preg_match('/Mobile|Android|iPhone|iPad/i', $userAgent) === 1;
+});
+
+Request::macro('preferredLocale', function (array $available = ['ja', 'en']) {
+    /** @var Request $this */
+    foreach ($this->getLanguages() as $lang) {
+        $short = substr($lang, 0, 2);
+        if (in_array($short, $available)) {
+            return $short;
+        }
+    }
+
+    return $available[0] ?? 'en';
+});
+```
+
+```php
+// コントローラーで使用
+public function index(Request $request)
+{
+    if ($request->isFromMobile()) {
+        return response()->json($this->getMobileData());
+    }
+
+    $locale = $request->preferredLocale(['ja', 'en', 'zh']);
+    // ...
+}
+```
+
+### Blueprintの拡張（マイグレーション）
+
+スキーマのカラム定義をまとめてマクロ化すると、一貫したDB設計を保てます。
+
+```php
+use Illuminate\Database\Schema\Blueprint;
+
+Blueprint::macro('addTimestampsWithTimezone', function () {
+    /** @var Blueprint $this */
+    $this->timestampsTz();
+    $this->softDeletesTz();
+});
+
+Blueprint::macro('addUserTracking', function () {
+    /** @var Blueprint $this */
+    $this->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+    $this->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+});
+```
+
+```php
+// マイグレーションで使用
+Schema::create('posts', function (Blueprint $table) {
+    $table->id();
+    $table->string('title');
+    $table->text('body');
+    $table->addTimestampsWithTimezone();
+    $table->addUserTracking();
+});
+```
+
+### テストレスポンスの拡張
+
+テスト専用のアサーションメソッドを追加できます。
+
+```php
+use Illuminate\Testing\TestResponse;
+
+TestResponse::macro('assertPaginated', function () {
+    /** @var TestResponse $this */
+    return $this->assertJsonStructure([
+        'data',
+        'meta' => ['current_page', 'last_page', 'per_page', 'total'],
+        'links' => ['first', 'last', 'prev', 'next'],
+    ]);
+});
+
+TestResponse::macro('assertApiSuccess', function () {
+    /** @var TestResponse $this */
+    return $this->assertOk()->assertJsonPath('success', true);
+});
+```
+
+```php
+// テストで使用
+$this->getJson('/api/posts')->assertPaginated();
+$this->postJson('/api/orders', $data)->assertApiSuccess();
+```
+
+## hasMacro() — マクロの存在確認
+
+```php
+use Illuminate\Support\Collection;
+
+if (Collection::hasMacro('toSentence')) {
+    $result = collect(['a', 'b'])->toSentence();
+}
+```
+
+## flushMacros() — マクロのリセット
+
+テストでマクロをリセットしたい場合に使います。
+
+```php
+use Illuminate\Support\Collection;
+
+// テスト内でのリセット
+Collection::flushMacros();
+```
+
+<Warning>
+  `flushMacros()` はそのクラスのすべてのマクロを削除します。テスト間の独立性を保つために `tearDown()` で呼ぶことがありますが、他のテストで登録したマクロも消えるため注意が必要です。
+</Warning>
+
+## 静的マクロ
+
+マクロはインスタンスメソッドとしてだけでなく、静的メソッドとしても動作します。`__callStatic` によって処理されます。
+
+```php
+Str::macro('randomHex', function (int $length = 8) {
+    return substr(bin2hex(random_bytes($length)), 0, $length);
+});
+
+// 静的呼び出し
+$hex = Str::randomHex(16);
+```
+
+## Macroableトレイトを自作クラスで使う
+
+自分で作ったクラスにも `Macroable` を組み込めます。
+
+```php
+namespace App\Services;
+
+use Illuminate\Support\Traits\Macroable;
+
+class ReportBuilder
+{
+    use Macroable;
+
+    protected array $sections = [];
+
+    public function addSection(string $name, callable $content): static
+    {
+        $this->sections[$name] = $content;
+
+        return $this;
+    }
+
+    public function build(): array
+    {
+        return array_map(fn ($fn) => $fn(), $this->sections);
+    }
+}
+```
+
+```php
+// サービスプロバイダーで拡張
+ReportBuilder::macro('withSummary', function (string $title) {
+    /** @var ReportBuilder $this */
+    return $this->addSection('summary', fn () => [
+        'title' => $title,
+        'generated_at' => now()->toIso8601String(),
+    ]);
+});
+
+// 使用例
+$report = app(ReportBuilder::class)
+    ->withSummary('月次レポート')
+    ->addSection('data', fn () => ['rows' => 42])
+    ->build();
+```
+
+## 内部実装の詳細
+
+```php
+// __call の実装（インスタンスメソッド呼び出し）
+public function __call($method, $parameters)
+{
+    if (! static::hasMacro($method)) {
+        throw new BadMethodCallException(sprintf(
+            'Method %s::%s does not exist.', static::class, $method
+        ));
+    }
+
+    $macro = static::$macros[$method];
+
+    if ($macro instanceof Closure) {
+        // bindTo で $this をインスタンスにバインド
+        $macro = $macro->bindTo($this, static::class);
+    }
+
+    return $macro(...$parameters);
+}
+```
+
+クロージャは `Closure::bindTo()` によってインスタンスにバインドされます。これにより `$this` がマクロ呼び出し元のオブジェクトを指すようになります。クロージャ以外（invokableオブジェクトなど）の場合はバインドされません。
+
+<Tip>
+  IDEのサポートを得るには、マクロのアノテーションを `@mixin` を使ったDocブロックで定義するか、Laravel IdeHelperパッケージを使ってヘルパーファイルを自動生成する方法があります。
+</Tip>
+
+## 次のステップ
+
+<Card title="Pipelineパターン" icon="arrow-right-arrow-left" href="/jp/advanced/pipeline">
+  パイプラインパターンを使って複数の処理ステップを直列に構成する方法を学びます。
+</Card>
