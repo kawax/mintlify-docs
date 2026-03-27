@@ -1,0 +1,460 @@
+---
+title: "ファイルストレージ"
+description: "LaravelのFlysystem統合を使ったファイルの読み書き、アップロード、クラウドストレージ連携の方法を解説します。"
+---
+
+## ファイルストレージとは
+
+Laravelは [Flysystem](https://github.com/thephpleague/flysystem) というPHPパッケージをベースにした、強力なファイルシステム抽象化レイヤーを提供しています。
+ローカルディスク・SFTP・Amazon S3など、異なるストレージバックエンドを同じAPIで操作できるため、環境に応じて切り替えても**コードの変更が不要**です。
+
+<Info>
+  ドライバーを切り替えてもコードは変わりません。開発環境ではローカル、本番環境ではS3、という構成が簡単に実現できます。
+</Info>
+
+## 設定
+
+ファイルシステムの設定は `config/filesystems.php` にまとめられています。
+ここで「ディスク」を定義します。ディスクとは、特定のドライバーとストレージ場所の組み合わせです。
+
+主なドライバーは次のとおりです。
+
+| ドライバー | 用途 |
+|---|---|
+| `local` | サーバーのローカルファイルシステム |
+| `public` | Web公開用のローカルディスク |
+| `s3` | Amazon S3（またはS3互換サービス） |
+| `sftp` | SFTPサーバー |
+| `ftp` | FTPサーバー |
+
+### localドライバー
+
+`local` ドライバーを使うと、`filesystems` 設定の `root` ディレクトリを基準にファイルを操作します。
+デフォルトでは `storage/app/private` が `root` です。
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+Storage::disk('local')->put('example.txt', 'Contents');
+// storage/app/private/example.txt に書き込まれる
+```
+
+### デフォルトディスクの変更
+
+`FILESYSTEM_DISK` 環境変数でデフォルトのディスクを切り替えられます。
+
+```ini
+FILESYSTEM_DISK=s3
+```
+
+## publicディスクとシンボリックリンク
+
+`public` ディスクはWebからアクセスできるファイルを置くためのものです。
+デフォルトでは `storage/app/public` ディレクトリに保存されます。
+
+Webサーバーからアクセスできるようにするには、`public/storage` から `storage/app/public` へのシンボリックリンクを作成します。
+
+<Steps>
+  <Step title="シンボリックリンクの作成">
+    ```shell
+    php artisan storage:link
+    ```
+  </Step>
+  <Step title="ファイルのURLを取得">
+    シンボリックリンク作成後、`asset` ヘルパーでURLを生成できます。
+
+    ```php
+    echo asset('storage/file.txt');
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  追加のシンボリックリンクが必要な場合、`config/filesystems.php` の `links` 配列で設定できます。
+
+  ```php
+  'links' => [
+      public_path('storage') => storage_path('app/public'),
+      public_path('images') => storage_path('app/images'),
+  ],
+  ```
+</Tip>
+
+シンボリックリンクを削除するには `storage:unlink` を使います。
+
+```shell
+php artisan storage:unlink
+```
+
+## Storageファサードの基本操作
+
+### ファイルの読み込み
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// ファイルの内容を文字列で取得
+$contents = Storage::get('file.jpg');
+
+// JSONファイルを取得してデコード
+$data = Storage::json('orders.json');
+
+// ファイルの存在確認
+if (Storage::exists('file.jpg')) {
+    // ファイルが存在する
+}
+
+// ファイルが存在しないことを確認
+if (Storage::missing('file.jpg')) {
+    // ファイルが存在しない
+}
+```
+
+### ファイルの書き込み
+
+```php
+// ファイルに書き込む
+Storage::put('file.jpg', $contents);
+
+// リソースをストリームとして書き込む
+Storage::put('file.jpg', $resource);
+
+// 先頭・末尾に追記する
+Storage::prepend('file.log', 'Prepended Text');
+Storage::append('file.log', 'Appended Text');
+
+// ファイルのコピーと移動
+Storage::copy('old/file.jpg', 'new/file.jpg');
+Storage::move('old/file.jpg', 'new/file.jpg');
+```
+
+<Info>
+  `put` が失敗した場合、デフォルトでは `false` を返します。
+  ディスク設定で `'throw' => true` とすることで、例外をスローさせることもできます。
+</Info>
+
+### ファイルの削除
+
+```php
+// 単一ファイルの削除
+Storage::delete('file.jpg');
+
+// 複数ファイルの削除
+Storage::delete(['file.jpg', 'file2.jpg']);
+
+// 特定ディスクのファイルを削除
+Storage::disk('s3')->delete('path/file.jpg');
+```
+
+### ファイルのダウンロードレスポンス
+
+```php
+// ブラウザにダウンロードを促すレスポンスを返す
+return Storage::download('file.jpg');
+
+// ファイル名とヘッダーを指定する場合
+return Storage::download('file.jpg', 'my-file.jpg', $headers);
+```
+
+## URLの生成
+
+### 通常のURL
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+$url = Storage::url('file.jpg');
+```
+
+`local` ドライバーでは `/storage/file.jpg` のような相対URLを返します。
+`s3` ドライバーでは完全なリモートURLを返します。
+
+### 一時URL（Temporary URL）
+
+期限付きのURLを生成したい場合は `temporaryUrl` メソッドを使います。
+`local` と `s3` ドライバーで利用できます。
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+$url = Storage::temporaryUrl(
+    'file.jpg',
+    now()->plus(minutes: 5)
+);
+```
+
+S3では追加のリクエストパラメータも指定できます。
+
+```php
+$url = Storage::temporaryUrl(
+    'file.jpg',
+    now()->plus(minutes: 5),
+    [
+        'ResponseContentType' => 'application/octet-stream',
+        'ResponseContentDisposition' => 'attachment; filename=file.jpg',
+    ]
+);
+```
+
+<Tip>
+  一時アップロードURLが必要な場合は `temporaryUploadUrl` メソッドを使います。
+  クライアントサイドから直接S3へアップロードするようなサーバーレス構成で活用できます。
+
+  ```php
+  ['url' => $url, 'headers' => $headers] = Storage::temporaryUploadUrl(
+      'file.jpg', now()->plus(minutes: 5)
+  );
+  ```
+</Tip>
+
+## ファイルのアップロード
+
+ユーザーがフォームからアップロードしたファイルを保存する一般的なパターンです。
+
+### storeメソッド（ファイル名を自動生成）
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+
+class UserAvatarController extends Controller
+{
+    public function update(Request $request): string
+    {
+        // ファイル名はMIMEタイプから拡張子を判定して自動生成される
+        $path = $request->file('avatar')->store('avatars');
+
+        return $path;
+    }
+}
+```
+
+### storeAsメソッド（ファイル名を指定）
+
+```php
+$path = $request->file('avatar')->storeAs(
+    'avatars',
+    $request->user()->id
+);
+```
+
+### ディスクを指定してアップロード
+
+```php
+// s3ディスクに保存
+$path = $request->file('avatar')->store(
+    'avatars/' . $request->user()->id,
+    's3'
+);
+```
+
+### Storageファサード経由でアップロード
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// ファイル名を自動生成
+$path = Storage::putFile('avatars', $request->file('avatar'));
+
+// ファイル名を指定
+$path = Storage::putFileAs(
+    'avatars',
+    $request->file('avatar'),
+    $request->user()->id
+);
+```
+
+<Warning>
+  `getClientOriginalName()` や `getClientOriginalExtension()` はユーザーが改ざんできるため安全ではありません。
+  ファイル名には `hashName()`、拡張子には `extension()` を使ってください。
+
+  ```php
+  $file = $request->file('avatar');
+
+  $name = $file->hashName();   // ユニークなランダム名を生成
+  $extension = $file->extension(); // MIMEタイプから拡張子を判定
+  ```
+</Warning>
+
+## ファイルの可視性（Visibility）
+
+Flysystemでは、ファイルの公開・非公開を `visibility` で管理します。
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// 書き込み時に可視性を指定
+Storage::put('file.jpg', $contents, 'public');
+
+// 可視性の取得と変更
+$visibility = Storage::getVisibility('file.jpg');
+Storage::setVisibility('file.jpg', 'public');
+```
+
+アップロードしたファイルを公開状態で保存する場合は `storePublicly` を使います。
+
+```php
+$path = $request->file('avatar')->storePublicly('avatars', 's3');
+```
+
+## 複数ディスクの使い分け
+
+`disk` メソッドで操作するディスクを切り替えられます。
+
+```php
+// デフォルトディスクに保存
+Storage::put('avatars/1', $content);
+
+// s3ディスクに保存
+Storage::disk('s3')->put('avatars/1', $content);
+
+// オンデマンドでディスクを作成
+$disk = Storage::build([
+    'driver' => 'local',
+    'root' => '/path/to/root',
+]);
+$disk->put('image.jpg', $content);
+```
+
+## クラウドストレージ（S3）の設定
+
+### パッケージのインストール
+
+```shell
+composer require league/flysystem-aws-s3-v3 "^3.0" --with-all-dependencies
+```
+
+### 環境変数の設定
+
+`.env` ファイルにS3の認証情報を設定します。
+
+```ini
+AWS_ACCESS_KEY_ID=your-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=your-bucket-name
+AWS_USE_PATH_STYLE_ENDPOINT=false
+```
+
+<Info>
+  DigitalOcean Spaces、Cloudflare R2、Vultr Object StorageなどのS3互換サービスも `s3` ドライバーで利用できます。
+  `endpoint` オプションにサービスのエンドポイントURLを指定してください。
+
+  ```php
+  'endpoint' => env('AWS_ENDPOINT', 'https://your-endpoint.example.com'),
+  ```
+</Info>
+
+## ファイルメタデータの取得
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// ファイルサイズ（バイト）
+$size = Storage::size('file.jpg');
+
+// 最終更新日時（UNIXタイムスタンプ）
+$time = Storage::lastModified('file.jpg');
+
+// MIMEタイプ
+$mime = Storage::mimeType('file.jpg');
+
+// ファイルの絶対パス（localドライバー）
+$path = Storage::path('file.jpg');
+```
+
+## ディレクトリ操作
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// ディレクトリ内のファイル一覧
+$files = Storage::files($directory);
+
+// サブディレクトリを含むファイル一覧
+$files = Storage::allFiles($directory);
+
+// ディレクトリ一覧
+$directories = Storage::directories($directory);
+
+// ディレクトリの作成
+Storage::makeDirectory($directory);
+
+// ディレクトリとその中のファイルをまとめて削除
+Storage::deleteDirectory($directory);
+```
+
+## テスト
+
+`Storage::fake()` を使うと、実際のディスクに触れることなくファイル操作のテストが書けます。
+
+```php
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+test('アバターをアップロードできる', function () {
+    Storage::fake('avatars');
+
+    $file = UploadedFile::fake()->image('avatar.jpg');
+
+    $this->post('/user/avatar', ['avatar' => $file]);
+
+    // ファイルが保存されたことを確認
+    Storage::disk('avatars')->assertExists('avatar.jpg');
+
+    // ファイルが保存されていないことを確認
+    Storage::disk('avatars')->assertMissing('other.jpg');
+});
+```
+
+<Info>
+  `UploadedFile::fake()->image()` を使うには、PHPの [GD拡張](https://www.php.net/manual/ja/book.image.php) が必要です。
+</Info>
+
+## 実践的なユースケース: プロフィール画像のアップロード
+
+バリデーション・保存・DBへのパス記録を組み合わせた実践的なコントローラーの例です。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
+
+class ProfileController extends Controller
+{
+    public function updateAvatar(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'avatar' => ['required', 'image', 'max:2048'],
+        ]);
+
+        $user = $request->user();
+
+        // 既存のアバターを削除
+        if ($user->avatar_path) {
+            Storage::disk('public')->delete($user->avatar_path);
+        }
+
+        // 新しいアバターを保存
+        $path = $request->file('avatar')->store('avatars', 'public');
+
+        // パスをDBに保存
+        $user->update(['avatar_path' => $path]);
+
+        return back()->with('status', 'avatar-updated');
+    }
+}
+```
+
+テンプレートでは `Storage::url()` を使ってURLを取得します。
+
+```blade
+<img src="{{ Storage::disk('public')->url($user->avatar_path) }}" alt="アバター">
+```
