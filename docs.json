@@ -92,6 +92,12 @@
             ]
           },
           {
+            "group": "スケジューリング",
+            "pages": [
+              "jp/intermediate/scheduling"
+              ]
+          },
+          {
             "group": "イベント",
             "pages": [
               "jp/intermediate/events"
