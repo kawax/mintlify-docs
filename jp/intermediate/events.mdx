@@ -1,0 +1,492 @@
+---
+title: "イベントとリスナー"
+description: "Laravelのイベントシステムを使って、アプリケーションのコンポーネントを疎結合に保つ方法を学びます。"
+---
+
+## イベントとは
+
+Laravelのイベントシステムは、シンプルなオブザーバーパターンの実装です。
+アプリケーション内で起きた出来事(イベント)を発火し、それに反応するリスナーを定義することで、コンポーネント間の依存を最小限に抑えられます。
+
+たとえば「注文が確定した」というイベントを発火すると、「確認メールを送る」「在庫を減らす」「Slackに通知する」といった複数のリスナーがそれぞれ独立して動きます。
+注文処理のコードはメール送信やSlack通知の実装を一切知る必要がありません。
+
+<Info>
+  イベントクラスは `app/Events` ディレクトリに、リスナークラスは `app/Listeners` ディレクトリに置きます。
+  どちらも存在しない場合は Artisan コマンドが自動で作成します。
+</Info>
+
+## イベントとリスナーの生成
+
+`make:event` と `make:listener` Artisan コマンドでクラスのひな型を生成します。
+
+```bash
+php artisan make:event UserRegistered
+
+php artisan make:listener SendWelcomeEmail --event=UserRegistered
+```
+
+引数なしで実行するとインタラクティブに入力を求められます。
+
+```bash
+php artisan make:event
+
+php artisan make:listener
+```
+
+## イベントの登録
+
+### イベントディスカバリー(自動検出)
+
+デフォルトでは、Laravel は `app/Listeners` ディレクトリをスキャンしてリスナーを自動登録します。
+`handle` または `__invoke` という名前のメソッドの引数型からイベントとのマッピングを推論します。
+
+```php
+use App\Events\UserRegistered;
+
+class SendWelcomeEmail
+{
+    public function handle(UserRegistered $event): void
+    {
+        // ウェルカムメールを送信する
+    }
+}
+```
+
+PHP のユニオン型を使うと、複数イベントを一つのメソッドで受け取れます。
+
+```php
+public function handle(UserRegistered|UserUpdated $event): void
+{
+    // ...
+}
+```
+
+リスナーを別ディレクトリに置く場合は `bootstrap/app.php` で追加スキャン先を指定します。
+
+```php
+->withEvents(discover: [
+    __DIR__.'/../app/Domain/Orders/Listeners',
+])
+```
+
+ワイルドカードを使って複数のディレクトリをまとめて指定できます。
+
+```php
+->withEvents(discover: [
+    __DIR__.'/../app/Domain/*/Listeners',
+])
+```
+
+登録されているリスナーの一覧は次のコマンドで確認できます。
+
+```bash
+php artisan event:list
+```
+
+<Tip>
+  本番環境ではリスナーのマニフェストをキャッシュしておくとパフォーマンスが向上します。
+  デプロイ時に `php artisan optimize` または `php artisan event:cache` を実行してください。
+  キャッシュを削除するには `php artisan event:clear` を使います。
+</Tip>
+
+### 手動登録
+
+`AppServiceProvider` の `boot` メソッドで `Event` ファサードを使って手動登録することもできます。
+
+```php
+use App\Events\UserRegistered;
+use App\Listeners\SendWelcomeEmail;
+use Illuminate\Support\Facades\Event;
+
+public function boot(): void
+{
+    Event::listen(
+        UserRegistered::class,
+        SendWelcomeEmail::class,
+    );
+}
+```
+
+クロージャで登録することも可能です。
+
+```php
+use App\Events\UserRegistered;
+use Illuminate\Support\Facades\Event;
+
+public function boot(): void
+{
+    Event::listen(function (UserRegistered $event) {
+        // ...
+    });
+}
+```
+
+## イベントの定義
+
+イベントクラスはデータの入れ物です。ロジックは持たず、イベントに関連する情報をプロパティとして保持します。
+
+```php
+<?php
+
+namespace App\Events;
+
+use App\Models\User;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+class UserRegistered
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
+    public function __construct(
+        public User $user,
+    ) {}
+}
+```
+
+`SerializesModels` トレイトにより、キューイングされたリスナーがイベントをシリアライズする際に Eloquent モデルが正しく扱われます。
+
+## イベントの発火
+
+`dispatch` スタティックメソッドまたは `event()` ヘルパーでイベントを発火します。
+
+```php
+use App\Events\UserRegistered;
+
+// スタティックメソッド
+UserRegistered::dispatch($user);
+
+// ヘルパー関数
+event(new UserRegistered($user));
+```
+
+条件付きで発火するメソッドも用意されています。
+
+```php
+UserRegistered::dispatchIf($condition, $user);
+
+UserRegistered::dispatchUnless($condition, $user);
+```
+
+### データベーストランザクション後に発火する
+
+イベントをトランザクションのコミット後にだけ発火したい場合は、`ShouldDispatchAfterCommit` インターフェースをイベントクラスに実装します。
+トランザクションが失敗するとイベントは破棄されます。
+
+```php
+<?php
+
+namespace App\Events;
+
+use App\Models\User;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+class UserRegistered implements ShouldDispatchAfterCommit
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
+    public function __construct(
+        public User $user,
+    ) {}
+}
+```
+
+## リスナーの実装
+
+リスナーは `handle` メソッドでイベントを受け取ります。
+コンストラクタでは、サービスコンテナが依存を自動注入します。
+
+```php
+<?php
+
+namespace App\Listeners;
+
+use App\Events\UserRegistered;
+use App\Mail\WelcomeMail;
+use Illuminate\Support\Facades\Mail;
+
+class SendWelcomeEmail
+{
+    public function __construct() {}
+
+    public function handle(UserRegistered $event): void
+    {
+        Mail::to($event->user->email)
+            ->send(new WelcomeMail($event->user));
+    }
+}
+```
+
+リスナーの `handle` メソッドで `false` を返すと、後続のリスナーへのイベント伝播を止められます。
+
+## キューイングされたリスナー
+
+メール送信や HTTP リクエストなど時間のかかる処理は、キューイングされたリスナーとして非同期に実行できます。
+`ShouldQueue` インターフェースを実装するだけで、イベント発火時にリスナーが自動的にキューに積まれます。
+
+```php
+<?php
+
+namespace App\Listeners;
+
+use App\Events\UserRegistered;
+use Illuminate\Contracts\Queue\ShouldQueue;
+
+class SendWelcomeEmail implements ShouldQueue
+{
+    public function handle(UserRegistered $event): void
+    {
+        // この処理はキューワーカーが非同期に実行する
+    }
+}
+```
+
+<Info>
+  キューイングされたリスナーを使う前に、キューの設定とワーカーの起動が必要です。
+  詳しくは[キューとジョブ](/jp/intermediate/queues)のページを参照してください。
+</Info>
+
+### キューの接続・名前・遅延時間をカスタマイズする
+
+PHP アトリビュートを使って接続先・キュー名・遅延時間を設定できます。
+
+```php
+<?php
+
+namespace App\Listeners;
+
+use App\Events\UserRegistered;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\Attributes\Connection;
+use Illuminate\Queue\Attributes\Delay;
+use Illuminate\Queue\Attributes\Queue;
+
+#[Connection('redis')]
+#[Queue('emails')]
+#[Delay(10)]
+class SendWelcomeEmail implements ShouldQueue
+{
+    public function handle(UserRegistered $event): void
+    {
+        // ...
+    }
+}
+```
+
+メソッドで動的に値を決めることもできます。
+
+```php
+public function viaConnection(): string
+{
+    return 'redis';
+}
+
+public function viaQueue(): string
+{
+    return 'emails';
+}
+
+public function withDelay(UserRegistered $event): int
+{
+    return 10;
+}
+```
+
+### 最大試行回数とタイムアウト
+
+`#[Tries]` と `#[Timeout]` アトリビュートで失敗時の挙動を制御できます。
+
+```php
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Attributes\Timeout;
+
+#[Tries(3)]
+#[Timeout(30)]
+class SendWelcomeEmail implements ShouldQueue
+{
+    // ...
+}
+```
+
+### 失敗時の処理
+
+`failed` メソッドを定義すると、リスナーが最大試行回数を超えて失敗したときの後処理を記述できます。
+
+```php
+use Throwable;
+
+public function failed(UserRegistered $event, Throwable $exception): void
+{
+    // 管理者への通知など
+}
+```
+
+## イベントサブスクライバー
+
+イベントサブスクライバーを使うと、関連する複数のイベントハンドラーを一つのクラスにまとめられます。
+
+### サブスクライバーの作成
+
+`subscribe` メソッドでイベントとハンドラーのマッピングを配列で返します。
+
+```php
+<?php
+
+namespace App\Listeners;
+
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Events\Dispatcher;
+
+class UserActivitySubscriber
+{
+    public function handleLogin(Login $event): void
+    {
+        // ログイン処理
+    }
+
+    public function handleLogout(Logout $event): void
+    {
+        // ログアウト処理
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function subscribe(Dispatcher $events): array
+    {
+        return [
+            Login::class => 'handleLogin',
+            Logout::class => 'handleLogout',
+        ];
+    }
+}
+```
+
+### サブスクライバーの登録
+
+イベントディスカバリーが有効な場合、`subscribe` メソッドから配列を返すサブスクライバーは自動登録されます。
+手動で登録する場合は `AppServiceProvider` の `boot` メソッドで `Event::subscribe` を呼び出します。
+
+```php
+use App\Listeners\UserActivitySubscriber;
+use Illuminate\Support\Facades\Event;
+
+public function boot(): void
+{
+    Event::subscribe(UserActivitySubscriber::class);
+}
+```
+
+## 実践例: ユーザー登録時にウェルカムメールを送信する
+
+<Steps>
+  <Step title="イベントクラスを作成する">
+    ```bash
+    php artisan make:event UserRegistered
+    ```
+
+    `app/Events/UserRegistered.php` を編集して登録ユーザーを保持するプロパティを追加します。
+
+    ```php
+    <?php
+
+    namespace App\Events;
+
+    use App\Models\User;
+    use Illuminate\Broadcasting\InteractsWithSockets;
+    use Illuminate\Foundation\Events\Dispatchable;
+    use Illuminate\Queue\SerializesModels;
+
+    class UserRegistered
+    {
+        use Dispatchable, InteractsWithSockets, SerializesModels;
+
+        public function __construct(
+            public User $user,
+        ) {}
+    }
+    ```
+  </Step>
+
+  <Step title="リスナークラスを作成する">
+    ```bash
+    php artisan make:listener SendWelcomeEmail --event=UserRegistered
+    ```
+
+    メール送信をキューで非同期に行うため `ShouldQueue` を実装します。
+
+    ```php
+    <?php
+
+    namespace App\Listeners;
+
+    use App\Events\UserRegistered;
+    use App\Mail\WelcomeMail;
+    use Illuminate\Contracts\Queue\ShouldQueue;
+    use Illuminate\Support\Facades\Mail;
+
+    class SendWelcomeEmail implements ShouldQueue
+    {
+        public function handle(UserRegistered $event): void
+        {
+            Mail::to($event->user->email)
+                ->send(new WelcomeMail($event->user));
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="コントローラでイベントを発火する">
+    ユーザー登録処理の後に `UserRegistered::dispatch()` を呼び出します。
+
+    ```php
+    <?php
+
+    namespace App\Http\Controllers\Auth;
+
+    use App\Events\UserRegistered;
+    use App\Models\User;
+    use Illuminate\Http\RedirectResponse;
+    use Illuminate\Http\Request;
+
+    class RegisterController extends Controller
+    {
+        public function store(Request $request): RedirectResponse
+        {
+            $user = User::create($request->validated());
+
+            UserRegistered::dispatch($user);
+
+            return redirect('/dashboard');
+        }
+    }
+    ```
+
+    `RegisterController` は `UserRegistered` イベントを発火するだけで、メール送信の実装を知りません。
+    将来「登録時にSlack通知も送る」となっても、コントローラには何も変更が不要です。
+  </Step>
+
+  <Step title="ワーカーを起動する">
+    キューイングされたリスナーを処理するため、ワーカーを起動します。
+
+    ```bash
+    php artisan queue:work
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  イベントディスカバリーが有効な場合、`AppServiceProvider` への手動登録は不要です。
+  `app/Listeners` ディレクトリに置かれたリスナーは自動で検出されます。
+</Tip>
+
+<Warning>
+  `php artisan event:list` で登録済みのイベントとリスナーの一覧を確認できます。
+  想定外のリスナーが登録されていないか定期的にチェックしてください。
+</Warning>
