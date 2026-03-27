@@ -69,6 +69,18 @@
         ]
       },
       {
+        "tab": "上級",
+        "groups": [
+          {
+            "group": "デザインパターン",
+            "pages": [
+              "jp/advanced/pipeline",
+              "jp/advanced/macroable"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "中級",
         "groups": [
           {
