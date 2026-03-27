@@ -1,0 +1,488 @@
+---
+title: "ローカライゼーション"
+description: "Laravelの多言語対応機能を使って、PHPファイルとJSONファイルで翻訳文字列を管理する方法を解説します。"
+---
+
+## ローカライゼーションとは
+
+Laravelのローカライゼーション機能は、複数の言語で翻訳文字列を取得する便利な仕組みを提供します。
+アプリケーション内で複数言語をサポートするために使います。
+
+翻訳文字列の管理方法は2種類あります。
+
+| 方法 | 特徴 |
+| --- | --- |
+| **PHPファイル形式** | `lang/ja/messages.php` のようなキー・バリュー配列。バリデーションエラーなど機能ごとに整理したい場合に向いている |
+| **JSON形式** | `lang/ja.json` に翻訳文字列をそのままキーとして定義。翻訳対象が多いアプリケーションに推奨 |
+
+<Info>
+  デフォルトのLaravelアプリケーションには `lang` ディレクトリが含まれていません。カスタマイズするには `lang:publish` Artisanコマンドで公開します。
+</Info>
+
+```shell
+php artisan lang:publish
+```
+
+## ロケールの設定
+
+### デフォルトロケール
+
+アプリケーションのデフォルト言語は `config/app.php` の `locale` で設定します。
+通常は `.env` ファイルの `APP_LOCALE` 環境変数を使います。
+
+```php
+// config/app.php
+'locale' => env('APP_LOCALE', 'en'),
+'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+```
+
+```ini
+# .env
+APP_LOCALE=ja
+APP_FALLBACK_LOCALE=en
+```
+
+`fallback_locale` は、指定した言語に翻訳文字列が存在しない場合のフォールバック言語です。
+
+### 実行時のロケール変更
+
+`App` ファサードの `setLocale()` メソッドで、リクエスト単位にロケールを変更できます。
+
+```php
+use Illuminate\Support\Facades\App;
+
+Route::get('/greeting/{locale}', function (string $locale) {
+    if (! in_array($locale, ['en', 'ja', 'fr'])) {
+        abort(400);
+    }
+
+    App::setLocale($locale);
+
+    // ...
+});
+```
+
+### 現在のロケールを確認する
+
+```php
+use Illuminate\Support\Facades\App;
+
+$locale = App::currentLocale();
+
+if (App::isLocale('ja')) {
+    // 日本語の場合の処理
+}
+```
+
+## 言語ファイルの作成
+
+### PHPファイル形式
+
+`lang/{言語コード}/` ディレクトリにPHPファイルを作成します。キー・バリュー形式の配列を返します。
+
+```text
+/lang
+    /en
+        messages.php
+    /ja
+        messages.php
+```
+
+```php
+<?php
+
+// lang/ja/messages.php
+
+return [
+    'welcome' => 'アプリケーションへようこそ！',
+    'goodbye' => 'またね！',
+];
+```
+
+<Warning>
+  地域差のある言語は ISO 15897 に従ってディレクトリ名を付けます。たとえばイギリス英語は `en-gb` ではなく `en_GB` です。
+</Warning>
+
+### JSON形式
+
+翻訳する文字列が多い場合は、JSON形式が推奨されます。
+`lang/` ディレクトリに言語コード名のJSONファイルを作成します。
+
+```text
+/lang
+    en.json
+    ja.json
+```
+
+デフォルトの翻訳文字列（英語）をキーとして定義します。
+
+```json
+{
+    "Welcome to our application!": "アプリケーションへようこそ！",
+    "I love programming.": "プログラミングが大好きです。",
+    "Logout": "ログアウト",
+    "Dashboard": "ダッシュボード"
+}
+```
+
+<Tip>
+  JSON形式では英語の文章そのものがキーになるため、英語のデフォルト表示が自動で機能します。翻訳ファイルがない言語ではキー（英語原文）がそのまま表示されます。
+</Tip>
+
+### PHPファイル形式とJSON形式の使い分け
+
+<AccordionGroup>
+  <Accordion title="PHPファイル形式が向いているケース">
+    - バリデーションエラーメッセージなど機能ごとに整理したい場合
+    - Laravelの組み込み翻訳（`validation.php`、`auth.php` など）を上書きする場合
+    - 階層的なキー管理が必要な場合
+
+    ```php
+    // lang/ja/validation.php
+    return [
+        'required' => ':attributeは必須です。',
+        'email' => ':attributeは有効なメールアドレスである必要があります。',
+    ];
+    ```
+  </Accordion>
+
+  <Accordion title="JSON形式が向いているケース">
+    - UIの文言が多く、キーを考えるのが煩わしい場合
+    - テンプレートに英語をそのまま書いておき、他言語は翻訳ファイルで対応する場合
+    - 国際化対応が後から追加になったアプリケーション
+
+    ```blade
+    {{-- Bladeテンプレートに英語をそのまま書く --}}
+    {{ __('Welcome to our application!') }}
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## 翻訳文字列の取得
+
+### `__()` ヘルパー
+
+最もよく使う方法です。PHPファイル形式では「ファイル名.キー」形式で指定します。
+
+```php
+// PHPファイル形式: lang/ja/messages.php の 'welcome' キー
+echo __('messages.welcome');
+// => アプリケーションへようこそ！
+
+// JSON形式: キーに翻訳元の文字列をそのまま指定
+echo __('I love programming.');
+// => プログラミングが大好きです。
+```
+
+翻訳文字列が存在しない場合は、指定したキーがそのまま返ります。
+
+```php
+echo __('messages.not_exists');
+// => messages.not_exists（キーがそのまま返る）
+```
+
+### Bladeテンプレートでの使用
+
+Bladeテンプレートでは `{{ __() }}` を使います。
+
+```blade
+{{-- PHPファイル形式 --}}
+<h1>{{ __('messages.welcome') }}</h1>
+
+{{-- JSON形式 --}}
+<button>{{ __('Logout') }}</button>
+
+{{-- @lang ディレクティブ（非推奨・後方互換のため残っている） --}}
+@lang('messages.welcome')
+```
+
+<Tip>
+  `@lang` ディレクティブは非推奨です。現在は `{{ __() }}` を使うことが推奨されています。
+</Tip>
+
+## プレースホルダー
+
+翻訳文字列に `:名前` 形式のプレースホルダーを埋め込めます。
+
+```php
+// lang/ja/messages.php
+return [
+    'welcome' => 'ようこそ、:nameさん！',
+    'greet'   => 'こんにちは、:Nameさん！',  // 最初の文字を大文字に
+    'shout'   => 'HEY :NAME!',              // 全大文字に
+];
+```
+
+`__()` の第2引数に置換値の配列を渡します。
+
+```php
+echo __('messages.welcome', ['name' => '田中']);
+// => ようこそ、田中さん！
+
+echo __('messages.greet', ['name' => 'taro']);
+// => こんにちは、Taroさん！（Nameは先頭大文字）
+
+echo __('messages.shout', ['name' => 'taro']);
+// => HEY TARO!（NAMEは全大文字）
+```
+
+Bladeテンプレートでも同様に使えます。
+
+```blade
+<p>{{ __('messages.welcome', ['name' => $user->name]) }}</p>
+```
+
+## 複数形
+
+言語によって複数形のルールが異なります。Laravelは `|` 記号で単数形と複数形を切り替えられます。
+
+### 基本的な複数形
+
+```php
+// lang/ja/messages.php
+return [
+    'apples' => 'りんごが1個あります|りんごが複数あります',
+];
+```
+
+JSON形式でも同様に定義できます。
+
+```json
+{
+    "There is one apple|There are many apples": "りんごが1個あります|りんごが複数あります"
+}
+```
+
+`trans_choice()` 関数で数量を渡して取得します。
+
+```php
+echo trans_choice('messages.apples', 1);
+// => りんごが1個あります
+
+echo trans_choice('messages.apples', 5);
+// => りんごが複数あります
+```
+
+### 範囲を指定した複数形
+
+より詳細な範囲指定ができます。
+
+```php
+'apples' => '{0} りんごはありません|[1,19] いくつかのりんごがあります|[20,*] たくさんのりんごがあります',
+```
+
+```php
+echo trans_choice('messages.apples', 0);
+// => りんごはありません
+
+echo trans_choice('messages.apples', 10);
+// => いくつかのりんごがあります
+
+echo trans_choice('messages.apples', 50);
+// => たくさんのりんごがあります
+```
+
+### 複数形でのプレースホルダー
+
+`:count` で数量を表示できます。第3引数に追加の置換値を渡せます。
+
+```php
+// lang/ja/messages.php
+return [
+    'minutes_ago' => '{1} :value分前|[2,*] :value分前',
+    'items'       => ':count件のアイテムがあります',
+];
+```
+
+```php
+echo trans_choice('messages.minutes_ago', 5, ['value' => 5]);
+// => 5分前
+
+echo trans_choice('messages.items', 3);
+// => 3件のアイテムがあります
+```
+
+## パッケージの言語ファイルをオーバーライド
+
+サードパーティパッケージが独自の言語ファイルを持っている場合、`lang/vendor/{パッケージ名}/{言語コード}/` に同名ファイルを置くことで上書きできます。
+
+たとえば `skyrim/hearthfire` パッケージの英語メッセージをカスタマイズするには。
+
+```text
+lang/
+└── vendor/
+    └── hearthfire/
+        └── en/
+            └── messages.php
+```
+
+```php
+// lang/vendor/hearthfire/en/messages.php
+return [
+    'welcome' => 'カスタマイズしたメッセージ',
+    // 上書きしたいキーだけ定義する。他のキーは元のファイルから読み込まれる
+];
+```
+
+## 実践例: 日英切り替えミドルウェア
+
+URLパスやセッション、ユーザー設定に基づいてロケールを自動切り替えするミドルウェアの実装例です。
+
+<Steps>
+  <Step title="ミドルウェアを作成する">
+    ```shell
+    php artisan make:middleware SetLocale
+    ```
+  </Step>
+
+  <Step title="ミドルウェアを実装する">
+    ```php
+    <?php
+
+    namespace App\Http\Middleware;
+
+    use Closure;
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\App;
+    use Symfony\Component\HttpFoundation\Response;
+
+    class SetLocale
+    {
+        public function handle(Request $request, Closure $next): Response
+        {
+            // サポートするロケールの一覧
+            $supportedLocales = ['ja', 'en'];
+
+            // セッションにロケールが保存されていればそれを使う
+            $locale = $request->session()->get('locale');
+
+            // セッションになければブラウザの Accept-Language を参照する
+            if (! $locale) {
+                $browserLocale = substr($request->getPreferredLanguage($supportedLocales) ?? 'ja', 0, 2);
+                $locale = in_array($browserLocale, $supportedLocales) ? $browserLocale : 'ja';
+            }
+
+            App::setLocale($locale);
+
+            return $next($request);
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="ミドルウェアを登録する">
+    `bootstrap/app.php` でミドルウェアを登録します。
+
+    ```php
+    use App\Http\Middleware\SetLocale;
+
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->append(SetLocale::class);
+    })
+    ```
+  </Step>
+
+  <Step title="ロケール切り替えルートを追加する">
+    ```php
+    // routes/web.php
+    Route::post('/locale/{locale}', function (string $locale) {
+        if (! in_array($locale, ['ja', 'en'])) {
+            abort(400);
+        }
+
+        session(['locale' => $locale]);
+
+        return back();
+    })->name('locale.switch');
+    ```
+  </Step>
+
+  <Step title="Bladeテンプレートに切り替えボタンを追加する">
+    ```blade
+    <div>
+        <form method="POST" action="{{ route('locale.switch', 'ja') }}">
+            @csrf
+            <button type="submit">日本語</button>
+        </form>
+
+        <form method="POST" action="{{ route('locale.switch', 'en') }}">
+            @csrf
+            <button type="submit">English</button>
+        </form>
+    </div>
+    ```
+  </Step>
+</Steps>
+
+### 翻訳ファイルの構成例
+
+```text
+lang/
+├── ja.json          # JSON形式（UI文言）
+├── en.json
+├── ja/
+│   └── validation.php   # PHPファイル形式（バリデーション）
+└── en/
+    └── validation.php
+```
+
+```json
+// lang/ja.json
+{
+    "Dashboard": "ダッシュボード",
+    "Login": "ログイン",
+    "Logout": "ログアウト",
+    "Welcome, :name!": "ようこそ、:nameさん！",
+    "Save": "保存",
+    "Cancel": "キャンセル",
+    "Are you sure?": "本当によろしいですか？"
+}
+```
+
+```blade
+{{-- resources/views/layouts/app.blade.php --}}
+<nav>
+    <a href="{{ route('dashboard') }}">{{ __('Dashboard') }}</a>
+    <span>{{ __('Welcome, :name!', ['name' => auth()->user()->name]) }}</span>
+
+    <form method="POST" action="{{ route('logout') }}">
+        @csrf
+        <button type="submit">{{ __('Logout') }}</button>
+    </form>
+</nav>
+```
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="翻訳文字列の定義方法">
+    | 方法 | ファイルパス | キーの例 | 取得方法 |
+    | --- | --- | --- | --- |
+    | PHPファイル | `lang/ja/messages.php` | `'welcome' => '...'` | `__('messages.welcome')` |
+    | JSON | `lang/ja.json` | `"Welcome": "..."` | `__('Welcome')` |
+  </Accordion>
+
+  <Accordion title="よく使う関数・ファサード">
+    | 関数・メソッド | 用途 |
+    | --- | --- |
+    | `__('key')` | 翻訳文字列を取得するヘルパー |
+    | `trans('key')` | `__()` と同等のヘルパー |
+    | `trans_choice('key', $count)` | 複数形対応の翻訳文字列を取得 |
+    | `App::setLocale('ja')` | リクエスト単位でロケールを変更 |
+    | `App::currentLocale()` | 現在のロケールを取得 |
+    | `App::isLocale('ja')` | 現在のロケールを確認 |
+  </Accordion>
+
+  <Accordion title="Bladeでの使い方">
+    ```blade
+    {{-- 基本 --}}
+    {{ __('messages.welcome') }}
+
+    {{-- プレースホルダーあり --}}
+    {{ __('messages.welcome', ['name' => $user->name]) }}
+
+    {{-- 複数形 --}}
+    {{ trans_choice('messages.apples', $count) }}
+    ```
+  </Accordion>
+</AccordionGroup>
