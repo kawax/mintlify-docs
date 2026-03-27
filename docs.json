@@ -155,6 +155,12 @@
             ]
           },
           {
+            "group": "フロントエンド",
+            "pages": [
+              "jp/intermediate/vite"
+            ]
+          },
+          {
             "group": "リアルタイム通信",
             "pages": [
               "jp/intermediate/broadcasting"

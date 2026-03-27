@@ -1,0 +1,389 @@
+---
+title: "Viteによるアセットバンドル"
+description: "LaravelプロジェクトでViteを使ってJavaScript・CSSをバンドルし、ホットリロードで快適な開発環境を構築する方法を解説します。"
+---
+
+## LaravelとViteとは
+
+[Vite](https://vitejs.dev) は高速なフロントエンドビルドツールです。開発中は即座にファイルの変更を反映するホットモジュールリプレースメント（HMR）を提供し、本番ビルドでは最適化されたアセットを生成します。
+
+Laravel 9以降、Viteが標準のフロントエンドビルドツールとして採用されており、`laravel-vite-plugin` を通じてLaravelと連携します。このプラグインが担う主な役割は次のとおりです。
+
+- エントリーポイントの管理
+- 開発サーバーのHMRサポート
+- `@vite()` Bladeディレクティブとの連携
+- 本番ビルド時のアセットのバージョニング（キャッシュバスティング）
+
+<Info>
+  Laravelのスターターキット（Laravel Breezeなど）を使っている場合、ViteとTailwindの設定はすでに含まれています。このページではゼロから設定する方法を説明します。
+</Info>
+
+## インストールと設定
+
+### Nodeのインストール確認
+
+Viteを使うには Node.js（16以上）とnpmが必要です。インストール済みかどうか確認します。
+
+```shell
+node -v
+npm -v
+```
+
+### パッケージのインストール
+
+新規インストールしたLaravelプロジェクトには、すでに `package.json` に `vite` と `laravel-vite-plugin` が含まれています。次のコマンドで依存パッケージをインストールします。
+
+```shell
+npm install
+```
+
+### vite.config.js の設定
+
+プロジェクトルートに `vite.config.js` が生成されています。エントリーポイント（バンドルの起点となるファイル）を指定します。
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+
+export default defineConfig({
+    plugins: [
+        laravel([
+            'resources/css/app.css',
+            'resources/js/app.js',
+        ]),
+    ],
+});
+```
+
+<Tip>
+  SPAやInertiaを使う場合は、CSSをJavaScriptからインポートする形式が推奨されます。その場合はエントリーポイントから `resources/css/app.css` を除き、`resources/js/app.js` の先頭に `import '../css/app.css';` を追加します。
+</Tip>
+
+## 開発サーバーの起動
+
+開発中は `npm run dev` でViteの開発サーバーを起動します。ファイルを変更すると、ブラウザが自動的に更新されます（HMR）。
+
+```shell
+npm run dev
+```
+
+Laravelの開発サーバーと同時に起動することもできます。
+
+```shell
+composer run dev
+```
+
+<Info>
+  `composer run dev` は `php artisan serve` と `npm run dev` を同時に起動します。
+</Info>
+
+### Bladeビューの自動リロード
+
+`refresh: true` を設定すると、Bladeビューやルートファイルを保存したときにブラウザが自動リロードされます。
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+            ],
+            refresh: true,
+        }),
+    ],
+});
+```
+
+`refresh: true` のとき、次のディレクトリへの変更が監視対象になります。
+
+- `resources/views/**`
+- `app/Livewire/**`
+- `routes/**`
+- `lang/**`
+
+## 本番ビルド
+
+本番環境へデプロイする前に `npm run build` を実行します。アセットがバンドル・バージョニングされ、`public/build/` に出力されます。
+
+```shell
+npm run build
+```
+
+ビルド後のディレクトリ構造の例:
+
+```text
+public/
+  build/
+    assets/
+      app-Cv82Mlke.css
+      app-DnAZBF4U.js
+    manifest.json
+```
+
+`manifest.json` にはファイル名とハッシュのマッピングが記録されており、`@vite()` ディレクティブがこれを参照して正しいファイルを読み込みます。
+
+<Warning>
+  `public/build/` ディレクトリはビルド成果物なので `.gitignore` に追加することを推奨します。デプロイ先でビルドを実行するか、CIでビルドしてデプロイします。
+</Warning>
+
+## Bladeからのアセット読み込み
+
+`@vite()` Bladeディレクティブをレイアウトの `<head>` に追加します。
+
+```blade
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ config('app.name') }}</title>
+
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+<body>
+    @yield('content')
+</body>
+</html>
+```
+
+CSSをJavaScriptからインポートしている場合は、JavaScriptのエントリーポイントだけ指定します。
+
+```blade
+@vite('resources/js/app.js')
+```
+
+`@vite()` ディレクティブは開発中と本番で自動的に動作を切り替えます。
+
+| 状況 | 動作 |
+| --- | --- |
+| 開発サーバー起動中 | Vite開発サーバーからアセットを読み込み、HMRを有効化 |
+| 本番（ビルド済み） | `public/build/manifest.json` を参照してバージョン付きファイルを読み込む |
+
+## JavaScript・CSSのエントリーポイント設定
+
+### JavaScriptの設定
+
+`resources/js/app.js` がメインのエントリーポイントです。ここから他のモジュールをインポートします。
+
+```js
+import './bootstrap';
+import '../css/app.css';
+
+// 自作モジュールのインポート
+import './components/modal';
+import './utils/format';
+```
+
+### CSSの設定
+
+`resources/css/app.css` にグローバルなスタイルを記述します。
+
+```css
+/* Tailwind CSSを使う場合 */
+@import 'tailwindcss';
+
+/* カスタムスタイル */
+body {
+    font-family: 'Noto Sans JP', sans-serif;
+}
+```
+
+### 複数のエントリーポイント
+
+管理画面など、ページごとに異なるアセットをバンドルしたい場合は、複数のエントリーポイントを指定します。
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+
+export default defineConfig({
+    plugins: [
+        laravel([
+            'resources/css/app.css',
+            'resources/js/app.js',
+            'resources/css/admin.css',
+            'resources/js/admin.js',
+        ]),
+    ],
+});
+```
+
+Bladeでは対応するエントリーポイントのみ読み込みます。
+
+```blade
+{{-- 管理画面レイアウト --}}
+@vite(['resources/css/admin.css', 'resources/js/admin.js'])
+```
+
+## Tailwind CSSとの連携
+
+Tailwind CSS v4以降はViteプラグインとして統合されます。
+
+<Steps>
+  <Step title="Tailwindをインストールする">
+    ```shell
+    npm install tailwindcss @tailwindcss/vite
+    ```
+  </Step>
+
+  <Step title="vite.config.js にプラグインを追加する">
+    ```js
+    import { defineConfig } from 'vite';
+    import laravel from 'laravel-vite-plugin';
+    import tailwindcss from '@tailwindcss/vite';
+
+    export default defineConfig({
+        plugins: [
+            tailwindcss(),
+            laravel([
+                'resources/css/app.css',
+                'resources/js/app.js',
+            ]),
+        ],
+    });
+    ```
+  </Step>
+
+  <Step title="CSSにTailwindをインポートする">
+    ```css
+    /* resources/css/app.css */
+    @import 'tailwindcss';
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  Tailwind CSS v3を使う場合は `tailwind.config.js` と `postcss.config.js` が必要です。最新のTailwind CSS v4ではこれらのファイルは不要です。
+</Info>
+
+## エイリアス設定
+
+`laravel-vite-plugin` は `@` エイリアスを自動で設定します。これは `resources/js` ディレクトリを指します。
+
+```js
+// エイリアスを使ったインポート
+import UserCard from '@/components/UserCard.vue';
+// 上記は次と同じ
+import UserCard from '/resources/js/components/UserCard.vue';
+```
+
+カスタムエイリアスを追加したい場合は `resolve.alias` で設定します。
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import path from 'path';
+
+export default defineConfig({
+    plugins: [
+        laravel(['resources/js/app.js']),
+    ],
+    resolve: {
+        alias: {
+            '@': '/resources/js',
+            '@css': '/resources/css',
+            '@images': '/resources/images',
+        },
+    },
+});
+```
+
+エイリアスを使ったインポート例:
+
+```js
+import logo from '@images/logo.png';
+import '@css/custom.css';
+```
+
+## フレームワーク別の設定
+
+### Vue
+
+```shell
+npm install --save-dev @vitejs/plugin-vue
+```
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import vue from '@vitejs/plugin-vue';
+
+export default defineConfig({
+    plugins: [
+        laravel(['resources/js/app.js']),
+        vue({
+            template: {
+                transformAssetUrls: {
+                    base: null,
+                    includeAbsolute: false,
+                },
+            },
+        }),
+    ],
+});
+```
+
+### React
+
+```shell
+npm install --save-dev @vitejs/plugin-react
+```
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+    plugins: [
+        laravel(['resources/js/app.jsx']),
+        react(),
+    ],
+});
+```
+
+Reactを使う場合、Bladeテンプレートに `@viteReactRefresh` ディレクティブを `@vite` より前に追加します。
+
+```blade
+@viteReactRefresh
+@vite('resources/js/app.jsx')
+```
+
+## 静的アセットの処理
+
+Bladeテンプレートから参照する画像やフォントもViteでバージョニングできます。`assets` オプションで対象ディレクトリを指定します。
+
+```js
+laravel({
+    input: 'resources/js/app.js',
+    assets: ['resources/images/**', 'resources/fonts/**'],
+})
+```
+
+Bladeテンプレートでは `Vite::asset()` メソッドでバージョン付きURLを取得します。
+
+```blade
+<img src="{{ Vite::asset('resources/images/logo.png') }}" alt="ロゴ">
+```
+
+## まとめ
+
+| やりたいこと | 方法 |
+| --- | --- |
+| 開発サーバーを起動する | `npm run dev` |
+| 本番用アセットをビルドする | `npm run build` |
+| Bladeでアセットを読み込む | `@vite(['resources/css/app.css', 'resources/js/app.js'])` |
+| Bladeビュー変更で自動リロード | `refresh: true` を `vite.config.js` に設定 |
+| Tailwind CSSを使う | `@tailwindcss/vite` プラグインを追加 |
+| `@` エイリアスを使う | デフォルトで `resources/js` を指す |
+| 静的アセットをバージョニングする | `assets` オプションと `Vite::asset()` を使う |
+
+## 次のステップ
+
+<Card title="キャッシュ" href="/jp/intermediate/cache" icon="database">
+  Laravelのキャッシュ機能でアプリケーションのパフォーマンスをさらに向上させる方法を学びます。
+</Card>
