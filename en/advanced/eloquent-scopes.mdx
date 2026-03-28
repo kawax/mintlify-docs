@@ -1,0 +1,404 @@
+---
+title: "Eloquent Scopes"
+description: "How local and global scopes work in Eloquent, with a look at SoftDeletingScope from the framework internals, plus practical patterns for multi-tenancy and publish/draft filtering."
+---
+
+## What are scopes?
+
+Eloquent scopes package reusable query constraints so you can apply them anywhere without repeating yourself. There are two kinds.
+
+| Kind | When it applies | Common uses |
+|---|---|---|
+| **Global scope** | Automatically on every query | Soft deletes, multi-tenancy, publish filters |
+| **Local scope** | Only when you call it explicitly | "popular posts", "active users", shared filters |
+
+## Local scopes
+
+### Defining a local scope
+
+Add the `#[Scope]` attribute to a protected model method that accepts a `Builder` instance.
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+
+class Post extends Model
+{
+    #[Scope]
+    protected function published(Builder $query): void
+    {
+        $query->where('status', 'published');
+    }
+
+    #[Scope]
+    protected function popular(Builder $query): void
+    {
+        $query->where('views', '>', 1000);
+    }
+}
+```
+
+<Info>
+  The `#[Scope]` attribute is in the `Illuminate\Database\Eloquent\Attributes` namespace. It requires PHP 8.0+.
+</Info>
+
+### Using local scopes
+
+Call the scope as a method on the model. You can chain multiple scopes.
+
+```php
+use App\Models\Post;
+
+// Only published posts
+$posts = Post::published()->get();
+
+// Published AND popular, ordered by newest
+$posts = Post::published()->popular()->latest()->get();
+```
+
+### Passing parameters
+
+Add extra parameters after the `Builder` argument.
+
+```php
+#[Scope]
+protected function ofStatus(Builder $query, string $status): void
+{
+    $query->where('status', $status);
+}
+```
+
+Pass the value directly when calling the scope.
+
+```php
+$drafts    = Post::ofStatus('draft')->get();
+$published = Post::ofStatus('published')->get();
+```
+
+### Combining scopes with orWhere
+
+When you combine scopes with `orWhere`, use a closure to ensure correct grouping.
+
+```php
+// Closure approach — explicit but verbose
+$users = User::popular()->orWhere(function (Builder $query) {
+    $query->active();
+})->get();
+
+// Higher-order method — concise
+$users = User::popular()->orWhere->active()->get();
+```
+
+## Global scopes
+
+### How they work
+
+A global scope is a class that implements `Illuminate\Database\Eloquent\Scope`. The interface requires a single `apply` method.
+
+```php
+// Framework source: src/Illuminate/Database/Eloquent/Scope.php
+
+interface Scope
+{
+    public function apply(Builder $builder, Model $model);
+}
+```
+
+Inside `apply`, you add constraints to the query builder.
+
+### Creating a global scope
+
+Generate a scope class with Artisan.
+
+```bash
+php artisan make:scope ActiveScope
+```
+
+This creates `app/Models/Scopes/ActiveScope.php`.
+
+```php
+<?php
+
+namespace App\Models\Scopes;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Scope;
+
+class ActiveScope implements Scope
+{
+    public function apply(Builder $builder, Model $model): void
+    {
+        $builder->where('is_active', true);
+    }
+}
+```
+
+### Applying a global scope to a model
+
+<Steps>
+  <Step title="Use the #[ScopedBy] attribute (recommended)">
+    In Laravel 13, the `#[ScopedBy]` attribute is the simplest approach.
+
+    ```php
+    <?php
+
+    namespace App\Models;
+
+    use App\Models\Scopes\ActiveScope;
+    use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+    use Illuminate\Database\Eloquent\Model;
+
+    #[ScopedBy([ActiveScope::class])]
+    class User extends Model
+    {
+        //
+    }
+    ```
+
+    Pass multiple scopes as an array.
+
+    ```php
+    #[ScopedBy([ActiveScope::class, TenantScope::class])]
+    class User extends Model
+    {
+        //
+    }
+    ```
+  </Step>
+
+  <Step title="Register in booted() manually">
+    Override `booted` and call `addGlobalScope`.
+
+    ```php
+    <?php
+
+    namespace App\Models;
+
+    use App\Models\Scopes\ActiveScope;
+    use Illuminate\Database\Eloquent\Model;
+
+    class User extends Model
+    {
+        protected static function booted(): void
+        {
+            static::addGlobalScope(new ActiveScope);
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+Once the global scope is applied, `User::all()` automatically includes `WHERE is_active = 1`.
+
+### Anonymous closure scopes
+
+For simple scopes that do not warrant a separate file, use a named closure.
+
+```php
+protected static function booted(): void
+{
+    static::addGlobalScope('active', function (Builder $builder) {
+        $builder->where('is_active', true);
+    });
+}
+```
+
+<Warning>
+  To remove a closure-based global scope, you must use the string name you provided, not a class name.
+</Warning>
+
+### Removing global scopes
+
+```php
+use App\Models\Scopes\ActiveScope;
+
+// Remove one specific scope
+User::withoutGlobalScope(ActiveScope::class)->get();
+
+// Remove a closure-based scope by name
+User::withoutGlobalScope('active')->get();
+
+// Remove all global scopes
+User::withoutGlobalScopes()->get();
+
+// Remove multiple scopes
+User::withoutGlobalScopes([ActiveScope::class, TenantScope::class])->get();
+
+// Remove all scopes except the ones you list
+User::withoutGlobalScopesExcept([TenantScope::class])->get();
+```
+
+## Inside the framework: SoftDeletingScope
+
+Laravel's `SoftDeletes` trait is a good example of how global scopes are used in practice.
+
+```php
+// src/Illuminate/Database/Eloquent/SoftDeletingScope.php
+
+class SoftDeletingScope implements Scope
+{
+    protected $extensions = [
+        'Restore', 'RestoreOrCreate', 'CreateOrRestore',
+        'WithTrashed', 'WithoutTrashed', 'OnlyTrashed',
+    ];
+
+    public function apply(Builder $builder, Model $model)
+    {
+        $builder->whereNull($model->getQualifiedDeletedAtColumn());
+    }
+
+    public function extend(Builder $builder)
+    {
+        foreach ($this->extensions as $extension) {
+            $this->{"add{$extension}"}($builder);
+        }
+
+        $builder->onDelete(function (Builder $builder) {
+            $column = $this->getDeletedAtColumn($builder);
+            return $builder->update([
+                $column => $builder->getModel()->freshTimestampString(),
+            ]);
+        });
+    }
+}
+```
+
+<Accordion title="See the withTrashed() implementation">
+  `withTrashed()` simply calls `withoutGlobalScope($this)` — it removes the `SoftDeletingScope` itself so soft-deleted records are included.
+
+  ```php
+  protected function addWithTrashed(Builder $builder)
+  {
+      $builder->macro('withTrashed', function (Builder $builder, $withTrashed = true) {
+          if (! $withTrashed) {
+              return $builder->withoutTrashed();
+          }
+
+          return $builder->withoutGlobalScope($this);
+      });
+  }
+  ```
+
+  `onlyTrashed()` also removes the scope, then adds a `whereNotNull('deleted_at')` constraint.
+
+  ```php
+  protected function addOnlyTrashed(Builder $builder)
+  {
+      $builder->macro('onlyTrashed', function (Builder $builder) {
+          $model = $builder->getModel();
+
+          $builder->withoutGlobalScope($this)->whereNotNull(
+              $model->getQualifiedDeletedAtColumn()
+          );
+
+          return $builder;
+      });
+  }
+  ```
+</Accordion>
+
+<Tip>
+  The `Scope` interface does not declare an `extend` method, but Eloquent's builder calls it automatically when it exists. Use `extend` to attach macros to the builder when your scope is applied.
+</Tip>
+
+## Practical use cases
+
+### Multi-tenancy: filtering by tenant automatically
+
+In a SaaS application you want every query to be scoped to the current tenant's data.
+
+```php
+<?php
+
+namespace App\Models\Scopes;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Scope;
+
+class TenantScope implements Scope
+{
+    public function apply(Builder $builder, Model $model): void
+    {
+        if ($tenantId = auth()->user()?->tenant_id) {
+            $builder->where('tenant_id', $tenantId);
+        }
+    }
+}
+```
+
+```php
+use App\Models\Scopes\TenantScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+
+#[ScopedBy([TenantScope::class])]
+class Post extends Model
+{
+    //
+}
+```
+
+Calling `Post::all()` now returns only the current tenant's posts automatically.
+
+### Published / draft filtering
+
+Show only published content to visitors, but allow admins to see everything.
+
+```php
+<?php
+
+namespace App\Models\Scopes;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Scope;
+
+class PublishedScope implements Scope
+{
+    public function apply(Builder $builder, Model $model): void
+    {
+        $builder->where('status', 'published')
+                ->where('published_at', '<=', now());
+    }
+}
+```
+
+```php
+// Public site: PublishedScope applied automatically
+$posts = Post::latest()->get();
+
+// Admin panel: bypass the scope
+$posts = Post::withoutGlobalScope(PublishedScope::class)->latest()->get();
+```
+
+### Use addSelect instead of select in global scopes
+
+<Warning>
+  When adding columns inside a global scope, always use `addSelect` rather than `select`. Using `select` overwrites any columns the caller already selected.
+
+  ```php
+  // Bad: overwrites the caller's select clause
+  public function apply(Builder $builder, Model $model): void
+  {
+      $builder->select('id', 'tenant_id', 'name');
+  }
+
+  // Good: appends to the existing select clause
+  public function apply(Builder $builder, Model $model): void
+  {
+      $builder->addSelect('tenant_id');
+  }
+  ```
+</Warning>
+
+## Next steps
+
+<Card title="Eloquent custom casts" icon="wand-magic-sparkles" href="/en/advanced/eloquent-casts">
+  Learn how to implement custom casts with the CastsAttributes interface and the Castable pattern.
+</Card>

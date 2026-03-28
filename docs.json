@@ -439,6 +439,28 @@
                 ]
               }
             ]
+          },
+          {
+            "tab": "Advanced Topics",
+            "groups": [
+              {
+                "group": "Design Patterns",
+                "pages": [
+                  "en/advanced/pipeline",
+                  "en/advanced/macroable",
+                  "en/advanced/conditionable",
+                  "en/advanced/higher-order-messages"
+                ]
+              },
+              {
+                "group": "Eloquent Deep Dive",
+                "pages": [
+                  "en/advanced/eloquent-observers",
+                  "en/advanced/eloquent-scopes",
+                  "en/advanced/eloquent-casts"
+                ]
+              }
+            ]
           }
         ]
       }
