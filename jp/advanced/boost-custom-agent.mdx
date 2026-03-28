@@ -1,0 +1,561 @@
+---
+title: "Boostのカスタムエージェントを作る"
+description: "Laravel Boostの拡張アーキテクチャを深掘りし、SupportsGuidelines・SupportsMcp・SupportsSkillsコントラクトを実装したカスタムエージェントを作成する方法を解説します。"
+---
+
+## なぜカスタムエージェントが必要か
+
+Laravel Boostは Claude Code、Cursor、Codex、GitHub Copilot など主要なAIコーディングツールを標準でサポートしています。しかし社内ツール、新興のAIエージェント、独自ワークフローへ対応するには、Boostの拡張機能を使ってカスタムエージェントを実装する必要があります。
+
+カスタムエージェントが役立つ場面:
+
+- Boostが未対応のIDEやAIツールを使っている
+- 社内開発ワークフローや独自CI/CDパイプラインにBoostを統合したい
+- エージェント固有の設定ファイル形式やインストール手順がある
+
+## Boostの拡張アーキテクチャ
+
+### Agent基底クラス
+
+すべてのエージェントは `Laravel\Boost\Install\Agents\Agent` を継承します。この抽象クラスが提供する機能:
+
+- エージェントの検出（システム全体・プロジェクト単位）
+- MCPサーバーのインストール（ファイルベース・シェルコマンドベース）
+- ガイドライン変換フック（`transformGuidelines`）
+
+実装が必須の抽象メソッドは2つです。
+
+| メソッド | 説明 |
+| --- | --- |
+| `name()` | エージェントの内部識別子（例: `claude_code`） |
+| `displayName()` | インストール時に表示される名前（例: `Claude Code`） |
+| `systemDetectionConfig(Platform $platform)` | システム全体へのインストール検出設定 |
+| `projectDetectionConfig()` | プロジェクト単位のインストール検出設定 |
+
+### 3つのコントラクト
+
+Boostの機能を選択的に有効化するために、以下のコントラクトを必要な分だけ実装します。
+
+| コントラクト | 役割 |
+| --- | --- |
+| `SupportsGuidelines` | AIガイドラインファイルの書き出しパスと変換処理 |
+| `SupportsMcp` | MCPサーバー設定のインストール |
+| `SupportsSkills` | Agent Skillsのインストールパス |
+
+<Info>
+  3つのコントラクトはすべて任意です。ガイドラインだけサポートしてMCPは不要、という実装も可能です。
+</Info>
+
+### SupportsGuidelinesコントラクト
+
+```php
+interface SupportsGuidelines
+{
+    // AIガイドラインを書き出すファイルパス
+    public function guidelinesPath(): string;
+
+    // ガイドラインファイルにフロントマターが必要か
+    public function frontmatter(): bool;
+
+    // 生成されたガイドラインのMarkdownを後処理する
+    public function transformGuidelines(string $markdown): string;
+}
+```
+
+`guidelinesPath()` は生成したガイドラインを書き込むファイルパスを返します。Claude Codeなら `CLAUDE.md`、Cursorなら `.cursor/rules/laravel-boost.mdc` のように、エージェントが読み込む形式に合わせます。
+
+`transformGuidelines()` は生成後のMarkdownを加工するフックです。エージェント固有のヘッダーを追加したり、特殊なフォーマットに変換したりできます。`Agent` 基底クラスに実装済みのデフォルトはそのまま文字列を返します。
+
+### SupportsMcpコントラクト
+
+```php
+interface SupportsMcp
+{
+    // MCPコマンドに絶対パスを使うか
+    public function useAbsolutePathForMcp(): bool;
+
+    // PHP実行ファイルのパスを返す
+    public function getPhpPath(bool $forceAbsolutePath = false): string;
+
+    // artisanのパスを返す
+    public function getArtisanPath(bool $forceAbsolutePath = false): string;
+
+    // MCPサーバー設定をインストールする
+    public function installMcp(string $key, string $command, array $args = [], array $env = []): bool;
+
+    // HTTP経由のMCPサーバー設定をインストールする
+    public function installHttpMcp(string $key, string $url): bool;
+}
+```
+
+`Agent` 基底クラスが `installMcp()` と `installHttpMcp()` のデフォルト実装を持っているため、多くの場合は `mcpInstallationStrategy()` と `mcpConfigPath()` をオーバーライドするだけで済みます。
+
+インストール戦略は2種類あります。
+
+| `McpInstallationStrategy` | 動作 |
+| --- | --- |
+| `FILE` | JSON/TOMLファイルに設定を書き込む（デフォルト） |
+| `SHELL` | シェルコマンドを実行してMCPを登録する |
+| `NONE` | MCPインストールをスキップする |
+
+### SupportsSkillsコントラクト
+
+```php
+interface SupportsSkills
+{
+    // Agent Skillsを書き出すディレクトリパス
+    public function skillsPath(): string;
+}
+```
+
+エージェントが読み込むスキルディレクトリのパスを返します。Claude Codeなら `.claude/skills`、Cursorなら `.cursor/skills` のようにエージェントの仕様に合わせます。
+
+## カスタムエージェントの作成
+
+実際に独自エージェントクラスを実装します。ここでは独自のCI/CDワークフローに組み込まれた仮想エージェント「MyAgent」を例にします。
+
+<Steps>
+  <Step title="エージェントクラスを作成する">
+    `app/Boost/MyAgent.php` を作成します。
+
+    ```php
+    <?php
+
+    declare(strict_types=1);
+
+    namespace App\Boost;
+
+    use Laravel\Boost\Contracts\SupportsGuidelines;
+    use Laravel\Boost\Contracts\SupportsMcp;
+    use Laravel\Boost\Contracts\SupportsSkills;
+    use Laravel\Boost\Install\Agents\Agent;
+    use Laravel\Boost\Install\Enums\McpInstallationStrategy;
+    use Laravel\Boost\Install\Enums\Platform;
+
+    class MyAgent extends Agent implements SupportsGuidelines, SupportsMcp, SupportsSkills
+    {
+        public function name(): string
+        {
+            return 'my_agent';
+        }
+
+        public function displayName(): string
+        {
+            return 'MyAgent';
+        }
+
+        public function systemDetectionConfig(Platform $platform): array
+        {
+            return match ($platform) {
+                Platform::Darwin, Platform::Linux => [
+                    'command' => 'command -v myagent',
+                ],
+                Platform::Windows => [
+                    'command' => 'cmd /c where myagent 2>nul',
+                ],
+            };
+        }
+
+        public function projectDetectionConfig(): array
+        {
+            return [
+                'files' => ['.myagent.json'],
+            ];
+        }
+
+        // --- SupportsGuidelines ---
+
+        public function guidelinesPath(): string
+        {
+            return 'MYAGENT.md';
+        }
+
+        // frontmatter() は Agent 基底クラスのデフォルト (false) を使用
+        // transformGuidelines() も基底クラスのデフォルト（そのまま返す）を使用
+
+        // --- SupportsMcp ---
+
+        // useAbsolutePathForMcp(), getPhpPath(), getArtisanPath(),
+        // installMcp(), installHttpMcp() はすべて Agent 基底クラスが実装済み
+
+        public function mcpInstallationStrategy(): McpInstallationStrategy
+        {
+            return McpInstallationStrategy::FILE;
+        }
+
+        public function mcpConfigPath(): string
+        {
+            return '.myagent.json';
+        }
+
+        // --- SupportsSkills ---
+
+        public function skillsPath(): string
+        {
+            return '.myagent/skills';
+        }
+    }
+    ```
+
+    <Info>
+      `systemDetectionConfig()` と `projectDetectionConfig()` はBoostがエージェントをシステム・プロジェクトで自動検出するために使います。`boost:install` 実行時に対象エージェントを自動的に候補として表示します。
+    </Info>
+  </Step>
+
+  <Step title="エージェントを登録する">
+    `App\Providers\AppServiceProvider` の `boot` メソッドにカスタムエージェントを登録します。
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Boost\MyAgent;
+    use Illuminate\Support\ServiceProvider;
+    use Laravel\Boost\Boost;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            Boost::registerAgent('my_agent', MyAgent::class);
+        }
+    }
+    ```
+
+    登録後、`php artisan boost:install` を実行するとMyAgentが選択肢に表示されます。
+  </Step>
+
+  <Step title="動作を確認する">
+    ```shell
+    php artisan boost:install
+    ```
+
+    インストール対象のエージェントを選択する画面でMyAgentが表示されます。選択すると `MYAGENT.md`、`.myagent.json`、`.myagent/skills/` が生成されます。
+  </Step>
+</Steps>
+
+## ガイドラインのカスタマイズ
+
+### guidelinesPathの設定
+
+エージェントによってガイドラインファイルの読み込み場所は異なります。
+
+```php
+// 単一ファイルとして出力する場合
+public function guidelinesPath(): string
+{
+    return 'MYAGENT.md';
+}
+```
+
+設定ファイルから上書きできるようにすると柔軟性が高まります。
+
+```php
+public function guidelinesPath(): string
+{
+    return config('boost.agents.my_agent.guidelines_path', 'MYAGENT.md');
+}
+```
+
+### フロントマターが必要なエージェント
+
+Cursorの `.cursor/rules/*.mdc` のようにフロントマターが必要なフォーマットには `frontmatter()` で `true` を返します。
+
+```php
+public function frontmatter(): bool
+{
+    return true;
+}
+```
+
+### ガイドラインの後処理
+
+`transformGuidelines()` を使って生成後のMarkdownを加工できます。
+
+```php
+public function transformGuidelines(string $markdown): string
+{
+    // エージェント独自のヘッダーを追加する
+    $header = "<!-- Generated by Laravel Boost for MyAgent -->\n\n";
+
+    return $header . $markdown;
+}
+```
+
+## カスタムAIガイドラインの追加
+
+プロジェクト固有のルールをBoostのガイドラインに追加するには、`.ai/guidelines/` ディレクトリに Blade ファイルを配置します。
+
+```
+.ai/
+└── guidelines/
+    ├── my-domain-rules.blade.php
+    └── coding-standards.blade.php
+```
+
+ファイル例:
+
+```php
+## プロジェクト固有のルール
+
+このプロジェクトでは以下の規約に従うこと:
+
+- モデルは必ず `App\Models\` 名前空間に配置する
+- すべてのAPIエンドポイントは `App\Http\Controllers\Api\` 以下に作成する
+- DBトランザクションは `DB::transaction()` を使いサービスクラス内に閉じ込める
+
+@verbatim
+<code-snippet name="サービスクラスのトランザクション例" lang="php">
+DB::transaction(function () use ($data) {
+    $order = Order::create($data);
+    $order->items()->createMany($data['items']);
+    event(new OrderCreated($order));
+});
+</code-snippet>
+@endverbatim
+```
+
+`boost:install` を実行すると、このガイドラインがBoost組み込みのガイドラインと自動的に結合されて出力されます。
+
+### 組み込みガイドラインのオーバーライド
+
+Boostの組み込みガイドラインと同じパスにカスタムファイルを置くと、そちらが優先されます。
+
+```
+# Boostの "Inertia React v2 Form Guidance" をオーバーライドする
+.ai/guidelines/inertia-react/2/forms.blade.php
+```
+
+## カスタムスキルの追加
+
+### SKILL.mdの作成
+
+`.ai/skills/{スキル名}/SKILL.md` にスキルを定義します。
+
+```
+.ai/
+└── skills/
+    └── creating-invoices/
+        └── SKILL.md
+```
+
+`SKILL.md` はYAMLフロントマターとMarkdownの指示で構成します。
+
+```markdown
+---
+name: creating-invoices
+description: 請求書（Invoice）の作成・更新・送信に関する処理を実装する際に使うスキル。
+---
+
+# 請求書作成スキル
+
+## このスキルを使う場面
+
+請求書モデルの作成、請求書のPDF生成、メール送信を実装するときに使います。
+
+## ファイル構造
+
+- `app/Models/Invoice.php` — 請求書モデル
+- `app/Services/InvoiceService.php` — ビジネスロジック
+- `app/Jobs/SendInvoiceEmail.php` — メール送信ジョブ
+
+## 実装パターン
+
+### 請求書の作成
+
+```php
+// $items はコントローラーや他のサービスから渡された配列
+$invoice = InvoiceService::create([
+    'user_id' => $user->id,
+    'items' => $items,
+    'due_date' => now()->addDays(30),
+]);
+```
+
+### 請求書のPDF生成
+
+PDFは `barryvdh/laravel-dompdf` を使って生成する:
+
+```php
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Storage;
+
+$pdf = Pdf::loadView('invoices.pdf', ['invoice' => $invoice]);
+Storage::put("invoices/{$invoice->id}.pdf", $pdf->output());
+```
+```
+
+<Tip>
+  スキルは「必要なときだけ読み込む」設計です。常に必要な情報はガイドラインに、タスク固有の詳細なパターンはスキルに分けることで、AIのコンテキスト使用量を最適化できます。
+</Tip>
+
+### 組み込みスキルのオーバーライド
+
+Boostの組み込みスキルと同じ名前でカスタムスキルを作ると上書きされます。
+
+```
+# livewire-development スキルをカスタマイズする
+.ai/skills/livewire-development/SKILL.md
+```
+
+## サードパーティパッケージへのBoost対応追加
+
+自作パッケージにBoostサポートを追加するには、パッケージの `resources/boost/` ディレクトリに設定ファイルを配置します。
+
+### ガイドラインの追加
+
+```
+resources/
+└── boost/
+    └── guidelines/
+        └── core.blade.php
+```
+
+```php
+## MyPackage
+
+このパッケージは [機能の概要] を提供します。
+
+### 基本的な使い方
+
+@verbatim
+<code-snippet name="MyPackageの初期化" lang="php">
+$result = MyPackage::create([
+    'option' => 'value',
+]);
+</code-snippet>
+@endverbatim
+```
+
+### スキルの追加
+
+```
+resources/
+└── boost/
+    └── skills/
+        └── mypackage-development/
+            └── SKILL.md
+```
+
+```markdown
+---
+name: mypackage-development
+description: MyPackageの機能を実装するスキル。
+---
+
+# MyPackage Development
+
+## このスキルを使う場面
+MyPackageを使った機能実装時に使います。
+
+## 主な機能
+
+- 機能1: ...
+- 機能2: ...
+```
+
+パッケージユーザーが `php artisan boost:install` を実行すると、これらのガイドラインとスキルが自動的に検出されてインストール対象として表示されます。
+
+## 実践例：独自CI/CDエージェント向けカスタムエージェント
+
+社内のCI/CDパイプラインに組み込まれた仮想エージェント「PipelineAgent」の完全な実装例です。このエージェントはガイドラインのみサポートし、MCPとスキルはサポートしません。
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Boost;
+
+use Laravel\Boost\Contracts\SupportsGuidelines;
+use Laravel\Boost\Install\Agents\Agent;
+use Laravel\Boost\Install\Enums\Platform;
+
+class PipelineAgent extends Agent implements SupportsGuidelines
+{
+    public function name(): string
+    {
+        return 'pipeline_agent';
+    }
+
+    public function displayName(): string
+    {
+        return 'Pipeline Agent (CI/CD)';
+    }
+
+    public function systemDetectionConfig(Platform $platform): array
+    {
+        // CI環境変数で存在を検出する
+        return [
+            'command' => match ($platform) {
+                Platform::Windows => 'cmd /c echo %CI_AGENT_VERSION% 2>nul',
+                default => 'echo $CI_AGENT_VERSION',
+            },
+        ];
+    }
+
+    public function projectDetectionConfig(): array
+    {
+        // プロジェクトルートの設定ファイルで検出する
+        return [
+            'files' => ['.pipeline-agent.yml'],
+        ];
+    }
+
+    public function guidelinesPath(): string
+    {
+        // CI/CDエージェントが読み込む規約のパス
+        return '.pipeline/CODING_GUIDELINES.md';
+    }
+
+    public function frontmatter(): bool
+    {
+        return false;
+    }
+
+    public function transformGuidelines(string $markdown): string
+    {
+        // パイプライン用のメタデータヘッダーを追加する
+        $timestamp = now()->toIso8601String();
+
+        return "<!-- Generated by Laravel Boost at {$timestamp} -->\n\n{$markdown}";
+    }
+}
+```
+
+`AppServiceProvider` に登録します:
+
+```php
+use App\Boost\PipelineAgent;
+use Laravel\Boost\Boost;
+
+public function boot(): void
+{
+    Boost::registerAgent('pipeline_agent', PipelineAgent::class);
+}
+```
+
+CI環境では以下のコマンドでガイドラインのみを生成できます:
+
+```shell
+php artisan boost:install --agent=pipeline_agent
+```
+
+## 参考リンク
+
+<Card
+  title="ClaudeCode.php — 公式実装例"
+  icon="github"
+  href="https://github.com/laravel/boost/blob/main/src/Install/Agents/ClaudeCode.php"
+>
+  Boostに同梱されているClaudeCodeエージェントの完全な実装をソースコードで確認できます。
+</Card>
+
+<Card
+  title="Agent Skills"
+  icon="book"
+  href="https://agentskills.io/what-are-skills"
+>
+  SKILL.mdのフォーマット仕様とベストプラクティスを参照できます。
+</Card>
