@@ -1,0 +1,380 @@
+---
+title: "レート制限のカスタマイズ"
+description: "LaravelのRateLimiterファサードを深掘りし、ユーザー別・プラン別・IPアドレス別のカスタムレート制限の実装から、Redisを使った高可用な設定まで解説します。"
+---
+
+## `RateLimiter` ファサードの仕組み
+
+Laravelのレート制限は `Illuminate\Cache\RateLimiting\Limit` クラスと `RateLimiter` ファサードで構成されています。内部的にはキャッシュドライバー（デフォルトはファイルまたはRedis）にカウンターを保存し、リクエスト数を追跡します。
+
+`throttle` ミドルウェアが受け取ったリクエストに対して `RateLimiter::for()` で定義したクロージャを実行し、制限に達していれば `429 Too Many Requests` を返します。
+
+## `AppServiceProvider` でのカスタムリミッター定義
+
+レート制限の設定は `App\Providers\AppServiceProvider` の `boot()` メソッドで行います。
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+    }
+}
+```
+
+`RateLimiter::for()` の第1引数はリミッター名で、`throttle` ミドルウェアから参照する際に使います。第2引数のクロージャは `Illuminate\Cache\RateLimiting\Limit` インスタンスを返す必要があります。
+
+## ユーザー別・IPアドレス別・プランごとのレート制限
+
+### 認証済みユーザーとゲストで制限を変える
+
+```php
+RateLimiter::for('uploads', function (Request $request) {
+    return $request->user()
+        ? Limit::perHour(100)->by($request->user()->id)
+        : Limit::perHour(10)->by($request->ip());
+});
+```
+
+### ユーザーのプランに応じた制限
+
+```php
+RateLimiter::for('api', function (Request $request) {
+    $user = $request->user();
+
+    if (! $user) {
+        return Limit::perMinute(30)->by($request->ip());
+    }
+
+    return match ($user->plan) {
+        'enterprise' => Limit::none(),
+        'pro'        => Limit::perMinute(500)->by($user->id),
+        default      => Limit::perMinute(60)->by($user->id),
+    };
+});
+```
+
+### IPアドレスによるグローバル制限
+
+特定のエンドポイントに関係なく、IPアドレス単位でスロットリングします。
+
+```php
+RateLimiter::for('global', function (Request $request) {
+    return Limit::perMinute(1000)->by($request->ip());
+});
+```
+
+### 複数の制限を組み合わせる
+
+配列で返すと、すべての制限が評価されます。いずれかに達した時点で `429` を返します。
+
+```php
+RateLimiter::for('login', function (Request $request) {
+    return [
+        Limit::perMinute(10)->by($request->ip()),
+        Limit::perMinute(5)->by($request->input('email')),
+    ];
+});
+```
+
+<Info>
+  同じ `by` 値を持つ複数の制限を定義する場合は、キーが衝突しないようにプレフィックスを付けてください。
+</Info>
+
+```php
+RateLimiter::for('uploads', function (Request $request) {
+    return [
+        Limit::perMinute(10)->by('minute:' . $request->user()->id),
+        Limit::perDay(1000)->by('day:' . $request->user()->id),
+    ];
+});
+```
+
+## `throttle` ミドルウェアとカスタムリミッター名の指定
+
+`throttle` ミドルウェアに定義したリミッター名を渡します。
+
+```php
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['throttle:api'])->group(function () {
+    Route::get('/user', function () { /* ... */ });
+    Route::post('/posts', function () { /* ... */ });
+});
+```
+
+### `bootstrap/app.php` での登録
+
+Laravel 11以降、ミドルウェアは `bootstrap/app.php` で管理します。
+
+```php
+use Illuminate\Foundation\Application;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        apiPrefix: 'api',
+    )
+    ->withMiddleware(function (\Illuminate\Foundation\Configuration\Middleware $middleware): void {
+        $middleware->throttleApi('api');
+    })
+    ->create();
+```
+
+## APIルートへの適用例
+
+<Steps>
+  <Step title="リミッターを定義する">
+    `AppServiceProvider` に複数のリミッターを定義します。
+
+    ```php
+    public function boot(): void
+    {
+        // 一般APIアクセス
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // ファイルアップロード
+        RateLimiter::for('uploads', function (Request $request) {
+            return $request->user()?->isPro()
+                ? Limit::perHour(500)->by($request->user()->id)
+                : Limit::perHour(50)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // ログイン試行
+        RateLimiter::for('login', function (Request $request) {
+            return [
+                Limit::perMinute(10)->by($request->ip()),
+                Limit::perMinute(5)->by($request->input('email')),
+            ];
+        });
+    }
+    ```
+  </Step>
+  <Step title="ルートにミドルウェアを適用する">
+    ```php
+    // routes/api.php
+    use Illuminate\Support\Facades\Route;
+
+    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+        Route::get('/user', [\App\Http\Controllers\UserController::class, 'show']);
+        Route::get('/posts', [\App\Http\Controllers\PostController::class, 'index']);
+    });
+
+    Route::middleware(['auth:sanctum', 'throttle:uploads'])->group(function () {
+        Route::post('/uploads', [\App\Http\Controllers\UploadController::class, 'store']);
+    });
+
+    Route::middleware(['throttle:login'])->group(function () {
+        Route::post('/login', [\App\Http\Controllers\AuthController::class, 'login']);
+    });
+    ```
+  </Step>
+</Steps>
+
+## レスポンスヘッダー（`X-RateLimit-*`）の仕組み
+
+`throttle` ミドルウェアは制限情報をレスポンスヘッダーに自動付与します。
+
+| ヘッダー | 説明 |
+|---|---|
+| `X-RateLimit-Limit` | 許可されているリクエスト数 |
+| `X-RateLimit-Remaining` | 残りのリクエスト数 |
+| `Retry-After` | 次のリクエストが可能になるまでの秒数（429時のみ） |
+| `X-RateLimit-Reset` | 制限がリセットされるUNIXタイムスタンプ |
+
+```http
+HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 0
+Retry-After: 45
+X-RateLimit-Reset: 1717000000
+Content-Type: application/json
+
+{
+    "message": "Too Many Requests."
+}
+```
+
+### カスタムレスポンスを返す
+
+```php
+RateLimiter::for('api', function (Request $request) {
+    return Limit::perMinute(60)
+        ->by($request->user()?->id ?: $request->ip())
+        ->response(function (Request $request, array $headers) {
+            return response()->json([
+                'message' => 'リクエスト制限を超えました。しばらくしてから再試行してください。',
+                'retry_after' => $headers['Retry-After'],
+            ], 429, $headers);
+        });
+});
+```
+
+## `RateLimiter::attempt()` を使った手動チェック
+
+`throttle` ミドルウェアを使わず、コードの中で任意のタイミングでレート制限を確認したい場合は `RateLimiter::attempt()` を使います。
+
+```php
+use Illuminate\Support\Facades\RateLimiter;
+
+class SmsController extends Controller
+{
+    public function send(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $key = 'sms:' . $request->user()->id;
+
+        $executed = RateLimiter::attempt(
+            key: $key,
+            maxAttempts: 5,
+            callback: function () use ($request) {
+                app(SmsService::class)->send(
+                    $request->user()->phone,
+                    $request->input('message')
+                );
+            },
+            decaySeconds: 3600,  // 1時間
+        );
+
+        if (! $executed) {
+            $seconds = RateLimiter::availableIn($key);
+
+            return response()->json([
+                'message' => "SMS送信の制限を超えました。{$seconds}秒後に再試行してください。",
+            ], 429);
+        }
+
+        return response()->json(['message' => 'SMSを送信しました。']);
+    }
+}
+```
+
+### 試行回数の確認とリセット
+
+```php
+// 現在の試行回数を取得
+$hits = RateLimiter::attempts($key);
+
+// 次のリセットまでの秒数
+$seconds = RateLimiter::availableIn($key);
+
+// 制限に達しているか確認
+$tooMany = RateLimiter::tooManyAttempts($key, $maxAttempts = 5);
+
+// カウンターを手動でリセット（ログアウト後など）
+RateLimiter::clear($key);
+```
+
+### ログインスロットリングの例
+
+```php
+public function login(Request $request): mixed
+{
+    $key = 'login:' . $request->input('email');
+
+    if (RateLimiter::tooManyAttempts($key, 5)) {
+        $seconds = RateLimiter::availableIn($key);
+
+        throw ValidationException::withMessages([
+            'email' => "ログイン試行回数が多すぎます。{$seconds}秒後に再試行してください。",
+        ]);
+    }
+
+    if (! Auth::attempt($request->only('email', 'password'))) {
+        RateLimiter::hit($key, 300);  // 5分間カウント
+
+        throw ValidationException::withMessages([
+            'email' => 'メールアドレスまたはパスワードが正しくありません。',
+        ]);
+    }
+
+    RateLimiter::clear($key);
+
+    return redirect()->intended('/dashboard');
+}
+```
+
+## レスポンスベースのレート制限
+
+特定のレスポンスのみカウントしたい場合は `after()` を使います。404レスポンスのみカウントすることでリソース列挙攻撃を防ぐ例：
+
+```php
+use Symfony\Component\HttpFoundation\Response;
+
+RateLimiter::for('resource-lookup', function (Request $request) {
+    return Limit::perMinute(10)
+        ->by($request->user()?->id ?: $request->ip())
+        ->after(function (Response $response) {
+            return $response->getStatusCode() === 404;
+        });
+});
+```
+
+## Redisを使ったレート制限
+
+デフォルトのキャッシュドライバーをRedisに変更するだけで、`throttle` ミドルウェアも自動的にRedisを使います。
+
+### Redisドライバーの設定
+
+```php
+// config/cache.php
+'default' => env('CACHE_DRIVER', 'redis'),
+```
+
+```ini
+# .env
+CACHE_DRIVER=redis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+```
+
+### `throttleWithRedis` を使う
+
+Redis専用の最適化されたスロットリングミドルウェアを使うには `bootstrap/app.php` で `throttleWithRedis()` を呼び出します。
+
+```php
+use Illuminate\Foundation\Application;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        apiPrefix: 'api',
+    )
+    ->withMiddleware(function (\Illuminate\Foundation\Configuration\Middleware $middleware): void {
+        $middleware->throttleWithRedis();
+    })
+    ->create();
+```
+
+これにより `throttle` ミドルウェアが `ThrottleRequestsWithRedis` クラスにマッピングされ、Redisのアトミック操作を使って正確なカウントが行われます。
+
+<Warning>
+  `throttleWithRedis()` を使う場合は必ずRedisが利用可能な状態にしてください。Redisへの接続が失敗すると、リクエストがすべて拒否される可能性があります。
+</Warning>
+
+### Redisを使う利点
+
+- **水平スケーリング対応** — 複数のサーバーインスタンス間でカウンターを共有できる
+- **高精度** — アトミック操作でレースコンディションを防ぐ
+- **TTL管理** — Redisのネイティブな有効期限機能でカウンターを自動削除
+
+## 関連ページ
+
+<Card title="キャッシュ" icon="database" href="/jp/intermediate/cache">
+  Redisを含むLaravelのキャッシュドライバーの設定と使い方を確認します。
+</Card>
