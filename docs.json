@@ -219,7 +219,8 @@
               {
                 "group": "AI上級",
                 "pages": [
-                  "jp/advanced/boost-custom-agent"
+                  "jp/advanced/boost-custom-agent",
+                  "jp/advanced/mcp-server"
                 ]
               }
             ]
