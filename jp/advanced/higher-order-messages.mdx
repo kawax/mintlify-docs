@@ -1,0 +1,261 @@
+---
+title: "コレクションの高階メッセージ"
+description: "コレクションの高階メッセージ(Higher-order Messages)の仕組みと実践的な使い方"
+---
+
+## 高階メッセージとは
+
+高階メッセージ(Higher-order Messages)は、コレクションのメソッドをプロパティアクセスの形で呼び出す構文です。コールバックを書くことなく、各要素に対してメソッドを呼び出したり、プロパティを取得したりできます。
+
+```php
+// 通常の書き方
+$names = $users->map(fn ($user) => $user->name);
+
+// 高階メッセージを使った書き方
+$names = $users->map->name;
+```
+
+`$users->map->name` は「各ユーザーの `name` プロパティを取り出して `map` する」という意味になります。
+
+## 仕組み — HigherOrderCollectionProxy
+
+`$collection->map` のようにプロパティとしてアクセスすると、`EnumeratesValues` トレイトの `__get()` が呼ばれます。
+
+```php
+// src/Illuminate/Collections/Traits/EnumeratesValues.php
+public function __get($key)
+{
+    if (! in_array($key, static::$proxies)) {
+        throw new Exception("Property [{$key}] does not exist on this collection instance.");
+    }
+
+    return new HigherOrderCollectionProxy($this, $key);
+}
+```
+
+`$proxies` に含まれるメソッド名の場合、`HigherOrderCollectionProxy` インスタンスが返ります。このプロキシはコレクションとメソッド名の2つを保持します。
+
+### __get によるプロパティアクセスのプロキシ
+
+続けてプロパティにアクセス(`->name`)すると、プロキシの `__get()` が呼ばれます。
+
+```php
+// src/Illuminate/Collections/HigherOrderCollectionProxy.php
+public function __get($key)
+{
+    return $this->collection->{$this->method}(function ($value) use ($key) {
+        return is_array($value) ? $value[$key] : $value->{$key};
+    });
+}
+```
+
+つまり `$users->map->name` は次と同等です。
+
+```php
+$users->map(fn ($user) => $user->name);
+```
+
+### __call によるメソッド呼び出しのプロキシ
+
+続けてメソッドを呼び出す(`->activate()`)と、プロキシの `__call()` が呼ばれます。
+
+```php
+public function __call($method, $parameters)
+{
+    return $this->collection->{$this->method}(function ($value) use ($method, $parameters) {
+        return is_string($value)
+            ? $value::{$method}(...$parameters)
+            : $value->{$method}(...$parameters);
+    });
+}
+```
+
+`$users->each->activate()` は次と同等です。
+
+```php
+$users->each(fn ($user) => $user->activate());
+```
+
+## 対応しているメソッド一覧
+
+高階メッセージとして使えるメソッドは `$proxies` 配列で定義されています。
+
+```php
+protected static $proxies = [
+    'average', 'avg',
+    'contains', 'doesntContain', 'some',
+    'each', 'every',
+    'filter', 'reject',
+    'first', 'last',
+    'flatMap', 'map',
+    'groupBy', 'keyBy',
+    'hasMany', 'hasSole',
+    'max', 'min', 'sum', 'percentage',
+    'partition',
+    'skipUntil', 'skipWhile',
+    'sortBy', 'sortByDesc',
+    'takeUntil', 'takeWhile',
+    'unique',
+    'unless', 'until', 'when',
+];
+```
+
+カスタムメソッドを追加するには `Collection::proxy()` を使います。
+
+```php
+Collection::proxy('myCustomMethod');
+```
+
+## 実践的なユースケース
+
+### Eloquentモデルのコレクション
+
+高階メッセージはEloquentのコレクションで特に便利です。
+
+```php
+$users = User::with('posts')->get();
+
+// メソッド呼び出し: 各ユーザーのステータスを更新
+$users->each->markAsVerified();
+
+// プロパティアクセス: 名前だけ取り出す
+$names = $users->map->name;
+
+// メソッドに引数を渡す
+$users->each->sendPasswordReset('ja');
+
+// メール送信
+$users->each->notify(new WelcomeNotification);
+```
+
+### フィルタリング
+
+```php
+$activeUsers = $users->filter->isActive();
+
+// isActive() が true を返すユーザーだけ残す
+// $users->filter(fn ($user) => $user->isActive()) と同等
+
+$inactiveUsers = $users->reject->isActive();
+```
+
+### 集計
+
+```php
+// 各ユーザーのpost_countプロパティで合計
+$totalPosts = $users->sum->post_count;
+
+// 各ユーザーのscoreで最大値
+$highestScore = $users->max->score;
+
+// 各ユーザーのageで平均
+$averageAge = $users->avg->age;
+```
+
+### グループ化・ソート
+
+```php
+// role プロパティでグループ化
+$grouped = $users->groupBy->role;
+
+// name プロパティで昇順ソート
+$sorted = $users->sortBy->name;
+
+// created_at プロパティで降順ソート
+$sorted = $users->sortByDesc->created_at;
+```
+
+### flatMap でネストを展開
+
+```php
+// 各ユーザーの posts リレーションを展開して1つのコレクションにする
+$posts = $users->flatMap->posts;
+```
+
+### 条件確認
+
+```php
+// 全員が管理者か確認
+$allAdmins = $users->every->isAdmin();
+
+// 1人でもアクティブがいるか確認
+$hasActive = $users->contains->isActive();
+
+// 全員が特定のプランか確認
+$allPro = $users->every->hasPlan('pro');
+```
+
+### 文字列コレクション
+
+値が文字列のコレクションでも使えます。プロキシの `__call()` は文字列の場合に静的メソッドとして呼び出します。
+
+```php
+$names = collect(['alice', 'bob', 'charlie']);
+
+// 文字列コレクションに対してはクロージャの方が明示的
+$upper = $names->map(fn ($name) => strtoupper($name));
+// ['ALICE', 'BOB', 'CHARLIE']
+```
+
+<Info>
+  文字列コレクションへの高階メッセージは、メソッドが文字列型に静的に定義されている必要があります。通常はEloquentモデルや独自クラスのコレクションで使うのが自然です。
+</Info>
+
+## 通常のクロージャとの比較
+
+高階メッセージは簡潔ですが、すべてのケースで使えるわけではありません。
+
+```php
+// 高階メッセージ: シンプルなプロパティ取得・メソッド呼び出しに適する
+$emails = $users->map->email;
+$users->each->sendWelcomeMail();
+$admins = $users->filter->isAdmin();
+
+// クロージャ: 複雑なロジックや引数が必要なケースに適する
+$formatted = $users->map(function ($user) {
+    return "{$user->name} <{$user->email}>";
+});
+
+$filtered = $users->filter(function ($user) use ($minAge, $role) {
+    return $user->age >= $minAge && $user->role === $role;
+});
+```
+
+<Tip>
+  「各要素の同じプロパティを取り出す」「各要素の同じメソッドを呼ぶ」場合は高階メッセージが読みやすくなります。条件が複雑だったり引数が動的だったりする場合はクロージャを使います。
+</Tip>
+
+## カスタムクラスで高階メッセージを使う
+
+`EnumeratesValues` トレイトを通じて `HigherOrderCollectionProxy` の仕組みを利用するには、`Collection::proxy()` を呼んでメソッドをプロキシ対象に追加します。
+
+```php
+namespace App\Providers;
+
+use Illuminate\Support\Collection;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        // カスタムマクロをプロキシ対象に追加
+        Collection::macro('active', function () {
+            return $this->filter(fn ($item) => $item->isActive());
+        });
+
+        Collection::proxy('active');
+    }
+}
+```
+
+```php
+// 登録後は高階メッセージとして使える
+$activeUsers = $users->active;
+```
+
+## 次のステップ
+
+<Card title="Conditionableトレイト" icon="git-branch" href="/jp/advanced/conditionable">
+  `when()` / `unless()` の内部実装と、QueryBuilderや自作クラスへの適用方法を学びます。
+</Card>

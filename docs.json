@@ -179,7 +179,9 @@
                 "group": "デザインパターン",
                 "pages": [
                   "jp/advanced/pipeline",
-                  "jp/advanced/macroable"
+                  "jp/advanced/macroable",
+                  "jp/advanced/conditionable",
+                  "jp/advanced/higher-order-messages"
                 ]
               }
             ]
