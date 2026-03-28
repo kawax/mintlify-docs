@@ -1,0 +1,290 @@
+---
+title: "Pagination"
+description: "Add pagination to query builder and Eloquent results with zero configuration. Covers offset-based, simple, and cursor pagination — plus Blade rendering and JSON API output."
+---
+
+## How pagination works
+
+Laravel's paginator integrates directly with the query builder and Eloquent. Call `paginate()`, `simplePaginate()`, or `cursorPaginate()` on any query, and Laravel automatically reads the current page from the `page` query string parameter and injects it into generated links.
+
+Generated HTML is compatible with Tailwind CSS by default; Bootstrap is also available.
+
+## Choosing the right method
+
+| Method | Class returned | When to use |
+|---|---|---|
+| `paginate()` | `LengthAwarePaginator` | You need a total count and numbered page links |
+| `simplePaginate()` | `Paginator` | You only need "Previous / Next" links (no total count) |
+| `cursorPaginate()` | `CursorPaginator` | Large datasets or infinite scroll; no page numbers |
+
+## Basic usage
+
+### Query builder
+
+```php
+use Illuminate\Support\Facades\DB;
+
+$users = DB::table('users')->orderBy('name')->paginate(15);
+```
+
+### Eloquent
+
+```php
+use App\Models\User;
+
+$users = User::paginate(15);
+
+// With constraints
+$users = User::where('active', true)->paginate(15);
+```
+
+### Simple pagination
+
+Skip the `COUNT(*)` query entirely when you don't need a total. This is faster for large tables:
+
+```php
+$users = User::where('active', true)->simplePaginate(15);
+```
+
+<Tip>
+  If your UI doesn't display "Page 3 of 12" style information, use `simplePaginate()`. It runs one fewer database query on every request.
+</Tip>
+
+### Cursor pagination
+
+Cursor pagination replaces the SQL `OFFSET` clause with a `WHERE` clause, making it index-friendly and safe for datasets that change frequently:
+
+```php
+// orderBy is required
+$users = DB::table('users')->orderBy('id')->cursorPaginate(15);
+$posts = User::where('published', true)->cursorPaginate(20);
+```
+
+The cursor value is encoded in the URL instead of a page number:
+
+```text
+https://example.com/users?cursor=eyJpZCI6MTUsIl9wb2ludHNUb05leHRJdGVtcyI6dHJ1ZX0
+```
+
+<Warning>
+  Cursor pagination requires an `orderBy` clause. The column you order by must belong to the table being paginated and must not contain `null` values.
+</Warning>
+
+### Offset vs. cursor — the SQL difference
+
+```sql
+-- paginate() / simplePaginate()
+SELECT * FROM users ORDER BY id ASC LIMIT 15 OFFSET 15;
+
+-- cursorPaginate()
+SELECT * FROM users WHERE id > 15 ORDER BY id ASC LIMIT 15;
+```
+
+Cursor pagination uses the index directly and won't show duplicate or skipped records if rows are inserted or deleted between page loads. The trade-off: no numbered page links.
+
+## Controller setup
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use Illuminate\View\View;
+
+class UserController extends Controller
+{
+    public function index(): View
+    {
+        $users = User::orderBy('name')->paginate(20);
+
+        return view('users.index', compact('users'));
+    }
+}
+```
+
+## Displaying results in Blade
+
+```blade
+@foreach ($users as $user)
+    <p>{{ $user->name }}</p>
+@endforeach
+
+{{-- Renders Tailwind-compatible page links --}}
+{{ $users->links() }}
+```
+
+### Adjust the link window
+
+Control how many links appear on each side of the current page:
+
+```blade
+{{-- Show 5 links before and after the current page --}}
+{{ $users->onEachSide(5)->links() }}
+```
+
+## Accepting per-page from the request
+
+```php
+public function index(Request $request): View
+{
+    $perPage = $request->integer('per_page', 15);
+    $perPage = min(max($perPage, 1), 100);
+
+    $users = User::paginate($perPage);
+
+    return view('users.index', compact('users'));
+}
+```
+
+## Multiple paginators on one page
+
+Two paginators both default to the `page` query string parameter, which causes a conflict. Give each one a unique parameter name:
+
+```php
+$users = User::paginate(perPage: 15, pageName: 'users');
+$posts = Post::paginate(perPage: 10, pageName: 'posts');
+```
+
+## Customizing URLs
+
+```php
+$users = User::paginate(15);
+
+// Change the base path — generates /admin/users?page=N
+$users->withPath('/admin/users');
+
+// Carry the current request's query string through each link
+$users->withQueryString();
+
+// Append specific parameters
+$users->appends(['sort' => 'name', 'dir' => 'asc']);
+
+// Add a hash fragment
+$users->fragment('user-list');
+```
+
+## JSON API output
+
+Return a paginator directly from a route or controller and Laravel serializes it to JSON automatically:
+
+```php
+Route::get('/api/users', function () {
+    return User::paginate(15);
+});
+```
+
+The response includes meta fields alongside the records:
+
+```json
+{
+    "total": 50,
+    "per_page": 15,
+    "current_page": 1,
+    "last_page": 4,
+    "next_page_url": "http://example.com/api/users?page=2",
+    "prev_page_url": null,
+    "path": "http://example.com/api/users",
+    "from": 1,
+    "to": 15,
+    "data": [
+        { "id": 1, "name": "Jane Smith" },
+        { "id": 2, "name": "John Doe" }
+    ]
+}
+```
+
+### With API resources
+
+Pass the paginator to an API resource collection and pagination metadata is preserved automatically:
+
+```php
+use App\Http\Resources\UserResource;
+
+Route::get('/api/users', function () {
+    return UserResource::collection(User::paginate(15));
+});
+```
+
+<Info>
+  Cursor paginators serialize `next_cursor` and `prev_cursor` instead of page numbers. API clients pass the cursor value as the `cursor` query parameter on the next request.
+</Info>
+
+## Custom pagination views
+
+### Per-call override
+
+```blade
+{{-- Use a custom Blade view for this paginator --}}
+{{ $paginator->links('vendor.pagination.custom') }}
+```
+
+### Publish and edit the default views
+
+```shell
+php artisan vendor:publish --tag=laravel-pagination
+```
+
+This creates files under `resources/views/vendor/pagination/`, including `tailwind.blade.php` and `bootstrap-5.blade.php`. Edit them directly, or register a new default in `AppServiceProvider`:
+
+```php
+use Illuminate\Pagination\Paginator;
+
+public function boot(): void
+{
+    Paginator::defaultView('vendor.pagination.custom');
+    Paginator::defaultSimpleView('vendor.pagination.simple-custom');
+}
+```
+
+### Switch to Bootstrap
+
+```php
+use Illuminate\Pagination\Paginator;
+
+public function boot(): void
+{
+    Paginator::useBootstrapFive();
+}
+```
+
+## Manually creating a paginator
+
+Paginate an in-memory array instead of a database query:
+
+```php
+use Illuminate\Pagination\LengthAwarePaginator;
+
+$items = collect(range(1, 500))->map(fn ($i) => ['id' => $i, 'name' => "Item {$i}"]);
+
+$perPage     = 15;
+$currentPage = request()->integer('page', 1);
+
+$paginator = new LengthAwarePaginator(
+    items: $items->forPage($currentPage, $perPage),
+    total: $items->count(),
+    perPage: $perPage,
+    currentPage: $currentPage,
+    options: ['path' => request()->url()]
+);
+```
+
+## Useful instance methods
+
+```php
+$paginator = User::paginate(15);
+
+$paginator->currentPage();      // e.g. 2
+$paginator->lastPage();         // total number of pages
+$paginator->total();            // total record count
+$paginator->perPage();          // items per page
+$paginator->count();            // items on the current page
+$paginator->firstItem();        // position of the first item overall
+$paginator->lastItem();         // position of the last item overall
+$paginator->hasPages();         // more than one page?
+$paginator->hasMorePages();     // is there a next page?
+$paginator->nextPageUrl();      // URL of the next page
+$paginator->previousPageUrl();  // URL of the previous page
+$paginator->url(3);             // URL for page 3
+$paginator->items();            // array of current page items
+```

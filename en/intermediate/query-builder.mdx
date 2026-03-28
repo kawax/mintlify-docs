@@ -1,0 +1,385 @@
+---
+title: "Query builder"
+description: "Build and execute database queries using Laravel's fluent DB facade — without writing raw SQL. Covers retrieval, filtering, joins, aggregates, and mutations."
+---
+
+## What is the query builder?
+
+Laravel's query builder gives you a fluent, chainable interface for constructing database queries using the `DB` facade. You start with `DB::table()` and chain methods until you call a terminal method like `get()` or `first()`.
+
+```php
+use Illuminate\Support\Facades\DB;
+
+$users = DB::table('users')->get();
+```
+
+Every query uses PDO parameter binding internally, so your application is protected against SQL injection without any extra effort.
+
+<Info>
+  The query builder works with all of Laravel's supported databases: MySQL, MariaDB, PostgreSQL, SQLite, and SQL Server. You can switch databases without rewriting your queries.
+</Info>
+
+## When to use the query builder vs. Eloquent
+
+| Situation | Prefer |
+|---|---|
+| You need models, relationships, and model events | Eloquent |
+| Complex aggregates or reporting queries | Query builder |
+| Migrations, seeders, and bulk operations | Query builder |
+| Maximum performance on large datasets | Query builder |
+
+## Retrieving data
+
+### Fetch all rows
+
+```php
+$users = DB::table('users')->get();
+
+foreach ($users as $user) {
+    echo $user->name;
+}
+```
+
+`get()` returns an `Illuminate\Support\Collection` of `stdClass` objects.
+
+### Fetch a single row
+
+```php
+// First match, or null
+$user = DB::table('users')->where('email', 'jane@example.com')->first();
+
+// First match, or throw a 404
+$user = DB::table('users')->where('email', 'jane@example.com')->firstOrFail();
+
+// A single column value
+$email = DB::table('users')->where('name', 'Jane')->value('email');
+
+// A row by its primary key
+$user = DB::table('users')->find(42);
+```
+
+### Pluck a column
+
+```php
+// A flat collection of email addresses
+$emails = DB::table('users')->pluck('email');
+
+// Keyed by name — ['Jane' => 'jane@example.com', ...]
+$emails = DB::table('users')->pluck('email', 'name');
+```
+
+### Chunk large result sets
+
+Use `chunk()` when you need to process thousands of rows without loading them all into memory at once:
+
+```php
+use Illuminate\Support\Collection;
+
+DB::table('orders')->orderBy('id')->chunk(200, function (Collection $orders) {
+    foreach ($orders as $order) {
+        // process each order
+    }
+});
+```
+
+<Warning>
+  If you modify records while iterating, use `chunkById()` instead of `chunk()`. Updating rows during a `chunk()` loop can shift offsets and cause records to be skipped.
+</Warning>
+
+```php
+DB::table('users')->where('active', false)
+    ->chunkById(200, function (Collection $users) {
+        foreach ($users as $user) {
+            DB::table('users')
+                ->where('id', $user->id)
+                ->update(['active' => true]);
+        }
+    });
+```
+
+### Stream lazily
+
+`lazy()` returns a `LazyCollection` — the query runs in chunks but you iterate over results as a single stream:
+
+```php
+DB::table('users')->orderBy('id')->lazy()->each(function (object $user) {
+    // one user at a time, memory-efficient
+});
+```
+
+## Aggregates
+
+```php
+$count = DB::table('users')->count();
+$max   = DB::table('orders')->max('amount');
+$min   = DB::table('orders')->min('amount');
+$avg   = DB::table('orders')->avg('amount');
+$total = DB::table('orders')->sum('amount');
+
+// Scoped aggregate
+$avgPremium = DB::table('orders')
+    ->where('plan', 'premium')
+    ->avg('amount');
+```
+
+Check existence without counting:
+
+```php
+if (DB::table('orders')->where('status', 'pending')->exists()) {
+    // at least one pending order
+}
+
+if (DB::table('orders')->where('status', 'pending')->doesntExist()) {
+    // no pending orders
+}
+```
+
+## Select clauses
+
+```php
+// Pick specific columns
+$users = DB::table('users')
+    ->select('name', 'email as user_email')
+    ->get();
+
+// Remove duplicates
+$users = DB::table('users')->distinct()->get();
+
+// Add columns to an existing query object
+$query = DB::table('users')->select('name');
+$users = $query->addSelect('created_at')->get();
+```
+
+## Where clauses
+
+### Basic conditions
+
+```php
+// Equality (= is implied)
+$users = DB::table('users')->where('status', 'active')->get();
+
+// Other operators
+$users = DB::table('users')->where('age', '>=', 18)->get();
+$users = DB::table('users')->where('name', 'like', 'A%')->get();
+
+// Multiple conditions (AND)
+$users = DB::table('users')
+    ->where('status', 'active')
+    ->where('role', 'editor')
+    ->get();
+
+// OR condition
+$users = DB::table('users')
+    ->where('role', 'admin')
+    ->orWhere('role', 'moderator')
+    ->get();
+```
+
+### Grouping conditions
+
+Use a closure to wrap OR conditions so they don't bleed into surrounding AND logic:
+
+```php
+use Illuminate\Database\Query\Builder;
+
+$users = DB::table('users')
+    ->where('active', true)
+    ->where(function (Builder $query) {
+        $query->where('role', 'admin')
+              ->orWhere('role', 'moderator');
+    })
+    ->get();
+// WHERE active = 1 AND (role = 'admin' OR role = 'moderator')
+```
+
+### Common where helpers
+
+```php
+// IN / NOT IN
+$users = DB::table('users')->whereIn('id', [1, 2, 3])->get();
+$users = DB::table('users')->whereNotIn('status', ['banned', 'suspended'])->get();
+
+// BETWEEN
+$orders = DB::table('orders')->whereBetween('amount', [100, 1000])->get();
+
+// NULL checks
+$users = DB::table('users')->whereNull('deleted_at')->get();
+$users = DB::table('users')->whereNotNull('email_verified_at')->get();
+
+// LIKE — case-sensitivity depends on your database collation
+$users = DB::table('users')->whereLike('name', '%smith%')->get();
+
+// Match any column
+$users = DB::table('users')
+    ->whereAny(['name', 'email', 'bio'], 'like', '%laravel%')
+    ->get();
+```
+
+## Joins
+
+```php
+// Inner join
+$users = DB::table('users')
+    ->join('orders', 'users.id', '=', 'orders.user_id')
+    ->select('users.name', 'orders.amount')
+    ->get();
+
+// Left join
+$users = DB::table('users')
+    ->leftJoin('profiles', 'users.id', '=', 'profiles.user_id')
+    ->get();
+
+// Subquery join
+$latestOrders = DB::table('orders')
+    ->select('user_id', DB::raw('MAX(created_at) as last_order_at'))
+    ->groupBy('user_id');
+
+$users = DB::table('users')
+    ->joinSub($latestOrders, 'latest_orders', function ($join) {
+        $join->on('users.id', '=', 'latest_orders.user_id');
+    })
+    ->get();
+```
+
+## Ordering, grouping, and limiting
+
+```php
+// Sort ascending (default) and descending
+$users = DB::table('users')->orderBy('last_name')->orderBy('first_name', 'desc')->get();
+
+// Random order
+$featured = DB::table('products')->inRandomOrder()->limit(5)->get();
+
+// Group and aggregate
+$summary = DB::table('orders')
+    ->select('status', DB::raw('COUNT(*) as total'))
+    ->groupBy('status')
+    ->having('total', '>', 10)
+    ->get();
+
+// Limit and offset
+$page = DB::table('users')->skip(20)->take(10)->get();
+```
+
+## Raw expressions
+
+<Warning>
+  Raw expressions are injected directly into the SQL string. Never pass unvalidated user input to a raw expression — use the bindings array instead.
+</Warning>
+
+```php
+// Inline raw expression
+$users = DB::table('users')
+    ->select(DB::raw('COUNT(*) as total, status'))
+    ->groupBy('status')
+    ->get();
+
+// selectRaw with bindings
+$orders = DB::table('orders')
+    ->selectRaw('price * ? as price_with_tax', [1.08])
+    ->get();
+
+// whereRaw with bindings
+$orders = DB::table('orders')
+    ->whereRaw('price > IF(state = "CA", ?, 100)', [200])
+    ->get();
+
+// havingRaw
+$orders = DB::table('orders')
+    ->select('department', DB::raw('SUM(amount) as total'))
+    ->groupBy('department')
+    ->havingRaw('SUM(amount) > ?', [5000])
+    ->get();
+```
+
+## Insert, update, and delete
+
+```php
+// Single insert
+DB::table('users')->insert([
+    'name'  => 'Jane Smith',
+    'email' => 'jane@example.com',
+]);
+
+// Insert and get the new ID
+$id = DB::table('users')->insertGetId([
+    'name'  => 'John Doe',
+    'email' => 'john@example.com',
+]);
+
+// Upsert — insert or update on conflict
+DB::table('products')->upsert(
+    [
+        ['sku' => 'WIDGET-01', 'name' => 'Widget', 'price' => 9.99],
+        ['sku' => 'GADGET-01', 'name' => 'Gadget', 'price' => 24.99],
+    ],
+    uniqueBy: ['sku'],
+    update: ['name', 'price']
+);
+
+// Update
+DB::table('users')
+    ->where('id', 1)
+    ->update(['role' => 'admin']);
+
+// Increment / decrement
+DB::table('posts')->where('id', 1)->increment('views');
+DB::table('accounts')->where('id', 1)->decrement('balance', 50);
+
+// Delete
+DB::table('users')->where('status', 'inactive')->delete();
+
+// Truncate (clears the table and resets auto-increment)
+DB::table('temp_imports')->truncate();
+```
+
+## Conditional clauses
+
+Apply query constraints only when a condition is true, keeping your code clean:
+
+```php
+$status = request('status');
+$sortBy = request('sort', 'name');
+
+$users = DB::table('users')
+    ->when($status, fn ($q, $status) => $q->where('status', $status))
+    ->when($sortBy === 'email', fn ($q) => $q->orderBy('email'), fn ($q) => $q->orderBy('name'))
+    ->get();
+```
+
+## Debugging
+
+```php
+// See the generated SQL
+$sql = DB::table('users')->where('active', true)->toSql();
+// "select * from `users` where `active` = ?"
+
+// See the bindings
+$bindings = DB::table('users')->where('active', true)->getBindings();
+
+// Dump the query and continue execution
+DB::table('users')->where('active', true)->dump();
+
+// Dump and stop
+DB::table('users')->where('active', true)->dd();
+```
+
+<Tip>
+  Use `toSql()` and `getBindings()` in production-safe debugging. Reserve `dd()` for local development only — it halts the request.
+</Tip>
+
+## Quick reference
+
+| Method | What it returns |
+|---|---|
+| `get()` | Collection of `stdClass` objects |
+| `first()` | Single `stdClass` or `null` |
+| `find($id)` | Single row by primary key |
+| `value($col)` | A single scalar value |
+| `pluck($col)` | Flat collection of values |
+| `count()` / `sum()` / `avg()` | Aggregate scalar |
+| `exists()` / `doesntExist()` | Boolean |
+| `chunk($n, fn)` | Processes in batches |
+| `lazy()` | `LazyCollection` stream |
+| `insert([])` / `update([])` / `delete()` | Rows affected |
+| `toSql()` | SQL string for debugging |

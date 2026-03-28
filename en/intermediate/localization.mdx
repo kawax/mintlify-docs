@@ -1,0 +1,342 @@
+---
+title: "Localization"
+description: "Manage translation strings in PHP files or JSON files, retrieve them with the __() helper, and handle placeholders and pluralization for multilingual Laravel apps."
+---
+
+## What is localization?
+
+Laravel's localization system lets you store translation strings for each language your application supports and retrieve them through a single helper function. When you call `__('messages.welcome')`, Laravel looks up the string in the active locale's file and returns the translated version.
+
+There are two ways to organize translation strings:
+
+| Approach | Structure | Best for |
+|---|---|---|
+| **Short keys (PHP files)** | `lang/en/messages.php` | Structured, grouped strings; overriding built-in Laravel messages |
+| **String keys (JSON files)** | `lang/en.json` | Large apps where English text serves as the default key |
+
+## Publishing language files
+
+New Laravel apps don't include the `lang` directory by default. Run this command to create it and publish Laravel's built-in translations:
+
+```shell
+php artisan lang:publish
+```
+
+## Configuring the locale
+
+### Default locale
+
+Set the application's default language in `config/app.php`, typically via `.env`:
+
+```ini
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+```
+
+The fallback locale is used whenever a string is missing from the active locale's files.
+
+### Changing locale at runtime
+
+Use the `App` facade to switch locale for the current request — useful in middleware:
+
+```php
+use Illuminate\Support\Facades\App;
+
+Route::get('/greeting/{locale}', function (string $locale) {
+    if (! in_array($locale, ['en', 'es', 'fr'])) {
+        abort(400);
+    }
+
+    App::setLocale($locale);
+
+    return view('greeting');
+});
+```
+
+### Checking the current locale
+
+```php
+$locale = App::currentLocale();  // e.g. 'en'
+
+if (App::isLocale('es')) {
+    // Spanish is active
+}
+```
+
+## Defining translation strings
+
+### PHP file format (short keys)
+
+Create one file per feature group inside a locale directory:
+
+```text
+lang/
+├── en/
+│   └── messages.php
+└── es/
+    └── messages.php
+```
+
+```php
+<?php
+// lang/en/messages.php
+return [
+    'welcome' => 'Welcome to our application!',
+    'goodbye' => 'See you later!',
+];
+```
+
+```php
+<?php
+// lang/es/messages.php
+return [
+    'welcome' => '¡Bienvenido a nuestra aplicación!',
+    'goodbye' => '¡Hasta luego!',
+];
+```
+
+<Warning>
+  Use underscores for regional locale directory names: `en_GB` for British English, `fr_FR` for French — not `en-gb` or `fr-fr`. Laravel follows the POSIX locale convention for directory names.
+</Warning>
+
+### JSON file format (translation strings as keys)
+
+Use the English text as the key. Each other language gets a JSON file at the `lang/` root:
+
+```text
+lang/
+├── en.json
+└── es.json
+```
+
+```json
+{
+    "Welcome to our application!": "¡Bienvenido a nuestra aplicación!",
+    "Log out": "Cerrar sesión",
+    "Dashboard": "Panel de control"
+}
+```
+
+When no JSON file exists for a locale, or when a key is missing, Laravel returns the key string as-is — which doubles as the English fallback automatically.
+
+<Tip>
+  The JSON approach works well for UI labels where you write English directly in Blade templates. You don't have to invent key names, and the English app is ready without any translation file.
+</Tip>
+
+## Retrieving translation strings
+
+### The `__()` helper
+
+```php
+// PHP file format — file.key
+echo __('messages.welcome');
+// Welcome to our application!
+
+// JSON format — pass the English string
+echo __('Log out');
+// Cerrar sesión (when locale is 'es')
+
+// Missing key — the key itself is returned
+echo __('messages.does_not_exist');
+// messages.does_not_exist
+```
+
+### In Blade templates
+
+```blade
+{{-- PHP file format --}}
+<h1>{{ __('messages.welcome') }}</h1>
+
+{{-- JSON format --}}
+<button>{{ __('Log out') }}</button>
+```
+
+## Placeholders
+
+Define dynamic parts with a `:name` prefix:
+
+```php
+// lang/en/messages.php
+return [
+    'greeting'  => 'Hello, :name!',
+    'uppercase' => 'Hello, :NAME!',   // placeholder uppercased → value uppercased
+    'titlecase' => 'Hello, :Name!',   // placeholder title-cased → value title-cased
+];
+```
+
+Pass replacement values as the second argument:
+
+```php
+echo __('messages.greeting', ['name' => 'Alice']);
+// Hello, Alice!
+
+echo __('messages.uppercase', ['name' => 'alice']);
+// Hello, ALICE!
+```
+
+In Blade:
+
+```blade
+<p>{{ __('messages.greeting', ['name' => $user->name]) }}</p>
+```
+
+## Pluralization
+
+Different languages handle pluralization differently. Laravel's `trans_choice()` function selects the right form based on a count.
+
+### Simple singular / plural
+
+Separate the two forms with `|`:
+
+```php
+// lang/en/messages.php
+return [
+    'apples' => 'There is one apple|There are many apples',
+];
+```
+
+```php
+echo trans_choice('messages.apples', 1);  // There is one apple
+echo trans_choice('messages.apples', 5);  // There are many apples
+```
+
+### Range-based forms
+
+Use `{n}` for exact values and `[min,max]` for ranges (`*` means infinity):
+
+```php
+'items' => '{0} No items|{1} One item|[2,*] :count items',
+```
+
+```php
+echo trans_choice('messages.items', 0);   // No items
+echo trans_choice('messages.items', 1);   // One item
+echo trans_choice('messages.items', 12);  // 12 items
+```
+
+### Placeholders in plural strings
+
+`:count` is always available as the passed count:
+
+```php
+'minutes_ago' => '{1} :value minute ago|[2,*] :value minutes ago',
+```
+
+```php
+echo trans_choice('messages.minutes_ago', 5, ['value' => 5]);
+// 5 minutes ago
+```
+
+## Setting up locale switching
+
+Here's a complete pattern for letting users switch language and persist it in the session:
+
+<Steps>
+  <Step title="Create a SetLocale middleware">
+    ```shell
+    php artisan make:middleware SetLocale
+    ```
+  </Step>
+
+  <Step title="Implement the middleware">
+    ```php
+    <?php
+
+    namespace App\Http\Middleware;
+
+    use Closure;
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\App;
+    use Symfony\Component\HttpFoundation\Response;
+
+    class SetLocale
+    {
+        private array $supported = ['en', 'es', 'fr'];
+
+        public function handle(Request $request, Closure $next): Response
+        {
+            $locale = $request->session()->get('locale', config('app.locale'));
+
+            if (in_array($locale, $this->supported)) {
+                App::setLocale($locale);
+            }
+
+            return $next($request);
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Register the middleware">
+    In `bootstrap/app.php`:
+
+    ```php
+    use App\Http\Middleware\SetLocale;
+
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->append(SetLocale::class);
+    })
+    ```
+  </Step>
+
+  <Step title="Add a locale-switching route">
+    ```php
+    // routes/web.php
+    Route::post('/locale/{locale}', function (string $locale) {
+        if (! in_array($locale, ['en', 'es', 'fr'])) {
+            abort(400);
+        }
+
+        session(['locale' => $locale]);
+
+        return back();
+    })->name('locale.switch');
+    ```
+  </Step>
+
+  <Step title="Add switcher buttons in Blade">
+    ```blade
+    <form method="POST" action="{{ route('locale.switch', 'en') }}">
+        @csrf
+        <button type="submit">English</button>
+    </form>
+
+    <form method="POST" action="{{ route('locale.switch', 'es') }}">
+        @csrf
+        <button type="submit">Español</button>
+    </form>
+    ```
+  </Step>
+</Steps>
+
+## Overriding package translations
+
+When a third-party package ships its own language files, override individual strings by placing a file in `lang/vendor/{package}/{locale}/`:
+
+```text
+lang/
+└── vendor/
+    └── acme-billing/
+        └── en/
+            └── invoices.php
+```
+
+```php
+// lang/vendor/acme-billing/en/invoices.php
+return [
+    'paid' => 'Invoice paid',  // overrides the package's string
+    // Keys not listed here fall through to the package's file
+];
+```
+
+## Function reference
+
+| Function / method | Purpose |
+|---|---|
+| `__('key')` | Retrieve a translation string |
+| `trans('key')` | Alias for `__()` |
+| `trans_choice('key', $n)` | Pluralization-aware retrieval |
+| `App::setLocale('es')` | Set locale for the current request |
+| `App::currentLocale()` | Get the active locale |
+| `App::isLocale('es')` | Test the active locale |
+| `App::getLocale()` | Alias for `currentLocale()` |
