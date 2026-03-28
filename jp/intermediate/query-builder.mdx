@@ -1,0 +1,516 @@
+---
+title: "クエリビルダー"
+description: "LaravelのDB::table()を使ったクエリビルダーの基本から応用まで解説します。Eloquentを使わず直接SQLを組み立てる方法と使い分けを学びます。"
+---
+
+## クエリビルダーとは
+
+Laravelのクエリビルダーは、データベースクエリを流暢なインターフェースで構築・実行する仕組みです。`DB` ファサードの `table()` メソッドから始まり、メソッドチェーンでクエリを組み立てます。
+
+```php
+use Illuminate\Support\Facades\DB;
+
+$users = DB::table('users')->get();
+```
+
+内部ではPDOパラメーターバインディングを使用しているため、SQLインジェクション対策が自動的に行われます。
+
+<Info>
+クエリビルダーはLaravelがサポートするすべてのデータベース（MySQL、MariaDB、PostgreSQL、SQLite、SQL Server）で動作します。データベースを切り替えても同じコードが使えます。
+</Info>
+
+## Eloquentとの使い分け
+
+| 状況 | 推奨 |
+| --- | --- |
+| モデルとリレーションが必要 | Eloquent |
+| 複雑な集計やレポート | クエリビルダー |
+| パフォーマンスが重要な大量データ処理 | クエリビルダー |
+| 既存テーブルへのシンプルな操作 | クエリビルダー |
+| マイグレーションやシーダー内の処理 | クエリビルダー |
+
+## データの取得
+
+### 全件取得
+
+```php
+$users = DB::table('users')->get();
+
+foreach ($users as $user) {
+    echo $user->name;
+}
+```
+
+`get()` は `Illuminate\Support\Collection` を返します。各レコードはPHPの `stdClass` オブジェクトです。
+
+### 1件取得
+
+```php
+// 最初の1件を取得（見つからなければ null）
+$user = DB::table('users')->where('name', '山田太郎')->first();
+
+// 見つからなければ例外を投げる（404レスポンスを自動返却）
+$user = DB::table('users')->where('name', '山田太郎')->firstOrFail();
+
+// 特定カラムの値のみ取得
+$email = DB::table('users')->where('name', '山田太郎')->value('email');
+
+// IDで取得
+$user = DB::table('users')->find(3);
+```
+
+### 特定カラムの値をリストで取得
+
+```php
+// emailカラムの値のコレクション
+$emails = DB::table('users')->pluck('email');
+
+// nameをキー、emailを値とする連想コレクション
+$emailByName = DB::table('users')->pluck('email', 'name');
+```
+
+### 大量データの分割処理
+
+```php
+use Illuminate\Support\Collection;
+
+// 100件ずつ処理
+DB::table('users')->orderBy('id')->chunk(100, function (Collection $users) {
+    foreach ($users as $user) {
+        // 処理...
+    }
+});
+
+// 更新しながらチャンク処理する場合は chunkById を使う
+DB::table('users')->where('active', false)
+    ->chunkById(100, function (Collection $users) {
+        foreach ($users as $user) {
+            DB::table('users')
+                ->where('id', $user->id)
+                ->update(['active' => true]);
+        }
+    });
+```
+
+<Warning>
+チャンク処理中にレコードを更新・削除する場合、`chunk()` ではなく `chunkById()` を使ってください。`chunk()` ではレコードのずれが生じることがあります。
+</Warning>
+
+### ストリーミング（LazyCollection）
+
+```php
+DB::table('users')->orderBy('id')->lazy()->each(function (object $user) {
+    // 1件ずつ処理
+});
+```
+
+## 集計
+
+```php
+$count   = DB::table('users')->count();
+$maxAge  = DB::table('users')->max('age');
+$minAge  = DB::table('users')->min('age');
+$avgAge  = DB::table('users')->avg('age');
+$total   = DB::table('orders')->sum('amount');
+
+// 条件付き集計
+$avgPremium = DB::table('orders')
+    ->where('plan', 'premium')
+    ->avg('amount');
+```
+
+### レコードの存在確認
+
+```php
+if (DB::table('orders')->where('finalized', 1)->exists()) {
+    // レコードが存在する
+}
+
+if (DB::table('orders')->where('finalized', 1)->doesntExist()) {
+    // レコードが存在しない
+}
+```
+
+## SELECT句
+
+```php
+// 取得するカラムを指定
+$users = DB::table('users')
+    ->select('name', 'email as user_email')
+    ->get();
+
+// 重複を除外
+$users = DB::table('users')->distinct()->get();
+
+// 後からカラムを追加
+$query = DB::table('users')->select('name');
+$users = $query->addSelect('age')->get();
+```
+
+## WHERE句
+
+### 基本的な条件
+
+```php
+// 等値条件（= は省略可能）
+$users = DB::table('users')->where('votes', 100)->get();
+
+// 比較演算子を指定
+$users = DB::table('users')->where('votes', '>=', 100)->get();
+$users = DB::table('users')->where('name', 'like', '山田%')->get();
+
+// 複数条件（AND）
+$users = DB::table('users')
+    ->where('status', 'active')
+    ->where('age', '>', 20)
+    ->get();
+
+// OR条件
+$users = DB::table('users')
+    ->where('votes', '>', 100)
+    ->orWhere('name', '山田太郎')
+    ->get();
+```
+
+### 条件のグループ化
+
+```php
+use Illuminate\Database\Query\Builder;
+
+// OR条件をグループ化してANDと組み合わせる
+$users = DB::table('users')
+    ->where('active', true)
+    ->where(function (Builder $query) {
+        $query->where('role', 'admin')
+              ->orWhere('role', 'moderator');
+    })
+    ->get();
+// WHERE active = 1 AND (role = 'admin' OR role = 'moderator')
+```
+
+### whereIn / whereBetween / whereNull
+
+```php
+// IN句
+$users = DB::table('users')
+    ->whereIn('id', [1, 2, 3])
+    ->get();
+
+$users = DB::table('users')
+    ->whereNotIn('id', [1, 2, 3])
+    ->get();
+
+// BETWEEN句
+$users = DB::table('users')
+    ->whereBetween('age', [20, 40])
+    ->get();
+
+// NULL判定
+$users = DB::table('users')->whereNull('deleted_at')->get();
+$users = DB::table('users')->whereNotNull('email_verified_at')->get();
+```
+
+### whereLike（パターンマッチ）
+
+```php
+// デフォルトは大文字小文字を区別しない
+$users = DB::table('users')
+    ->whereLike('name', '%山田%')
+    ->get();
+
+// 大文字小文字を区別する
+$users = DB::table('users')
+    ->whereLike('name', '%Yamada%', caseSensitive: true)
+    ->get();
+```
+
+### whereAny / whereAll（複数カラムへの同一条件）
+
+```php
+// いずれかのカラムがLIKE条件にマッチ
+$users = DB::table('users')
+    ->where('active', true)
+    ->whereAny(['name', 'email', 'bio'], 'like', '%Laravel%')
+    ->get();
+
+// すべてのカラムがLIKE条件にマッチ
+$posts = DB::table('posts')
+    ->whereAll(['title', 'content'], 'like', '%Laravel%')
+    ->get();
+```
+
+## JOIN
+
+```php
+// INNER JOIN
+$users = DB::table('users')
+    ->join('orders', 'users.id', '=', 'orders.user_id')
+    ->select('users.name', 'orders.amount')
+    ->get();
+
+// LEFT JOIN
+$users = DB::table('users')
+    ->leftJoin('orders', 'users.id', '=', 'orders.user_id')
+    ->get();
+
+// 複数テーブルのJOIN
+$users = DB::table('users')
+    ->join('contacts', 'users.id', '=', 'contacts.user_id')
+    ->join('orders', 'users.id', '=', 'orders.user_id')
+    ->select('users.*', 'contacts.phone', 'orders.amount')
+    ->get();
+```
+
+### サブクエリJOIN
+
+```php
+// サブクエリを使ったJOIN
+$latestOrders = DB::table('orders')
+    ->select('user_id', DB::raw('MAX(created_at) as last_order_at'))
+    ->groupBy('user_id');
+
+$users = DB::table('users')
+    ->joinSub($latestOrders, 'latest_orders', function ($join) {
+        $join->on('users.id', '=', 'latest_orders.user_id');
+    })
+    ->get();
+```
+
+## 並び替え・グループ化・リミット
+
+```php
+// 並び替え
+$users = DB::table('users')
+    ->orderBy('name', 'asc')
+    ->get();
+
+// 複数カラムで並び替え
+$users = DB::table('users')
+    ->orderBy('last_name')
+    ->orderBy('first_name', 'desc')
+    ->get();
+
+// ランダム順
+$users = DB::table('users')->inRandomOrder()->get();
+
+// グループ化
+$orders = DB::table('orders')
+    ->select('status', DB::raw('COUNT(*) as count'))
+    ->groupBy('status')
+    ->get();
+
+// HAVING句
+$orders = DB::table('orders')
+    ->select('user_id', DB::raw('SUM(amount) as total'))
+    ->groupBy('user_id')
+    ->having('total', '>', 10000)
+    ->get();
+
+// リミットとオフセット
+$users = DB::table('users')
+    ->skip(10)   // OFFSET
+    ->take(5)    // LIMIT
+    ->get();
+```
+
+## サブクエリ
+
+```php
+// WHERE句のサブクエリ
+$activeUsers = DB::table('users')->select('id')->where('is_active', 1);
+
+$comments = DB::table('comments')
+    ->whereIn('user_id', $activeUsers)
+    ->get();
+
+// SELECT句のサブクエリ
+$users = DB::table('users')
+    ->select('name')
+    ->selectSub(function ($query) {
+        $query->from('orders')
+              ->selectRaw('COUNT(*)')
+              ->whereColumn('orders.user_id', 'users.id');
+    }, 'order_count')
+    ->get();
+```
+
+## Raw式
+
+<Warning>
+Raw式はSQL文字列として直接クエリに挿入されます。ユーザー入力を直接渡すとSQLインジェクションの危険があります。必ずバインディングを使って安全に記述してください。
+</Warning>
+
+```php
+// DB::raw() — 任意のSQL式を埋め込む
+$users = DB::table('users')
+    ->select(DB::raw('count(*) as user_count, status'))
+    ->groupBy('status')
+    ->get();
+
+// selectRaw — SELECT句にRaw式を追加
+$orders = DB::table('orders')
+    ->selectRaw('price * ? as price_with_tax', [1.10])
+    ->get();
+
+// whereRaw — WHERE句にRaw式を追加
+$orders = DB::table('orders')
+    ->whereRaw('price > IF(state = "JP", ?, 100)', [500])
+    ->get();
+
+// havingRaw — HAVING句にRaw式を追加
+$orders = DB::table('orders')
+    ->select('department', DB::raw('SUM(amount) as total'))
+    ->groupBy('department')
+    ->havingRaw('SUM(amount) > ?', [100000])
+    ->get();
+
+// orderByRaw — ORDER BY句にRaw式を追加
+$orders = DB::table('orders')
+    ->orderByRaw('updated_at - created_at DESC')
+    ->get();
+```
+
+## INSERT / UPDATE / DELETE
+
+### INSERT
+
+```php
+// 1件挿入
+DB::table('users')->insert([
+    'email' => 'yamada@example.com',
+    'name'  => '山田太郎',
+]);
+
+// 複数件挿入
+DB::table('users')->insert([
+    ['email' => 'yamada@example.com', 'name' => '山田太郎'],
+    ['email' => 'suzuki@example.com', 'name' => '鈴木花子'],
+]);
+
+// 挿入後にAUTO_INCREMENTのIDを取得
+$id = DB::table('users')->insertGetId([
+    'email' => 'sato@example.com',
+    'name'  => '佐藤次郎',
+]);
+```
+
+### UPSERT（INSERT OR UPDATE）
+
+```php
+// 存在すれば更新、なければ挿入
+DB::table('users')->upsert(
+    [
+        ['email' => 'yamada@example.com', 'name' => '山田太郎', 'votes' => 5],
+        ['email' => 'suzuki@example.com', 'name' => '鈴木花子', 'votes' => 10],
+    ],
+    uniqueBy: ['email'],    // 重複チェックのカラム
+    update: ['name', 'votes'] // 更新するカラム
+);
+```
+
+### UPDATE
+
+```php
+// 条件付き更新
+$affected = DB::table('users')
+    ->where('id', 1)
+    ->update(['name' => '山田一郎', 'updated_at' => now()]);
+
+// インクリメント・デクリメント
+DB::table('users')->where('id', 1)->increment('votes');       // +1
+DB::table('users')->where('id', 1)->increment('votes', 5);    // +5
+DB::table('users')->where('id', 1)->decrement('votes');       // -1
+DB::table('users')->where('id', 1)->decrement('balance', 100); // -100
+```
+
+### DELETE
+
+```php
+// 条件付き削除
+$deleted = DB::table('users')->where('status', 'inactive')->delete();
+
+// テーブル全件削除（AUTO_INCREMENTをリセット）
+DB::table('users')->truncate();
+```
+
+## 条件付きクエリ（when）
+
+クエリ条件を動的に適用したいときは `when()` を使うと条件分岐をすっきり書けます。
+
+```php
+$status = request('status');
+$sortBy = request('sort', 'name');
+
+$users = DB::table('users')
+    ->when($status, function ($query, $status) {
+        $query->where('status', $status);
+    })
+    ->when($sortBy === 'email', function ($query) {
+        $query->orderBy('email');
+    }, function ($query) {
+        $query->orderBy('name');
+    })
+    ->get();
+```
+
+## デバッグ
+
+```php
+// 生成されるSQLを確認
+$sql = DB::table('users')->where('active', true)->toSql();
+// "select * from `users` where `active` = ?"
+
+// SQLとバインディングを両方確認
+$bindings = DB::table('users')->where('active', true)->getBindings();
+
+// クエリを実行してダンプ（実行は続行）
+DB::table('users')->where('active', true)->dump();
+
+// クエリを実行してダンプして終了
+DB::table('users')->where('active', true)->dd();
+```
+
+<Tip>
+`dd()` はデバッグ時に便利ですが、本番環境では絶対に使わないでください。`toSql()` と `getBindings()` でSQLとバインディングを確認するのが安全です。
+</Tip>
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="よく使うメソッド一覧">
+    | メソッド | 説明 |
+    | --- | --- |
+    | `get()` | 全件取得（Collection） |
+    | `first()` | 最初の1件取得 |
+    | `find($id)` | IDで1件取得 |
+    | `value($column)` | カラムの値を1件取得 |
+    | `pluck($column)` | カラム値のリストを取得 |
+    | `count()` | 件数 |
+    | `sum($col)` | 合計 |
+    | `avg($col)` | 平均 |
+    | `max($col)` | 最大値 |
+    | `min($col)` | 最小値 |
+    | `exists()` | 存在確認 |
+    | `insert([...])` | 挿入 |
+    | `update([...])` | 更新 |
+    | `delete()` | 削除 |
+    | `chunk($n, fn)` | 分割して処理 |
+    | `when($cond, fn)` | 条件付きクエリ |
+    | `toSql()` | 生成SQLを確認 |
+  </Accordion>
+
+  <Accordion title="クエリビルダー vs Eloquent">
+    クエリビルダーはEloquentよりも低レベルで、モデルのインスタンスではなく `stdClass` を返します。
+    リレーションやモデルイベント（オブザーバー）が不要な場合、クエリビルダーの方がシンプルで高速です。
+
+    ```php
+    // Eloquent: Userモデルのインスタンスを返す
+    $users = User::where('active', true)->get();
+    echo $users[0]->name; // Userオブジェクト
+
+    // クエリビルダー: stdClassを返す
+    $users = DB::table('users')->where('active', true)->get();
+    echo $users[0]->name; // stdClassオブジェクト
+    ```
+  </Accordion>
+</AccordionGroup>

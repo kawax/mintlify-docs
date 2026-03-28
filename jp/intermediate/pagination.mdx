@@ -1,0 +1,370 @@
+---
+title: "ページネーション"
+description: "Laravelのページネーション機能を解説します。paginate()・simplePaginate()・cursorPaginate()の違い、Bladeでの表示、APIレスポンス、URLのカスタマイズまでカバーします。"
+---
+
+## ページネーションとは
+
+Laravelのページネーションは、クエリビルダーおよびEloquent ORMと統合されており、設定なしで使い始めることができます。現在のページはHTTPリクエストの `page` クエリパラメーターから自動的に取得され、生成されたリンクにも自動で付加されます。
+
+デフォルトのHTMLはTailwind CSSに対応しており、Bootstrap CSSも選択できます。
+
+## 3種類のページネーション
+
+| メソッド | 返り値 | 特徴 |
+| --- | --- | --- |
+| `paginate()` | `LengthAwarePaginator` | 総件数を取得。ページ番号リンクを生成 |
+| `simplePaginate()` | `Paginator` | 総件数を取得しない。「前へ」「次へ」のみ |
+| `cursorPaginate()` | `CursorPaginator` | カーソルベース。大量データに最適 |
+
+## 基本的な使い方
+
+### クエリビルダーのページネーション
+
+```php
+use Illuminate\Support\Facades\DB;
+
+// 1ページあたり15件で取得
+$users = DB::table('users')->paginate(15);
+```
+
+### Eloquentのページネーション
+
+```php
+use App\Models\User;
+
+$users = User::paginate(15);
+
+// 条件付き
+$users = User::where('votes', '>', 100)->paginate(15);
+```
+
+### simplePaginate
+
+総件数のカウントクエリが不要な場合（「前へ」「次へ」リンクのみ表示）は `simplePaginate()` を使うと効率的です。
+
+```php
+$users = DB::table('users')->simplePaginate(15);
+$users = User::where('active', true)->simplePaginate(15);
+```
+
+<Tip>
+「全部で何件中何件目」という表示が不要なら `simplePaginate()` を選びましょう。`paginate()` は `COUNT(*)` クエリを追加で実行するため、`simplePaginate()` の方が高速です。
+</Tip>
+
+### cursorPaginate（カーソルページネーション）
+
+カーソルページネーションはOFFSET句の代わりにWHERE句を使うため、大量データに対して高いパフォーマンスを発揮します。無限スクロールのUIに特に適しています。
+
+```php
+// orderBy が必須
+$users = DB::table('users')->orderBy('id')->cursorPaginate(15);
+$users = User::where('active', true)->cursorPaginate(15);
+```
+
+生成されるURLにはページ番号ではなくカーソル文字列が入ります。
+
+```
+http://example.com/users?cursor=eyJpZCI6MTUsIl9wb2ludHNUb05leHRJdGVtcyI6dHJ1ZX0
+```
+
+<Warning>
+カーソルページネーションを使うには `orderBy` が必須です。また、並び順のカラムはページネーション対象のテーブルに属している必要があります。
+</Warning>
+
+### OFFSETとカーソルの比較
+
+```sql
+-- paginate() / simplePaginate() — OFFSETを使う
+SELECT * FROM users ORDER BY id ASC LIMIT 15 OFFSET 15;
+
+-- cursorPaginate() — WHERE句を使う（インデックスが効く）
+SELECT * FROM users WHERE id > 15 ORDER BY id ASC LIMIT 15;
+```
+
+カーソルページネーションはインデックスが有効活用され、データが頻繁に追加・削除される場合もレコードの重複・欠落が起きにくいという利点があります。ただし、ページ番号リンクの生成はできず、「前へ」「次へ」のみです。
+
+## コントローラーでの実装
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use Illuminate\View\View;
+
+class UserController extends Controller
+{
+    public function index(): View
+    {
+        $users = User::orderBy('name')->paginate(20);
+
+        return view('users.index', compact('users'));
+    }
+}
+```
+
+## Bladeでのページネーションリンク表示
+
+```blade
+<div class="container">
+    @foreach ($users as $user)
+        <p>{{ $user->name }}</p>
+    @endforeach
+</div>
+
+{{-- ページネーションリンクを出力（Tailwind CSS対応） --}}
+{{ $users->links() }}
+```
+
+`links()` メソッドが自動でページリンクのHTMLを生成します。現在のページの前後3ページ分のリンクが表示されます。
+
+### 表示するリンク数の調整
+
+`onEachSide()` で現在のページの前後に表示するリンク数を変更できます。
+
+```blade
+{{-- 現在ページの前後5ページ分を表示 --}}
+{{ $users->onEachSide(5)->links() }}
+```
+
+## 1ページあたりの件数をリクエストから受け取る
+
+```php
+public function index(Request $request): View
+{
+    $perPage = $request->integer('per_page', 15);
+    $perPage = min(max($perPage, 1), 100); // 1〜100の範囲に制限
+
+    $users = User::paginate($perPage);
+
+    return view('users.index', compact('users'));
+}
+```
+
+## 1ページに複数のページネーターを表示する
+
+同一画面に2つのページネーターを表示する場合、両方が `page` パラメーターを使うと競合します。第3引数でパラメーター名を変更します。
+
+```php
+$users = User::paginate(
+    perPage: 15,
+    columns: ['*'],
+    pageName: 'users'
+);
+
+$posts = Post::paginate(
+    perPage: 10,
+    columns: ['*'],
+    pageName: 'posts'
+);
+```
+
+## URLのカスタマイズ
+
+### ベースURLの変更
+
+```php
+$users = User::paginate(15);
+
+// /admin/users?page=N 形式のURLを生成
+$users->withPath('/admin/users');
+```
+
+### クエリパラメーターの追加
+
+```php
+// sort=votes を各ページリンクに追加
+$users->appends(['sort' => 'votes']);
+
+// 現在のリクエストの全クエリパラメーターを引き継ぐ
+$users->withQueryString();
+```
+
+### ハッシュフラグメントの追加
+
+```php
+// URLの末尾に #users を追加
+$users->fragment('users');
+```
+
+## APIレスポンス（JSON出力）
+
+ページネーターをルートやコントローラーからそのまま返すと、自動的にJSONに変換されます。
+
+```php
+use App\Models\User;
+
+Route::get('/api/users', function () {
+    return User::paginate(15);
+});
+```
+
+レスポンスのJSON形式：
+
+```json
+{
+    "total": 50,
+    "per_page": 15,
+    "current_page": 1,
+    "last_page": 4,
+    "first_page_url": "http://example.com/api/users?page=1",
+    "last_page_url": "http://example.com/api/users?page=4",
+    "next_page_url": "http://example.com/api/users?page=2",
+    "prev_page_url": null,
+    "path": "http://example.com/api/users",
+    "from": 1,
+    "to": 15,
+    "data": [
+        { "id": 1, "name": "山田太郎" },
+        { "id": 2, "name": "鈴木花子" }
+    ]
+}
+```
+
+### APIリソースとの組み合わせ
+
+`paginate()` の結果をAPIリソースコレクションでラップする場合は `UserResource::collection()` に渡します。
+
+```php
+use App\Http\Resources\UserResource;
+use App\Models\User;
+
+Route::get('/api/users', function () {
+    $users = User::paginate(15);
+
+    return UserResource::collection($users);
+});
+```
+
+`UserResource::collection()` にページネーターを渡すと、ページネーション情報がメタデータとして自動で付加されます。
+
+<Info>
+`cursorPaginate()` のJSONにはページ番号ではなく `next_cursor` と `prev_cursor` が含まれます。APIクライアントはこれらの値を次のリクエストの `cursor` パラメーターとして使います。
+</Info>
+
+## カスタムページネーションビュー
+
+### ビューファイルに直接指定
+
+```blade
+{{-- カスタムビューでリンクを出力 --}}
+{{ $paginator->links('vendor.pagination.custom') }}
+
+{{-- データを追加で渡す --}}
+{{ $paginator->links('vendor.pagination.custom', ['theme' => 'dark']) }}
+```
+
+### デフォルトビューをカスタムファイルに変更
+
+まず公式のビューを公開してからカスタマイズします。
+
+```shell
+php artisan vendor:publish --tag=laravel-pagination
+```
+
+`resources/views/vendor/pagination/` に以下のファイルが生成されます。
+
+- `tailwind.blade.php` — デフォルト（Tailwind CSS用）
+- `bootstrap-5.blade.php` — Bootstrap 5用
+- `simple-tailwind.blade.php` — simplePaginate用
+- ...
+
+`tailwind.blade.php` を直接編集するか、新しいビューを作成して `AppServiceProvider` で指定します。
+
+```php
+use Illuminate\Pagination\Paginator;
+
+public function boot(): void
+{
+    Paginator::defaultView('vendor.pagination.custom');
+    Paginator::defaultSimpleView('vendor.pagination.simple-custom');
+}
+```
+
+### Bootstrap CSSを使う
+
+TailwindではなくBootstrapを使う場合は `AppServiceProvider` の `boot()` で指定します。
+
+```php
+use Illuminate\Pagination\Paginator;
+
+public function boot(): void
+{
+    Paginator::useBootstrapFive(); // Bootstrap 5
+    // Paginator::useBootstrapFour(); // Bootstrap 4
+}
+```
+
+## 手動でページネーターを作成する
+
+配列などの既存データにページネーションを適用したい場合、ページネータークラスを直接インスタンス化します。
+
+```php
+use Illuminate\Pagination\LengthAwarePaginator;
+
+$items = collect(range(1, 200))->map(fn ($i) => ['id' => $i, 'name' => "アイテム{$i}"]);
+
+$perPage = 15;
+$currentPage = request()->integer('page', 1);
+
+$paginator = new LengthAwarePaginator(
+    items: $items->forPage($currentPage, $perPage),
+    total: $items->count(),
+    perPage: $perPage,
+    currentPage: $currentPage,
+    options: ['path' => request()->url()]
+);
+```
+
+## よく使うインスタンスメソッド
+
+```php
+$paginator = User::paginate(15);
+
+$paginator->currentPage();     // 現在のページ番号
+$paginator->lastPage();        // 最後のページ番号（simplePaginate では使用不可）
+$paginator->total();           // 総件数（simplePaginate では使用不可）
+$paginator->perPage();         // 1ページあたりの件数
+$paginator->count();           // 現在ページの件数
+$paginator->firstItem();       // 現在ページの最初のアイテムの番号
+$paginator->lastItem();        // 現在ページの最後のアイテムの番号
+$paginator->hasPages();        // 複数ページが存在するか
+$paginator->hasMorePages();    // 次のページが存在するか
+$paginator->onFirstPage();     // 最初のページか
+$paginator->onLastPage();      // 最後のページか
+$paginator->nextPageUrl();     // 次のページURL
+$paginator->previousPageUrl(); // 前のページURL
+$paginator->url(3);            // ページ3のURL
+$paginator->items();           // 現在ページのアイテム配列
+```
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="ページネーション方式の選び方">
+    - **`paginate()`** — 総件数とページ番号リンクが必要な場合（一般的なリスト画面）
+    - **`simplePaginate()`** — 「前へ」「次へ」リンクのみで十分な場合（高速）
+    - **`cursorPaginate()`** — 大量データ・無限スクロール・頻繁な書き込みがある場合（最高パフォーマンス）
+  </Accordion>
+
+  <Accordion title="Blade表示の基本パターン">
+    ```blade
+    @foreach ($users as $user)
+        <p>{{ $user->name }}</p>
+    @endforeach
+
+    {{ $users->links() }}
+    ```
+
+    `paginate()` の結果をビューに渡し、`links()` でページリンクを出力するだけです。
+    現在のページは `page` クエリパラメーターから自動で検出されます。
+  </Accordion>
+
+  <Accordion title="APIでのページネーション">
+    ページネーターをルートから直接返すと自動的にJSONに変換されます。
+    APIリソースと組み合わせるには `UserResource::collection($paginator)` を返します。
+    レスポンスには `data`（レコード配列）と各種メタ情報が含まれます。
+  </Accordion>
+</AccordionGroup>

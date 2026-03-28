@@ -81,6 +81,13 @@
             "tab": "ガイド",
             "groups": [
               {
+                "group": "データベース",
+                "pages": [
+                  "jp/intermediate/query-builder",
+                  "jp/intermediate/pagination"
+                ]
+              },
+              {
                 "group": "アーキテクチャ",
                 "pages": [
                   "jp/intermediate/service-container",
