@@ -213,7 +213,17 @@
                 "group": "Basics",
                 "pages": [
                   "en/tutorial/routing",
-                  "en/tutorial/blade"
+                  "en/tutorial/views",
+                  "en/tutorial/blade",
+                  "en/tutorial/controllers",
+                  "en/tutorial/validation"
+                ]
+              },
+              {
+                "group": "Database",
+                "pages": [
+                  "en/tutorial/migrations",
+                  "en/tutorial/eloquent"
                 ]
               }
             ]
