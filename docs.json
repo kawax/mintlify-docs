@@ -367,6 +367,13 @@
                 ]
               },
               {
+                "group": "Database",
+                "pages": [
+                  "en/intermediate/query-builder",
+                  "en/intermediate/pagination"
+                ]
+              },
+              {
                 "group": "HTTP & External",
                 "pages": [
                   "en/intermediate/http-client"
@@ -395,6 +402,24 @@
                 "pages": [
                   "en/intermediate/error-handling",
                   "en/intermediate/logging"
+                ]
+              },
+              {
+                "group": "Collections",
+                "pages": [
+                  "en/intermediate/collections"
+                ]
+              },
+              {
+                "group": "Internationalization",
+                "pages": [
+                  "en/intermediate/localization"
+                ]
+              },
+              {
+                "group": "Real-time",
+                "pages": [
+                  "en/intermediate/broadcasting"
                 ]
               }
             ]
