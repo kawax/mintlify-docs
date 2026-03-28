@@ -1,0 +1,466 @@
+---
+title: "Eloquentのカスタムキャスト"
+description: "CastsAttributes インターフェースを実装してカスタムキャストを作成する方法を解説します。Value Objectパターン、インバウンドキャスト、Castablesなど上級のパターンも紹介します。"
+---
+
+## キャストとは
+
+Eloquentのキャストは、データベースから取得した生の値をPHPのデータ型に変換し、保存時にはその逆変換をする仕組みです。`casts` メソッドで定義します。
+
+```php
+protected function casts(): array
+{
+    return [
+        'is_admin'   => 'boolean',
+        'settings'   => 'array',
+        'created_at' => 'datetime',
+    ];
+}
+```
+
+## 組み込みキャストの種類
+
+Laravelが標準で提供するキャスト一覧です。
+
+| キャスト | 説明 |
+|---|---|
+| `integer` / `int` | 整数に変換 |
+| `float` / `double` | 浮動小数点数に変換 |
+| `string` | 文字列に変換 |
+| `boolean` / `bool` | 真偽値に変換（`0`/`1` を含む） |
+| `array` | JSON文字列 ↔ PHP配列 |
+| `collection` | JSON文字列 ↔ Collectionインスタンス |
+| `object` | JSON文字列 ↔ stdObjectインスタンス |
+| `datetime` | 文字列 ↔ Carbonインスタンス |
+| `immutable_datetime` | 文字列 ↔ CarbonImmutableインスタンス |
+| `date` | 文字列 ↔ Carbon（時刻なし） |
+| `timestamp` | 文字列 ↔ UNIXタイムスタンプ |
+| `encrypted` | 保存時に暗号化、取得時に復号 |
+| `hashed` | 保存時にハッシュ化（読み取り専用キャストと組み合わせる） |
+| `AsStringable::class` | 文字列 ↔ Stringableオブジェクト |
+| `AsArrayObject::class` | JSON ↔ ArrayObjectインスタンス |
+| `AsCollection::class` | JSON ↔ Collectionインスタンス |
+
+<Info>
+  `AsArrayObject` や `AsCollection` は、配列の特定のオフセットを直接変更できるように、Laravel内部でカスタムキャストとして実装されています。
+</Info>
+
+## カスタムキャストクラスの作成
+
+組み込みキャストでは対応できない変換が必要な場合、`CastsAttributes` インターフェースを実装したカスタムキャストを作成します。
+
+### インターフェースの定義
+
+フレームワーク本体のコントラクトは次のように定義されています。
+
+```php
+// src/Illuminate/Contracts/Database/Eloquent/CastsAttributes.php
+
+interface CastsAttributes
+{
+    /**
+     * DBの生の値をPHPの値に変換する（読み取り時）
+     *
+     * @param  array<string, mixed>  $attributes  モデルのすべての属性値
+     */
+    public function get(Model $model, string $key, mixed $value, array $attributes);
+
+    /**
+     * PHPの値をDBに保存できる形に変換する（書き込み時）
+     *
+     * @param  array<string, mixed>  $attributes  モデルのすべての属性値
+     */
+    public function set(Model $model, string $key, mixed $value, array $attributes);
+}
+```
+
+`$attributes` 引数にはモデルの全属性が入っているため、複数のカラムをまたいだ変換も可能です（後述のValue Objectパターン参照）。
+
+### 基本的なカスタムキャストの実装
+
+`make:cast` コマンドで雛形を生成します。
+
+```bash
+php artisan make:cast AsMoney
+```
+
+`app/Casts/AsMoney.php` が生成されます。例として金額（整数で保存）を `Money` Value Objectに変換するキャストを実装します。
+
+```php
+<?php
+
+namespace App\Casts;
+
+use App\ValueObjects\Money;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Eloquent\Model;
+
+class AsMoney implements CastsAttributes
+{
+    /**
+     * DBの整数値（円単位）を Money オブジェクトに変換する
+     */
+    public function get(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): Money {
+        return new Money((int) $value);
+    }
+
+    /**
+     * Money オブジェクトをDBに保存できる整数値に変換する
+     */
+    public function set(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): int {
+        if ($value instanceof Money) {
+            return $value->amount;
+        }
+
+        return (int) $value;
+    }
+}
+```
+
+モデルにキャストを適用します。
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Casts\AsMoney;
+use Illuminate\Database\Eloquent\Model;
+
+class Order extends Model
+{
+    protected function casts(): array
+    {
+        return [
+            'price' => AsMoney::class,
+        ];
+    }
+}
+```
+
+これで `$order->price` は `Money` インスタンスを返します。
+
+## Value Objectキャスト
+
+複数のDBカラムをまとめて1つのValue Objectとして扱うパターンです。
+
+### 実装例: 住所キャスト
+
+`address_line_one` と `address_line_two` の2カラムを `Address` Value Objectにまとめます。
+
+```php
+<?php
+
+namespace App\ValueObjects;
+
+use Illuminate\Contracts\Support\Arrayable;
+
+class Address implements Arrayable, \JsonSerializable
+{
+    public function __construct(
+        public readonly string $lineOne,
+        public readonly string $lineTwo,
+    ) {}
+
+    public function toArray(): array
+    {
+        return [
+            'line_one' => $this->lineOne,
+            'line_two' => $this->lineTwo,
+        ];
+    }
+
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
+    }
+}
+```
+
+```php
+<?php
+
+namespace App\Casts;
+
+use App\ValueObjects\Address;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
+
+class AsAddress implements CastsAttributes
+{
+    /**
+     * 複数カラムから Address オブジェクトを組み立てる
+     */
+    public function get(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): Address {
+        return new Address(
+            $attributes['address_line_one'],
+            $attributes['address_line_two'],
+        );
+    }
+
+    /**
+     * Address オブジェクトをカラムごとの配列に分解して返す
+     *
+     * @return array<string, string>
+     */
+    public function set(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): array {
+        if (! $value instanceof Address) {
+            throw new InvalidArgumentException('The given value is not an Address instance.');
+        }
+
+        return [
+            'address_line_one' => $value->lineOne,
+            'address_line_two' => $value->lineTwo,
+        ];
+    }
+}
+```
+
+<Info>
+  `set` メソッドで配列を返すと、Eloquentはキーをカラム名として、値をそれぞれのカラムに保存します。単一カラムのキャストでは文字列や整数を返します。
+</Info>
+
+モデルへの適用と使い方は次のとおりです。
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Casts\AsAddress;
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    protected function casts(): array
+    {
+        return [
+            'address' => AsAddress::class,
+        ];
+    }
+}
+```
+
+```php
+$user = User::find(1);
+
+// Address オブジェクトとして取得できる
+echo $user->address->lineOne;
+
+// Value Object を変更すると保存時に自動的にDBに反映される
+$user->address = new Address('123 Main St', 'Apt 4B');
+$user->save();
+```
+
+### Value Objectのキャッシュ
+
+Value Objectに変換された属性値はEloquentによってキャッシュされます。同じ属性に2回アクセスしても、同じオブジェクトインスタンスが返ります。
+
+キャッシュを無効化したい場合は `$withoutObjectCaching` プロパティをキャストクラスに追加します。
+
+```php
+class AsAddress implements CastsAttributes
+{
+    public bool $withoutObjectCaching = true;
+
+    // ...
+}
+```
+
+## インバウンドキャスト（書き込み専用）
+
+DBへの書き込み時にのみ変換を行い、読み取り時には変換しないキャストです。`CastsInboundAttributes` インターフェースを実装します。
+
+典型的な用途はハッシュ化です。パスワードや秘密値を保存するときだけ変換し、読み取り時はハッシュ値をそのまま返します。
+
+```bash
+php artisan make:cast AsHash --inbound
+```
+
+```php
+<?php
+
+namespace App\Casts;
+
+use Illuminate\Contracts\Database\Eloquent\CastsInboundAttributes;
+use Illuminate\Database\Eloquent\Model;
+
+class AsHash implements CastsInboundAttributes
+{
+    public function __construct(
+        protected string|null $algorithm = null,
+    ) {}
+
+    /**
+     * 保存時にハッシュ化する
+     */
+    public function set(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): string {
+        return is_null($this->algorithm)
+            ? bcrypt($value)
+            : hash($this->algorithm, $value);
+    }
+}
+```
+
+## キャストパラメータ
+
+カスタムキャストにパラメータを渡す場合は、クラス名の後にコロン区切りで指定します。複数のパラメータはカンマ区切りです。
+
+```php
+protected function casts(): array
+{
+    return [
+        'secret' => AsHash::class.':sha256',
+        'data'   => AsHash::class.':sha512',
+    ];
+}
+```
+
+パラメータはキャストクラスのコンストラクタに渡されます。
+
+```php
+class AsHash implements CastsInboundAttributes
+{
+    public function __construct(
+        protected string|null $algorithm = null, // ':sha256' が渡される
+    ) {}
+}
+```
+
+## Castables: Value Object側にキャストロジックを持たせる
+
+`Castable` インターフェースを実装した Value Object は、自身のキャストクラスを返す `castUsing` メソッドを持ちます。モデル側でキャストクラスを知らなくて済むため、ドメインロジックが整理されます。
+
+```php
+<?php
+
+namespace App\ValueObjects;
+
+use App\Casts\AsAddress;
+use Illuminate\Contracts\Database\Eloquent\Castable;
+
+class Address implements Castable
+{
+    /**
+     * このオブジェクトのキャストに使うクラスを返す
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    public static function castUsing(array $arguments): string
+    {
+        return AsAddress::class;
+    }
+}
+```
+
+モデル側はキャストクラスの代わりに Value Object クラスを指定します。
+
+```php
+protected function casts(): array
+{
+    return [
+        'address' => Address::class,
+    ];
+}
+```
+
+<Tip>
+  `Castable` と無名クラスを組み合わせると、Value Objectとキャストロジックをひとつのファイルにまとめられます。
+
+  ```php
+  class Address implements Castable
+  {
+      public static function castUsing(array $arguments): CastsAttributes
+      {
+          return new class implements CastsAttributes
+          {
+              public function get(Model $model, string $key, mixed $value, array $attributes): Address
+              {
+                  return new Address(
+                      $attributes['address_line_one'],
+                      $attributes['address_line_two'],
+                  );
+              }
+
+              public function set(Model $model, string $key, mixed $value, array $attributes): array
+              {
+                  return [
+                      'address_line_one' => $value->lineOne,
+                      'address_line_two' => $value->lineTwo,
+                  ];
+              }
+          };
+      }
+  }
+  ```
+</Tip>
+
+## `$appends` と `$hidden` との相互作用
+
+キャストと `$appends`、`$hidden` は独立した仕組みですが、組み合わせるときに注意が必要です。
+
+```php
+class User extends Model
+{
+    protected function casts(): array
+    {
+        return [
+            'address' => AsAddress::class,
+        ];
+    }
+
+    // toArray() / toJson() 時に address を除外する
+    protected $hidden = ['address_line_one', 'address_line_two'];
+
+    // キャスト済みの address をシリアライズ結果に含める
+    protected $appends = ['address'];
+}
+```
+
+<Warning>
+  `$hidden` に指定するのはDBのカラム名です。キャストを通じて作られる属性名（`address`）ではなく、元のカラム名（`address_line_one`, `address_line_two`）を指定します。
+</Warning>
+
+## 実行時キャストの追加
+
+特定のクエリやリクエストだけキャストを追加したいときは `mergeCasts` メソッドを使います。
+
+```php
+$user = User::find(1);
+
+$user->mergeCasts([
+    'extra_data' => 'array',
+]);
+```
+
+## 次のステップ
+
+<Card title="Eloquent Observer とモデルイベント" icon="bell" href="/jp/advanced/eloquent-observers">
+  モデルの保存・削除などのライフサイクルイベントにフックして処理を追加する方法を学びます。
+</Card>
