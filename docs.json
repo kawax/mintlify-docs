@@ -171,6 +171,12 @@
                 ]
               },
               {
+                "group": "AI開発",
+                "pages": [
+                  "jp/intermediate/boost"
+                ]
+              },
+              {
                 "group": "リアルタイム通信",
                 "pages": [
                   "jp/intermediate/broadcasting"

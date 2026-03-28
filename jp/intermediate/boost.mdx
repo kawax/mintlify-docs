@@ -1,0 +1,357 @@
+---
+title: "Laravel Boost"
+description: "Laravel BoostはAI支援開発を加速するパッケージです。MCPサーバー、AIガイドライン、Agent Skillsを通じて、AIコーディングエージェントがあなたのLaravelアプリケーションを深く理解できるようにします。"
+---
+
+## はじめに
+
+Laravel Boostは、AIエージェントが高品質なLaravelアプリケーションをLaravelのベストプラクティスに沿って書けるよう、必要なガイドラインとAgent Skillsを提供することで、AI支援開発を加速させるパッケージです。
+
+Boostはまた、1万7,000件以上のLaravel固有情報を含む知識ベースと、埋め込みを使った意味的検索を組み合わせた強力なLaravelエコシステム ドキュメントAPIを提供します。Boostは、Claude CodeやCursorなどのAIエージェントに対して、このAPIを活用して最新のLaravel機能やベストプラクティスを学ぶよう指示します。
+
+## インストール
+
+Laravel BoostはComposerでインストールします。
+
+```shell
+composer require laravel/boost --dev
+```
+
+次に、MCPサーバーとコーディングガイドラインをインストールします。
+
+```shell
+php artisan boost:install
+```
+
+`boost:install` コマンドは、インストール時に選択したコーディングエージェント向けの関連ガイドラインとスキルファイルを生成します。
+
+インストール完了後は、Cursor、Claude Code、またはお好みのAIエージェントを使ってコーディングを始められます。
+
+<Note>
+  生成されたMCP設定ファイル(`.mcp.json`)、ガイドラインファイル(`CLAUDE.md`、`AGENTS.md`、`junie/` など)、および `boost.json` 設定ファイルはアプリケーションの `.gitignore` に追加しても構いません。これらのファイルは `boost:install` や `boost:update` を実行する際に自動的に再生成されます。
+</Note>
+
+### エージェントの設定
+
+<Tabs>
+  <Tab title="Cursor">
+    1. コマンドパレットを開きます（`Cmd+Shift+P` または `Ctrl+Shift+P`）
+    2. "/open MCP Settings" を選択して `Enter` を押します
+    3. `laravel-boost` のトグルをオンにします
+  </Tab>
+  <Tab title="Claude Code">
+    Claude Codeのサポートは通常、自動的に有効になります。有効になっていない場合は、プロジェクトディレクトリでシェルを開き、次のコマンドを実行してください。
+
+    ```shell
+    claude mcp add -s local -t stdio laravel-boost php artisan boost:mcp
+    ```
+  </Tab>
+  <Tab title="Codex">
+    Codexのサポートは通常、自動的に有効になります。有効になっていない場合は、プロジェクトディレクトリでシェルを開き、次のコマンドを実行してください。
+
+    ```shell
+    codex mcp add laravel-boost -- php "artisan" "boost:mcp"
+    ```
+  </Tab>
+  <Tab title="Gemini CLI">
+    Gemini CLIのサポートは通常、自動的に有効になります。有効になっていない場合は、プロジェクトディレクトリでシェルを開き、次のコマンドを実行してください。
+
+    ```shell
+    gemini mcp add -s project -t stdio laravel-boost php artisan boost:mcp
+    ```
+  </Tab>
+  <Tab title="GitHub Copilot (VS Code)">
+    1. コマンドパレットを開きます（`Cmd+Shift+P` または `Ctrl+Shift+P`）
+    2. "MCP: List Servers" を選択して `Enter` を押します
+    3. `laravel-boost` を選択して `Enter` を押します
+    4. "Start server" を選択します
+  </Tab>
+  <Tab title="Junie">
+    1. `Shift` を2回押してコマンドパレットを開きます
+    2. "MCP Settings" を検索して `Enter` を押します
+    3. `laravel-boost` の横のチェックボックスにチェックを入れます
+    4. 右下の "Apply" をクリックします
+  </Tab>
+</Tabs>
+
+### Boostリソースの更新
+
+インストールされているLaravelエコシステムパッケージの最新バージョンを反映させるため、ローカルのBoostリソース（AIガイドラインとスキル）を定期的に更新することをお勧めします。`boost:update` Artisanコマンドを使用してください。
+
+```shell
+php artisan boost:update
+```
+
+Composerの `post-update-cmd` スクリプトに追加して自動化することもできます。
+
+```json
+{
+  "scripts": {
+    "post-update-cmd": [
+      "@php artisan boost:update --ansi"
+    ]
+  }
+}
+```
+
+デフォルトでは、`boost:update` コマンドはアプリケーション内にすでに公開されているBoostリソースのみを更新します。新しくインストールされたパッケージを検出してそのガイドラインやスキルを公開するよう促したい場合は、`--discover` オプションを使用します。
+
+```shell
+php artisan boost:update --discover
+```
+
+## MCPサーバー
+
+Laravel BoostはMCP（Model Context Protocol）サーバーを提供し、AIエージェントがLaravelアプリケーションと対話するためのツールを公開します。これらのツールにより、エージェントはアプリケーションの構造を調査したり、データベースに問い合わせたり、コードを実行したりすることができます。
+
+### 利用可能なMCPツール
+
+| ツール名 | 説明 |
+| --- | --- |
+| Application Info | PHPとLaravelのバージョン、データベースエンジン、バージョン付きエコシステムパッケージ一覧、Eloquentモデルを読み取る |
+| Browser Logs | ブラウザからのログとエラーを読み取る |
+| Database Connections | デフォルト接続を含む利用可能なデータベース接続を確認する |
+| Database Query | データベースに対してクエリを実行する |
+| Database Schema | データベーススキーマを読み取る |
+| Get Absolute URL | 相対パスのURIを絶対URLに変換し、エージェントが有効なURLを生成できるようにする |
+| Last Error | アプリケーションのログファイルから最後のエラーを読み取る |
+| Read Log Entries | 最後のN件のログエントリを読み取る |
+| Search Docs | インストール済みパッケージに基づいてLaravelのホスト型ドキュメントAPIサービスに問い合わせる |
+
+### 手動でのMCPサーバー登録
+
+エディタによっては、Laravel Boost MCPサーバーを手動で登録する必要がある場合があります。以下の情報でMCPサーバーを登録してください。
+
+| 項目 | 値 |
+| --- | --- |
+| **Command** | `php` |
+| **Args** | `artisan boost:mcp` |
+
+JSON形式での記述例:
+
+```json
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "php",
+            "args": ["artisan", "boost:mcp"]
+        }
+    }
+}
+```
+
+## AIガイドライン
+
+AIガイドラインは、AIエージェントにLaravelエコシステムパッケージに関する重要なコンテキストを提供するために、あらかじめ読み込まれる命令ファイルです。これらのガイドラインにはコアの規約、ベストプラクティス、フレームワーク固有のパターンが含まれており、エージェントが一貫した高品質なコードを生成するのに役立ちます。
+
+### 利用可能なガイドライン
+
+Laravel Boostには以下のパッケージとフレームワーク向けのAIガイドラインが含まれています。`core` ガイドラインは、バージョンに関係なく適用される汎用的なアドバイスを提供します。
+
+| パッケージ | 対応バージョン |
+| --- | --- |
+| Core & Boost | core |
+| Laravel Framework | core, 10.x, 11.x, 12.x |
+| Livewire | core, 2.x, 3.x, 4.x |
+| Flux UI | core, free, pro |
+| Folio | core |
+| Herd | core |
+| Inertia Laravel | core, 1.x, 2.x, 3.x |
+| Inertia React | core, 1.x, 2.x, 3.x |
+| Inertia Vue | core, 1.x, 2.x, 3.x |
+| Inertia Svelte | core, 1.x, 2.x, 3.x |
+| MCP | core |
+| Pennant | core |
+| Pest | core, 3.x, 4.x |
+| PHPUnit | core |
+| Pint | core |
+| Sail | core |
+| Tailwind CSS | core, 3.x, 4.x |
+| Livewire Volt | core |
+| Wayfinder | core |
+| Enforce Tests | conditional |
+
+<Tip>
+  AIガイドラインを最新の状態に保つには、[Boostリソースの更新](#boostリソースの更新)を参照してください。
+</Tip>
+
+### カスタムガイドラインの追加
+
+独自のカスタムAIガイドラインをLaravel Boostに追加するには、`.blade.php` または `.md` ファイルをアプリケーションの `.ai/guidelines/*` ディレクトリに追加します。これらのファイルは `boost:install` を実行する際に、Laravel Boostのガイドラインと自動的に組み合わされます。
+
+### Boostのガイドラインをオーバーライドする
+
+ファイルパスが一致するカスタムガイドラインを作成することで、Boostの組み込みガイドラインをオーバーライドできます。既存のBoostガイドラインと一致するパスにカスタムガイドラインを作成すると、Boostは組み込みのガイドラインの代わりにカスタムバージョンを使用します。
+
+たとえば、Boostの "Inertia React v2 Form Guidance" ガイドラインをオーバーライドするには、`.ai/guidelines/inertia-react/2/forms.blade.php` にファイルを作成します。`boost:install` を実行すると、Boostはデフォルトのガイドラインの代わりにカスタムガイドラインを使用します。
+
+### サードパーティパッケージのガイドライン
+
+サードパーティパッケージを管理しており、Boostにそのパッケージ向けのAIガイドラインを含めたい場合は、パッケージに `resources/boost/guidelines/core.blade.php` ファイルを追加します。パッケージのユーザーが `php artisan boost:install` を実行すると、Boostが自動的にそのガイドラインを読み込みます。
+
+AIガイドラインには、パッケージの概要、必要なファイル構造や規約の説明、主な機能の作成方法や使用方法（コマンドやコードスニペットの例を含む）を記述してください。簡潔でアクション重視の内容にし、ベストプラクティスに焦点を当てることで、AIがユーザーのために正しいコードを生成できるようになります。
+
+```php
+## Package Name
+
+This package provides [brief description of functionality].
+
+### Features
+
+- Feature 1: [clear & short description].
+- Feature 2: [clear & short description]. Example usage:
+
+@verbatim
+<code-snippet name="How to use Feature 2" lang="php">
+$result = PackageName::featureTwo($param1, $param2);
+</code-snippet>
+@endverbatim
+```
+
+## Agent Skills
+
+[Agent Skills](https://agentskills.io/home) は、エージェントが特定のドメインで作業する際にオンデマンドで有効化できる、軽量で的を絞った知識モジュールです。ガイドラインがあらかじめ読み込まれるのとは異なり、スキルは関連する場合にのみ詳細なパターンとベストプラクティスを読み込むため、コンテキストの肥大化を抑えてAI生成コードの品質を高めます。
+
+`boost:install` を実行してスキルを機能として選択すると、`composer.json` で検出されたパッケージに基づいてスキルが自動的にインストールされます。たとえば、プロジェクトに `livewire/livewire` が含まれている場合、`livewire-development` スキルが自動的にインストールされます。
+
+### 利用可能なスキル
+
+| スキル | パッケージ |
+| --- | --- |
+| fluxui-development | Flux UI |
+| folio-routing | Folio |
+| inertia-react-development | Inertia React |
+| inertia-svelte-development | Inertia Svelte |
+| inertia-vue-development | Inertia Vue |
+| livewire-development | Livewire |
+| mcp-development | MCP |
+| pennant-development | Pennant |
+| pest-testing | Pest |
+| tailwindcss-development | Tailwind CSS |
+| volt-development | Volt |
+| wayfinder-development | Wayfinder |
+
+<Tip>
+  スキルを最新の状態に保つには、[Boostリソースの更新](#boostリソースの更新)を参照してください。
+</Tip>
+
+### カスタムスキルの作成
+
+独自のカスタムスキルを作成するには、`SKILL.md` ファイルをアプリケーションの `.ai/skills/{skill-name}/` ディレクトリに追加します。`boost:update` を実行すると、カスタムスキルがBoostの組み込みスキルと一緒にインストールされます。
+
+たとえば、アプリケーション固有のドメインロジック向けのカスタムスキルを作成するには:
+
+```
+.ai/skills/creating-invoices/SKILL.md
+```
+
+### スキルのオーバーライド
+
+一致する名前のカスタムスキルを作成することで、Boostの組み込みスキルをオーバーライドできます。既存のBoostスキルと一致する名前でカスタムスキルを作成すると、Boostは組み込みスキルの代わりにカスタムバージョンを使用します。
+
+たとえば、Boostの `livewire-development` スキルをオーバーライドするには、`.ai/skills/livewire-development/SKILL.md` にファイルを作成します。`boost:update` を実行すると、Boostはデフォルトのスキルの代わりにカスタムスキルを使用します。
+
+### サードパーティパッケージのスキル
+
+サードパーティパッケージを管理しており、Boostにそのパッケージ向けのスキルを含めたい場合は、パッケージに `resources/boost/skills/{skill-name}/SKILL.md` ファイルを追加します。パッケージのユーザーが `php artisan boost:install` を実行すると、Boostはユーザーの希望に応じてスキルを自動的にインストールします。
+
+BoostのスキルはAgent Skillsフォーマットをサポートしており、YAMLフロントマターとMarkdown指示を含む `SKILL.md` ファイルを格納したフォルダとして構成する必要があります。`SKILL.md` ファイルには必須フロントマター（`name` と `description`）を含め、スクリプト、テンプレート、参照資料をオプションで含めることができます。
+
+```markdown
+---
+name: package-name-development
+description: Build and work with PackageName features, including components and workflows.
+---
+
+# Package Name Development
+
+## When to use this skill
+Use this skill when working with PackageName features...
+
+## Features
+
+- Feature 1: [clear & short description].
+- Feature 2: [clear & short description]. Example usage:
+
+$result = PackageName::featureTwo($param1, $param2);
+```
+
+## ガイドラインとスキルの比較
+
+Laravel Boostは、AIエージェントにアプリケーションに関するコンテキストを提供するための2つの異なる方法を提供します: **ガイドライン**と**スキル**です。
+
+**ガイドライン**はAIエージェントの起動時にあらかじめ読み込まれ、コードベース全体に広く適用されるLaravelの規約とベストプラクティスに関する重要なコンテキストを提供します。
+
+**スキル**は特定のタスクで作業する際にオンデマンドで有効化され、特定のドメイン（LivewireコンポーネントやPestテストなど）の詳細なパターンを含みます。必要な場合にのみスキルを読み込むことで、コンテキストの肥大化を抑えてコード品質を向上させます。
+
+| 観点 | ガイドライン | スキル |
+| --- | --- | --- |
+| **読み込みタイミング** | あらかじめ、常に存在 | オンデマンド、関連する場合のみ |
+| **スコープ** | 広範囲、基盤的 | 焦点を絞った、タスク固有 |
+| **目的** | コアの規約とベストプラクティス | 詳細な実装パターン |
+
+## ドキュメントAPI
+
+Laravel Boostには、1万7,000件以上のLaravel固有情報を含む知識ベースへのアクセスをAIエージェントに提供するドキュメントAPIが含まれています。このAPIは埋め込みを使った意味的検索を使用して、精度の高いコンテキスト対応の結果を提供します。
+
+`Search Docs` MCPツールにより、エージェントはインストール済みパッケージに基づいてLaravelのホスト型ドキュメントAPIサービスに問い合わせることができます。BoostのAIガイドラインとスキルがコーディングエージェントにこのAPIを使用するよう自動的に指示します。
+
+| パッケージ | 対応バージョン |
+| --- | --- |
+| Laravel Framework | 10.x, 11.x, 12.x |
+| Filament | 2.x, 3.x, 4.x, 5.x |
+| Flux UI | 2.x Free, 2.x Pro |
+| Inertia | 1.x, 2.x |
+| Livewire | 1.x, 2.x, 3.x, 4.x |
+| Nova | 4.x, 5.x |
+| Pest | 3.x, 4.x |
+| Tailwind CSS | 3.x, 4.x |
+
+## Boostの拡張
+
+Boostは多くの一般的なIDEやAIエージェントですぐに使えます。お使いのコーディングツールがまだサポートされていない場合は、独自のエージェントを作成してBoostと統合できます。
+
+### 他のIDE/AIエージェントへの対応追加
+
+新しいIDEやAIエージェントのサポートを追加するには、`Laravel\Boost\Install\Agents\Agent` を継承するクラスを作成し、必要に応じて以下のコントラクトを1つ以上実装します。
+
+- `Laravel\Boost\Contracts\SupportsGuidelines` — AIガイドラインのサポートを追加
+- `Laravel\Boost\Contracts\SupportsMcp` — MCPのサポートを追加
+- `Laravel\Boost\Contracts\SupportsSkills` — Agent Skillsのサポートを追加
+
+#### エージェントの実装
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App;
+
+use Laravel\Boost\Contracts\SupportsGuidelines;
+use Laravel\Boost\Contracts\SupportsMcp;
+use Laravel\Boost\Contracts\SupportsSkills;
+use Laravel\Boost\Install\Agents\Agent;
+
+class CustomAgent extends Agent implements SupportsGuidelines, SupportsMcp, SupportsSkills
+{
+    // Your implementation...
+}
+```
+
+実装例として [ClaudeCode.php](https://github.com/laravel/boost/blob/main/src/Install/Agents/ClaudeCode.php) を参照してください。
+
+#### エージェントの登録
+
+カスタムエージェントをアプリケーションの `App\Providers\AppServiceProvider` の `boot` メソッドに登録します。
+
+```php
+use Laravel\Boost\Boost;
+
+public function boot(): void
+{
+    Boost::registerAgent('customagent', CustomAgent::class);
+}
+```
+
+登録後、`php artisan boost:install` を実行する際にエージェントが選択肢として表示されます。
