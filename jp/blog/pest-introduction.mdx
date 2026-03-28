@@ -1,0 +1,267 @@
+---
+title: "Pest PHPで始めるLaravelテスト"
+description: "Laravel 11からデフォルトになったPest PHPをシニアエンジニア視点で紹介します。PHPUnitとの違い・移行コスト・`arch()`テストの活用まで、実際のプロジェクト導入を想定して解説します。"
+---
+
+## なぜPestがLaravelのデフォルトになったか
+
+Laravel 11より、`laravel new` でプロジェクトを作成する際に **Pest** がデフォルトのテストフレームワークとして選択されるようになりました。PHPUnit は長年 PHP の標準的なテストツールとして使われてきましたが、Pest はその PHPUnit をベースにしながら、より簡潔で読みやすいテスト記法を提供します。
+
+<Info>
+  PestはPHPUnit上で動作するため、既存のPHPUnitテストはそのまま実行できます。移行は段階的に進められます。
+</Info>
+
+公式が Pest を採用した背景には、テストを書く際の摩擦を減らすという目標があります。クラスを定義してメソッドを書いてという儀式的な手順をなくし、「テストしたいこと」そのものに集中できる記法を提供することで、テストを書く習慣が自然と身につくようになります。
+
+---
+
+## PHPUnitとの主な違い
+
+### テストの記法
+
+最もわかりやすい違いはテストの書き方です。
+
+```php tab=Pest
+test('ユーザーがログインできる', function () {
+    $user = User::factory()->create();
+
+    $response = $this->post('/login', [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $response->assertRedirect('/dashboard');
+});
+```
+
+```php tab=PHPUnit
+class AuthTest extends TestCase
+{
+    public function test_user_can_login(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect('/dashboard');
+    }
+}
+```
+
+Pest の `test()` 関数はクロージャを受け取ります。クラスやメソッドの定義が不要なため、テストの意図が一行目から明確です。`it()` も同様に使えます。英語で書く場合は `it('can login', ...)` という自然な文として読めます。
+
+### `expect()` API
+
+Pest の最大の特徴は `expect()` を使ったチェーン形式のアサーションです。
+
+```php
+test('投稿一覧APIがJSON形式で返る', function () {
+    $posts = Post::factory(3)->create();
+
+    $response = $this->getJson('/api/posts');
+
+    expect($response->status())->toBe(200);
+    expect($response->json('data'))->toHaveCount(3);
+    expect($response->json('data.0.title'))->not->toBeEmpty();
+});
+```
+
+`expect($value)->toBe()`, `->toBeNull()`, `->toContain()`, `->toHaveCount()` など、英語として自然に読める形式でアサーションを書けます。複数のアサーションをメソッドチェーンでまとめることもできます。
+
+```php
+expect($user)
+    ->name->toBe('田中太郎')
+    ->email->toBe('tanaka@example.com')
+    ->is_admin->toBeFalse();
+```
+
+### セットアップとティアダウン
+
+PHPUnit の `setUp()` に相当するのが `beforeEach()`、`tearDown()` に相当するのが `afterEach()` です。
+
+```php
+beforeEach(function () {
+    $this->user = User::factory()->create();
+    $this->actingAs($this->user);
+});
+
+test('認証済みユーザーはプロフィールにアクセスできる', function () {
+    $response = $this->get('/profile');
+    $response->assertOk();
+});
+
+test('認証済みユーザーはプロフィールを更新できる', function () {
+    $response = $this->patch('/profile', ['name' => '新しい名前']);
+    $response->assertRedirect('/profile');
+});
+```
+
+### データセット — テーブルドリブンテスト
+
+同じテストロジックを複数のデータで実行したい場合は `dataset` を使います。
+
+```php
+test('無効なメールアドレスはバリデーションエラーになる', function (string $email) {
+    $response = $this->postJson('/api/users', [
+        'name' => '田中太郎',
+        'email' => $email,
+    ]);
+
+    $response->assertUnprocessable();
+})->with([
+    'メールなし' => [''],
+    '形式不正' => ['notanemail'],
+    '二重@' => ['a@@example.com'],
+]);
+```
+
+各データセットのラベル（`'メールなし'` など）がテスト名に付加されるため、どのパターンで失敗したかが一目でわかります。
+
+---
+
+## `arch()` テスト — アーキテクチャの自動チェック
+
+Pest の `arch()` はコードベースの構造を検証するテストです。「コントローラーがモデルに直接依存していないか」「モデルが Eloquent を継承しているか」といったアーキテクチャルールを自動で検証できます。
+
+```php
+test('モデルはEloquentを継承している', function () {
+    arch()->expect('App\Models')
+        ->toExtend(Illuminate\Database\Eloquent\Model::class);
+});
+
+test('コントローラーはfinalで定義されている', function () {
+    arch()->expect('App\Http\Controllers')
+        ->toBeFinal();
+});
+
+test('サービスクラスはコントローラーに依存しない', function () {
+    arch()->expect('App\Services')
+        ->not->toUse('App\Http\Controllers');
+});
+```
+
+<Tip>
+  `arch()` テストはソースコードを静的解析して実行されます。実際にHTTPリクエストを送ったりデータベースにアクセスしたりしないため、非常に高速です。
+</Tip>
+
+Pest にはよく使われるアーキテクチャルールのプリセットも用意されています。
+
+```php
+test('Laravelのアーキテクチャルールに従っている', function () {
+    arch()->preset()->laravel();
+});
+```
+
+`laravel()` プリセットはモデルの命名・コントローラーの継承・ミドルウェアの構造など、Laravelの一般的な慣習に沿ったルールをまとめて検証します。
+
+---
+
+## Laravelプロジェクトでの実践例
+
+### テストの作成
+
+```shell
+php artisan make:test UserTest
+```
+
+Laravel 11 以降でデフォルト設定のまま実行すると、Pest 形式のテストファイルが生成されます。
+
+```php
+<?php
+
+test('example', function () {
+    expect(true)->toBeTrue();
+});
+```
+
+### Laravelのテストヘルパーをそのまま使う
+
+Pest は Laravel の `TestCase` を継承しているため、`actingAs()`、`assertDatabaseHas()`、HTTP テストヘルパーなど、すべての Laravel テストヘルパーがそのまま使えます。
+
+```php
+use App\Models\Post;
+use App\Models\User;
+
+test('ユーザーは自分の投稿を削除できる', function () {
+    $user = User::factory()->create();
+    $post = Post::factory()->for($user)->create();
+
+    $response = $this
+        ->actingAs($user)
+        ->delete("/posts/{$post->id}");
+
+    $response->assertRedirect('/posts');
+    $this->assertModelMissing($post);
+});
+
+test('他ユーザーの投稿は削除できない', function () {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $post = Post::factory()->for($otherUser)->create();
+
+    $this
+        ->actingAs($user)
+        ->delete("/posts/{$post->id}")
+        ->assertForbidden();
+
+    $this->assertModelExists($post);
+});
+```
+
+### ファクトリーとデータベーストランザクション
+
+`RefreshDatabase` や `DatabaseTransactions` トレイトも `uses()` で簡単に適用できます。ファイル先頭に書けばそのファイル全体に適用されます。
+
+```php
+uses(Tests\TestCase::class, Illuminate\Foundation\Testing\RefreshDatabase::class)->in('Feature');
+```
+
+`tests/Pest.php` に一度設定しておくと、すべての Feature テストで `RefreshDatabase` が自動的に有効になります。個別のテストファイルで上書きすることも可能です。
+
+---
+
+## 既存PHPUnitテストとの共存方法
+
+Pest と PHPUnit は同じプロジェクト内で共存できます。既存の PHPUnit テストを書き換える必要はなく、新しいテストから Pest 形式で書き始めればよいだけです。
+
+```shell
+./vendor/bin/pest       # Pestで全テストを実行（PHPUnitテストも含む）
+./vendor/bin/pest --filter="ユーザー"  # テスト名でフィルタリング
+php artisan test        # ArtisanコマンドでもPestが動く
+```
+
+<Info>
+  `php artisan test` は Laravel 11 以降、Pest がインストールされている場合は自動的に Pest を使って実行します。
+</Info>
+
+### 移行の進め方
+
+1. まず `tests/Pest.php` に `uses()` の設定を追加する
+2. 新しく追加するテストは Pest 形式で書く
+3. 既存の PHPUnit テストは動作を確認しながら少しずつ移行する
+
+急いで全テストを書き換える必要はありません。Pest のシンタックスは PHPUnit と比べて学習コストが低いため、チームへの浸透も比較的スムーズです。
+
+---
+
+## まとめ
+
+| 比較項目 | PHPUnit | Pest |
+|---------|---------|------|
+| テスト定義 | クラス + メソッド | `test()` / `it()` 関数 |
+| アサーション | `$this->assert*()` | `expect()->to*()` |
+| セットアップ | `setUp()` | `beforeEach()` |
+| データ駆動 | `@dataProvider` | `->with()` |
+| アーキテクチャ検証 | なし | `arch()` |
+| 実行速度 | 標準 | 同等（PHPUnit上で動作） |
+
+Pest は PHPUnit の置き換えではなく、PHPUnit をラップした上位レイヤーです。Laravel との統合も深く、スターターキット生成時からデフォルトで選択されるほどになっています。既存プロジェクトへの導入コストは低く、新規のテストから試し始めるだけで恩恵を受けられます。
+
+テストを書く量が増えれば、バグの発見が早くなり、リファクタリングへの心理的ハードルも下がります。Pest はその「テストを書くこと自体の摩擦」を減らすための道具です。
+
+<Card title="Pest公式ドキュメント" icon="book-open" href="https://pestphp.com/docs">
+  データセット、カバレッジ、並列実行など、Pestの全機能については公式ドキュメントを参照してください。
+</Card>

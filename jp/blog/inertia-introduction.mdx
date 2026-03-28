@@ -1,0 +1,400 @@
+---
+title: "Inertia.jsでSPAを構築する"
+description: "LaravelバックエンドとVue/React/SvelteフロントエンドをつなぐInertia.js v3を紹介します。APIなしでSPAを実現する仕組みから、ページコンポーネント・共有データ・フォーム処理まで実践的に解説します。"
+---
+
+## Inertia.jsとは
+
+フロントエンドをReactやVueで作りたい。でもAPIを別途設計・実装・管理するのは避けたい——そんなジレンマを解決するのが **Inertia.js** です。
+
+Inertia はサーバーサイドのルーティングとコントローラーをそのままに、フロントエンドだけをReact・Vue・Svelteで書けるようにする「グルー（接着剤）」です。フレームワークではなく、既存のLaravelとJavaScriptフレームワークをつなぐアダプター層として機能します。
+
+<Info>
+  現在の最新バージョンはInertia v3（2026年3月26日リリース）です。Laravel 13のスターターキット（React・Vue・Svelte）はInertia対応済みです。
+</Info>
+
+### 従来のSPA・MPAとの違い
+
+| アーキテクチャ | 特徴 | 課題 |
+|------------|------|------|
+| MPA（従来のBladeアプリ） | シンプル、Laravelとの統合が容易 | ページ遷移のたびにフルリロード |
+| SPA（API + フロントエンド分離） | 高いインタラクション性 | API設計・認証・型定義の二重管理 |
+| **Inertia（モダンモノリス）** | SPAのUX + サーバー側のシンプルさ | 独自の学習コストがある |
+
+Inertia を使うと、Laravelのコントローラーから直接VueコンポーネントやReactコンポーネントにデータを渡せます。REST APIを定義する必要はなく、ページ遷移もブラウザのフルリロードではなくXHRで行われるため、SPA的なスムーズな操作感を実現できます。
+
+---
+
+## Laravelスターターキットとの関係
+
+`laravel new` でプロジェクトを作成する際にReact・Vue・Svelteを選ぶと、Inertiaが自動的にセットアップされます。
+
+```shell
+laravel new my-app
+# 対話式プロンプトでReact / Vue / Svelteを選ぶとInertia構成になる
+```
+
+スターターキットでは以下の構成が自動で用意されます。
+
+- `inertiajs/inertia-laravel`（サーバーサイドアダプター）
+- `@inertiajs/react` / `@inertiajs/vue3` / `@inertiajs/svelte`（クライアントアダプター）
+- `HandleInertiaRequests` ミドルウェア
+- ログイン・登録・パスワードリセットなどの認証画面（すでにInertiaコンポーネントで実装済み）
+
+既存プロジェクトに手動でInertiaを導入する場合はサーバーサイドとクライアントサイドを別々にインストールします。詳細は公式ドキュメントのインストール手順を参照してください。
+
+---
+
+## `Inertia::render()` の基本
+
+Laravelのコントローラーから Inertia レスポンスを返すには `Inertia::render()` を使います。第一引数にJavaScriptコンポーネント名、第二引数にプロップとして渡すデータを指定します。
+
+```php
+use Inertia\Inertia;
+
+class PostController extends Controller
+{
+    public function index()
+    {
+        return Inertia::render('Posts/Index', [
+            'posts' => Post::latest()->paginate(10),
+        ]);
+    }
+
+    public function show(Post $post)
+    {
+        return Inertia::render('Posts/Show', [
+            'post' => $post->only('id', 'title', 'content', 'created_at'),
+            'author' => $post->user->only('id', 'name'),
+        ]);
+    }
+}
+```
+
+<Tip>
+  `Inertia::render()` の代わりに `inertia()` ヘルパー関数も使えます。どちらを使うかはチームのスタイルで統一してください。
+</Tip>
+
+コンポーネント名 `'Posts/Index'` はファイルパスに対応します。Reactなら `resources/js/Pages/Posts/Index.jsx`、Vueなら `resources/js/Pages/Posts/Index.vue` が対応するコンポーネントです。
+
+---
+
+## ページコンポーネントの構造
+
+Inertiaのページコンポーネントは通常のVue/Reactコンポーネントです。コントローラーから渡したデータがプロップとして受け取れます。
+
+```jsx React
+// resources/js/Pages/Posts/Index.jsx
+import { Link } from '@inertiajs/react'
+
+export default function PostsIndex({ posts }) {
+    return (
+        <div>
+            <h1>投稿一覧</h1>
+            {posts.data.map(post => (
+                <article key={post.id}>
+                    <h2>
+                        <Link href={`/posts/${post.id}`}>{post.title}</Link>
+                    </h2>
+                </article>
+            ))}
+        </div>
+    )
+}
+```
+
+```vue Vue
+<!-- resources/js/Pages/Posts/Index.vue -->
+<script setup>
+import { Link } from '@inertiajs/vue3'
+
+defineProps({
+    posts: Object,
+})
+</script>
+
+<template>
+    <div>
+        <h1>投稿一覧</h1>
+        <article v-for="post in posts.data" :key="post.id">
+            <h2>
+                <Link :href="`/posts/${post.id}`">{{ post.title }}</Link>
+            </h2>
+        </article>
+    </div>
+</template>
+```
+
+`<Link>` コンポーネントを使うと、ページ遷移がXHRで行われ、フルページリロードを回避できます。通常の `<a>` タグとまったく同じように書けますが、裏側でInertiaがページコンポーネントだけを差し替えます。
+
+---
+
+## 共有データ — `HandleInertiaRequests` ミドルウェア
+
+すべてのページで共通して必要なデータ（ログイン中のユーザー情報・フラッシュメッセージなど）は、`HandleInertiaRequests` ミドルウェアの `share()` メソッドで定義します。
+
+```php
+// app/Http/Middleware/HandleInertiaRequests.php
+use Illuminate\Http\Request;
+use Inertia\Middleware;
+
+class HandleInertiaRequests extends Middleware
+{
+    public function share(Request $request): array
+    {
+        return array_merge(parent::share($request), [
+            'appName' => config('app.name'),
+
+            'auth' => [
+                'user' => $request->user()
+                    ? $request->user()->only('id', 'name', 'email')
+                    : null,
+            ],
+
+            'flash' => [
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
+            ],
+        ]);
+    }
+}
+```
+
+共有データは自動的にすべてのページのプロップにマージされます。
+
+```jsx React
+// レイアウトコンポーネントからアクセスする例
+import { usePage } from '@inertiajs/react'
+
+export default function Layout({ children }) {
+    const { auth, flash } = usePage().props
+
+    return (
+        <main>
+            <header>
+                {auth.user ? `ログイン中: ${auth.user.name}` : 'ゲスト'}
+            </header>
+            {flash.success && <div className="alert-success">{flash.success}</div>}
+            <article>{children}</article>
+        </main>
+    )
+}
+```
+
+<Info>
+  共有データはすべてのリクエストに含まれるため、必要最低限のデータに絞ることを推奨します。`fn()` を使ったレイジー評価にすると、実際に必要なリクエストでのみ評価されます。
+</Info>
+
+---
+
+## フォーム送信とバリデーションエラーの処理
+
+Inertiaでのフォーム処理はLaravelのバリデーションと自然に統合されます。`useForm()` ヘルパーを使うと、フォームの状態管理・送信・エラー表示がシンプルに実装できます。
+
+### コントローラー側
+
+```php
+class PostController extends Controller
+{
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title'   => ['required', 'string', 'max:255'],
+            'content' => ['required', 'string'],
+        ]);
+
+        Post::create($validated + ['user_id' => auth()->id()]);
+
+        return redirect()->route('posts.index')
+            ->with('success', '投稿を作成しました。');
+    }
+}
+```
+
+バリデーションエラーが発生した場合、Laravelは自動的にフォームページにリダイレクトし、エラー情報をセッションに保存します。Inertiaはこれを自動的に検知して `errors` プロップとしてページに渡します。
+
+### フロントエンド側
+
+```jsx React
+// resources/js/Pages/Posts/Create.jsx
+import { useForm } from '@inertiajs/react'
+
+export default function PostsCreate() {
+    const { data, setData, post, processing, errors } = useForm({
+        title: '',
+        content: '',
+    })
+
+    function handleSubmit(e) {
+        e.preventDefault()
+        post('/posts')
+    }
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <div>
+                <label>タイトル</label>
+                <input
+                    value={data.title}
+                    onChange={e => setData('title', e.target.value)}
+                />
+                {errors.title && <p className="error">{errors.title}</p>}
+            </div>
+
+            <div>
+                <label>本文</label>
+                <textarea
+                    value={data.content}
+                    onChange={e => setData('content', e.target.value)}
+                />
+                {errors.content && <p className="error">{errors.content}</p>}
+            </div>
+
+            <button type="submit" disabled={processing}>
+                {processing ? '送信中...' : '投稿する'}
+            </button>
+        </form>
+    )
+}
+```
+
+```vue Vue
+<!-- resources/js/Pages/Posts/Create.vue -->
+<script setup>
+import { useForm } from '@inertiajs/vue3'
+
+const form = useForm({
+    title: '',
+    content: '',
+})
+
+function submit() {
+    form.post('/posts')
+}
+</script>
+
+<template>
+    <form @submit.prevent="submit">
+        <div>
+            <label>タイトル</label>
+            <input v-model="form.title" />
+            <p v-if="form.errors.title" class="error">{{ form.errors.title }}</p>
+        </div>
+
+        <div>
+            <label>本文</label>
+            <textarea v-model="form.content"></textarea>
+            <p v-if="form.errors.content" class="error">{{ form.errors.content }}</p>
+        </div>
+
+        <button type="submit" :disabled="form.processing">
+            {{ form.processing ? '送信中...' : '投稿する' }}
+        </button>
+    </form>
+</template>
+```
+
+バリデーションエラーが返ったとき、`useForm()` は入力内容を保持したままエラーを表示します。フォームを再入力させる手間がなく、ユーザー体験が向上します。
+
+---
+
+## 向いているユースケース・向いていないケース
+
+### Inertiaが向いているケース
+
+- Laravelをよく知っているチームがSPA的なUIを作りたいとき
+- 認証・認可・バリデーションをLaravel側で一元管理したいとき
+- 管理画面・社内ツールなど、SEOの優先度が低いアプリ
+- APIを別途設計・管理するコストを避けたいプロジェクト
+
+### 向いていないケース
+
+- 外部の複数クライアント（モバイルアプリなど）が同じAPIを使う場合
+- SEOが非常に重要なコンテンツサイト（SSRで対応可能だが複雑になる）
+- マイクロフロントエンド構成など、フロントエンドが完全に独立したチームで開発される場合
+
+<Tip>
+  Inertia はサーバーサイドレンダリング（SSR）もサポートしています。SEOが必要なページがある場合は SSR オプションを検討してください。Laravel のスターターキットでも SSR 設定が組み込まれています。
+</Tip>
+
+---
+
+## Inertia v3 の主な変更点
+
+Inertia v3 は2026年3月26日にリリースされました。v2からの主な変更点を紹介します。
+
+### Axios を廃止 — 軽量な組み込みXHRクライアントへ
+
+v3 では Axios が廃止され、より軽量な組み込みXHRクライアントに置き換えられました。ほとんどのアプリケーションでコード変更は不要です。Axios のインターセプターは組み込みインターセプターに直接移行できます。引き続き Axios を使いたい場合は Axios アダプター経由で利用できます。
+
+### `@inertiajs/vite` プラグインによるSSRのシンプル化
+
+新しい Vite プラグインを導入すると、ページコンポーネントの自動解決とSSR設定が大幅に簡略化されます。開発中のSSRは `npm run dev` を実行するだけで動作するようになり、別途Nodeサーバーを起動する必要がなくなりました。
+
+```bash
+npm install @inertiajs/vite@^3.0
+```
+
+### `useHttp` フック — ページ遷移を伴わないHTTPリクエスト
+
+`useHttp` フックを使うと、ページ遷移（Inertia visit）を発生させずにサーバーへHTTPリクエストを送れます。モーダルの保存やバックグラウンド処理など、現在のページを維持したまま通信したい場面で役立ちます。
+
+### 楽観的UI更新（Optimistic Updates）
+
+`useForm` およびルーターレベルで楽観的な更新がサポートされました。サーバーの応答を待たずにUIを即座に更新し、失敗した場合は自動的にロールバックします。
+
+### レイアウトプロップ（Layout Props）
+
+`useLayoutProps` フックを使うと、ページコンポーネントから永続レイアウトへデータを渡せるようになりました。従来は共有データかページプロップに頼るしかなかった「特定ページのレイアウト状態制御」がシンプルに書けます。
+
+### 要件の変更
+
+v3 では以下の最低バージョンが引き上げられました。
+
+| 項目 | v2 | v3 |
+|------|----|----|
+| PHP | 8.1+ | 8.2+ |
+| Laravel | 10+ | 11+ |
+| React | 18+ | 19+ |
+| Svelte | 4+ | 5+ |
+
+### `Inertia::lazy()` の廃止
+
+v2 で非推奨になっていた `Inertia::lazy()` が v3 で完全に削除されました。代わりに `Inertia::optional()` を使います。
+
+```php
+// v2（非推奨）
+'users' => Inertia::lazy(fn () => User::all()),
+
+// v3
+'users' => Inertia::optional(fn () => User::all()),
+```
+
+### イベント名の変更
+
+| v2 | v3 |
+|----|----|
+| `invalid` | `httpException` |
+| `exception` | `networkError` |
+
+### `future` オプションの廃止
+
+v2 で実験的オプションとして提供されていた `future` 設定ブロックが廃止されました。これらのオプションはすべてデフォルトで有効になっています。`createInertiaApp` の設定から `future` ブロックを削除してください。
+
+<Info>
+  v2 からのアップグレード手順の詳細は <a href="https://inertiajs.com/docs/v3/getting-started/upgrade-guide">公式アップグレードガイド</a> を参照してください。v2 は2026年9月26日までバグ修正が、2027年3月26日までセキュリティ修正が提供されます。
+</Info>
+
+---
+
+## まとめ
+
+Inertia.js は「LaravelはそのままでフロントエンドをReact/Vueで書きたい」という現実的なニーズに応えるツールです。APIを設計せずに、コントローラーから直接コンポーネントにデータを渡せるシンプルさが最大の強みです。
+
+Laravel 13 のスターターキットが Inertia に対応していることからも、Laravel エコシステムにおける Inertia の位置づけは確立されています。Livewire がPHPだけで動的UIを作るアプローチなら、Inertia はJavaScriptフレームワークのパワーをサーバー側のシンプルさを損なわずに使えるアプローチです。
+
+どちらを選ぶかはチームのスキルセットとプロジェクトの要件次第ですが、「LaravelのコントローラーをそのままにReactで画面を作りたい」という場面では Inertia が最も自然な選択です。
+
+<Card title="Inertia.js公式ドキュメント" icon="book-open" href="https://inertiajs.com">
+  SSR・部分リロード・遅延プロップなど、Inertia v3の全機能については公式ドキュメントを参照してください。
+</Card>

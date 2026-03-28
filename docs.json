@@ -272,7 +272,9 @@
                 "group": "パッケージ紹介",
                 "pages": [
                   "jp/blog/laravel-pennant",
-                  "jp/blog/livewire-introduction"
+                  "jp/blog/livewire-introduction",
+                  "jp/blog/pest-introduction",
+                  "jp/blog/inertia-introduction"
                 ]
               },
               {
