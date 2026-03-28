@@ -1,0 +1,353 @@
+---
+title: "Laravel 11から12へのアップグレードガイド"
+description: "Laravel 11から12へのアップグレード手順と主な変更点を解説します"
+---
+
+## はじめに
+
+Laravel 12 は 2025年2月にリリースされました。このガイドでは Laravel 11.x から 12.x へのアップグレード手順を説明します。
+
+<Info>
+  アップグレードに必要な推定時間は **約5分** です。ただし、破壊的変更がアプリケーションに与える影響は規模や使用している機能によって異なります。
+</Info>
+
+### Laravel Shift を使った自動アップグレード
+
+[Laravel Shift](https://laravelshift.com/) を使ってアップグレードを自動化することもできます。Shift はアプリケーションの依存関係や設定ファイルを自動的に更新してくれます。
+
+---
+
+## 影響度別の変更点
+
+### 影響度: 高
+
+- 依存関係の更新
+- Laravel インストーラーの更新
+
+### 影響度: 中
+
+- Eloquent `HasUuids` トレイトと UUIDv7
+
+### 影響度: 低
+
+- Carbon 3
+- Concurrency の結果インデックスマッピング
+- コンテナのクラス依存解決
+- 画像バリデーションの SVG 除外
+- ローカルファイルシステムディスクのデフォルトルートパス
+- マルチスキーマのデータベースインスペクション
+- ネストされた配列リクエストのマージ
+
+---
+
+## アップグレード手順
+
+### 依存関係の更新
+
+**影響度: 高**
+
+`composer.json` の以下の依存関係を更新してください。
+
+```json
+{
+  "require": {
+    "laravel/framework": "^12.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.0",
+    "pestphp/pest": "^3.0"
+  }
+}
+```
+
+更新後、以下のコマンドで依存関係をインストールします。
+
+```shell
+composer update
+```
+
+---
+
+### Laravel インストーラーの更新
+
+**影響度: 高**
+
+Laravel インストーラー CLI を使って新しい Laravel アプリケーションを作成する場合は、Laravel 12.x および[新しいスターターキット](https://laravel.com/starter-kits)に対応したバージョンに更新してください。
+
+`composer global require` でインストールした場合:
+
+```shell
+composer global update laravel/installer
+```
+
+`php.new` でインストールした場合は、OS に合わせて再インストールコマンドを実行してください。
+
+```shell tab=macOS
+/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.4)"
+```
+
+```shell tab=Windows PowerShell
+# 管理者として実行
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.4'))
+```
+
+```shell tab=Linux
+/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.4)"
+```
+
+[Laravel Herd](https://herd.laravel.com) のバンドル版を使用している場合は、Herd 自体を最新リリースに更新してください。
+
+---
+
+## 新スターターキット
+
+Laravel 12 では、従来の Breeze や Jetstream に代わる新しいスターターキットが導入されました。`laravel new` を実行すると、フロントエンドスタックを対話的に選択できます。
+
+利用可能なスターターキット:
+
+- **React** — Inertia 2、React 19、TypeScript、Tailwind 4、shadcn/ui
+- **Vue** — Inertia 2、Vue Composition API、TypeScript、Tailwind 4、shadcn-vue
+- **Svelte** — Inertia 2、Svelte 5、TypeScript、Tailwind 4、shadcn-svelte
+- **Livewire** — Livewire、Tailwind 4、Flux UI
+
+```shell
+laravel new my-app
+```
+
+コマンドを実行するとスターターキットの選択が促されます。選択後は依存関係をインストールして開発サーバーを起動するだけです。
+
+```shell
+cd my-app
+npm install && npm run build
+composer run dev
+```
+
+<Info>
+  既存のアプリケーションをアップグレードする場合、スターターキットを導入し直す必要はありません。新規プロジェクト向けの変更です。
+</Info>
+
+---
+
+## 破壊的変更 (Breaking Changes)
+
+### Eloquent
+
+#### `HasUuids` トレイトと UUIDv7
+
+**影響度: 中**
+
+`HasUuids` トレイトが UUID v7 (順序付き UUID) を返すようになりました。以前の順序付き UUID v4 の動作を維持したい場合は、`HasVersion4Uuids` トレイトに切り替えてください。
+
+```php
+use Illuminate\Database\Eloquent\Concerns\HasUuids; // [tl! remove]
+use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids; // [tl! add]
+```
+
+以前から `HasVersion7Uuids` トレイトを使用していた場合は、`HasUuids` トレイトに変更してください（同じ動作になりました）。
+
+---
+
+### バリデーション
+
+#### 画像バリデーションの SVG 除外
+
+**影響度: 低**
+
+`image` バリデーションルールがデフォルトで SVG を許可しなくなりました。SVG を許可する場合は明示的に指定してください。
+
+```php
+use Illuminate\Validation\Rules\File;
+
+'photo' => 'required|image:allow_svg'
+
+// または
+'photo' => ['required', File::image(allowSvg: true)],
+```
+
+---
+
+### ストレージ
+
+#### ローカルファイルシステムディスクのデフォルトルートパス
+
+**影響度: 低**
+
+`filesystems` 設定で `local` ディスクを明示的に定義していない場合、デフォルトのルートパスが `storage/app` から `storage/app/private` に変更されました。
+
+以前の動作を維持するには、設定ファイルで `local` ディスクを明示的に定義してください。
+
+```php
+// config/filesystems.php
+'local' => [
+    'driver' => 'local',
+    'root' => storage_path('app'),
+],
+```
+
+---
+
+### データベース
+
+#### マルチスキーマのデータベースインスペクション
+
+**影響度: 低**
+
+`Schema::getTables()`、`Schema::getViews()`、`Schema::getTypes()` がデフォルトですべてのスキーマの結果を返すようになりました。特定のスキーマのみを対象にするには `schema` 引数を渡してください。
+
+```php
+// すべてのスキーマのテーブル
+$tables = Schema::getTables();
+
+// 'main' スキーマのテーブルのみ
+$tables = Schema::getTables(schema: 'main');
+```
+
+`Schema::getTableListing()` がデフォルトでスキーマ修飾されたテーブル名を返すようになりました。
+
+```php
+$tables = Schema::getTableListing();
+// ['main.migrations', 'main.users', 'blog.posts']
+
+$tables = Schema::getTableListing(schema: 'main', schemaQualified: false);
+// ['migrations', 'users']
+```
+
+#### データベースコンストラクターシグネチャの変更
+
+**影響度: 非常に低**
+
+`Illuminate\Database\Schema\Blueprint` と `Illuminate\Database\Grammar` のコンストラクターが `Connection` インスタンスを第一引数として要求するようになりました。
+
+```php
+// Laravel <= 11.x
+$grammar = new MySqlGrammar;
+$grammar->setConnection($connection);
+
+// Laravel >= 12.x
+$grammar = new MySqlGrammar($connection);
+```
+
+また、以下の API が削除または非推奨になりました。
+
+| API | 状態 |
+|-----|------|
+| `Blueprint::getPrefix()` | 非推奨 |
+| `Connection::withTablePrefix()` | 削除 |
+| `Grammar::getTablePrefix()` / `setTablePrefix()` | 非推奨 |
+| `Grammar::setConnection()` | 削除 |
+
+テーブルプレフィックスはコネクションから直接取得してください。
+
+```php
+$prefix = $connection->getTablePrefix();
+```
+
+---
+
+### Concurrency
+
+#### 結果インデックスマッピング
+
+**影響度: 低**
+
+`Concurrency::run()` に連想配列を渡した場合、結果がそれぞれのキーと対応して返されるようになりました。
+
+```php
+$result = Concurrency::run([
+    'task-1' => fn () => 1 + 1,
+    'task-2' => fn () => 2 + 2,
+]);
+
+// ['task-1' => 2, 'task-2' => 4]
+```
+
+---
+
+### コンテナ
+
+#### クラス依存解決のデフォルト値
+
+**影響度: 低**
+
+DIコンテナが、クラスインスタンスを解決する際にクラスプロパティのデフォルト値を尊重するようになりました。
+
+```php
+class Example
+{
+    public function __construct(public ?Carbon $date = null) {}
+}
+
+$example = resolve(Example::class);
+
+// Laravel <= 11.x: Carbon インスタンスを返す
+// Laravel >= 12.x: null を返す
+```
+
+---
+
+### リクエスト
+
+#### ネストされた配列リクエストのマージ
+
+**影響度: 低**
+
+`$request->mergeIfMissing()` でドット記法を使ったネストされた配列データをマージできるようになりました。以前はドット記法のキーがそのまま最上位のキーとして作成されていました。
+
+```php
+$request->mergeIfMissing([
+    'user.last_name' => 'Otwell',
+]);
+```
+
+---
+
+### ルーティング
+
+#### ルートの優先順位
+
+**影響度: 低**
+
+同じ名前を持つ複数のルートがある場合の動作が、キャッシュあり・なしで統一されました。キャッシュなしのルーティングでも、最後ではなく最初に登録されたルートが優先されるようになりました。
+
+---
+
+### 認証
+
+#### `DatabaseTokenRepository` コンストラクターの変更
+
+**影響度: 非常に低**
+
+`Illuminate\Auth\Passwords\DatabaseTokenRepository` のコンストラクターが `$expires` パラメーターを分単位ではなく秒単位で受け取るようになりました。
+
+---
+
+### Carbon 3
+
+**影響度: 低**
+
+Carbon 2.x のサポートが削除されました。Laravel 12 のアプリケーションはすべて [Carbon 3.x](https://carbon.nesbot.com/guide/getting-started/migration.html) が必要です。
+
+---
+
+## まとめ
+
+Laravel 12 は比較的スムーズにアップグレードできるバージョンです。主な注意点をまとめます。
+
+| 変更点 | 影響度 | 対応 |
+|--------|--------|------|
+| `composer.json` の依存関係更新 | 高 | `laravel/framework ^12.0` に変更 |
+| Laravel インストーラーの更新 | 高 | `composer global update` |
+| `HasUuids` → UUIDv7 | 中 | 必要なら `HasVersion4Uuids` に切り替え |
+| `image` バリデーションの SVG 除外 | 低 | SVG を許可する場合は `allow_svg` を追加 |
+| ローカルディスクのデフォルトルート変更 | 低 | 設定ファイルで明示的に指定 |
+| Carbon 3 必須 | 低 | API 互換性を確認 |
+
+---
+
+## 参考資料
+
+- [公式アップグレードガイド (英語)](https://laravel.com/docs/12.x/upgrade)
+- [laravel/laravel リポジトリの差分 (11.x → 12.x)](https://github.com/laravel/laravel/compare/11.x...12.x)
+- [新しいスターターキット](https://laravel.com/starter-kits)
+- [Laravel Shift](https://laravelshift.com) — アップグレードを自動化するコミュニティサービス
+- [Carbon 3 移行ガイド](https://carbon.nesbot.com/guide/getting-started/migration.html)
