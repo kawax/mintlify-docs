@@ -1,0 +1,365 @@
+---
+title: "Testing"
+description: "Write automated tests for your Laravel application using Pest or PHPUnit."
+---
+
+## Why write tests?
+
+Tests verify that your code behaves as expected and alert you when changes break existing functionality. In team projects, a good test suite lets everyone refactor and ship with confidence.
+
+Laravel has first-class support for testing built in. Every new project ships with a `phpunit.xml` configuration file and a `tests/` directory, and supports both [Pest](https://pestphp.com) and [PHPUnit](https://phpunit.de/).
+
+<Tip>
+  Pest is built on top of PHPUnit and offers a more concise, readable syntax. If you're just getting started with testing, Pest is the recommended choice.
+</Tip>
+
+## The `tests/` directory
+
+```
+tests/
+├── Feature/      # Feature tests
+│   └── ExampleTest.php
+├── Unit/         # Unit tests
+│   └── ExampleTest.php
+└── TestCase.php
+```
+
+- **`Feature/`** — Tests that cover larger units of functionality, including HTTP requests. Most of your tests will live here.
+- **`Unit/`** — Tests for individual classes or methods in isolation. The Laravel application is not booted, so these tests cannot use the database or other framework features.
+
+## Creating tests
+
+Use the `make:test` Artisan command to generate a new test file:
+
+```shell
+# Create a feature test (default)
+php artisan make:test PostTest
+
+# Create a unit test
+php artisan make:test PostTest --unit
+```
+
+## Running tests
+
+Run all tests with:
+
+```shell
+php artisan test
+```
+
+You can also run `vendor/bin/pest` or `vendor/bin/phpunit` directly, but `php artisan test` produces more readable output.
+
+Useful options:
+
+```shell
+# Run only feature tests
+php artisan test --testsuite=Feature
+
+# Stop on the first failure
+php artisan test --stop-on-failure
+```
+
+## Writing tests
+
+### Basic assertions
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('true is true', function () {
+    expect(true)->toBeTrue();
+});
+
+test('string contains expected text', function () {
+    $message = 'Hello, Laravel!';
+
+    expect($message)->toContain('Laravel');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Unit;
+
+use PHPUnit\Framework\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_true_is_true(): void
+    {
+        $this->assertTrue(true);
+    }
+
+    public function test_string_contains_laravel(): void
+    {
+        $message = 'Hello, Laravel!';
+
+        $this->assertStringContainsString('Laravel', $message);
+    }
+}
+```
+</CodeGroup>
+
+### Common assertions
+
+| Pest | PHPUnit | Description |
+| --- | --- | --- |
+| `expect($x)->toBe($y)` | `$this->assertSame($y, $x)` | Strictly equal |
+| `expect($x)->toEqual($y)` | `$this->assertEquals($y, $x)` | Equal (type-coerced) |
+| `expect($x)->toBeTrue()` | `$this->assertTrue($x)` | Is `true` |
+| `expect($x)->toBeFalse()` | `$this->assertFalse($x)` | Is `false` |
+| `expect($x)->toBeNull()` | `$this->assertNull($x)` | Is `null` |
+| `expect($x)->toContain($y)` | `$this->assertStringContainsString($y, $x)` | String contains value |
+| `expect($x)->toHaveCount($n)` | `$this->assertCount($n, $x)` | Collection has N items |
+
+## HTTP tests
+
+Laravel's HTTP testing tools let you simulate requests to your application without running a real HTTP server. This is done inside `Feature/` tests.
+
+### Testing a page response
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('home page returns 200', function () {
+    $response = $this->get('/');
+
+    $response->assertStatus(200);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_home_page_returns_200(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+}
+```
+</CodeGroup>
+
+### Testing CRUD operations
+
+Using a `Post` model as an example:
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Models\Post;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+test('post list page is accessible', function () {
+    Post::factory()->count(3)->create();
+
+    $response = $this->get('/posts');
+
+    $response->assertStatus(200);
+    $response->assertSee('Posts');
+});
+
+test('a post can be created', function () {
+    $response = $this->post('/posts', [
+        'title' => 'My first post',
+        'body'  => 'Hello, world!',
+    ]);
+
+    $response->assertRedirect('/posts');
+    $this->assertDatabaseHas('posts', ['title' => 'My first post']);
+});
+
+test('a post can be deleted', function () {
+    $post = Post::factory()->create();
+
+    $response = $this->delete("/posts/{$post->id}");
+
+    $response->assertRedirect('/posts');
+    $this->assertDatabaseMissing('posts', ['id' => $post->id]);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Post;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class PostTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_post_list_page_is_accessible(): void
+    {
+        Post::factory()->count(3)->create();
+
+        $response = $this->get('/posts');
+
+        $response->assertStatus(200);
+        $response->assertSee('Posts');
+    }
+
+    public function test_a_post_can_be_created(): void
+    {
+        $response = $this->post('/posts', [
+            'title' => 'My first post',
+            'body'  => 'Hello, world!',
+        ]);
+
+        $response->assertRedirect('/posts');
+        $this->assertDatabaseHas('posts', ['title' => 'My first post']);
+    }
+
+    public function test_a_post_can_be_deleted(): void
+    {
+        $post = Post::factory()->create();
+
+        $response = $this->delete("/posts/{$post->id}");
+
+        $response->assertRedirect('/posts');
+        $this->assertDatabaseMissing('posts', ['id' => $post->id]);
+    }
+}
+```
+</CodeGroup>
+
+### Useful response assertions
+
+| Method | Description |
+| --- | --- |
+| `assertStatus(200)` | Assert the response has the given status code |
+| `assertOk()` | Assert status code is 200 |
+| `assertRedirect('/path')` | Assert a redirect to the given URL |
+| `assertSee('text')` | Assert the response body contains the given text |
+| `assertDontSee('text')` | Assert the response body does not contain the text |
+| `assertJson([...])` | Assert the JSON response contains the given data |
+| `assertDatabaseHas('table', [...])` | Assert a record exists in the database |
+| `assertDatabaseMissing('table', [...])` | Assert a record does not exist in the database |
+
+<Info>
+  The `RefreshDatabase` trait resets the database after each test, preventing data from one test leaking into another.
+</Info>
+
+## Testing authenticated routes
+
+Use `actingAs()` to authenticate a user for a test:
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+test('authenticated users can view the dashboard', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('/dashboard');
+
+    $response->assertStatus(200);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class DashboardTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_authenticated_users_can_view_the_dashboard(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertStatus(200);
+    }
+}
+```
+</CodeGroup>
+
+## Test environment configuration
+
+### `phpunit.xml`
+
+The `phpunit.xml` file at the project root configures the test environment. By default, the session and cache use the `array` driver so data is not persisted between requests:
+
+```xml
+<env name="APP_ENV" value="testing"/>
+<env name="CACHE_STORE" value="array"/>
+<env name="SESSION_DRIVER" value="array"/>
+```
+
+For database tests, use an in-memory SQLite database to keep tests fast and self-contained:
+
+```xml
+<env name="DB_CONNECTION" value="sqlite"/>
+<env name="DB_DATABASE" value=":memory:"/>
+```
+
+### `.env.testing`
+
+Create a `.env.testing` file at the project root to override environment variables specifically for the test environment. Laravel loads this file instead of `.env` when running tests:
+
+```ini
+APP_ENV=testing
+DB_CONNECTION=sqlite
+DB_DATABASE=:memory:
+```
+
+<Warning>
+  If you have cached your configuration, run `php artisan config:clear` before running tests. Stale cache can cause your test environment variables to be ignored.
+</Warning>
+
+## Running tests in parallel
+
+As your test suite grows, execution time increases. The `--parallel` flag runs tests across multiple processes simultaneously. First install the `brianium/paratest` package, then use the flag:
+
+```shell
+composer require brianium/paratest --dev
+```
+
+```shell
+php artisan test --parallel
+```
+
+By default, Laravel creates one process per CPU core. Control this with `--processes`:
+
+```shell
+php artisan test --parallel --processes=4
+```
+
+<Tip>
+  Parallel tests require each process to have its own isolated database. Using `RefreshDatabase` with in-memory SQLite (configured in `phpunit.xml`) satisfies this requirement automatically.
+</Tip>
+
+## Next steps
+
+<Card title="HTTP testing" icon="arrow-right" href="https://laravel.com/docs/http-tests">
+  Explore advanced HTTP testing — authenticated requests, JSON assertions, file uploads, and more — in the official Laravel documentation.
+</Card>

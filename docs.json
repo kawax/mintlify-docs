@@ -221,7 +221,9 @@
               {
                 "group": "Getting Started",
                 "pages": [
-                  "en/tutorial/installation"
+                  "en/tutorial/introduction",
+                  "en/tutorial/installation",
+                  "en/tutorial/directory-structure"
                 ]
               },
               {
@@ -231,14 +233,32 @@
                   "en/tutorial/views",
                   "en/tutorial/blade",
                   "en/tutorial/controllers",
-                  "en/tutorial/validation"
+                  "en/tutorial/middleware",
+                  "en/tutorial/requests",
+                  "en/tutorial/validation",
+                  "en/tutorial/responses",
+                  "en/tutorial/session"
                 ]
               },
               {
                 "group": "Database",
                 "pages": [
                   "en/tutorial/migrations",
-                  "en/tutorial/eloquent"
+                  "en/tutorial/eloquent",
+                  "en/tutorial/eloquent-relationships"
+                ]
+              },
+              {
+                "group": "Authentication",
+                "pages": [
+                  "en/tutorial/authentication",
+                  "en/tutorial/starter-kits"
+                ]
+              },
+              {
+                "group": "Testing and Deployment",
+                "pages": [
+                  "en/tutorial/testing"
                 ]
               }
             ]

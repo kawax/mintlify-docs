@@ -1,0 +1,315 @@
+---
+title: "Middleware"
+description: "Use Laravel middleware to inspect and filter HTTP requests before they reach your controllers."
+---
+
+## What is middleware?
+
+Middleware provides a convenient way to inspect and filter HTTP requests entering your application. For example, Laravel includes middleware that verifies whether a user is authenticated. If not, the middleware redirects them to the login page. If they are authenticated, the request is allowed to proceed.
+
+Beyond authentication, you can write middleware for logging, CSRF protection, rate limiting, and much more.
+
+<Info>
+  User-defined middleware lives in the `app/Http/Middleware` directory.
+</Info>
+
+## Built-in middleware
+
+Laravel ships with two default middleware groups: `web` and `api`. The `web` group is automatically applied to routes in `routes/web.php`, and the `api` group to routes in `routes/api.php`.
+
+| `web` middleware group |
+| --- |
+| `EncryptCookies` |
+| `AddQueuedCookiesToResponse` |
+| `StartSession` |
+| `ShareErrorsFromSession` |
+| `PreventRequestForgery` (CSRF) |
+| `SubstituteBindings` |
+
+Commonly used middleware also have short aliases:
+
+| Alias | Middleware |
+| --- | --- |
+| `auth` | `Illuminate\Auth\Middleware\Authenticate` |
+| `guest` | `Illuminate\Auth\Middleware\RedirectIfAuthenticated` |
+| `verified` | `Illuminate\Auth\Middleware\EnsureEmailIsVerified` |
+| `throttle` | `Illuminate\Routing\Middleware\ThrottleRequests` |
+
+## Creating middleware
+
+Use the `make:middleware` Artisan command to generate a new middleware class:
+
+```shell
+php artisan make:middleware EnsureTokenIsValid
+```
+
+This creates `app/Http/Middleware/EnsureTokenIsValid.php`. Write your filtering logic in the `handle` method:
+
+```php
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class EnsureTokenIsValid
+{
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     */
+    public function handle(Request $request, Closure $next): Response
+    {
+        if ($request->input('token') !== 'my-secret-token') {
+            return redirect('/home');
+        }
+
+        return $next($request);
+    }
+}
+```
+
+Calling `$next($request)` passes the request deeper into the application. To stop the request, return a redirect or response directly.
+
+### Before and after middleware
+
+Middleware can run logic **before** or **after** the request is handled:
+
+```php
+// Run logic before the request
+public function handle(Request $request, Closure $next): Response
+{
+    // Pre-processing here
+
+    return $next($request);
+}
+```
+
+```php
+// Run logic after the response
+public function handle(Request $request, Closure $next): Response
+{
+    $response = $next($request);
+
+    // Post-processing here
+
+    return $response;
+}
+```
+
+## Registering middleware
+
+### Global middleware
+
+To run middleware on every request, add it to the global stack in `bootstrap/app.php`:
+
+```php
+// bootstrap/app.php
+use App\Http\Middleware\EnsureTokenIsValid;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(EnsureTokenIsValid::class);
+    });
+```
+
+`append` adds the middleware at the end of the stack. Use `prepend` to add it at the beginning.
+
+### Assigning middleware to routes
+
+To apply middleware to specific routes, chain the `middleware` method on the route definition:
+
+```php
+use App\Http\Middleware\EnsureTokenIsValid;
+
+Route::get('/profile', function () {
+    // ...
+})->middleware(EnsureTokenIsValid::class);
+```
+
+Pass an array to apply multiple middleware at once:
+
+```php
+Route::get('/', function () {
+    // ...
+})->middleware([First::class, Second::class]);
+```
+
+To exclude a route from a middleware applied to a group, use `withoutMiddleware`:
+
+```php
+use App\Http\Middleware\EnsureTokenIsValid;
+
+Route::middleware([EnsureTokenIsValid::class])->group(function () {
+    Route::get('/', function () {
+        // Middleware applies here
+    });
+
+    Route::get('/profile', function () {
+        // Middleware excluded for this route
+    })->withoutMiddleware([EnsureTokenIsValid::class]);
+});
+```
+
+### Middleware aliases
+
+You can define short aliases for middleware class names in `bootstrap/app.php`:
+
+```php
+// bootstrap/app.php
+use App\Http\Middleware\EnsureUserIsSubscribed;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->alias([
+            'subscribed' => EnsureUserIsSubscribed::class,
+        ]);
+    });
+```
+
+Then reference the alias in route definitions:
+
+```php
+Route::get('/profile', function () {
+    // ...
+})->middleware('subscribed');
+```
+
+## Middleware groups
+
+Group multiple middleware under a single key to apply them together:
+
+```php
+// bootstrap/app.php
+use App\Http\Middleware\First;
+use App\Http\Middleware\Second;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->appendToGroup('group-name', [
+            First::class,
+            Second::class,
+        ]);
+    });
+```
+
+Apply the group to routes just like any other middleware:
+
+```php
+Route::get('/', function () {
+    // ...
+})->middleware('group-name');
+
+Route::middleware(['group-name'])->group(function () {
+    // ...
+});
+```
+
+To append middleware to the existing `web` or `api` groups, use the dedicated helpers:
+
+```php
+// bootstrap/app.php
+use App\Http\Middleware\EnsureUserIsSubscribed;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [
+            EnsureUserIsSubscribed::class,
+        ]);
+    });
+```
+
+## Middleware parameters
+
+Middleware can accept additional parameters. Add them to the `handle` method after the `$next` argument:
+
+```php
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class EnsureUserHasRole
+{
+    public function handle(Request $request, Closure $next, string $role): Response
+    {
+        if (! $request->user()->hasRole($role)) {
+            return redirect('/home');
+        }
+
+        return $next($request);
+    }
+}
+```
+
+Specify the parameter in the route definition by separating the middleware name and value with a colon:
+
+```php
+use App\Http\Middleware\EnsureUserHasRole;
+
+Route::put('/post/{id}', function (string $id) {
+    // ...
+})->middleware(EnsureUserHasRole::class.':editor');
+```
+
+Pass multiple parameters separated by commas:
+
+```php
+Route::put('/post/{id}', function (string $id) {
+    // ...
+})->middleware(EnsureUserHasRole::class.':editor,publisher');
+```
+
+## Example: authentication check
+
+A simple example that redirects unauthenticated users:
+
+```shell
+php artisan make:middleware RedirectIfNotAuthenticated
+```
+
+```php
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class RedirectIfNotAuthenticated
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        if (! $request->user()) {
+            return redirect('/login');
+        }
+
+        return $next($request);
+    }
+}
+```
+
+Apply it to a route:
+
+```php
+Route::get('/dashboard', function () {
+    return view('dashboard');
+})->middleware(RedirectIfNotAuthenticated::class);
+```
+
+<Tip>
+  Laravel ships with an `auth` middleware that handles this pattern already. Before writing your own, check whether the built-in middleware meets your needs.
+</Tip>
+
+## Next steps
+
+<Card title="HTTP requests" icon="globe" href="/en/tutorial/requests">
+  Learn how to retrieve request data in your controllers.
+</Card>
