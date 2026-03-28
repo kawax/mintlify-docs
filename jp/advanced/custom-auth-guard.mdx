@@ -1,0 +1,761 @@
+---
+title: "カスタム認証ガードの実装"
+description: "Laravelの認証システムの内部構造を理解し、Guard・StatefulGuardインターフェースを実装してカスタム認証ガードを作る方法をフレームワークのソースコードレベルで解説します。"
+---
+
+## Laravelの認証システムの内部構造
+
+### `Auth` ファサードと `AuthManager`
+
+`Auth` ファサードは `Illuminate\Auth\AuthManager` のプロキシです。`AuthManager` はドライバーパターンで複数のガードを管理し、`config/auth.php` の設定に基づいて適切なガードインスタンスを生成・キャッシュします。
+
+```php
+// Auth::guard('web') の内部動作（AuthManager::guard() の簡略版）
+public function guard($name = null)
+{
+    $name = $name ?: $this->getDefaultDriver();
+
+    return $this->guards[$name] ?? ($this->guards[$name] = $this->resolve($name));
+}
+```
+
+`resolve()` は `config/auth.php` の `guards` 配列から `driver` キーを読み取り、対応するファクトリークロージャを呼び出します。組み込みの `session` や `token` ドライバーも同じ仕組みで登録されています。
+
+### `Guard` インターフェースと `StatefulGuard` インターフェースの違い
+
+Laravelの認証ガードは `Illuminate\Contracts\Auth\Guard` を最低限実装する必要があります。セッションを維持する必要がある場合は `StatefulGuard` を実装します。
+
+<Accordion title="Guard インターフェース（Illuminate\Contracts\Auth\Guard）">
+```php
+interface Guard
+{
+    // 認証済みユーザーが存在するか確認する
+    public function check();
+
+    // ゲスト（未認証）かどうか確認する
+    public function guest();
+
+    // 現在の認証済みユーザーを返す（未認証なら null）
+    public function user();
+
+    // 現在の認証済みユーザーのIDを返す
+    public function id();
+
+    // 指定したクレデンシャルが有効かどうか確認する（ログインは行わない）
+    public function validate(array $credentials = []);
+
+    // ユーザーがセットされているか確認する（未ログインでも setUser で注入できる）
+    public function hasUser();
+
+    // 認証済みユーザーを手動でセットする
+    public function setUser(Authenticatable $user);
+}
+```
+</Accordion>
+
+<Accordion title="StatefulGuard インターフェース（Illuminate\Contracts\Auth\StatefulGuard）">
+`StatefulGuard` は `Guard` を継承し、セッションやクッキーを使ったログイン状態の維持に必要なメソッドを追加します。
+
+```php
+interface StatefulGuard extends Guard
+{
+    // クレデンシャルを検証してログインする（remember フラグあり）
+    public function attempt(array $credentials = [], $remember = false);
+
+    // セッションを保存せずに1リクエストだけ認証する
+    public function once(array $credentials = []);
+
+    // ユーザーインスタンスを直接ログインさせる
+    public function login(Authenticatable $user, $remember = false);
+
+    // IDを指定してログインする
+    public function loginUsingId($id, $remember = false);
+
+    // IDを指定して1リクエストだけ認証する
+    public function onceUsingId($id);
+
+    // 「ログイン状態を保持」クッキーでログインしたか確認する
+    public function viaRemember();
+
+    // ログアウトする
+    public function logout();
+}
+```
+</Accordion>
+
+<Info>
+  API認証や独自トークン認証など、セッションが不要なガードは `Guard` だけを実装すればよいです。管理者ログインのようにセッションが必要な場合は `StatefulGuard` を実装します。
+</Info>
+
+## カスタムガードの実装
+
+### `GuardHelpers` トレイト
+
+`Guard` インターフェースの `check()`、`guest()`、`id()`、`hasUser()` はほぼ共通の実装になるため、Laravelは `Illuminate\Auth\GuardHelpers` トレイトを提供しています。このトレイトを使うと、必須実装を `user()` と `validate()` の2メソッドに絞れます。
+
+```php
+// GuardHelpers が提供するデフォルト実装（抜粋）
+trait GuardHelpers
+{
+    protected $user;
+
+    public function check(): bool
+    {
+        return ! is_null($this->user());
+    }
+
+    public function guest(): bool
+    {
+        return ! $this->check();
+    }
+
+    public function id(): mixed
+    {
+        return $this->user()?->getAuthIdentifier();
+    }
+
+    public function hasUser(): bool
+    {
+        return ! is_null($this->user);
+    }
+
+    public function setUser(Authenticatable $user): static
+    {
+        $this->user = $user;
+        return $this;
+    }
+}
+```
+
+### APIトークン認証ガードの実装例
+
+`TokenGuard` の設計に倣い、シンプルなAPIトークン認証ガードを実装します。リクエストヘッダーまたはクエリパラメータからトークンを取得し、`UserProvider` を通してユーザーを解決します。
+
+<Steps>
+  <Step title="ガードクラスを作成する">
+    `app/Auth` ディレクトリにガードクラスを作成します。
+
+    ```php
+    <?php
+
+    namespace App\Auth;
+
+    use Illuminate\Auth\GuardHelpers;
+    use Illuminate\Contracts\Auth\Guard;
+    use Illuminate\Contracts\Auth\UserProvider;
+    use Illuminate\Http\Request;
+
+    class ApiTokenGuard implements Guard
+    {
+        use GuardHelpers;
+
+        protected Request $request;
+
+        public function __construct(UserProvider $provider, Request $request)
+        {
+            $this->provider = $provider;
+            $this->request = $request;
+        }
+
+        /**
+         * 現在の認証済みユーザーを返す
+         */
+        public function user(): ?\Illuminate\Contracts\Auth\Authenticatable
+        {
+            // キャッシュ済みのユーザーがあれば返す
+            if (! is_null($this->user)) {
+                return $this->user;
+            }
+
+            $token = $this->getTokenForRequest();
+
+            if (empty($token)) {
+                return null;
+            }
+
+            // UserProvider 経由でユーザーを取得する
+            $this->user = $this->provider->retrieveByCredentials([
+                'api_token' => $token,
+            ]);
+
+            return $this->user;
+        }
+
+        /**
+         * クレデンシャルの検証のみ行う（ログインはしない）
+         */
+        public function validate(array $credentials = []): bool
+        {
+            if (empty($credentials['api_token'])) {
+                return false;
+            }
+
+            return (bool) $this->provider->retrieveByCredentials($credentials);
+        }
+
+        /**
+         * リクエストからトークンを取得する
+         *
+         * 優先順位: Bearer ヘッダー → クエリパラメータ → リクエストボディ
+         */
+        protected function getTokenForRequest(): ?string
+        {
+            $token = $this->request->bearerToken();
+
+            if (empty($token)) {
+                $token = $this->request->query('api_token');
+            }
+
+            if (empty($token)) {
+                $token = $this->request->input('api_token');
+            }
+
+            return $token ?: null;
+        }
+
+        /**
+         * リクエストインスタンスを差し替える
+         */
+        public function setRequest(Request $request): static
+        {
+            $this->request = $request;
+            return $this;
+        }
+    }
+    ```
+  </Step>
+  <Step title="サービスプロバイダーでガードを登録する">
+    `AppServiceProvider` の `boot()` メソッドで `Auth::extend()` を使ってガードを登録します。
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Auth\ApiTokenGuard;
+    use Illuminate\Contracts\Foundation\Application;
+    use Illuminate\Support\Facades\Auth;
+    use Illuminate\Support\ServiceProvider;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            Auth::extend('api-token', function (Application $app, string $name, array $config) {
+                // Auth::createUserProvider() で config の provider を解決する
+                $provider = Auth::createUserProvider($config['provider'] ?? 'users');
+
+                return new ApiTokenGuard($provider, $app->make('request'));
+            });
+        }
+    }
+    ```
+
+    <Info>
+      `Auth::createUserProvider()` は `config/auth.php` の `providers` 設定を読み取り、対応する `UserProvider` インスタンスを返します。独自プロバイダーを作らない限り、この呼び出し方で標準の `EloquentUserProvider` を使えます。
+    </Info>
+  </Step>
+  <Step title="config/auth.php でガードを設定する">
+    `config/auth.php` に新しいガードを追加します。
+
+    ```php
+    'guards' => [
+        'web' => [
+            'driver'   => 'session',
+            'provider' => 'users',
+        ],
+
+        // 追加したカスタムガード
+        'api' => [
+            'driver'   => 'api-token', // Auth::extend() の第1引数と一致させる
+            'provider' => 'users',
+        ],
+    ],
+    ```
+  </Step>
+  <Step title="ルートにガードを適用する">
+    `auth` ミドルウェアにガード名を指定します。
+
+    ```php
+    // routes/api.php
+    use Illuminate\Support\Facades\Route;
+
+    Route::middleware('auth:api')->group(function () {
+        Route::get('/user', function () {
+            return auth()->user();
+        });
+
+        Route::get('/posts', [\App\Http\Controllers\PostController::class, 'index']);
+    });
+    ```
+
+    コントローラーやコード内で特定のガードを使うには `Auth::guard('api')` または `auth('api')` を呼び出します。
+
+    ```php
+    $user = Auth::guard('api')->user();
+    ```
+  </Step>
+</Steps>
+
+## クロージャによる簡易ガード
+
+`Auth::viaRequest()` を使うと、クラスを作らずクロージャだけでシンプルなガードを定義できます。プロトタイプや非常にシンプルな認証に向いています。
+
+```php
+use Illuminate\Http\Request;
+use App\Models\User;
+
+// AppServiceProvider::boot() 内
+Auth::viaRequest('custom-token', function (Request $request): ?User {
+    $token = $request->bearerToken();
+
+    if (empty($token)) {
+        return null;
+    }
+
+    return User::where('api_token', $token)->first();
+});
+```
+
+`config/auth.php` での設定：
+
+```php
+'guards' => [
+    'api' => [
+        'driver' => 'custom-token',
+    ],
+],
+```
+
+<Warning>
+  `Auth::viaRequest()` で定義したガードは `UserProvider` を使わないため、`retrieveById()` などのプロバイダーメソッドが機能しません。本番環境では `Auth::extend()` を使ったクラスベースのガードを推奨します。
+</Warning>
+
+## カスタム `UserProvider` の実装
+
+ユーザー情報をデータベース以外のソース（外部API、LDAPなど）から取得する場合は、`Illuminate\Contracts\Auth\UserProvider` インターフェースを実装します。
+
+```php
+<?php
+
+namespace App\Auth;
+
+use App\Models\User;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\UserProvider;
+
+class ApiUserProvider implements UserProvider
+{
+    public function __construct(
+        protected string $apiBaseUrl,
+        protected string $model = User::class,
+    ) {}
+
+    /**
+     * IDでユーザーを取得する
+     */
+    public function retrieveById(mixed $identifier): ?Authenticatable
+    {
+        return ($this->model)::find($identifier);
+    }
+
+    /**
+     * 「ログイン状態を保持」トークンでユーザーを取得する
+     * セッションを使わないガードでは null を返すだけでよい
+     */
+    public function retrieveByToken(mixed $identifier, string $token): ?Authenticatable
+    {
+        return null;
+    }
+
+    /**
+     * 「ログイン状態を保持」トークンを更新する
+     * セッションを使わないガードでは何もしなくてよい
+     */
+    public function updateRememberToken(Authenticatable $user, string $token): void {}
+
+    /**
+     * クレデンシャルでユーザーを取得する
+     * ガードの validate() と user() から呼ばれる
+     */
+    public function retrieveByCredentials(array $credentials): ?Authenticatable
+    {
+        if (empty($credentials['api_token'])) {
+            return null;
+        }
+
+        // 外部APIでトークンを検証してユーザー情報を取得する例
+        $response = \Illuminate\Support\Facades\Http::withToken($credentials['api_token'])
+            ->get("{$this->apiBaseUrl}/auth/me");
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $data = $response->json();
+
+        // ローカルDBのユーザーと紐付けるか、動的にモデルを生成する
+        return User::firstOrCreate(
+            ['external_id' => $data['id']],
+            ['name' => $data['name'], 'email' => $data['email']],
+        );
+    }
+
+    /**
+     * 取得したユーザーのクレデンシャルを検証する
+     * トークン認証では retrieveByCredentials が成功すれば true でよい
+     */
+    public function validateCredentials(Authenticatable $user, array $credentials): bool
+    {
+        return true;
+    }
+
+    /**
+     * パスワード再ハッシュが必要かどうか確認する
+     * トークン認証では常に false でよい
+     */
+    public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false): void {}
+}
+```
+
+### カスタム `UserProvider` の登録
+
+```php
+// AppServiceProvider::boot()
+Auth::provider('api-user', function (Application $app, array $config) {
+    return new \App\Auth\ApiUserProvider(
+        config('services.auth_api.base_url'),
+        $config['model'] ?? \App\Models\User::class,
+    );
+});
+```
+
+`config/auth.php` の `providers` セクションに追加します：
+
+```php
+'providers' => [
+    'users' => [
+        'driver' => 'eloquent',
+        'model'  => App\Models\User::class,
+    ],
+
+    // カスタムプロバイダー
+    'api-users' => [
+        'driver' => 'api-user',
+        'model'  => App\Models\User::class,
+    ],
+],
+```
+
+ガードとプロバイダーを組み合わせます：
+
+```php
+'guards' => [
+    'api' => [
+        'driver'   => 'api-token',
+        'provider' => 'api-users', // カスタムプロバイダーを指定
+    ],
+],
+```
+
+## 実践的なユースケース
+
+### マルチ認証（管理者と一般ユーザーで別ガード）
+
+<Steps>
+  <Step title="管理者モデルを作成する">
+    管理者用のEloquentモデルを用意します。`Authenticatable` を継承することで `Auth` システムと連携できます。
+
+    ```bash
+    php artisan make:model Admin -m
+    ```
+
+    ```php
+    <?php
+
+    namespace App\Models;
+
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+
+    class Admin extends Authenticatable
+    {
+        protected $fillable = ['name', 'email', 'password'];
+
+        protected $hidden = ['password', 'remember_token'];
+    }
+    ```
+  </Step>
+  <Step title="config/auth.php を設定する">
+    ```php
+    'guards' => [
+        'web' => [
+            'driver'   => 'session',
+            'provider' => 'users',
+        ],
+        'admin' => [
+            'driver'   => 'session',
+            'provider' => 'admins', // 管理者用プロバイダー
+        ],
+    ],
+
+    'providers' => [
+        'users' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\User::class,
+        ],
+        'admins' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\Admin::class, // 管理者モデル
+        ],
+    ],
+    ```
+  </Step>
+  <Step title="ルートとミドルウェアを設定する">
+    ```php
+    // routes/web.php
+
+    // 一般ユーザー用ルート（デフォルトの web ガード）
+    Route::middleware('auth')->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'index']);
+    });
+
+    // 管理者用ルート（admin ガード）
+    Route::prefix('admin')->middleware('auth:admin')->group(function () {
+        Route::get('/dashboard', [AdminDashboardController::class, 'index']);
+    });
+    ```
+  </Step>
+  <Step title="ガードを指定してログイン処理を書く">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers\Admin;
+
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\Auth;
+
+    class LoginController extends Controller
+    {
+        public function store(Request $request)
+        {
+            $credentials = $request->validate([
+                'email'    => 'required|email',
+                'password' => 'required',
+            ]);
+
+            // admin ガードを明示して attempt する
+            if (Auth::guard('admin')->attempt($credentials)) {
+                $request->session()->regenerate();
+                return redirect()->intended('/admin/dashboard');
+            }
+
+            return back()->withErrors(['email' => 'ログイン情報が正しくありません。']);
+        }
+
+        public function destroy(Request $request)
+        {
+            Auth::guard('admin')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect('/admin/login');
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+### JWTトークンによる外部API認証
+
+外部のJWT認証サービスを使う場合のカスタムガード実装例です。
+
+```php
+<?php
+
+namespace App\Auth;
+
+use App\Models\User;
+use Illuminate\Auth\GuardHelpers;
+use Illuminate\Contracts\Auth\Guard;
+use Illuminate\Contracts\Auth\UserProvider;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+
+class JwtGuard implements Guard
+{
+    use GuardHelpers;
+
+    protected Request $request;
+    protected ?array $payload = null;
+
+    public function __construct(UserProvider $provider, Request $request)
+    {
+        $this->provider = $provider;
+        $this->request  = $request;
+    }
+
+    public function user(): ?\Illuminate\Contracts\Auth\Authenticatable
+    {
+        if (! is_null($this->user)) {
+            return $this->user;
+        }
+
+        $token = $this->request->bearerToken();
+
+        if (empty($token)) {
+            return null;
+        }
+
+        // 外部サービスでJWTを検証する
+        $payload = $this->verifyToken($token);
+
+        if (is_null($payload)) {
+            return null;
+        }
+
+        $this->payload = $payload;
+
+        $this->user = $this->provider->retrieveById($payload['sub']);
+
+        return $this->user;
+    }
+
+    public function validate(array $credentials = []): bool
+    {
+        if (empty($credentials['token'])) {
+            return false;
+        }
+
+        return ! is_null($this->verifyToken($credentials['token']));
+    }
+
+    /**
+     * JWTの検証と payload の取得
+     */
+    protected function verifyToken(string $token): ?array
+    {
+        $response = Http::withToken($token)
+            ->get(config('services.auth.verify_url'));
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        return $response->json();
+    }
+
+    /**
+     * 検証済みのJWT payload を返す
+     */
+    public function payload(): ?array
+    {
+        return $this->payload;
+    }
+}
+```
+
+`AppServiceProvider` での登録：
+
+```php
+Auth::extend('jwt', function (Application $app, string $name, array $config) {
+    return new \App\Auth\JwtGuard(
+        Auth::createUserProvider($config['provider'] ?? 'users'),
+        $app->make('request'),
+    );
+});
+```
+
+<Tip>
+  `Auth::guard('jwt')->payload()` のように、カスタムガード固有のメソッドにもアクセスできます。`Auth::guard()` が返すのはガードインスタンスそのものなので、インターフェースにないメソッドも呼び出せます。
+</Tip>
+
+## テスト
+
+カスタムガードのユニットテストでは、`UserProvider` をモックしてガードの動作を確認します。
+
+```php
+<?php
+
+namespace Tests\Unit\Auth;
+
+use App\Auth\ApiTokenGuard;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\UserProvider;
+use Illuminate\Http\Request;
+use PHPUnit\Framework\MockObject\MockObject;
+use Tests\TestCase;
+
+class ApiTokenGuardTest extends TestCase
+{
+    private UserProvider&MockObject $provider;
+    private ApiTokenGuard $guard;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->provider = $this->createMock(UserProvider::class);
+    }
+
+    public function test_user_returns_null_when_no_token(): void
+    {
+        $request = Request::create('/');
+        $guard   = new ApiTokenGuard($this->provider, $request);
+
+        $this->assertNull($guard->user());
+    }
+
+    public function test_user_returns_user_with_valid_bearer_token(): void
+    {
+        $mockUser = $this->createMock(Authenticatable::class);
+
+        $this->provider
+            ->expects($this->once())
+            ->method('retrieveByCredentials')
+            ->with(['api_token' => 'valid-token'])
+            ->willReturn($mockUser);
+
+        $request = Request::create('/');
+        $request->headers->set('Authorization', 'Bearer valid-token');
+
+        $guard = new ApiTokenGuard($this->provider, $request);
+
+        $this->assertSame($mockUser, $guard->user());
+    }
+
+    public function test_check_returns_false_when_no_token(): void
+    {
+        $request = Request::create('/');
+        $guard   = new ApiTokenGuard($this->provider, $request);
+
+        $this->assertFalse($guard->check());
+    }
+
+    public function test_validate_returns_false_without_api_token_credential(): void
+    {
+        $request = Request::create('/');
+        $guard   = new ApiTokenGuard($this->provider, $request);
+
+        $this->assertFalse($guard->validate([]));
+    }
+}
+```
+
+`ActingAs` を使った機能テストでは、特定のガードにユーザーをセットできます。
+
+```php
+// 特定のガードでユーザーを認証してテストする
+$this->actingAs($user, 'api')
+    ->getJson('/api/user')
+    ->assertOk();
+```
+
+## 関連ページ
+
+<Card title="認証（入門）" icon="shield-check" href="/jp/tutorial/authentication">
+  スターターキットや標準的な認証フローを確認します。
+</Card>
+
+<Card title="サービスコンテナ" icon="box" href="/jp/intermediate/service-container">
+  ガード登録で使うサービスコンテナの仕組みを理解します。
+</Card>
