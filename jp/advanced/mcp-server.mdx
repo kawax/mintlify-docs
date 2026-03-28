@@ -1,0 +1,934 @@
+---
+title: "LaravelでMCPサーバーを作る"
+description: "laravel/mcp パッケージを使って本番運用できるMCPサーバーを構築する。ツール・リソース・プロンプトの実装から認証・テスト・デプロイまで、実践的な実装知識を解説します。"
+---
+
+## MCPサーバーとは（上級向け解説）
+
+**Model Context Protocol（MCP）** は、AIクライアント（Claude、Cursor、GitHub Copilotなど）とアプリケーションが標準化されたプロトコルで通信するための仕様です。MCP には3つの主要なプリミティブがあります。
+
+| プリミティブ | 役割 | 主な用途 |
+| --- | --- | --- |
+| **ツール（Tools）** | AIが呼び出せる関数 | データ操作、外部API連携、計算処理 |
+| **リソース（Resources）** | AIが読み込めるコンテキスト | ドキュメント、設定情報、動的データ |
+| **プロンプト（Prompts）** | 再利用可能なテンプレート | 定型クエリ、ワークフロー誘導 |
+
+LaravelでMCPサーバーを構築する利点は、Eloquent・キャッシュ・認証・バリデーションといったLaravelのエコシステムをそのまま活用できることです。
+
+<Info>
+  この上級ガイドでは実践的な実装に踏み込みます。基本的なMCPの概念については [中級: Laravel MCP](/jp/intermediate/mcp) を参照してください。
+</Info>
+
+## インストールと初期設定
+
+<Steps>
+  <Step title="パッケージをインストールする">
+    Composerでパッケージをインストールします。
+
+    ```shell
+    composer require laravel/mcp
+    ```
+  </Step>
+  <Step title="ルートファイルを公開する">
+    `vendor:publish` でMCPサーバーの登録場所となる `routes/ai.php` を生成します。
+
+    ```shell
+    php artisan vendor:publish --tag=ai-routes
+    ```
+  </Step>
+  <Step title="サーバークラスを生成する">
+    Artisanコマンドでサーバークラスを作成します。
+
+    ```shell
+    php artisan make:mcp-server DatabaseServer
+    ```
+
+    生成された `app/Mcp/Servers/DatabaseServer.php` にツール、リソース、プロンプトを登録します。
+  </Step>
+  <Step title="サーバーを登録する">
+    `routes/ai.php` でサーバーをルートに登録します。
+
+    <CodeGroup>
+      ```php Webサーバー
+      use App\Mcp\Servers\DatabaseServer;
+      use Laravel\Mcp\Facades\Mcp;
+
+      Mcp::web('/mcp/database', DatabaseServer::class);
+      ```
+
+      ```php ローカルサーバー
+      use App\Mcp\Servers\DatabaseServer;
+      use Laravel\Mcp\Facades\Mcp;
+
+      Mcp::local('database', DatabaseServer::class);
+      ```
+    </CodeGroup>
+
+    WebサーバーはHTTP POST経由でアクセスされます。ローカルサーバーはArtisanコマンドとして動作し、CLIベースのAIクライアントとの連携に使います。
+  </Step>
+</Steps>
+
+## ツールの実装
+
+ツールはAIクライアントが呼び出せる関数です。Laravelのサービスコンテナ、バリデーション、Eloquentをそのまま使えます。
+
+### ツールの作成
+
+```shell
+php artisan make:mcp-tool SearchUsersTool
+```
+
+生成されたクラスに `handle` メソッドと `schema` メソッドを実装します。
+
+### パラメータ定義（スキーマ）
+
+`schema` メソッドで `Illuminate\Contracts\JsonSchema\JsonSchema` ビルダーを使い、受け付けるパラメータを定義します。
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('ユーザーを名前またはメールアドレスで検索します。')]
+class SearchUsersTool extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $validated = $request->validate([
+            'query'   => 'required|string|max:100',
+            'limit'   => 'integer|min:1|max:50',
+            'role'    => 'nullable|string|in:admin,editor,viewer',
+        ], [
+            'query.required' => '検索キーワードを指定してください。例: "田中" や "tanaka@example.com"',
+            'limit.max'      => '取得件数は最大50件まで指定できます。',
+            'role.in'        => 'ロールは admin、editor、viewer のいずれかを指定してください。',
+        ]);
+
+        $users = \App\Models\User::query()
+            ->where(function ($q) use ($validated) {
+                $q->where('name', 'like', "%{$validated['query']}%")
+                  ->orWhere('email', 'like', "%{$validated['query']}%");
+            })
+            ->when(isset($validated['role']), fn ($q) => $q->where('role', $validated['role']))
+            ->limit($validated['limit'] ?? 10)
+            ->get(['id', 'name', 'email', 'role']);
+
+        if ($users->isEmpty()) {
+            return Response::text('条件に一致するユーザーが見つかりませんでした。');
+        }
+
+        $result = $users->map(fn ($u) => "ID:{$u->id} {$u->name} <{$u->email}> [{$u->role}]")
+                        ->implode("\n");
+
+        return Response::text($result);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'query' => $schema->string()
+                ->description('検索キーワード。名前またはメールアドレスで検索します。')
+                ->required(),
+
+            'limit' => $schema->integer()
+                ->description('取得件数の上限（デフォルト: 10、最大: 50）。')
+                ->minimum(1)
+                ->maximum(50)
+                ->default(10),
+
+            'role' => $schema->string()
+                ->description('絞り込むロール。admin、editor、viewer のいずれか。')
+                ->enum(['admin', 'editor', 'viewer']),
+        ];
+    }
+}
+```
+
+### ツールアノテーション
+
+MCPプロトコルのアノテーションを使うと、AIクライアントがツールの安全性を判断できます。
+
+```php
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+
+#[IsReadOnly]      // 環境を変更しない読み取り専用ツール
+#[IsIdempotent]    // 同じ引数で複数回呼んでも結果が変わらない
+class SearchUsersTool extends Tool
+{
+    // ...
+}
+```
+
+| アノテーション | 説明 |
+| --- | --- |
+| `#[IsReadOnly]` | データを変更しない |
+| `#[IsDestructive]` | 削除など破壊的な操作を行う |
+| `#[IsIdempotent]` | 同じ引数での再実行が安全 |
+| `#[IsOpenWorld]` | 外部エンティティと通信する |
+
+### 構造化レスポンス
+
+AIクライアントがパースしやすいJSON形式のレスポンスを返す場合は `Response::structured` を使います。
+
+```php
+return Response::structured([
+    'total' => $users->count(),
+    'users' => $users->map(fn ($u) => [
+        'id'    => $u->id,
+        'name'  => $u->name,
+        'email' => $u->email,
+    ])->toArray(),
+]);
+```
+
+### ストリーミングレスポンス
+
+長時間かかる処理では Generator を返すことで途中経過をストリームできます。
+
+```php
+use Generator;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+
+public function handle(Request $request): Generator
+{
+    $items = \App\Models\Product::all();
+    $total = $items->count();
+
+    foreach ($items as $index => $item) {
+        yield Response::notification('processing/progress', [
+            'current' => $index + 1,
+            'total'   => $total,
+            'name'    => $item->name,
+        ]);
+
+        // 重い処理...
+        yield Response::text("処理完了: {$item->name}");
+    }
+}
+```
+
+Webサーバーではストリーミングレスポンスが自動的にSSE（Server-Sent Events）ストリームとして送信されます。
+
+### 条件付き登録
+
+特定の条件を満たすユーザーにのみツールを公開できます。
+
+```php
+public function shouldRegister(Request $request): bool
+{
+    return $request?->user()?->hasRole('admin') ?? false;
+}
+```
+
+## リソースの実装
+
+リソースはAIクライアントがコンテキストとして読み込むデータです。ドキュメント、設定情報、動的データを提供します。
+
+### 静的リソース
+
+```shell
+php artisan make:mcp-resource AppDocumentationResource
+```
+
+```php
+<?php
+
+namespace App\Mcp\Resources;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\MimeType;
+use Laravel\Mcp\Server\Attributes\Uri;
+use Laravel\Mcp\Server\Resource;
+
+#[Uri('app://resources/documentation')]
+#[MimeType('text/markdown')]
+#[Description('アプリケーションのAPIドキュメントとビジネスルールの概要。')]
+class AppDocumentationResource extends Resource
+{
+    public function handle(Request $request): Response
+    {
+        $content = \Illuminate\Support\Facades\Storage::get('docs/api-overview.md')
+            ?? 'ドキュメントが見つかりません。';
+
+        return Response::text($content);
+    }
+}
+```
+
+### 動的リソース（URIテンプレート）
+
+URIテンプレートを使うと、URLのパラメータに基づいて動的なリソースを提供できます。
+
+```php
+<?php
+
+namespace App\Mcp\Resources;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\MimeType;
+use Laravel\Mcp\Server\Contracts\HasUriTemplate;
+use Laravel\Mcp\Server\Resource;
+use Laravel\Mcp\Support\UriTemplate;
+
+#[MimeType('application/json')]
+#[Description('ユーザーIDを指定してユーザー情報を取得します。')]
+class UserProfileResource extends Resource implements HasUriTemplate
+{
+    public function uriTemplate(): UriTemplate
+    {
+        return new UriTemplate('app://users/{userId}/profile');
+    }
+
+    public function handle(Request $request): Response
+    {
+        $userId = $request->get('userId');
+
+        $user = \App\Models\User::find($userId);
+
+        if (! $user) {
+            return Response::error("ユーザーID {$userId} が見つかりません。");
+        }
+
+        return Response::text(json_encode([
+            'id'         => $user->id,
+            'name'       => $user->name,
+            'email'      => $user->email,
+            'created_at' => $user->created_at->toIso8601String(),
+        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    }
+}
+```
+
+AIクライアントは `app://users/42/profile` のようなURIでリソースを要求し、`{userId}` の値が `$request->get('userId')` で取得できます。
+
+### リソースアノテーション
+
+リソースの優先度やオーディエンスを明示できます。
+
+```php
+use Laravel\Mcp\Enums\Role;
+use Laravel\Mcp\Server\Annotations\Audience;
+use Laravel\Mcp\Server\Annotations\Priority;
+
+#[Audience(Role::Assistant)]   // AIアシスタント向け
+#[Priority(0.8)]               // 重要度（0.0〜1.0）
+class AppDocumentationResource extends Resource
+{
+    // ...
+}
+```
+
+## プロンプトの実装
+
+プロンプトはAIクライアントが使える再利用可能なテンプレートです。定型的なクエリや複雑なワークフローを標準化します。
+
+### プロンプトの作成
+
+```shell
+php artisan make:mcp-prompt DataAnalysisPrompt
+```
+
+```php
+<?php
+
+namespace App\Mcp\Prompts;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Prompt;
+use Laravel\Mcp\Server\Prompts\Argument;
+
+#[Description('データ分析レポートを生成するためのプロンプトテンプレート。')]
+class DataAnalysisPrompt extends Prompt
+{
+    public function arguments(): array
+    {
+        return [
+            new Argument(
+                name: 'target',
+                description: '分析対象。例: "先月の売上"、"ユーザー登録数の推移"',
+                required: true,
+            ),
+            new Argument(
+                name: 'format',
+                description: '出力形式。"summary"（要約）または "detail"（詳細）',
+                required: false,
+            ),
+        ];
+    }
+
+    public function handle(Request $request): array
+    {
+        $validated = $request->validate([
+            'target' => 'required|string|max:200',
+            'format' => 'nullable|in:summary,detail',
+        ]);
+
+        $target = $validated['target'];
+        $format = $validated['format'] ?? 'summary';
+        $instruction = $format === 'detail'
+            ? '数値・トレンド・異常値・推奨アクションを含む詳細なレポートを作成してください。'
+            : '主要な指標と3つの重要な洞察を含む簡潔な要約を作成してください。';
+
+        return [
+            Response::text(
+                "あなたはデータアナリストです。{$instruction}"
+            )->asAssistant(),
+            Response::text(
+                "次のデータを分析してください: {$target}"
+            ),
+        ];
+    }
+}
+```
+
+<Tip>
+  `asAssistant()` を使うとメッセージがAIアシスタントの発言として扱われます。システムプロンプトとユーザーメッセージを組み合わせて、AIの振る舞いを細かく制御できます。
+</Tip>
+
+## 認証と認可
+
+### Sanctumによるトークン認証
+
+最もシンプルな認証方法です。MCPクライアントは `Authorization: Bearer <token>` ヘッダーを付与します。
+
+```php
+// routes/ai.php
+Mcp::web('/mcp/database', DatabaseServer::class)
+    ->middleware('auth:sanctum');
+```
+
+### OAuth 2.1 による認証
+
+より堅牢な認証にはLaravel Passportを使います。
+
+```php
+// routes/ai.php
+use Laravel\Mcp\Facades\Mcp;
+
+Mcp::oauthRoutes();
+
+Mcp::web('/mcp/database', DatabaseServer::class)
+    ->middleware('auth:api');
+```
+
+OAuth認証を使う場合は、MCP提供の認可ビューを公開して `AppServiceProvider` に設定します。
+
+```shell
+php artisan vendor:publish --tag=mcp-views
+```
+
+```php
+// app/Providers/AppServiceProvider.php
+use Laravel\Passport\Passport;
+
+public function boot(): void
+{
+    Passport::authorizationView(function ($parameters) {
+        return view('mcp.authorize', $parameters);
+    });
+}
+```
+
+### カスタムミドルウェアによる認証
+
+独自のAPIトークンを使っている場合は、カスタムミドルウェアで `Authorization` ヘッダーを検証します。
+
+```php
+// app/Http/Middleware/McpTokenMiddleware.php
+public function handle($request, Closure $next)
+{
+    $token = $request->bearerToken();
+
+    if (! $token || ! \App\Models\ApiToken::where('token', hash('sha256', $token))->exists()) {
+        return response()->json(['error' => 'Unauthorized'], 401);
+    }
+
+    return $next($request);
+}
+```
+
+### ツール内での認可
+
+ツールやリソースの `handle` メソッド内で `$request->user()` を使い、きめ細かい認可チェックができます。
+
+```php
+public function handle(Request $request): Response
+{
+    $user = $request->user();
+
+    if (! $user?->can('manage-users')) {
+        return Response::error('このツールを使用する権限がありません。管理者にお問い合わせください。');
+    }
+
+    // 認可済みの処理を続ける...
+}
+```
+
+<Warning>
+  `shouldRegister` はツールをリストから非表示にするだけです。ツールが呼び出された際の認可チェックは `handle` メソッド内で必ず行ってください。
+</Warning>
+
+## 実践例: データベース操作ツール
+
+Eloquentを使ってデータを検索・作成するツールの完全な実装例です。
+
+### サーバークラス
+
+```php
+<?php
+
+namespace App\Mcp\Servers;
+
+use App\Mcp\Tools\CreatePostTool;
+use App\Mcp\Tools\SearchPostsTool;
+use Laravel\Mcp\Server\Attributes\Instructions;
+use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Version;
+use Laravel\Mcp\Server;
+
+#[Name('Blog Management Server')]
+#[Version('1.0.0')]
+#[Instructions('ブログ記事の検索・作成ができるMCPサーバーです。')]
+class BlogServer extends Server
+{
+    protected array $tools = [
+        SearchPostsTool::class,
+        CreatePostTool::class,
+    ];
+}
+```
+
+### 検索ツール（読み取り専用）
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use App\Models\Post;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('ブログ記事をキーワードやステータスで検索します。')]
+#[IsReadOnly]
+#[IsIdempotent]
+class SearchPostsTool extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $validated = $request->validate([
+            'keyword' => 'nullable|string|max:100',
+            'status'  => 'nullable|in:draft,published,archived',
+            'limit'   => 'integer|min:1|max:20',
+        ]);
+
+        $posts = Post::query()
+            ->when($validated['keyword'] ?? null, fn ($q, $kw) =>
+                $q->where('title', 'like', "%{$kw}%")
+                  ->orWhere('body', 'like', "%{$kw}%")
+            )
+            ->when($validated['status'] ?? null, fn ($q, $s) => $q->where('status', $s))
+            ->latest()
+            ->limit($validated['limit'] ?? 5)
+            ->get(['id', 'title', 'status', 'published_at']);
+
+        if ($posts->isEmpty()) {
+            return Response::text('条件に一致する記事が見つかりませんでした。');
+        }
+
+        return Response::structured([
+            'total' => $posts->count(),
+            'posts' => $posts->map(fn ($p) => [
+                'id'           => $p->id,
+                'title'        => $p->title,
+                'status'       => $p->status,
+                'published_at' => $p->published_at?->toIso8601String(),
+            ])->toArray(),
+        ]);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'keyword' => $schema->string()
+                ->description('タイトルまたは本文に含まれるキーワード。'),
+
+            'status' => $schema->string()
+                ->description('記事のステータス。')
+                ->enum(['draft', 'published', 'archived']),
+
+            'limit' => $schema->integer()
+                ->description('取得件数の上限（デフォルト: 5、最大: 20）。')
+                ->default(5),
+        ];
+    }
+}
+```
+
+### 作成ツール（書き込み）
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use App\Models\Post;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('新しいブログ記事を下書きとして作成します。')]
+class CreatePostTool extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $user = $request->user();
+
+        if (! $user?->can('create-posts')) {
+            return Response::error('記事を作成する権限がありません。');
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'body'  => 'required|string',
+            'tags'  => 'nullable|array',
+            'tags.*' => 'string|max:50',
+        ], [
+            'title.required' => '記事のタイトルを指定してください。',
+            'body.required'  => '記事の本文を指定してください。',
+        ]);
+
+        $post = Post::create([
+            'title'   => $validated['title'],
+            'body'    => $validated['body'],
+            'status'  => 'draft',
+            'user_id' => $user->id,
+        ]);
+
+        if (! empty($validated['tags'])) {
+            $post->syncTags($validated['tags']);
+        }
+
+        return Response::structured([
+            'id'         => $post->id,
+            'title'      => $post->title,
+            'status'     => $post->status,
+            'created_at' => $post->created_at->toIso8601String(),
+            'message'    => '記事を下書きとして作成しました。',
+        ]);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'title' => $schema->string()
+                ->description('記事のタイトル（最大255文字）。')
+                ->required(),
+
+            'body' => $schema->string()
+                ->description('記事の本文。Markdownが使用できます。')
+                ->required(),
+
+            'tags' => $schema->array()
+                ->description('記事に付けるタグの配列。例: ["Laravel", "PHP"]'),
+        ];
+    }
+}
+```
+
+## 実践例: ファイルシステム操作ツール
+
+Storageファサードを使ってファイルを操作するツールの実装例です。
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Storage;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('ストレージ内のファイル一覧を取得し、テキストファイルの内容を読み込みます。')]
+#[IsReadOnly]
+class ReadFileTool extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $validated = $request->validate([
+            'path'    => 'required|string|max:500',
+            'disk'    => 'nullable|string|in:local,public,s3',
+        ]);
+
+        $disk = $validated['disk'] ?? 'local';
+        $path = $validated['path'];
+
+        // ディレクトリトラバーサル攻撃を防ぐ
+        if (str_contains($path, '..')) {
+            return Response::error('無効なパスが指定されました。');
+        }
+
+        if (! Storage::disk($disk)->exists($path)) {
+            return Response::error("ファイルが見つかりません: {$path}");
+        }
+
+        $mimeType = Storage::disk($disk)->mimeType($path);
+
+        // テキストファイルのみ内容を返す
+        if (str_starts_with($mimeType, 'text/') || $mimeType === 'application/json') {
+            $content = Storage::disk($disk)->get($path);
+            return Response::text($content);
+        }
+
+        // 画像ファイルはバイナリで返す
+        if (str_starts_with($mimeType, 'image/')) {
+            return Response::fromStorage($path, disk: $disk);
+        }
+
+        return Response::error("このファイル形式には対応していません: {$mimeType}");
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'path' => $schema->string()
+                ->description('読み込むファイルのパス。例: "reports/2025-01.csv"')
+                ->required(),
+
+            'disk' => $schema->string()
+                ->description('使用するストレージディスク。')
+                ->enum(['local', 'public', 's3'])
+                ->default('local'),
+        ];
+    }
+}
+```
+
+<Warning>
+  ファイル操作ツールでは必ずパスのサニタイズを行い、許可されたディレクトリ以外へのアクセスを防いでください。`..` を含むパスは拒否することが重要です。
+</Warning>
+
+## テスト
+
+MCPサーバー、ツール、リソース、プロンプトはLaravelの標準テスト機能でユニットテストを書けます。
+
+### ツールのテスト
+
+`Server::tool()` メソッドでツールを直接呼び出してテストします。
+
+<CodeGroup>
+  ```php Pest
+  use App\Mcp\Servers\BlogServer;
+  use App\Mcp\Tools\SearchPostsTool;
+  use App\Models\Post;
+  use App\Models\User;
+
+  test('記事を検索できる', function () {
+      Post::factory()->create(['title' => 'Laravelの基礎', 'status' => 'published']);
+      Post::factory()->create(['title' => 'PHPの応用', 'status' => 'draft']);
+
+      $response = BlogServer::tool(SearchPostsTool::class, [
+          'keyword' => 'Laravel',
+          'status'  => 'published',
+      ]);
+
+      $response
+          ->assertOk()
+          ->assertSee('Laravelの基礎');
+  });
+
+  test('権限のないユーザーは記事を作成できない', function () {
+      $user = User::factory()->create();
+
+      $response = BlogServer::actingAs($user)
+          ->tool(\App\Mcp\Tools\CreatePostTool::class, [
+              'title' => 'テスト記事',
+              'body'  => '本文',
+          ]);
+
+      $response->assertSee('記事を作成する権限がありません');
+  });
+  ```
+
+  ```php PHPUnit
+  use App\Mcp\Servers\BlogServer;
+  use App\Mcp\Tools\SearchPostsTool;
+  use App\Models\Post;
+  use App\Models\User;
+
+  public function test_記事を検索できる(): void
+  {
+      Post::factory()->create(['title' => 'Laravelの基礎', 'status' => 'published']);
+      Post::factory()->create(['title' => 'PHPの応用', 'status' => 'draft']);
+
+      $response = BlogServer::tool(SearchPostsTool::class, [
+          'keyword' => 'Laravel',
+          'status'  => 'published',
+      ]);
+
+      $response
+          ->assertOk()
+          ->assertSee('Laravelの基礎');
+  }
+
+  public function test_権限のないユーザーは記事を作成できない(): void
+  {
+      $user = User::factory()->create();
+
+      $response = BlogServer::actingAs($user)
+          ->tool(\App\Mcp\Tools\CreatePostTool::class, [
+              'title' => 'テスト記事',
+              'body'  => '本文',
+          ]);
+
+      $response->assertSee('記事を作成する権限がありません');
+  }
+  ```
+</CodeGroup>
+
+### リソースとプロンプトのテスト
+
+```php
+// リソースのテスト
+$response = BlogServer::resource(\App\Mcp\Resources\AppDocumentationResource::class);
+$response->assertOk()->assertSee('API');
+
+// プロンプトのテスト
+$response = BlogServer::prompt(\App\Mcp\Prompts\DataAnalysisPrompt::class, [
+    'target' => '先月の売上',
+    'format' => 'summary',
+]);
+$response->assertOk()->assertSee('データアナリスト');
+```
+
+### 主なアサーションメソッド
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertOk()` | レスポンスにエラーがないことを確認 |
+| `assertSee($text)` | レスポンスに指定テキストが含まれることを確認 |
+| `assertHasErrors()` | レスポンスにエラーがあることを確認 |
+| `assertHasNoErrors()` | レスポンスにエラーがないことを確認 |
+| `assertName($name)` | ツール名を確認 |
+| `assertSentNotification($method, $data)` | 通知が送信されたことを確認 |
+| `assertNotificationCount($count)` | 通知の送信回数を確認 |
+
+### MCP Inspector を使ったデバッグ
+
+インタラクティブなデバッグには MCP Inspector を使います。
+
+```shell
+# Webサーバーの検査
+php artisan mcp:inspector mcp/database
+
+# ローカルサーバーの検査
+php artisan mcp:inspector database
+```
+
+## デプロイの考慮事項
+
+### HTTPストリーミングとSSE
+
+Webサーバーでストリーミングレスポンス（Generator）を使う場合、サーバーの設定を確認してください。
+
+<CodeGroup>
+  ```nginx Nginx
+  location /mcp {
+      proxy_pass http://127.0.0.1:8000;
+      proxy_buffering off;          # SSEにはバッファリングを無効化
+      proxy_cache off;
+      proxy_read_timeout 3600s;     # 長時間接続に対応
+      proxy_set_header Connection '';
+      chunked_transfer_encoding on;
+  }
+  ```
+
+  ```apache Apache
+  # mod_proxy_http を使用する場合
+  ProxyPass /mcp http://127.0.0.1:8000/mcp
+  ProxyPassReverse /mcp http://127.0.0.1:8000/mcp
+  SetEnv proxy-sendchunks 1
+  ```
+</CodeGroup>
+
+### Laravel Octane との組み合わせ
+
+高トラフィックのMCPサーバーには Laravel Octane（FrankenPHP または Swoole）の使用を検討してください。リクエストごとのオーバーヘッドが大幅に削減されます。
+
+<Warning>
+  Octane 使用時はリクエスト間で状態が共有されます。ツール内で静的プロパティやグローバルな状態を使わないよう注意してください。
+</Warning>
+
+### レートリミット
+
+`throttle` ミドルウェアでMCPサーバーへのリクエストを制限します。
+
+```php
+// config/cache.php で専用のレートリミッターを定義
+// routes/ai.php
+Mcp::web('/mcp/database', DatabaseServer::class)
+    ->middleware(['auth:sanctum', 'throttle:60,1']);
+```
+
+### キャッシュ
+
+頻繁に呼び出される読み取り専用ツールにはキャッシュを活用します。
+
+```php
+public function handle(Request $request): Response
+{
+    $data = \Illuminate\Support\Facades\Cache::remember(
+        "mcp:search:{$request->get('keyword')}",
+        now()->addMinutes(5),
+        fn () => $this->fetchFromDatabase($request)
+    );
+
+    return Response::structured($data);
+}
+```
+
+### ログとモニタリング
+
+MCPツールの呼び出しをログに記録することで、AIクライアントの利用状況を把握できます。
+
+```php
+public function handle(Request $request): Response
+{
+    \Illuminate\Support\Facades\Log::info('MCP tool called', [
+        'tool'   => static::class,
+        'user'   => $request->user()?->id,
+        'params' => $request->all(),
+    ]);
+
+    // ...
+}
+```
+
+<Tip>
+  本番環境では Laravel Telescope や Sentry を使ってMCPサーバーのパフォーマンスと例外を監視することをお勧めします。
+</Tip>
