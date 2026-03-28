@@ -189,6 +189,12 @@
                 "pages": [
                   "jp/advanced/php-attributes"
                 ]
+              },
+              {
+                "group": "Eloquent 深掘り",
+                "pages": [
+                  "jp/advanced/eloquent-observers"
+                ]
               }
             ]
           },
