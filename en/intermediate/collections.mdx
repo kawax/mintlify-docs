@@ -1,0 +1,330 @@
+---
+title: "Collections"
+description: "Work with arrays of data using Laravel's Collection class — a fluent, chainable wrapper with over 100 methods for transforming, filtering, and aggregating data."
+---
+
+## What is a collection?
+
+`Illuminate\Support\Collection` is a wrapper around a PHP array that lets you chain operations instead of nesting array functions. Every method that transforms data returns a new collection, leaving the original untouched.
+
+```php
+// PHP array functions — hard to read, inside-out
+$names = array_values(array_filter(
+    array_map(fn ($user) => $user['name'], $users),
+    fn ($name) => strlen($name) > 0
+));
+
+// Collection — left to right, easy to follow
+$names = collect($users)
+    ->pluck('name')
+    ->filter()
+    ->values()
+    ->all();
+```
+
+<Info>
+  Collections are immutable. Each transformation method returns a new collection instance, so you can branch a pipeline without affecting earlier steps.
+</Info>
+
+## Creating collections
+
+```php
+// From an array
+$products = collect([
+    ['name' => 'Laptop', 'price' => 1299, 'in_stock' => true],
+    ['name' => 'Mouse',  'price' => 29,   'in_stock' => false],
+    ['name' => 'Keyboard', 'price' => 79, 'in_stock' => true],
+]);
+
+// Empty collection
+$empty = collect();
+
+// From a JSON string
+$items = Collection::fromJson('[{"id":1},{"id":2}]');
+```
+
+Eloquent's `get()` always returns an `Illuminate\Database\Eloquent\Collection`, which extends `Collection` and supports all the same methods.
+
+## Essential methods
+
+### `map` — transform each item
+
+```php
+$prices = collect([1299, 29, 79]);
+
+$withTax = $prices->map(fn ($price) => round($price * 1.08, 2));
+// [1402.92, 31.32, 85.32]
+```
+
+### `filter` and `reject` — narrow the set
+
+```php
+$products = collect([
+    ['name' => 'Laptop',   'in_stock' => true],
+    ['name' => 'Mouse',    'in_stock' => false],
+    ['name' => 'Keyboard', 'in_stock' => true],
+]);
+
+$available = $products->filter(fn ($p) => $p['in_stock']);
+$soldOut   = $products->reject(fn ($p) => $p['in_stock']);
+
+// No callback — removes falsy values (null, false, '', 0)
+$cleaned = collect(['Alice', '', null, 'Bob'])->filter()->values();
+// ['Alice', 'Bob']
+```
+
+<Tip>
+  After `filter()`, the original keys are preserved. Call `values()` to re-index from 0 when you need a sequential array.
+</Tip>
+
+### `first` and `last` — retrieve one item
+
+```php
+$orders = collect([
+    ['id' => 1, 'status' => 'shipped'],
+    ['id' => 2, 'status' => 'pending'],
+    ['id' => 3, 'status' => 'pending'],
+]);
+
+$nextOrder = $orders->first(fn ($o) => $o['status'] === 'pending');
+// ['id' => 2, 'status' => 'pending']
+
+$latest = $orders->last();
+// ['id' => 3, 'status' => 'pending']
+```
+
+### `pluck` — extract one field
+
+```php
+$users = collect([
+    ['id' => 1, 'name' => 'Alice', 'role' => 'admin'],
+    ['id' => 2, 'name' => 'Bob',   'role' => 'editor'],
+]);
+
+$names = $users->pluck('name');
+// ['Alice', 'Bob']
+
+// Keyed by id
+$nameById = $users->pluck('name', 'id');
+// [1 => 'Alice', 2 => 'Bob']
+```
+
+### `groupBy` — organize by a key
+
+```php
+$users = collect([
+    ['name' => 'Alice', 'department' => 'Engineering'],
+    ['name' => 'Bob',   'department' => 'Sales'],
+    ['name' => 'Carol', 'department' => 'Engineering'],
+]);
+
+$byDept = $users->groupBy('department');
+// [
+//   'Engineering' => [['name' => 'Alice', ...], ['name' => 'Carol', ...]],
+//   'Sales'       => [['name' => 'Bob',   ...]],
+// ]
+```
+
+### `sortBy` and `sortByDesc` — reorder
+
+```php
+$products = collect([
+    ['name' => 'Laptop',   'price' => 1299],
+    ['name' => 'Mouse',    'price' => 29],
+    ['name' => 'Keyboard', 'price' => 79],
+]);
+
+$cheapFirst     = $products->sortBy('price');
+$expensiveFirst = $products->sortByDesc('price');
+
+// Sort by multiple keys
+$sorted = $products->sortBy([
+    ['price', 'asc'],
+    ['name',  'asc'],
+]);
+```
+
+### `each` — run side effects
+
+```php
+$orders->each(function (array $order) {
+    \Log::info("Processing order #{$order['id']}");
+});
+
+// Return false to stop the loop early
+$orders->each(function (array $order) {
+    if ($order['status'] === 'cancelled') {
+        return false;
+    }
+    // ...
+});
+```
+
+### `reduce` — fold to a single value
+
+```php
+$cart = collect([
+    ['name' => 'Laptop',   'qty' => 1, 'price' => 1299],
+    ['name' => 'Mouse',    'qty' => 2, 'price' => 29],
+    ['name' => 'Keyboard', 'qty' => 1, 'price' => 79],
+]);
+
+$total = $cart->reduce(
+    fn ($carry, $item) => $carry + ($item['qty'] * $item['price']),
+    0
+);
+// 1436
+```
+
+<Tip>
+  For simple sums, `sum()` is more readable: `$cart->sum(fn ($i) => $i['qty'] * $i['price'])`.
+</Tip>
+
+### `chunk` — split into batches
+
+```php
+$users = collect(range(1, 100))->map(fn ($i) => ['id' => $i]);
+
+// Split into groups of 20
+$batches = $users->chunk(20);
+
+$batches->each(function ($batch) {
+    // send a batch email, bulk insert, etc.
+});
+```
+
+### `flatMap` — map then flatten one level
+
+```php
+$users = collect([
+    ['name' => 'Alice', 'tags' => ['php', 'laravel']],
+    ['name' => 'Bob',   'tags' => ['python', 'django']],
+]);
+
+$allTags = $users->flatMap(fn ($u) => $u['tags']);
+// ['php', 'laravel', 'python', 'django']
+```
+
+## Method chaining
+
+The real power of collections is composing transformations:
+
+```php
+$orders = collect([
+    ['customer' => 'Alice', 'status' => 'completed', 'amount' => 250, 'category' => 'hardware'],
+    ['customer' => 'Bob',   'status' => 'pending',   'amount' => 80,  'category' => 'hardware'],
+    ['customer' => 'Carol', 'status' => 'completed', 'amount' => 420, 'category' => 'software'],
+    ['customer' => 'Dave',  'status' => 'completed', 'amount' => 150, 'category' => 'hardware'],
+]);
+
+// Top completed hardware orders, formatted for display
+$result = $orders
+    ->filter(fn ($o) => $o['status'] === 'completed')
+    ->filter(fn ($o) => $o['category'] === 'hardware')
+    ->sortByDesc('amount')
+    ->map(fn ($o) => [
+        'customer' => $o['customer'],
+        'amount'   => '$' . number_format($o['amount']),
+    ])
+    ->values();
+
+// [
+//   ['customer' => 'Alice', 'amount' => '$250'],
+//   ['customer' => 'Dave',  'amount' => '$150'],
+// ]
+```
+
+## Working with Eloquent collections
+
+Eloquent returns `Illuminate\Database\Eloquent\Collection` from `get()`, which extends the base `Collection` and adds a few extras:
+
+```php
+$users = User::all();
+
+// Find a model by primary key
+$user = $users->find(1);
+
+// Load relationships on an already-fetched collection
+$users->load('orders', 'profile');
+
+// Get all primary keys
+$ids = $users->modelKeys();   // [1, 2, 3, ...]
+
+// Set operations
+$diff      = $users->diff($otherUsers);
+$intersect = $users->intersect($otherUsers);
+```
+
+<Warning>
+  Filter and sort in the database when you can. Doing it on a collection means all rows are loaded into memory first. Use `where()` and `orderBy()` on the query before calling `get()`.
+</Warning>
+
+## Lazy collections
+
+`LazyCollection` uses PHP generators to process one item at a time, keeping memory flat regardless of how many records are in the result set.
+
+```php
+use Illuminate\Support\LazyCollection;
+
+// Standard collection — all 100k rows in memory
+$users = User::all();
+
+// LazyCollection — one row at a time
+User::cursor()->each(function (User $user) {
+    // process $user, then move to the next
+});
+```
+
+### Creating a lazy collection
+
+```php
+$lazy = LazyCollection::make(function () {
+    $handle = fopen('large-export.csv', 'r');
+
+    while (($row = fgetcsv($handle)) !== false) {
+        yield $row;
+    }
+
+    fclose($handle);
+});
+```
+
+### Chaining on a lazy collection
+
+Lazy collection methods are evaluated on demand, so you can chain `filter()`, `map()`, and `each()` without pulling everything into memory:
+
+```php
+User::where('subscribed', true)
+    ->cursor()
+    ->filter(fn (User $user) => $user->plan === 'pro')
+    ->each(fn (User $user) => $user->sendMonthlyReport());
+```
+
+<Info>
+  `cursor()` keeps a single database connection open for the duration of the loop. For very long-running loops, consider using `chunk()` to release and re-acquire the connection between batches.
+</Info>
+
+## Common methods at a glance
+
+| Method | Purpose |
+|---|---|
+| `map($fn)` | Transform each item |
+| `filter($fn)` | Keep items that pass a test |
+| `reject($fn)` | Remove items that pass a test |
+| `first($fn)` | First matching item |
+| `last($fn)` | Last matching item |
+| `pluck($key)` | Extract one field from each item |
+| `groupBy($key)` | Group items into sub-collections |
+| `sortBy($key)` | Sort ascending |
+| `sortByDesc($key)` | Sort descending |
+| `each($fn)` | Side-effect iteration |
+| `flatMap($fn)` | Map then flatten one level |
+| `reduce($fn, $init)` | Accumulate to a single value |
+| `chunk($n)` | Split into batches |
+| `values()` | Reindex keys from 0 |
+| `sum($key)` | Sum a column |
+| `count()` | Number of items |
+| `unique($key)` | Remove duplicates |
+| `contains($key, $val)` | Check membership |
+| `toArray()` | Convert back to a plain array |
+| `toJson()` | Serialize to JSON |
