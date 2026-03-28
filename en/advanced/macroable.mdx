@@ -1,0 +1,375 @@
+---
+title: "The Macroable Trait"
+description: "How to use Illuminate\\Support\\Traits\\Macroable to add custom methods to existing Laravel classes without touching core code."
+---
+
+## What is the Macroable trait?
+
+The `Macroable` trait lets you attach new methods to a class at runtime without modifying the class itself. Many of Laravel's core classes use this trait, so you can extend them freely without forking or overriding core code.
+
+The implementation lives in `Illuminate\Support\Traits\Macroable`. Registered macros are stored in the static `$macros` property and invoked through the `__call` / `__callStatic` magic methods.
+
+## Classes that support macros
+
+| Class | Purpose |
+|---|---|
+| `Illuminate\Support\Collection` | Collection operations |
+| `Illuminate\Support\Str` | String helpers |
+| `Illuminate\Support\Arr` | Array helpers |
+| `Illuminate\Http\Request` | HTTP request |
+| `Illuminate\Http\Response` | HTTP response |
+| `Illuminate\Routing\Router` | Router |
+| `Illuminate\Routing\ResponseFactory` | Response factory |
+| `Illuminate\Database\Schema\Blueprint` | Schema builder |
+| `Illuminate\Pipeline\Pipeline` | Pipeline |
+| `Illuminate\Testing\TestResponse` | Test response |
+
+## macro() — adding a method
+
+Pass the method name as the first argument and a closure as the second.
+
+```php
+use Illuminate\Support\Collection;
+
+Collection::macro('toSentence', function (string $separator = ', ') {
+    /** @var Collection $this */
+    return $this->implode($separator);
+});
+
+$result = collect(['apples', 'oranges', 'grapes'])->toSentence();
+// 'apples, oranges, grapes'
+```
+
+Inside the closure, `$this` is bound to the instance that called the macro, giving you direct access to the class's properties and methods.
+
+## mixin() — registering multiple methods at once
+
+When you have many macros to register, group them in a mixin class. All `public` and `protected` methods of the mixin are registered as macros.
+
+```php
+namespace App\Mixins;
+
+class CollectionMixin
+{
+    public function toCsv(): Closure
+    {
+        return function (string $separator = ',') {
+            /** @var \Illuminate\Support\Collection $this */
+            return $this->map(function ($item) use ($separator) {
+                return is_array($item) ? implode($separator, $item) : $item;
+            })->implode("\n");
+        };
+    }
+
+    public function filterEmpty(): Closure
+    {
+        return function () {
+            /** @var \Illuminate\Support\Collection $this */
+            return $this->filter(fn ($item) => ! empty($item))->values();
+        };
+    }
+
+    public function groupByFirst(): Closure
+    {
+        return function (string $key) {
+            /** @var \Illuminate\Support\Collection $this */
+            return $this->groupBy(fn ($item) => $item[$key][0] ?? '');
+        };
+    }
+}
+```
+
+<Info>
+  Each method in a mixin class must return a closure. The closure is the actual macro implementation.
+</Info>
+
+## Registering macros in a service provider
+
+Macros must be registered before any code uses them. The `boot()` method of `AppServiceProvider` is the right place.
+
+```php
+namespace App\Providers;
+
+use App\Mixins\CollectionMixin;
+use Illuminate\Support\Collection;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
+use Illuminate\Http\Request;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        // Single macro
+        Collection::macro('toSentence', function (string $separator = ', ') {
+            return $this->implode($separator);
+        });
+
+        // Mixin — registers all methods at once
+        Collection::mixin(new CollectionMixin);
+
+        // Macro on Str
+        Str::macro('initials', function (string $name) {
+            return collect(explode(' ', $name))
+                ->map(fn ($word) => strtoupper($word[0]))
+                ->implode('');
+        });
+    }
+}
+```
+
+## Practical use cases
+
+### Extending Collection
+
+Adding custom methods to collections is the most common use of macros.
+
+```php
+// Statistical method for numeric collections
+Collection::macro('median', function () {
+    $sorted = $this->sort()->values();
+    $count = $sorted->count();
+
+    if ($count === 0) {
+        return null;
+    }
+
+    $middle = (int) floor($count / 2);
+
+    if ($count % 2 === 0) {
+        return ($sorted->get($middle - 1) + $sorted->get($middle)) / 2;
+    }
+
+    return $sorted->get($middle);
+});
+
+$median = collect([3, 1, 4, 1, 5, 9, 2, 6])->median();
+// 3.5
+```
+
+### Extending Str
+
+```php
+// Convert snake_case to dot notation
+Str::macro('toDotNotation', function (string $value) {
+    return str_replace('_', '.', $value);
+});
+
+$dot = Str::toDotNotation('user_profile_name');
+// 'user.profile.name'
+```
+
+### Extending Request
+
+```php
+use Illuminate\Http\Request;
+
+Request::macro('isFromMobile', function () {
+    /** @var Request $this */
+    $userAgent = $this->userAgent() ?? '';
+
+    return preg_match('/Mobile|Android|iPhone|iPad/i', $userAgent) === 1;
+});
+
+Request::macro('preferredLocale', function (array $available = ['en']) {
+    /** @var Request $this */
+    foreach ($this->getLanguages() as $lang) {
+        $short = substr($lang, 0, 2);
+        if (in_array($short, $available)) {
+            return $short;
+        }
+    }
+
+    return $available[0] ?? 'en';
+});
+```
+
+```php
+// In a controller
+public function index(Request $request)
+{
+    if ($request->isFromMobile()) {
+        return response()->json($this->getMobileData());
+    }
+
+    $locale = $request->preferredLocale(['en', 'fr', 'de']);
+    // ...
+}
+```
+
+### Extending Blueprint (migrations)
+
+Grouping common column patterns into a macro keeps your schema definitions consistent.
+
+```php
+use Illuminate\Database\Schema\Blueprint;
+
+Blueprint::macro('addTimestampsWithTimezone', function () {
+    /** @var Blueprint $this */
+    $this->timestampsTz();
+    $this->softDeletesTz();
+});
+
+Blueprint::macro('addUserTracking', function () {
+    /** @var Blueprint $this */
+    $this->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+    $this->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
+});
+```
+
+```php
+// In a migration
+Schema::create('posts', function (Blueprint $table) {
+    $table->id();
+    $table->string('title');
+    $table->text('body');
+    $table->addTimestampsWithTimezone();
+    $table->addUserTracking();
+});
+```
+
+### Extending TestResponse
+
+Add custom assertion methods to clean up your tests.
+
+```php
+use Illuminate\Testing\TestResponse;
+
+TestResponse::macro('assertPaginated', function () {
+    /** @var TestResponse $this */
+    return $this->assertJsonStructure([
+        'data',
+        'meta' => ['current_page', 'last_page', 'per_page', 'total'],
+        'links' => ['first', 'last', 'prev', 'next'],
+    ]);
+});
+
+TestResponse::macro('assertApiSuccess', function () {
+    /** @var TestResponse $this */
+    return $this->assertOk()->assertJsonPath('success', true);
+});
+```
+
+```php
+// In a test
+$this->getJson('/api/posts')->assertPaginated();
+$this->postJson('/api/orders', $data)->assertApiSuccess();
+```
+
+## hasMacro() — checking whether a macro exists
+
+```php
+use Illuminate\Support\Collection;
+
+if (Collection::hasMacro('toSentence')) {
+    $result = collect(['a', 'b'])->toSentence();
+}
+```
+
+## flushMacros() — removing all macros
+
+Use this in tests when you need a clean slate between test cases.
+
+```php
+use Illuminate\Support\Collection;
+
+Collection::flushMacros();
+```
+
+<Warning>
+  `flushMacros()` removes every macro registered on that class. If you call it in `tearDown()`, macros registered by other tests or service providers will also be removed.
+</Warning>
+
+## Static macros
+
+Macros work as static method calls in addition to instance calls. The `__callStatic` magic method handles this.
+
+```php
+Str::macro('randomHex', function (int $length = 8) {
+    return substr(bin2hex(random_bytes($length)), 0, $length);
+});
+
+// Static call
+$hex = Str::randomHex(16);
+```
+
+## Adding Macroable to your own classes
+
+You can include the `Macroable` trait in any class you write.
+
+```php
+namespace App\Services;
+
+use Illuminate\Support\Traits\Macroable;
+
+class ReportBuilder
+{
+    use Macroable;
+
+    protected array $sections = [];
+
+    public function addSection(string $name, callable $content): static
+    {
+        $this->sections[$name] = $content;
+
+        return $this;
+    }
+
+    public function build(): array
+    {
+        return array_map(fn ($fn) => $fn(), $this->sections);
+    }
+}
+```
+
+```php
+// Extend from a service provider
+ReportBuilder::macro('withSummary', function (string $title) {
+    /** @var ReportBuilder $this */
+    return $this->addSection('summary', fn () => [
+        'title' => $title,
+        'generated_at' => now()->toIso8601String(),
+    ]);
+});
+
+// Usage
+$report = app(ReportBuilder::class)
+    ->withSummary('Monthly report')
+    ->addSection('data', fn () => ['rows' => 42])
+    ->build();
+```
+
+## How it works internally
+
+```php
+// __call implementation (instance method calls)
+public function __call($method, $parameters)
+{
+    if (! static::hasMacro($method)) {
+        throw new BadMethodCallException(sprintf(
+            'Method %s::%s does not exist.', static::class, $method
+        ));
+    }
+
+    $macro = static::$macros[$method];
+
+    if ($macro instanceof Closure) {
+        // bindTo makes $this point to the calling instance
+        $macro = $macro->bindTo($this, static::class);
+    }
+
+    return $macro(...$parameters);
+}
+```
+
+Closures are bound using `Closure::bindTo()`, which makes `$this` refer to the object that called the macro. Non-closure callables (invokable objects) are not bound.
+
+<Tip>
+  For IDE auto-completion, annotate your macros with `@method` docblocks, or use the Laravel IDE Helper package to auto-generate helper files.
+</Tip>
+
+## Next steps
+
+<Card title="The Pipeline pattern" icon="arrow-right-arrow-left" href="/en/advanced/pipeline">
+  Learn how to compose sequential processing steps with the Pipeline pattern.
+</Card>

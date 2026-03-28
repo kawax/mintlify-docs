@@ -1,0 +1,382 @@
+---
+title: "Eloquent Observers and Model Events"
+description: "How Eloquent model events work, and how to use Observer classes to handle them in one place. Includes the #[ObservedBy] attribute introduced in Laravel 10 and used throughout Laravel 13."
+---
+
+## What are model events?
+
+Eloquent models automatically fire events at each stage of their lifecycle. You can hook into these events to run code before or after a model is saved, deleted, and so on.
+
+| Event | When it fires |
+|---|---|
+| `retrieved` | After a model is fetched from the database |
+| `creating` | Before a new model is saved for the first time |
+| `created` | After a new model is saved for the first time |
+| `updating` | Before an existing model is saved |
+| `updated` | After an existing model is saved |
+| `saving` | Before either a create or an update |
+| `saved` | After either a create or an update |
+| `deleting` | Before a model is deleted |
+| `deleted` | After a model is deleted |
+| `trashed` | After a model is soft-deleted |
+| `forceDeleting` | Before a model is permanently deleted |
+| `forceDeleted` | After a model is permanently deleted |
+| `restoring` | Before a soft-deleted model is restored |
+| `restored` | After a soft-deleted model is restored |
+| `replicating` | When `replicate()` is called on a model |
+
+Events ending in `-ing` fire **before** the change is persisted. Events ending in `-ed` fire **after**.
+
+<Warning>
+  Mass updates and mass deletes (`User::where(...)->update(...)`) do not fire `saving`, `saved`, `updating`, `updated`, `deleting`, or `deleted` events because the models are never retrieved from the database.
+</Warning>
+
+## Closure-based event listeners
+
+For simple cases, register closures inside the model's `booted` method.
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            // Runs after the user is created
+        });
+
+        static::deleting(function (User $user) {
+            // Runs before the user is deleted
+        });
+    }
+}
+```
+
+To run a closure on a queue instead, wrap it with the `queueable` helper.
+
+```php
+use function Illuminate\Events\queueable;
+
+static::created(queueable(function (User $user) {
+    // Runs asynchronously on a queue
+}));
+```
+
+## The $dispatchesEvents property
+
+When you want model events to feed into Laravel's event system, map them to dedicated event classes using `$dispatchesEvents`.
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Events\UserDeleted;
+use App\Events\UserSaved;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+
+class User extends Authenticatable
+{
+    /**
+     * @var array<string, string>
+     */
+    protected $dispatchesEvents = [
+        'saved' => UserSaved::class,
+        'deleted' => UserDeleted::class,
+    ];
+}
+```
+
+The mapped event class receives the model instance in its constructor.
+
+```php
+<?php
+
+namespace App\Events;
+
+use App\Models\User;
+
+class UserSaved
+{
+    public function __construct(
+        public readonly User $user,
+    ) {}
+}
+```
+
+## Creating an Observer class
+
+When a model triggers several events, an Observer class is cleaner than scattered closures.
+
+<Steps>
+  <Step title="Generate the Observer with Artisan">
+    Use `make:observer` with the `--model` option to get stubs for the relevant event methods.
+
+    ```bash
+    php artisan make:observer UserObserver --model=User
+    ```
+
+    This creates `app/Observers/UserObserver.php`.
+  </Step>
+
+  <Step title="Implement the event methods">
+    Each method name corresponds to an event. The method receives the model instance.
+
+    ```php
+    <?php
+
+    namespace App\Observers;
+
+    use App\Models\User;
+
+    class UserObserver
+    {
+        public function created(User $user): void
+        {
+            // Runs after a user is created
+        }
+
+        public function updated(User $user): void
+        {
+            // Runs after a user is updated
+        }
+
+        public function deleted(User $user): void
+        {
+            // Runs after a user is deleted
+        }
+
+        public function restored(User $user): void
+        {
+            // Runs after a soft-deleted user is restored
+        }
+
+        public function forceDeleted(User $user): void
+        {
+            // Runs after a user is permanently deleted
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Register the Observer">
+    There are two ways to register an observer. The `#[ObservedBy]` attribute is preferred in Laravel 13.
+
+    **Option 1: `#[ObservedBy]` attribute (recommended)**
+
+    Add the attribute to the model class. No changes to `AppServiceProvider` are needed.
+
+    ```php
+    <?php
+
+    namespace App\Models;
+
+    use App\Observers\UserObserver;
+    use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+
+    #[ObservedBy(UserObserver::class)]
+    class User extends Authenticatable
+    {
+        //
+    }
+    ```
+
+    To attach multiple observers, repeat the attribute or pass an array.
+
+    ```php
+    #[ObservedBy(UserObserver::class)]
+    #[ObservedBy(AuditObserver::class)]
+    class User extends Authenticatable
+    {
+        //
+    }
+    ```
+
+    **Option 2: Register in AppServiceProvider**
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Models\User;
+    use App\Observers\UserObserver;
+    use Illuminate\Support\ServiceProvider;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            User::observe(UserObserver::class);
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  The `#[ObservedBy]` attribute lives in the `Illuminate\Database\Eloquent\Attributes` namespace. It is a native PHP 8.0+ attribute and the approach encouraged in Laravel 13.
+</Info>
+
+## Running Observers after a transaction commits
+
+When a model is created or updated inside a database transaction, you may want the observer to run only after the transaction commits successfully. Implement `ShouldHandleEventsAfterCommit` to get this behavior.
+
+```php
+<?php
+
+namespace App\Observers;
+
+use App\Models\User;
+use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
+
+class UserObserver implements ShouldHandleEventsAfterCommit
+{
+    public function created(User $user): void
+    {
+        // Runs after the transaction commits
+    }
+}
+```
+
+If the event fires outside a transaction, it runs immediately as normal.
+
+## Temporarily disabling events
+
+### withoutEvents — silence all events for a block of code
+
+Inside the closure passed to `withoutEvents()`, no model events fire.
+
+```php
+use App\Models\User;
+
+$user = User::withoutEvents(function () {
+    User::findOrFail(1)->delete();
+
+    return User::find(2);
+});
+```
+
+### saveQuietly — save without firing events
+
+```php
+$user = User::findOrFail(1);
+
+$user->name = 'Victoria Faith';
+
+$user->saveQuietly();
+```
+
+Similar quiet methods exist for other operations.
+
+```php
+$user->deleteQuietly();
+$user->restoreQuietly();
+```
+
+## Practical use cases
+
+### Clearing cache automatically
+
+```php
+<?php
+
+namespace App\Observers;
+
+use App\Models\Post;
+use Illuminate\Support\Facades\Cache;
+
+class PostObserver
+{
+    public function saved(Post $post): void
+    {
+        Cache::forget("post:{$post->id}");
+        Cache::forget('posts:latest');
+    }
+
+    public function deleted(Post $post): void
+    {
+        Cache::forget("post:{$post->id}");
+        Cache::forget('posts:latest');
+    }
+}
+```
+
+### Recording an audit log
+
+`getDirty()` returns the attributes that have changed since the model was last synced.
+
+```php
+<?php
+
+namespace App\Observers;
+
+use App\Models\AuditLog;
+use App\Models\User;
+
+class UserObserver
+{
+    public function updating(User $user): void
+    {
+        AuditLog::create([
+            'model_type' => User::class,
+            'model_id'   => $user->id,
+            'changes'    => $user->getDirty(),
+            'user_id'    => auth()->id(),
+        ]);
+    }
+
+    public function deleted(User $user): void
+    {
+        AuditLog::create([
+            'model_type' => User::class,
+            'model_id'   => $user->id,
+            'changes'    => ['deleted' => true],
+            'user_id'    => auth()->id(),
+        ]);
+    }
+}
+```
+
+<Tip>
+  The `updating` event fires **before** the record is saved to the database, so `getDirty()` contains the pending changes. Calling `getDirty()` inside an `updated` listener will return an empty array because the model has already been synced.
+</Tip>
+
+### Updating related models automatically
+
+```php
+<?php
+
+namespace App\Observers;
+
+use App\Models\Order;
+
+class OrderObserver
+{
+    public function created(Order $order): void
+    {
+        foreach ($order->items as $item) {
+            $item->product->decrement('stock', $item->quantity);
+        }
+    }
+
+    public function deleted(Order $order): void
+    {
+        foreach ($order->items as $item) {
+            $item->product->increment('stock', $item->quantity);
+        }
+    }
+}
+```
+
+## Next steps
+
+<Card title="Eloquent scopes" icon="filter" href="/en/advanced/eloquent-scopes">
+  Learn how local and global scopes let you reuse query constraints across your application.
+</Card>

@@ -1,0 +1,246 @@
+---
+title: "Higher Order Messages"
+description: "How the HigherOrderCollectionProxy enables the $collection->map->method() syntax, and practical patterns for working with Eloquent collections."
+---
+
+## What are higher order messages?
+
+Higher order messages let you call collection methods using property-access syntax rather than writing a closure. You can retrieve a property or call a method on every element without any anonymous functions.
+
+```php
+// Standard approach
+$names = $users->map(fn ($user) => $user->name);
+
+// Higher order message
+$names = $users->map->name;
+```
+
+`$users->map->name` means "map over each user and return its `name` property."
+
+## How it works — HigherOrderCollectionProxy
+
+When you access `$collection->map` as a property, the `__get()` method in the `EnumeratesValues` trait is called.
+
+```php
+// src/Illuminate/Collections/Traits/EnumeratesValues.php
+public function __get($key)
+{
+    if (! in_array($key, static::$proxies)) {
+        throw new Exception("Property [{$key}] does not exist on this collection instance.");
+    }
+
+    return new HigherOrderCollectionProxy($this, $key);
+}
+```
+
+If the key is in the `$proxies` list, a `HigherOrderCollectionProxy` instance is returned. The proxy holds a reference to the collection and the method name.
+
+### Property access via __get
+
+Accessing a property on the proxy (`->name`) triggers the proxy's `__get()`.
+
+```php
+// src/Illuminate/Collections/HigherOrderCollectionProxy.php
+public function __get($key)
+{
+    return $this->collection->{$this->method}(function ($value) use ($key) {
+        return is_array($value) ? $value[$key] : $value->{$key};
+    });
+}
+```
+
+So `$users->map->name` is equivalent to:
+
+```php
+$users->map(fn ($user) => $user->name);
+```
+
+### Method calls via __call
+
+Calling a method on the proxy (`->activate()`) triggers the proxy's `__call()`.
+
+```php
+public function __call($method, $parameters)
+{
+    return $this->collection->{$this->method}(function ($value) use ($method, $parameters) {
+        return is_string($value)
+            ? $value::{$method}(...$parameters)
+            : $value->{$method}(...$parameters);
+    });
+}
+```
+
+So `$users->each->activate()` is equivalent to:
+
+```php
+$users->each(fn ($user) => $user->activate());
+```
+
+## Supported methods
+
+The methods available as higher order messages are defined in the `$proxies` array.
+
+```php
+protected static $proxies = [
+    'average', 'avg',
+    'contains', 'doesntContain', 'some',
+    'each', 'every',
+    'filter', 'reject',
+    'first', 'last',
+    'flatMap', 'map',
+    'groupBy', 'keyBy',
+    'hasMany', 'hasSole',
+    'max', 'min', 'sum', 'percentage',
+    'partition',
+    'skipUntil', 'skipWhile',
+    'sortBy', 'sortByDesc',
+    'takeUntil', 'takeWhile',
+    'unique',
+    'unless', 'until', 'when',
+];
+```
+
+To add a custom method to the proxy list, call `Collection::proxy()`.
+
+```php
+Collection::proxy('myCustomMethod');
+```
+
+## Practical use cases
+
+### Eloquent model collections
+
+Higher order messages are especially useful with Eloquent collections.
+
+```php
+$users = User::with('posts')->get();
+
+// Call a method on each element
+$users->each->markAsVerified();
+
+// Retrieve a property from each element
+$names = $users->map->name;
+
+// Pass arguments to a method
+$users->each->sendPasswordReset('en');
+
+// Send a notification to each user
+$users->each->notify(new WelcomeNotification);
+```
+
+### Filtering
+
+```php
+$activeUsers = $users->filter->isActive();
+// Equivalent to: $users->filter(fn ($user) => $user->isActive())
+
+$inactiveUsers = $users->reject->isActive();
+```
+
+### Aggregation
+
+```php
+// Sum a property across all elements
+$totalPosts = $users->sum->post_count;
+
+// Maximum value of a property
+$highestScore = $users->max->score;
+
+// Average value of a property
+$averageAge = $users->avg->age;
+```
+
+### Grouping and sorting
+
+```php
+// Group by a property
+$grouped = $users->groupBy->role;
+
+// Sort ascending by a property
+$sorted = $users->sortBy->name;
+
+// Sort descending by a property
+$sorted = $users->sortByDesc->created_at;
+```
+
+### Flattening nested collections
+
+```php
+// Expand each user's posts relation into a single collection
+$posts = $users->flatMap->posts;
+```
+
+### Checking conditions
+
+```php
+// Check whether every element satisfies a condition
+$allAdmins = $users->every->isAdmin();
+
+// Check whether at least one element satisfies a condition
+$hasActive = $users->contains->isActive();
+
+// Pass an argument to the method
+$allPro = $users->every->hasPlan('pro');
+```
+
+## Higher order messages vs closures
+
+Higher order messages are concise, but they do not cover every scenario.
+
+```php
+// Higher order messages: best for simple property access or method calls
+$emails = $users->map->email;
+$users->each->sendWelcomeMail();
+$admins = $users->filter->isAdmin();
+
+// Closures: use when logic is complex or arguments are dynamic
+$formatted = $users->map(function ($user) {
+    return "{$user->name} <{$user->email}>";
+});
+
+$filtered = $users->filter(function ($user) use ($minAge, $role) {
+    return $user->age >= $minAge && $user->role === $role;
+});
+```
+
+<Tip>
+  Use higher order messages when you are doing the same thing to every element — retrieving the same property or calling the same method. Switch to closures when the logic varies per element or depends on external variables.
+</Tip>
+
+## Adding custom methods to the proxy list
+
+Register the method as a macro first, then proxy it.
+
+```php
+namespace App\Providers;
+
+use Illuminate\Support\Collection;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        Collection::macro('active', function () {
+            return $this->filter(fn ($item) => $item->isActive());
+        });
+
+        Collection::proxy('active');
+    }
+}
+```
+
+```php
+// After registration, use it as a higher order message
+$activeUsers = $users->active;
+```
+
+<Info>
+  For string collections, the proxy's `__call()` attempts a static method call on the string. In practice, higher order messages work most naturally with Eloquent models or other objects.
+</Info>
+
+## Next steps
+
+<Card title="The Conditionable trait" icon="git-branch" href="/en/advanced/conditionable">
+  Learn how when() and unless() work internally, and how to use them in QueryBuilder and custom classes.
+</Card>

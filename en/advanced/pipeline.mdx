@@ -1,0 +1,380 @@
+---
+title: "The Pipeline Pattern"
+description: "How Illuminate\\Pipeline\\Pipeline works, and how to compose multi-step processing chains using the pipeline pattern."
+---
+
+## What is the pipeline pattern?
+
+The pipeline pattern passes a subject (the *passable*) through a series of pipes (processing steps) in sequence. Each pipe receives the output of the previous step, applies its transformation, and passes the result along.
+
+Laravel implements this pattern in `Illuminate\Pipeline\Pipeline`. Middleware processing is the most visible example — every HTTP request travels through a pipeline before reaching your controller.
+
+```
+Request → [Middleware 1] → [Middleware 2] → [Controller] → Response
+```
+
+## Where Laravel uses pipelines
+
+Pipelines are central to how Laravel's core works.
+
+- **HTTP middleware** — `Illuminate\Foundation\Http\Kernel` sends requests through a middleware pipeline.
+- **Console commands** — Artisan commands can be wrapped in pre/post processing.
+- **Route middleware** — Route groups apply middleware via pipelines.
+
+Here is how the HTTP kernel uses a pipeline internally.
+
+```php
+// Illuminate\Foundation\Http\Kernel
+protected function sendRequestThroughRouter($request)
+{
+    return (new Pipeline($this->app))
+        ->send($request)
+        ->through($this->app->shouldSkipMiddleware() ? [] : $this->middleware)
+        ->then($this->dispatchToRouter());
+}
+```
+
+## Basic usage
+
+### send / through / thenReturn
+
+The simplest pipeline chains three calls.
+
+```php
+use Illuminate\Pipeline\Pipeline;
+
+$result = app(Pipeline::class)
+    ->send('hello')
+    ->through([
+        function (string $passable, Closure $next): string {
+            return $next(strtoupper($passable));
+        },
+        function (string $passable, Closure $next): string {
+            return $next($passable . '!');
+        },
+    ])
+    ->thenReturn();
+
+// $result === 'HELLO!'
+```
+
+- `send($passable)` — the value to send through the pipeline.
+- `through($pipes)` — an array of pipes (closures or class names).
+- `thenReturn()` — run the pipeline and return the result.
+
+### then
+
+Use `then()` when you want to specify a final callback explicitly.
+
+```php
+$result = app(Pipeline::class)
+    ->send($request)
+    ->through([AuthPipe::class, LogPipe::class])
+    ->then(function ($request) {
+        return 'processed: ' . $request;
+    });
+```
+
+### pipe
+
+Add pipes dynamically after construction with `pipe()`.
+
+```php
+$pipeline = app(Pipeline::class)
+    ->send($data)
+    ->through([FirstPipe::class]);
+
+if ($needsExtra) {
+    $pipeline->pipe(ExtraPipe::class);
+}
+
+$result = $pipeline->thenReturn();
+```
+
+## Class-based pipes
+
+Using dedicated pipe classes instead of closures improves reusability. Each pipe class implements a `handle` method.
+
+```php
+namespace App\Pipes;
+
+use Closure;
+
+class TrimPipe
+{
+    public function handle(string $passable, Closure $next): string
+    {
+        return $next(trim($passable));
+    }
+}
+```
+
+```php
+namespace App\Pipes;
+
+use Closure;
+
+class SanitizePipe
+{
+    public function handle(string $passable, Closure $next): string
+    {
+        $sanitized = htmlspecialchars($passable, ENT_QUOTES, 'UTF-8');
+
+        return $next($sanitized);
+    }
+}
+```
+
+```php
+use App\Pipes\TrimPipe;
+use App\Pipes\SanitizePipe;
+use Illuminate\Pipeline\Pipeline;
+
+$result = app(Pipeline::class)
+    ->send('  <script>alert("xss")</script>  ')
+    ->through([TrimPipe::class, SanitizePipe::class])
+    ->thenReturn();
+
+// $result === '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
+```
+
+## via — changing the method name
+
+By default the pipeline calls `handle` on each pipe. Use `via()` to call a different method name.
+
+```php
+class ValidatePipe
+{
+    public function process(array $data, Closure $next): array
+    {
+        // validation logic
+        return $next($data);
+    }
+}
+
+$result = app(Pipeline::class)
+    ->send($data)
+    ->through([ValidatePipe::class])
+    ->via('process')
+    ->thenReturn();
+```
+
+## Passing parameters to pipes
+
+Append parameters to a class name using `:` and `,`. This is the same syntax used by route middleware (`throttle:60,1`).
+
+```php
+namespace App\Pipes;
+
+use Closure;
+
+class LimitLengthPipe
+{
+    public function handle(string $passable, Closure $next, int $max = 100): string
+    {
+        return $next(substr($passable, 0, $max));
+    }
+}
+```
+
+```php
+$result = app(Pipeline::class)
+    ->send($longText)
+    ->through(['App\Pipes\LimitLengthPipe:50'])
+    ->thenReturn();
+```
+
+## finally — running code after the pipeline
+
+Register a callback that always runs after the pipeline completes, regardless of success or failure.
+
+```php
+$result = app(Pipeline::class)
+    ->send($request)
+    ->through([LogPipe::class, AuthPipe::class])
+    ->finally(function ($passable) {
+        logger()->info('Pipeline completed', ['request' => $passable]);
+    })
+    ->thenReturn();
+```
+
+## withinTransaction — wrapping the pipeline in a transaction
+
+Since Laravel 11, you can run an entire pipeline inside a database transaction.
+
+```php
+$result = app(Pipeline::class)
+    ->send($order)
+    ->through([
+        CreateOrderPipe::class,
+        ChargePaymentPipe::class,
+        SendConfirmationPipe::class,
+    ])
+    ->withinTransaction()
+    ->thenReturn();
+```
+
+Specify a connection name to target a particular database.
+
+```php
+->withinTransaction('mysql')
+```
+
+If any pipe throws an exception, the entire transaction rolls back.
+
+## Practical example: order processing pipeline
+
+<Steps>
+  <Step title="Create the pipe classes">
+    ```php
+    namespace App\Pipes\Order;
+
+    use App\Models\Order;
+    use Closure;
+
+    class ValidateInventoryPipe
+    {
+        public function handle(Order $order, Closure $next): Order
+        {
+            foreach ($order->items as $item) {
+                if ($item->product->stock < $item->quantity) {
+                    throw new \RuntimeException("Out of stock: {$item->product->name}");
+                }
+            }
+
+            return $next($order);
+        }
+    }
+    ```
+
+    ```php
+    namespace App\Pipes\Order;
+
+    use App\Models\Order;
+    use Closure;
+
+    class ReserveInventoryPipe
+    {
+        public function handle(Order $order, Closure $next): Order
+        {
+            foreach ($order->items as $item) {
+                $item->product->decrement('stock', $item->quantity);
+            }
+
+            return $next($order);
+        }
+    }
+    ```
+
+    ```php
+    namespace App\Pipes\Order;
+
+    use App\Models\Order;
+    use App\Services\PaymentService;
+    use Closure;
+
+    class ProcessPaymentPipe
+    {
+        public function __construct(
+            protected PaymentService $payment,
+        ) {}
+
+        public function handle(Order $order, Closure $next): Order
+        {
+            $this->payment->charge($order->total, $order->payment_token);
+            $order->update(['status' => 'paid']);
+
+            return $next($order);
+        }
+    }
+    ```
+  </Step>
+  <Step title="Run the pipeline">
+    ```php
+    use App\Models\Order;
+    use App\Pipes\Order\ValidateInventoryPipe;
+    use App\Pipes\Order\ReserveInventoryPipe;
+    use App\Pipes\Order\ProcessPaymentPipe;
+    use Illuminate\Pipeline\Pipeline;
+
+    class OrderService
+    {
+        public function process(Order $order): Order
+        {
+            return app(Pipeline::class)
+                ->send($order)
+                ->through([
+                    ValidateInventoryPipe::class,
+                    ReserveInventoryPipe::class,
+                    ProcessPaymentPipe::class,
+                ])
+                ->withinTransaction()
+                ->thenReturn();
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## How the pipeline works internally
+
+The `carry()` method is the heart of the pipeline. It uses `array_reduce` to fold the pipe array from right to left, building a chain of closures.
+
+```php
+// Pipeline::then() internals
+protected function carry()
+{
+    return function ($stack, $pipe) {
+        return function ($passable) use ($stack, $pipe) {
+            if (is_callable($pipe)) {
+                return $pipe($passable, $stack);
+            } elseif (! is_object($pipe)) {
+                [$name, $parameters] = $this->parsePipeString($pipe);
+                $pipe = $this->getContainer()->make($name);
+                $parameters = array_merge([$passable, $stack], $parameters);
+            } else {
+                $parameters = [$passable, $stack];
+            }
+
+            return $pipe->{$this->method}(...$parameters);
+        };
+    };
+}
+```
+
+The pipes are reversed before being passed to `array_reduce` so that the first pipe in your array is the first to execute. The closure stack is built from the inside out.
+
+<Tip>
+  The pipeline is sometimes called an "onion" architecture. A request enters from the outermost layer (the first pipe) and travels inward. The response then unwinds back through each layer. This is why middleware can run code both before and after calling `$next()`.
+</Tip>
+
+## Using macros with Pipeline
+
+`Pipeline` uses the `Macroable` trait, so you can add custom methods to it.
+
+```php
+use Illuminate\Pipeline\Pipeline;
+
+Pipeline::macro('sendThroughLogging', function (array $pipes) {
+    /** @var Pipeline $this */
+    return $this->through(array_map(function ($pipe) {
+        return function ($passable, $next) use ($pipe) {
+            logger()->debug("Entering pipe: {$pipe}");
+            $result = $next($passable);
+            logger()->debug("Exiting pipe: {$pipe}");
+            return $result;
+        };
+    }, $pipes));
+});
+
+$result = app(Pipeline::class)
+    ->send($data)
+    ->sendThroughLogging([TrimPipe::class, SanitizePipe::class])
+    ->thenReturn();
+```
+
+## Next steps
+
+<Card title="The Macroable trait" icon="puzzle-piece" href="/en/advanced/macroable">
+  Learn how to add custom methods to existing Laravel classes using the Macroable trait.
+</Card>

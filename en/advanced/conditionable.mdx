@@ -1,0 +1,256 @@
+---
+title: "The Conditionable Trait"
+description: "How when() and unless() work internally, and patterns for keeping method chains clean with conditional logic."
+---
+
+## What is the Conditionable trait?
+
+`Illuminate\Support\Traits\Conditionable` adds `when()` and `unless()` to any class that uses it. These methods let you branch logic conditionally while keeping a fluent method chain intact.
+
+<Info>
+  The source lives in `src/Illuminate/Conditionable/Traits/Conditionable.php`. The `Illuminate\Support\Traits\Conditionable` namespace is an alias that points there.
+</Info>
+
+Many Laravel classes use this trait: QueryBuilder, Eloquent Builder, Mail, Notification, and others.
+
+## Basic usage
+
+### when() — execute when the condition is truthy
+
+```php
+use Illuminate\Support\Collection;
+
+$results = collect([1, 2, 3, 4, 5])
+    ->when(true, function (Collection $collection) {
+        return $collection->filter(fn ($n) => $n > 2);
+    });
+// [3, 4, 5]
+```
+
+When the first argument is truthy the second argument (callback) runs. When it is falsy the optional third argument (default callback) runs instead.
+
+```php
+$results = collect([1, 2, 3, 4, 5])
+    ->when(false, function (Collection $collection) {
+        return $collection->filter(fn ($n) => $n > 2);
+    }, function (Collection $collection) {
+        return $collection->filter(fn ($n) => $n < 3);
+    });
+// [1, 2]
+```
+
+### unless() — execute when the condition is falsy
+
+`unless()` is the inverse of `when()`. The callback runs when the condition is falsy.
+
+```php
+$results = collect([1, 2, 3, 4, 5])
+    ->unless(false, function (Collection $collection) {
+        return $collection->take(3);
+    });
+// [1, 2, 3]
+```
+
+## Why the chain continues
+
+When the callback returns `null`, `when()` returns `$this` so the chain continues. When the callback returns a value, that value becomes the next item in the chain.
+
+```php
+// The chain continues because the callbacks return void/null
+$query = User::query()
+    ->when($request->has('active'), function ($query) {
+        $query->where('active', true);
+    })
+    ->when($request->filled('name'), function ($query) use ($request) {
+        $query->where('name', 'like', "%{$request->name}%");
+    })
+    ->orderBy('created_at', 'desc');
+```
+
+The source implementation is:
+
+```php
+if ($value) {
+    return $callback($this, $value) ?? $this;
+} elseif ($default) {
+    return $default($this, $value) ?? $this;
+}
+
+return $this;
+```
+
+When the callback returns an explicit value, that value flows to the next call in the chain. When the callback returns nothing (`null`), `$this` is returned instead.
+
+## Calling when() with no arguments — HigherOrderWhenProxy
+
+Calling `when()` with zero arguments returns a `HigherOrderWhenProxy`. This lets you set the condition lazily.
+
+```php
+$query = User::query()
+    ->when()->isActive()
+    ->where('role', 'admin');
+```
+
+Calling `when()` with one argument returns a proxy that holds that value as the condition.
+
+```php
+// One argument: get a proxy with the condition already set
+$proxy = collect([1, 2, 3])->when($request->has('filter'));
+// $proxy->methodName() calls methodName() only when the condition is truthy
+```
+
+## Passing a closure as the condition
+
+When the first argument is a closure, the closure's return value is used as the condition.
+
+```php
+$results = User::query()
+    ->when(
+        fn ($query) => $request->filled('role'),
+        fn ($query) => $query->where('role', $request->role)
+    )
+    ->get();
+```
+
+This lets you encapsulate the condition evaluation inside a callback.
+
+## The classic QueryBuilder pattern
+
+Dynamic query building with `when()` is the most common use case.
+
+```php
+public function index(Request $request)
+{
+    $users = User::query()
+        ->when($request->filled('search'), function ($query) use ($request) {
+            $query->where('name', 'like', "%{$request->search}%")
+                  ->orWhere('email', 'like', "%{$request->search}%");
+        })
+        ->when($request->filled('role'), fn ($q) => $q->where('role', $request->role))
+        ->when($request->boolean('verified'), fn ($q) => $q->whereNotNull('email_verified_at'))
+        ->when(
+            $request->filled('sort'),
+            fn ($q) => $q->orderBy($request->sort, $request->get('direction', 'asc')),
+            fn ($q) => $q->latest()
+        )
+        ->paginate();
+
+    return UserResource::collection($users);
+}
+```
+
+## Adding Conditionable to your own classes
+
+Use the trait in any class to get `when()` and `unless()` for free.
+
+```php
+namespace App\Services;
+
+use Illuminate\Support\Traits\Conditionable;
+
+class ReportBuilder
+{
+    use Conditionable;
+
+    protected array $filters = [];
+    protected bool $includeArchived = false;
+    protected ?string $groupBy = null;
+
+    public function withArchived(): static
+    {
+        $this->includeArchived = true;
+
+        return $this;
+    }
+
+    public function groupBy(string $column): static
+    {
+        $this->groupBy = $column;
+
+        return $this;
+    }
+
+    public function addFilter(string $column, mixed $value): static
+    {
+        $this->filters[$column] = $value;
+
+        return $this;
+    }
+
+    public function build(): \Illuminate\Database\Eloquent\Builder
+    {
+        return Report::query()
+            ->when($this->includeArchived, fn ($q) => $q->withTrashed())
+            ->when($this->groupBy, fn ($q) => $q->groupBy($this->groupBy))
+            ->when($this->filters, function ($q) {
+                foreach ($this->filters as $column => $value) {
+                    $q->where($column, $value);
+                }
+            });
+    }
+}
+```
+
+```php
+// Usage
+$query = (new ReportBuilder)
+    ->when($request->boolean('archived'), fn ($b) => $b->withArchived())
+    ->when($request->filled('group'), fn ($b) => $b->groupBy($request->group))
+    ->addFilter('status', 'published')
+    ->build();
+```
+
+## Using when() with Mail and Notifications
+
+`when()` is available in Mailable and Notification classes too.
+
+```php
+use Illuminate\Mail\Mailable;
+
+class OrderConfirmation extends Mailable
+{
+    public function build(): static
+    {
+        return $this
+            ->subject('Your order has been received')
+            ->view('emails.order.confirmation')
+            ->when($this->order->hasDiscount(), function (Mailable $mail) {
+                $mail->attach(storage_path('discounts/coupon.pdf'));
+            })
+            ->when(app()->environment('production'), function (Mailable $mail) {
+                $mail->bcc('archive@example.com');
+            });
+    }
+}
+```
+
+## when() vs tap()
+
+Both look similar but serve different purposes.
+
+| | `tap()` | `when()` |
+|---|---|---|
+| Purpose | Side effects (logging, debugging) | Conditional branching |
+| Return value | Always `$this` | `$this` or the callback's return value |
+| Condition | None | Yes |
+
+```php
+// tap: use for side effects; always returns $this
+$user = User::find($id)
+    ->tap(fn ($user) => Log::info("User {$user->id} loaded"));
+
+// when: use for conditional branching
+$user = User::query()
+    ->when($isAdmin, fn ($q) => $q->where('role', 'admin'))
+    ->first();
+```
+
+<Tip>
+  If you only want to trigger a side effect (logging, debugging) mid-chain, use `tap()`. Use `when()` or `unless()` when you need to change behavior based on a condition.
+</Tip>
+
+## Next steps
+
+<Card title="Higher order messages" icon="layers" href="/en/advanced/higher-order-messages">
+  Learn how the `$collection->map->method()` syntax works and how to use it in practice.
+</Card>

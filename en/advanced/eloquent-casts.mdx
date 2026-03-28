@@ -1,0 +1,418 @@
+---
+title: "Eloquent Custom Casts"
+description: "How to implement the CastsAttributes interface to build custom casts. Covers Value Object casts, inbound-only casts, cast parameters, and the Castable pattern."
+---
+
+## What are casts?
+
+Eloquent casts convert raw database values to PHP types when you read them, and convert them back when you write. You define them in the model's `casts` method.
+
+```php
+protected function casts(): array
+{
+    return [
+        'is_admin'   => 'boolean',
+        'settings'   => 'array',
+        'created_at' => 'datetime',
+    ];
+}
+```
+
+## Built-in cast types
+
+| Cast | Description |
+|---|---|
+| `integer` / `int` | Cast to integer |
+| `float` / `double` | Cast to float |
+| `string` | Cast to string |
+| `boolean` / `bool` | Cast to boolean (handles `0` and `1`) |
+| `array` | JSON string ↔ PHP array |
+| `collection` | JSON string ↔ Collection instance |
+| `object` | JSON string ↔ stdClass instance |
+| `datetime` | String ↔ Carbon instance |
+| `immutable_datetime` | String ↔ CarbonImmutable instance |
+| `date` | String ↔ Carbon (date only) |
+| `timestamp` | String ↔ Unix timestamp |
+| `encrypted` | Encrypt on write, decrypt on read |
+| `hashed` | Hash on write (combine with a read-only accessor) |
+| `AsStringable::class` | String ↔ Stringable object |
+| `AsArrayObject::class` | JSON ↔ ArrayObject instance |
+| `AsCollection::class` | JSON ↔ Collection instance |
+
+<Info>
+  `AsArrayObject` and `AsCollection` are implemented as custom casts internally so that individual offsets can be modified directly.
+</Info>
+
+## Creating a custom cast
+
+When the built-in types do not cover your needs, implement `CastsAttributes`.
+
+### The interface
+
+```php
+// src/Illuminate/Contracts/Database/Eloquent/CastsAttributes.php
+
+interface CastsAttributes
+{
+    /**
+     * Convert the database value to a PHP value (reading).
+     *
+     * @param  array<string, mixed>  $attributes  All attributes on the model
+     */
+    public function get(Model $model, string $key, mixed $value, array $attributes);
+
+    /**
+     * Convert the PHP value to a database value (writing).
+     *
+     * @param  array<string, mixed>  $attributes  All attributes on the model
+     */
+    public function set(Model $model, string $key, mixed $value, array $attributes);
+}
+```
+
+The `$attributes` parameter gives you access to every column on the model, which makes multi-column Value Object casts possible.
+
+### Basic example
+
+Generate a stub with Artisan.
+
+```bash
+php artisan make:cast AsMoney
+```
+
+This creates `app/Casts/AsMoney.php`. The following implementation converts an integer amount stored in the database into a `Money` Value Object.
+
+```php
+<?php
+
+namespace App\Casts;
+
+use App\ValueObjects\Money;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Eloquent\Model;
+
+class AsMoney implements CastsAttributes
+{
+    public function get(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): Money {
+        return new Money((int) $value);
+    }
+
+    public function set(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): int {
+        if ($value instanceof Money) {
+            return $value->amount;
+        }
+
+        return (int) $value;
+    }
+}
+```
+
+Apply the cast to a model.
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Casts\AsMoney;
+use Illuminate\Database\Eloquent\Model;
+
+class Order extends Model
+{
+    protected function casts(): array
+    {
+        return [
+            'price' => AsMoney::class,
+        ];
+    }
+}
+```
+
+Now `$order->price` returns a `Money` instance.
+
+## Value Object casts
+
+A Value Object cast maps multiple database columns to a single PHP object.
+
+### Example: Address cast
+
+This cast combines `address_line_one` and `address_line_two` into a single `Address` Value Object.
+
+```php
+<?php
+
+namespace App\ValueObjects;
+
+use Illuminate\Contracts\Support\Arrayable;
+
+class Address implements Arrayable, \JsonSerializable
+{
+    public function __construct(
+        public readonly string $lineOne,
+        public readonly string $lineTwo,
+    ) {}
+
+    public function toArray(): array
+    {
+        return [
+            'line_one' => $this->lineOne,
+            'line_two' => $this->lineTwo,
+        ];
+    }
+
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
+    }
+}
+```
+
+```php
+<?php
+
+namespace App\Casts;
+
+use App\ValueObjects\Address;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
+
+class AsAddress implements CastsAttributes
+{
+    public function get(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): Address {
+        return new Address(
+            $attributes['address_line_one'],
+            $attributes['address_line_two'],
+        );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function set(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): array {
+        if (! $value instanceof Address) {
+            throw new InvalidArgumentException('The given value is not an Address instance.');
+        }
+
+        return [
+            'address_line_one' => $value->lineOne,
+            'address_line_two' => $value->lineTwo,
+        ];
+    }
+}
+```
+
+<Info>
+  When `set` returns an array, Eloquent uses the array keys as column names and writes each value to the corresponding column. For single-column casts, return a scalar value.
+</Info>
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Casts\AsAddress;
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    protected function casts(): array
+    {
+        return [
+            'address' => AsAddress::class,
+        ];
+    }
+}
+```
+
+```php
+$user = User::find(1);
+
+// Access as a Value Object
+echo $user->address->lineOne;
+
+// Assign a new Value Object; it is saved to the correct columns automatically
+$user->address = new Address('123 Main St', 'Apt 4B');
+$user->save();
+```
+
+### Value Object caching
+
+Cast Value Objects are cached by Eloquent. Accessing the same attribute twice returns the same object instance.
+
+To disable this behavior, add the `$withoutObjectCaching` property to your cast class.
+
+```php
+class AsAddress implements CastsAttributes
+{
+    public bool $withoutObjectCaching = true;
+
+    // ...
+}
+```
+
+## Inbound casts (write-only)
+
+An inbound cast transforms a value only when it is written to the database. Reading returns the raw stored value. Use `CastsInboundAttributes`.
+
+Hashing is the canonical example — you hash a password when storing it, but you never reverse the transformation when reading.
+
+```bash
+php artisan make:cast AsHash --inbound
+```
+
+```php
+<?php
+
+namespace App\Casts;
+
+use Illuminate\Contracts\Database\Eloquent\CastsInboundAttributes;
+use Illuminate\Database\Eloquent\Model;
+
+class AsHash implements CastsInboundAttributes
+{
+    public function __construct(
+        protected string|null $algorithm = null,
+    ) {}
+
+    public function set(
+        Model $model,
+        string $key,
+        mixed $value,
+        array $attributes,
+    ): string {
+        return is_null($this->algorithm)
+            ? bcrypt($value)
+            : hash($this->algorithm, $value);
+    }
+}
+```
+
+## Cast parameters
+
+Pass parameters to a cast class by appending them to the class name with `:` and `,`.
+
+```php
+protected function casts(): array
+{
+    return [
+        'secret' => AsHash::class.':sha256',
+        'data'   => AsHash::class.':sha512',
+    ];
+}
+```
+
+Parameters are passed to the cast class constructor.
+
+```php
+class AsHash implements CastsInboundAttributes
+{
+    public function __construct(
+        protected string|null $algorithm = null, // 'sha256' is passed here
+    ) {}
+}
+```
+
+## Castables — letting the Value Object own its cast
+
+A Value Object that implements `Castable` declares which cast class to use via a static `castUsing` method. The model does not need to know about the cast class at all.
+
+```php
+<?php
+
+namespace App\ValueObjects;
+
+use App\Casts\AsAddress;
+use Illuminate\Contracts\Database\Eloquent\Castable;
+
+class Address implements Castable
+{
+    /**
+     * @param  array<string, mixed>  $arguments
+     */
+    public static function castUsing(array $arguments): string
+    {
+        return AsAddress::class;
+    }
+}
+```
+
+The model references the Value Object class directly.
+
+```php
+protected function casts(): array
+{
+    return [
+        'address' => Address::class,
+    ];
+}
+```
+
+<Tip>
+  Combine `Castable` with an anonymous class to keep the Value Object and its cast logic in a single file.
+
+  ```php
+  class Address implements Castable
+  {
+      public static function castUsing(array $arguments): CastsAttributes
+      {
+          return new class implements CastsAttributes
+          {
+              public function get(Model $model, string $key, mixed $value, array $attributes): Address
+              {
+                  return new Address(
+                      $attributes['address_line_one'],
+                      $attributes['address_line_two'],
+                  );
+              }
+
+              public function set(Model $model, string $key, mixed $value, array $attributes): array
+              {
+                  return [
+                      'address_line_one' => $value->lineOne,
+                      'address_line_two' => $value->lineTwo,
+                  ];
+              }
+          };
+      }
+  }
+  ```
+</Tip>
+
+## Merging casts at runtime
+
+To apply a cast only for a specific query or request, use `mergeCasts`.
+
+```php
+$user = User::find(1);
+
+$user->mergeCasts([
+    'extra_data' => 'array',
+]);
+```
+
+## Next steps
+
+<Card title="Eloquent Observers" icon="bell" href="/en/advanced/eloquent-observers">
+  Learn how to hook into model lifecycle events with Observer classes.
+</Card>
