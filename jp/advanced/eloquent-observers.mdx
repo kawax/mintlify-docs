@@ -1,0 +1,394 @@
+---
+title: "Eloquent Observers とモデルイベント"
+description: "Eloquentモデルが発火するイベントの仕組みと、Observerクラスを使ってイベントを一元管理する方法を解説します。`#[ObservedBy]` アトリビュートなどLaravel 13の最新機能も含みます。"
+---
+
+## モデルイベントとは
+
+Eloquentモデルはライフサイクルの各タイミングで自動的にイベントを発火します。これらのイベントにフックすることで、モデルの保存・削除などの前後に処理を差し込めます。
+
+Eloquentが発火するイベントは以下のとおりです。
+
+| イベント | 発生タイミング |
+|---|---|
+| `retrieved` | DBからモデルを取得したとき |
+| `creating` | 新規モデルを保存する直前 |
+| `created` | 新規モデルを保存した直後 |
+| `updating` | 既存モデルを更新する直前 |
+| `updated` | 既存モデルを更新した直後 |
+| `saving` | 新規作成・更新のどちらかで保存する直前 |
+| `saved` | 新規作成・更新のどちらかで保存した直後 |
+| `deleting` | モデルを削除する直前 |
+| `deleted` | モデルを削除した直後 |
+| `trashed` | ソフトデリートした直後 |
+| `forceDeleting` | 物理削除する直前 |
+| `forceDeleted` | 物理削除した直後 |
+| `restoring` | ソフトデリートを復元する直前 |
+| `restored` | ソフトデリートを復元した直後 |
+| `replicating` | `replicate()` を呼び出したとき |
+
+`-ing` で終わるイベントは変更がDBに永続化される**前**に、`-ed` で終わるイベントは**後**に発火します。
+
+<Warning>
+  マスアップデートやマスデリート（`User::where(...)->update(...)` など）では、`saving`、`saved`、`updating`、`updated`、`deleting`、`deleted` イベントは発火しません。モデルが実際には取得されないためです。
+</Warning>
+
+## クロージャを使ったイベントリスナー
+
+イベントをシンプルに扱いたい場合は、モデルの `booted` メソッド内でクロージャを登録できます。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            // ユーザー作成後に実行される処理
+        });
+
+        static::deleting(function (User $user) {
+            // ユーザー削除前に実行される処理
+        });
+    }
+}
+```
+
+処理をキューで非同期実行したい場合は `queueable` ヘルパーを使います。
+
+```php
+use function Illuminate\Events\queueable;
+
+static::created(queueable(function (User $user) {
+    // キューで非同期実行される
+}));
+```
+
+## `$dispatchesEvents` プロパティ
+
+Laravelのイベントシステムと連携したい場合は、`$dispatchesEvents` プロパティでモデルイベントを独自のイベントクラスにマッピングします。
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Events\UserDeleted;
+use App\Events\UserSaved;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+
+class User extends Authenticatable
+{
+    /**
+     * モデルイベントとイベントクラスのマッピング
+     *
+     * @var array<string, string>
+     */
+    protected $dispatchesEvents = [
+        'saved' => UserSaved::class,
+        'deleted' => UserDeleted::class,
+    ];
+}
+```
+
+マッピングしたイベントクラスには、コンストラクタでモデルのインスタンスを受け取ります。
+
+```php
+<?php
+
+namespace App\Events;
+
+use App\Models\User;
+
+class UserSaved
+{
+    public function __construct(
+        public readonly User $user,
+    ) {}
+}
+```
+
+## Observerクラスの作成
+
+1つのモデルに対して複数のイベントを処理する場合、クロージャを並べるよりもObserverクラスにまとめるほうがすっきりします。
+
+<Steps>
+  <Step title="Artisanコマンドでクラスを生成する">
+    `make:observer` コマンドで雛形を生成します。`--model` オプションでモデルを指定すると、対応するメソッドが自動で追加されます。
+
+    ```bash
+    php artisan make:observer UserObserver --model=User
+    ```
+
+    `app/Observers/UserObserver.php` が生成されます。
+  </Step>
+
+  <Step title="各イベントのメソッドを実装する">
+    メソッド名がイベント名に対応します。引数にはモデルのインスタンスが渡されます。
+
+    ```php
+    <?php
+
+    namespace App\Observers;
+
+    use App\Models\User;
+
+    class UserObserver
+    {
+        public function created(User $user): void
+        {
+            // ユーザー作成後の処理
+        }
+
+        public function updated(User $user): void
+        {
+            // ユーザー更新後の処理
+        }
+
+        public function deleted(User $user): void
+        {
+            // ユーザー削除後の処理
+        }
+
+        public function restored(User $user): void
+        {
+            // ソフトデリート復元後の処理
+        }
+
+        public function forceDeleted(User $user): void
+        {
+            // 物理削除後の処理
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="ObserverをModelに登録する">
+    登録方法は2つあります。Laravel 13では `#[ObservedBy]` アトリビュートを使う方法が推奨されます。
+
+    **方法1: `#[ObservedBy]` アトリビュート（推奨）**
+
+    モデルクラスにアトリビュートを付与するだけで登録が完了します。`AppServiceProvider` の変更が不要です。
+
+    ```php
+    <?php
+
+    namespace App\Models;
+
+    use App\Observers\UserObserver;
+    use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+
+    #[ObservedBy(UserObserver::class)]
+    class User extends Authenticatable
+    {
+        //
+    }
+    ```
+
+    複数のObserverを登録する場合はアトリビュートを繰り返すか、配列で渡します。
+
+    ```php
+    #[ObservedBy(UserObserver::class)]
+    #[ObservedBy(AuditObserver::class)]
+    class User extends Authenticatable
+    {
+        //
+    }
+    ```
+
+    **方法2: `AppServiceProvider` で登録する**
+
+    `AppServiceProvider` の `boot` メソッドで `observe` を呼び出します。
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Models\User;
+    use App\Observers\UserObserver;
+    use Illuminate\Support\ServiceProvider;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            User::observe(UserObserver::class);
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  `#[ObservedBy]` アトリビュートは `Illuminate\Database\Eloquent\Attributes` 名前空間にあります。PHP 8.0以降のネイティブ構文で、Laravel 13で積極的に採用されています。
+</Info>
+
+## データベーストランザクション内でのObserver
+
+モデルがトランザクション内で作成・更新される場合、トランザクションのコミット後にObserverを実行したいことがあります。`ShouldHandleEventsAfterCommit` インターフェースを実装するとその挙動になります。
+
+```php
+<?php
+
+namespace App\Observers;
+
+use App\Models\User;
+use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
+
+class UserObserver implements ShouldHandleEventsAfterCommit
+{
+    public function created(User $user): void
+    {
+        // トランザクションがコミットされた後に実行される
+    }
+}
+```
+
+トランザクション外で実行された場合は、通常どおり即時実行されます。
+
+## イベントを一時的に無効化する
+
+### `withoutEvents` で特定の処理だけイベントを止める
+
+`User::withoutEvents()` に渡したクロージャ内では、一切のモデルイベントが発火しません。
+
+```php
+use App\Models\User;
+
+$user = User::withoutEvents(function () {
+    User::findOrFail(1)->delete();
+
+    return User::find(2);
+});
+```
+
+### `saveQuietly` で保存時のイベントを止める
+
+イベントを発火させずにモデルを保存したいときは `saveQuietly` を使います。
+
+```php
+$user = User::findOrFail(1);
+
+$user->name = 'Victoria Faith';
+
+$user->saveQuietly();
+```
+
+同様のメソッドが削除・復元・レプリケートにも用意されています。
+
+```php
+$user->deleteQuietly();
+$user->restoreQuietly();
+```
+
+## 実践的なユースケース
+
+### キャッシュの自動クリア
+
+モデルが更新・削除されたときに関連するキャッシュを自動でクリアします。
+
+```php
+<?php
+
+namespace App\Observers;
+
+use App\Models\Post;
+use Illuminate\Support\Facades\Cache;
+
+class PostObserver
+{
+    public function saved(Post $post): void
+    {
+        Cache::forget("post:{$post->id}");
+        Cache::forget('posts:latest');
+    }
+
+    public function deleted(Post $post): void
+    {
+        Cache::forget("post:{$post->id}");
+        Cache::forget('posts:latest');
+    }
+}
+```
+
+### 監査ログの記録
+
+モデルの変更履歴を自動で記録します。`getDirty()` で変更前後の値を取得できます。
+
+```php
+<?php
+
+namespace App\Observers;
+
+use App\Models\AuditLog;
+use App\Models\User;
+
+class UserObserver
+{
+    public function updating(User $user): void
+    {
+        AuditLog::create([
+            'model_type' => User::class,
+            'model_id'   => $user->id,
+            'changes'    => $user->getDirty(),
+            'user_id'    => auth()->id(),
+        ]);
+    }
+
+    public function deleted(User $user): void
+    {
+        AuditLog::create([
+            'model_type' => User::class,
+            'model_id'   => $user->id,
+            'changes'    => ['deleted' => true],
+            'user_id'    => auth()->id(),
+        ]);
+    }
+}
+```
+
+<Tip>
+  `updating` イベントはDBへの保存**前**に発火するため、`getDirty()` で変更予定の値を取得できます。`updated` イベント後に呼ぶと `getDirty()` は空になります。
+</Tip>
+
+### 関連モデルの自動更新
+
+注文が完了したときに在庫数を自動で更新する例です。
+
+```php
+<?php
+
+namespace App\Observers;
+
+use App\Models\Order;
+
+class OrderObserver
+{
+    public function created(Order $order): void
+    {
+        foreach ($order->items as $item) {
+            $item->product->decrement('stock', $item->quantity);
+        }
+    }
+
+    public function deleted(Order $order): void
+    {
+        foreach ($order->items as $item) {
+            $item->product->increment('stock', $item->quantity);
+        }
+    }
+}
+```
+
+## 次のステップ
+
+<Card title="上級: PHPアトリビュート" icon="tag" href="/jp/advanced/php-attributes">
+  `#[ObservedBy]` を含む、Laravel 13のPHPアトリビュートをまとめて学びます。
+</Card>
