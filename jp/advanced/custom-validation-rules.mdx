@@ -1,0 +1,594 @@
+---
+title: "カスタムバリデーションルール"
+description: "Laravelのバリデーション機能をルールオブジェクトやクロージャで拡張する方法を、フレームワークの内部実装まで踏み込んで解説します。"
+---
+
+## カスタムバリデーションルールとは
+
+Laravelには豊富な組み込みバリデーションルールが用意されていますが、アプリケーション固有の検証ロジックが必要な場面もあります。カスタムバリデーションルールを使うと、再利用可能な検証ロジックをクラスやクロージャとして定義し、標準のルールと同じように使えます。
+
+カスタムルールを定義する方法は主に2つあります。
+
+- **ルールオブジェクト** — 再利用性が高く、テストしやすい
+- **クロージャ** — 一度だけ使うシンプルなルールに向いている
+
+## ルールオブジェクト
+
+### ルールクラスを生成する
+
+`make:rule` Artisanコマンドで新しいルールクラスを生成します。生成されたクラスは `app/Rules` ディレクトリに配置されます。
+
+```bash
+php artisan make:rule Uppercase
+```
+
+### ValidationRuleインターフェースを実装する
+
+生成されたクラスに `validate` メソッドを実装します。このメソッドはバリデーション失敗時に `$fail` クロージャを呼び出します。
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
+
+class Uppercase implements ValidationRule
+{
+    /**
+     * バリデーションルールを実行する
+     */
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (strtoupper($value) !== $value) {
+            $fail('The :attribute must be uppercase.');
+        }
+    }
+}
+```
+
+`$fail` クロージャに渡す文字列には `:attribute` プレースホルダーを使えます。Laravelがフィールド名に置き換えます。
+
+### ルールオブジェクトを適用する
+
+ルールオブジェクトのインスタンスをバリデーション配列に渡します。
+
+```php
+use App\Rules\Uppercase;
+
+$request->validate([
+    'name' => ['required', 'string', new Uppercase],
+]);
+```
+
+フォームリクエストの `rules()` メソッドでも同様に使えます。
+
+```php
+public function rules(): array
+{
+    return [
+        'name' => ['required', 'string', new Uppercase],
+    ];
+}
+```
+
+### 翻訳キーを使ったエラーメッセージ
+
+エラーメッセージをハードコードする代わりに、翻訳キーを使うこともできます。
+
+```php
+public function validate(string $attribute, mixed $value, Closure $fail): void
+{
+    if (strtoupper($value) !== $value) {
+        $fail('validation.uppercase')->translate();
+    }
+}
+```
+
+翻訳ファイル `lang/ja/validation.php` にメッセージを追加します。
+
+```php
+return [
+    'uppercase' => ':attributeは大文字で入力してください。',
+    // ...
+];
+```
+
+### 複数のエラーメッセージを追加する
+
+一つのフィールドに複数のエラーを報告するには、`$fail` を複数回呼び出します。
+
+```php
+public function validate(string $attribute, mixed $value, Closure $fail): void
+{
+    if (! is_string($value)) {
+        $fail('The :attribute must be a string.');
+        return;
+    }
+
+    if (strlen($value) < 8) {
+        $fail('The :attribute must be at least 8 characters.');
+    }
+
+    if (! preg_match('/[A-Z]/', $value)) {
+        $fail('The :attribute must contain at least one uppercase letter.');
+    }
+}
+```
+
+## クロージャベースのルール
+
+アプリケーション内で一度だけ使うシンプルなルールは、クラスを作らずクロージャで定義できます。
+
+```php
+use Illuminate\Support\Facades\Validator;
+use Closure;
+
+$validator = Validator::make($request->all(), [
+    'title' => [
+        'required',
+        'max:255',
+        function (string $attribute, mixed $value, Closure $fail) {
+            if ($value === 'foo') {
+                $fail("The {$attribute} is invalid.");
+            }
+        },
+    ],
+]);
+```
+
+クロージャルールはインラインで定義するため手軽ですが、再利用や独立したテストが難しいため、複数箇所で使うロジックはルールオブジェクトに切り出すことをおすすめします。
+
+## Implicitルール（値が空でも実行する）
+
+デフォルトでは、フィールドが空または存在しない場合、カスタムルールは実行されません。空の値に対してもルールを実行したい場合は、`--implicit` オプションを付けてクラスを生成します。
+
+```bash
+php artisan make:rule Uppercase --implicit
+```
+
+生成されたクラスは `ImplicitRule` インターフェースを実装しています。このインターフェース自体は追加のメソッドを持たず、Laravelへのシグナルとして機能します。
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ImplicitRule;
+use Illuminate\Contracts\Validation\ValidationRule;
+
+class RequiredIfJapanese implements ValidationRule, ImplicitRule
+{
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (empty($value)) {
+            $fail('The :attribute is required.');
+            return;
+        }
+
+        if (! preg_match('/^[\p{Hiragana}\p{Katakana}\p{Han}ー]+$/u', $value)) {
+            $fail('The :attribute must contain only Japanese characters.');
+        }
+    }
+}
+```
+
+<Warning>
+  `ImplicitRule` は「属性が必須である」ことをLaravelに示すだけです。値が空のときに実際にバリデーションを失敗させるかどうかは、`validate` メソッドの実装次第です。
+</Warning>
+
+## データアクセス
+
+### DataAwareRule — フォーム全体のデータにアクセスする
+
+他のフィールドの値に基づいてバリデーションしたい場合は、`DataAwareRule` インターフェースを実装します。`setData` メソッドがバリデーション開始前に自動で呼び出されます。
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\DataAwareRule;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Support\Facades\DB;
+
+class UniqueForTenant implements DataAwareRule, ValidationRule
+{
+    /**
+     * バリデーション対象の全データ
+     *
+     * @var array<string, mixed>
+     */
+    protected array $data = [];
+
+    public function __construct(
+        protected string $table,
+        protected string $column = 'value',
+    ) {}
+
+    /**
+     * バリデーションデータをセットする
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function setData(array $data): static
+    {
+        $this->data = $data;
+
+        return $this;
+    }
+
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        $tenantId = $this->data['tenant_id'] ?? null;
+
+        $exists = DB::table($this->table)
+            ->where('tenant_id', $tenantId)
+            ->where($this->column, $value)
+            ->exists();
+
+        if ($exists) {
+            $fail('The :attribute has already been taken for this tenant.');
+        }
+    }
+}
+```
+
+使用例：
+
+```php
+$request->validate([
+    'tenant_id' => 'required|integer',
+    'email' => ['required', 'email', new UniqueForTenant('users', 'email')],
+]);
+```
+
+### ValidatorAwareRule — バリデーターインスタンスにアクセスする
+
+バリデーターが持つすべての情報（失敗したルール、カスタムメッセージなど）にアクセスするには、`ValidatorAwareRule` インターフェースを実装します。
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\ValidatorAwareRule;
+use Illuminate\Validation\Validator;
+
+class ConditionalFormat implements ValidationRule, ValidatorAwareRule
+{
+    protected Validator $validator;
+
+    public function setValidator(Validator $validator): static
+    {
+        $this->validator = $validator;
+
+        return $this;
+    }
+
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        // 他のフィールドがすでにバリデーション失敗している場合はスキップ
+        if ($this->validator->errors()->has('type')) {
+            return;
+        }
+
+        $type = $this->validator->getData()['type'] ?? null;
+
+        if ($type === 'phone' && ! preg_match('/^\+?[0-9\-\s]+$/', $value)) {
+            $fail('The :attribute must be a valid phone number.');
+        }
+
+        if ($type === 'email' && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            $fail('The :attribute must be a valid email address.');
+        }
+    }
+}
+```
+
+## 実践的なユースケース
+
+### 日本語文字チェック
+
+全角・半角の文字種を検証するルールです。
+
+```bash
+php artisan make:rule JapaneseOnly
+```
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
+
+class JapaneseOnly implements ValidationRule
+{
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        // ひらがな・カタカナ・漢字・長音符のみ許可
+        if (! preg_match('/^[\p{Hiragana}\p{Katakana}\p{Han}ー\s]+$/u', $value)) {
+            $fail(':attributeは日本語（ひらがな・カタカナ・漢字）で入力してください。');
+        }
+    }
+}
+```
+
+```php
+$request->validate([
+    'name_kana' => ['required', 'string', new JapaneseOnly],
+]);
+```
+
+### 電話番号フォーマット検証
+
+日本の電話番号形式を検証するルールです。
+
+```bash
+php artisan make:rule JapanesePhone
+```
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
+
+class JapanesePhone implements ValidationRule
+{
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        // ハイフンあり・なし両対応、国際形式も許可
+        $normalized = preg_replace('/[\s\-\(\)]/', '', $value);
+
+        $patterns = [
+            '/^0\d{9,10}$/',        // 一般的な固定・携帯電話番号
+            '/^\+81\d{9,10}$/',     // 国際形式
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalized)) {
+                return;
+            }
+        }
+
+        $fail(':attributeは有効な電話番号の形式で入力してください。');
+    }
+}
+```
+
+### テナントIDつきのユニーク制約
+
+マルチテナントアプリケーションでよくある、テナントスコープ内でのユニーク制約です。
+
+<Steps>
+  <Step title="ルールクラスを作成する">
+    ```bash
+    php artisan make:rule TenantUnique
+    ```
+
+    ```php
+    <?php
+
+    namespace App\Rules;
+
+    use Closure;
+    use Illuminate\Contracts\Validation\DataAwareRule;
+    use Illuminate\Contracts\Validation\ValidationRule;
+    use Illuminate\Support\Facades\DB;
+
+    class TenantUnique implements DataAwareRule, ValidationRule
+    {
+        protected array $data = [];
+
+        public function __construct(
+            protected string $table,
+            protected string $column,
+            protected ?int $ignoreId = null,
+        ) {}
+
+        public function setData(array $data): static
+        {
+            $this->data = $data;
+
+            return $this;
+        }
+
+        public function validate(string $attribute, mixed $value, Closure $fail): void
+        {
+            $tenantId = $this->data['tenant_id'] ?? null;
+
+            $query = DB::table($this->table)
+                ->where('tenant_id', $tenantId)
+                ->where($this->column, $value);
+
+            if ($this->ignoreId !== null) {
+                $query->where('id', '!=', $this->ignoreId);
+            }
+
+            if ($query->exists()) {
+                $fail(':attributeはすでに使用されています。');
+            }
+        }
+    }
+    ```
+  </Step>
+  <Step title="フォームリクエストで使用する">
+    ```php
+    <?php
+
+    namespace App\Http\Requests;
+
+    use App\Rules\TenantUnique;
+    use Illuminate\Foundation\Http\FormRequest;
+
+    class CreateProjectRequest extends FormRequest
+    {
+        public function rules(): array
+        {
+            return [
+                'tenant_id' => 'required|integer|exists:tenants,id',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    new TenantUnique('projects', 'name'),
+                ],
+            ];
+        }
+
+        public function authorize(): bool
+        {
+            return true;
+        }
+    }
+    ```
+  </Step>
+  <Step title="更新時はIDを除外する">
+    既存レコードを更新する場合は、自分自身のIDを除外して重複チェックします。
+
+    ```php
+    class UpdateProjectRequest extends FormRequest
+    {
+        public function rules(): array
+        {
+            $projectId = $this->route('project');
+
+            return [
+                'tenant_id' => 'required|integer|exists:tenants,id',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    new TenantUnique('projects', 'name', ignoreId: $projectId),
+                ],
+            ];
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## サービスプロバイダーでのルール登録
+
+### Validator::extend() でルールを追加する
+
+`Validator::extend()` を使うと、文字列形式（`'rule_name'`）でカスタムルールを使えるようになります。`AppServiceProvider` の `boot()` メソッドで登録します。
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Validator as ValidatorInstance;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        Validator::extend('japanese_only', function (string $attribute, mixed $value, array $parameters, ValidatorInstance $validator): bool {
+            return preg_match('/^[\p{Hiragana}\p{Katakana}\p{Han}ー\s]+$/u', $value) === 1;
+        });
+
+        Validator::replacer('japanese_only', function (string $message, string $attribute): string {
+            return str_replace(':attribute', $attribute, ':attributeは日本語で入力してください。');
+        });
+    }
+}
+```
+
+`Validator::extend()` で登録したルールは文字列として指定できます。
+
+```php
+$request->validate([
+    'name_kana' => 'required|japanese_only',
+]);
+```
+
+<Warning>
+  `Validator::extend()` はルールオブジェクトより古い登録方式です。新規開発では `ValidationRule` インターフェースを実装したルールオブジェクトを使うことを推奨します。
+</Warning>
+
+### Rule クラスにスタティックメソッドとして追加する
+
+`Rule` ファサードにマクロを追加することで、`Rule::myRule()` のような流暢なAPI（Fluent API）を提供できます。
+
+```php
+use Illuminate\Validation\Rule;
+
+Rule::macro('tenantUnique', function (string $table, string $column, ?int $ignoreId = null) {
+    return new \App\Rules\TenantUnique($table, $column, $ignoreId);
+});
+```
+
+```php
+// 使用例
+$request->validate([
+    'name' => ['required', Rule::tenantUnique('projects', 'name')],
+]);
+```
+
+## 内部実装の詳細
+
+`Illuminate\Validation\Validator` がカスタムルールを呼び出す仕組みを見てみましょう。
+
+バリデーター内では `validateAttribute()` が各フィールドを処理します。ルールが `ValidationRule` インターフェースを実装している場合、`validateUsingCustomRule()` メソッドが呼び出されます。
+
+```php
+// Illuminate\Validation\Validator::validateUsingCustomRule() の簡略版
+protected function validateUsingCustomRule($attribute, $value, $rule)
+{
+    // DataAwareRule の場合、全データを注入する
+    if ($rule instanceof DataAwareRule) {
+        $rule->setData($this->getData());
+    }
+
+    // ValidatorAwareRule の場合、バリデーター自身を注入する
+    if ($rule instanceof ValidatorAwareRule) {
+        $rule->setValidator($this);
+    }
+
+    // validate() を呼び出す
+    $rule->validate($attribute, $value, function ($message, $translate = false) use ($attribute, $rule) {
+        // $fail クロージャ — エラーメッセージを追加する
+        $this->errors()->add($attribute, $this->makeReplacements(
+            $message,
+            $attribute,
+            get_class($rule),
+            [], // 追加のプレースホルダー置換（例: ['min' => '8'] など）
+        ));
+    });
+}
+```
+
+`ImplicitRule` の処理は `isImplicit()` メソッドで判断され、値が空の場合でもルールのチェックを実行します。
+
+```php
+// 空の値に対してルールを実行するかどうかを判断する
+protected function isImplicit($rule): bool
+{
+    return $rule instanceof ImplicitRule
+        || in_array($rule, $this->implicitRules);
+}
+```
+
+<Tip>
+  `DataAwareRule` と `ValidatorAwareRule` を同時に実装することもできます。両インターフェースを持つクラスでは、どちらの注入も行われます。
+</Tip>
+
+## 関連ページ
+
+<Card title="バリデーション（入門）" icon="shield-check" href="/jp/tutorial/validation">
+  コントローラーやフォームリクエストでの標準的なバリデーション方法を確認します。
+</Card>
