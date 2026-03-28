@@ -1,0 +1,429 @@
+---
+title: "Eloquentのスコープ"
+description: "ローカルスコープとグローバルスコープの仕組みを解説します。SoftDeletingScope などのフレームワーク内部実装を読み解きながら、マルチテナントや公開/非公開フィルタなどの実践的なユースケースを紹介します。"
+---
+
+## スコープとは
+
+Eloquentのスコープは、クエリに対する制約をまとめて再利用できる仕組みです。スコープには2種類あります。
+
+| 種類 | 適用タイミング | 用途 |
+|---|---|---|
+| **グローバルスコープ** | 常に自動で適用 | ソフトデリート、マルチテナント、公開フィルタ |
+| **ローカルスコープ** | 明示的に呼び出したときだけ適用 | 「人気の投稿」「アクティブユーザー」などの共通フィルタ |
+
+## ローカルスコープ
+
+### 定義
+
+ローカルスコープは、モデルのメソッドに `#[Scope]` アトリビュートを付与して定義します。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+
+class Post extends Model
+{
+    /**
+     * 公開済みの投稿に絞り込む
+     */
+    #[Scope]
+    protected function published(Builder $query): void
+    {
+        $query->where('status', 'published');
+    }
+
+    /**
+     * 人気の投稿に絞り込む
+     */
+    #[Scope]
+    protected function popular(Builder $query): void
+    {
+        $query->where('views', '>', 1000);
+    }
+}
+```
+
+<Info>
+  `#[Scope]` アトリビュートは `Illuminate\Database\Eloquent\Attributes` 名前空間にあります。PHP 8.0以降のネイティブ構文です。
+</Info>
+
+### 使い方
+
+定義したスコープは、メソッドとして呼び出せます。チェーンもできます。
+
+```php
+use App\Models\Post;
+
+// 公開済み投稿のみ取得
+$posts = Post::published()->get();
+
+// 公開済みかつ人気の投稿を最新順で取得
+$posts = Post::published()->popular()->latest()->get();
+```
+
+### パラメータの受け渡し
+
+スコープメソッドの第2引数以降に追加のパラメータを定義できます。
+
+```php
+#[Scope]
+protected function ofStatus(Builder $query, string $status): void
+{
+    $query->where('status', $status);
+}
+```
+
+呼び出しのときにそのまま引数を渡します。
+
+```php
+$posts = Post::ofStatus('draft')->get();
+$posts = Post::ofStatus('published')->get();
+```
+
+### `orWhere` との組み合わせ
+
+スコープを `orWhere` でつなぐとき、論理グループが必要になる場合があります。
+
+```php
+// クロージャを使う方法（確実だが冗長）
+$users = User::popular()->orWhere(function (Builder $query) {
+    $query->active();
+})->get();
+
+// 高階メソッドを使うとシンプルに書ける
+$users = User::popular()->orWhere->active()->get();
+```
+
+## グローバルスコープ
+
+### 仕組み
+
+グローバルスコープは `Illuminate\Database\Eloquent\Scope` インターフェースを実装したクラスです。このインターフェースは `apply` メソッド1つだけを要求します。
+
+```php
+// フレームワーク本体のインターフェース定義
+// src/Illuminate/Database/Eloquent/Scope.php
+
+interface Scope
+{
+    public function apply(Builder $builder, Model $model);
+}
+```
+
+`apply` メソッドの中でクエリビルダーに制約を追加します。
+
+### グローバルスコープクラスの作成
+
+`make:scope` コマンドで雛形を生成します。
+
+```bash
+php artisan make:scope ActiveScope
+```
+
+`app/Models/Scopes/ActiveScope.php` が生成されます。
+
+```php
+<?php
+
+namespace App\Models\Scopes;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Scope;
+
+class ActiveScope implements Scope
+{
+    /**
+     * スコープをクエリビルダーに適用する
+     */
+    public function apply(Builder $builder, Model $model): void
+    {
+        $builder->where('is_active', true);
+    }
+}
+```
+
+### モデルへの適用
+
+<Steps>
+  <Step title="#[ScopedBy] アトリビュートで登録（推奨）">
+    Laravel 13では `#[ScopedBy]` アトリビュートを使うのが最もシンプルです。
+
+    ```php
+    <?php
+
+    namespace App\Models;
+
+    use App\Models\Scopes\ActiveScope;
+    use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+    use Illuminate\Database\Eloquent\Model;
+
+    #[ScopedBy([ActiveScope::class])]
+    class User extends Model
+    {
+        //
+    }
+    ```
+
+    複数のスコープを配列で指定できます。
+
+    ```php
+    #[ScopedBy([ActiveScope::class, TenantScope::class])]
+    class User extends Model
+    {
+        //
+    }
+    ```
+  </Step>
+
+  <Step title="booted() メソッドで手動登録">
+    `booted` メソッドをオーバーライドして `addGlobalScope` を呼び出す方法もあります。
+
+    ```php
+    <?php
+
+    namespace App\Models;
+
+    use App\Models\Scopes\ActiveScope;
+    use Illuminate\Database\Eloquent\Model;
+
+    class User extends Model
+    {
+        protected static function booted(): void
+        {
+            static::addGlobalScope(new ActiveScope);
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+グローバルスコープを追加すると、`User::all()` など全クエリに自動で `WHERE is_active = 1` が付きます。
+
+### 無名クロージャによるグローバルスコープ
+
+クラスを別ファイルに作るほどでもない単純なスコープは、クロージャで定義できます。
+
+```php
+protected static function booted(): void
+{
+    static::addGlobalScope('active', function (Builder $builder) {
+        $builder->where('is_active', true);
+    });
+}
+```
+
+<Warning>
+  クロージャで定義したスコープを後から除外するには、クラス名ではなくスコープ名（文字列）を使う必要があります。
+</Warning>
+
+### グローバルスコープの除外
+
+特定のクエリではスコープを無効にしたい場面があります。
+
+```php
+use App\Models\Scopes\ActiveScope;
+
+// 特定のスコープを除外
+User::withoutGlobalScope(ActiveScope::class)->get();
+
+// クロージャで定義したスコープを除外
+User::withoutGlobalScope('active')->get();
+
+// すべてのグローバルスコープを除外
+User::withoutGlobalScopes()->get();
+
+// 複数のスコープを除外
+User::withoutGlobalScopes([ActiveScope::class, TenantScope::class])->get();
+
+// 指定したスコープ以外をすべて除外
+User::withoutGlobalScopesExcept([TenantScope::class])->get();
+```
+
+## フレームワーク内部: SoftDeletingScope
+
+Laravel標準の `SoftDeletes` トレイトがグローバルスコープをどう活用しているかを見ると、実装パターンが分かります。
+
+`SoftDeletingScope` は `Scope` インターフェースを実装しています。
+
+```php
+// src/Illuminate/Database/Eloquent/SoftDeletingScope.php
+
+class SoftDeletingScope implements Scope
+{
+    protected $extensions = [
+        'Restore', 'RestoreOrCreate', 'CreateOrRestore',
+        'WithTrashed', 'WithoutTrashed', 'OnlyTrashed',
+    ];
+
+    /**
+     * スコープをクエリビルダーに適用する
+     * deleted_at が NULL のレコードだけを取得するよう制約を追加
+     */
+    public function apply(Builder $builder, Model $model)
+    {
+        $builder->whereNull($model->getQualifiedDeletedAtColumn());
+    }
+
+    /**
+     * クエリビルダーにマクロを拡張する
+     * withTrashed() / onlyTrashed() などが使えるようになる
+     */
+    public function extend(Builder $builder)
+    {
+        foreach ($this->extensions as $extension) {
+            $this->{"add{$extension}"}($builder);
+        }
+
+        // delete() 操作をオーバーライドして deleted_at を更新する処理にする
+        $builder->onDelete(function (Builder $builder) {
+            $column = $this->getDeletedAtColumn($builder);
+            return $builder->update([
+                $column => $builder->getModel()->freshTimestampString(),
+            ]);
+        });
+    }
+}
+```
+
+<Accordion title="withTrashed() の実装を見る">
+  `withTrashed()` は実際には `withoutGlobalScope($this)` を呼び出しています。つまり `SoftDeletingScope` 自身を除外することで、削除済みレコードも取得できるようにしています。
+
+  ```php
+  protected function addWithTrashed(Builder $builder)
+  {
+      $builder->macro('withTrashed', function (Builder $builder, $withTrashed = true) {
+          if (! $withTrashed) {
+              return $builder->withoutTrashed();
+          }
+
+          return $builder->withoutGlobalScope($this);
+      });
+  }
+  ```
+
+  `onlyTrashed()` も同様に、スコープ自身を除外した上で `whereNotNull('deleted_at')` を追加しています。
+
+  ```php
+  protected function addOnlyTrashed(Builder $builder)
+  {
+      $builder->macro('onlyTrashed', function (Builder $builder) {
+          $model = $builder->getModel();
+
+          $builder->withoutGlobalScope($this)->whereNotNull(
+              $model->getQualifiedDeletedAtColumn()
+          );
+
+          return $builder;
+      });
+  }
+  ```
+</Accordion>
+
+<Tip>
+  `Scope` インターフェースに `extend` メソッドは定義されていませんが、Eloquentのビルダーはスコープが `extend` メソッドを持っていれば自動的に呼び出します。カスタムマクロを追加したい場合に活用できます。
+</Tip>
+
+## 実践的なユースケース
+
+### マルチテナント: テナントIDによる自動絞り込み
+
+SaaSアプリケーションでは、全クエリにテナントIDのフィルタを自動適用することが重要です。
+
+```php
+<?php
+
+namespace App\Models\Scopes;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Scope;
+
+class TenantScope implements Scope
+{
+    public function apply(Builder $builder, Model $model): void
+    {
+        if ($tenantId = auth()->user()?->tenant_id) {
+            $builder->where('tenant_id', $tenantId);
+        }
+    }
+}
+```
+
+```php
+use App\Models\Scopes\TenantScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+
+#[ScopedBy([TenantScope::class])]
+class Post extends Model
+{
+    //
+}
+```
+
+これで `Post::all()` を呼ぶだけで、認証中のユーザーのテナントデータだけが返ります。
+
+### 公開/非公開フィルタ
+
+管理画面では非公開の投稿も表示したいが、フロントエンドでは公開済みのみ表示したい場合です。
+
+```php
+<?php
+
+namespace App\Models\Scopes;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Scope;
+
+class PublishedScope implements Scope
+{
+    public function apply(Builder $builder, Model $model): void
+    {
+        $builder->where('status', 'published')
+                ->where('published_at', '<=', now());
+    }
+}
+```
+
+管理画面では `withoutGlobalScope` でスコープを除外します。
+
+```php
+// フロントエンド: 公開済みのみ（PublishedScope が自動適用）
+$posts = Post::latest()->get();
+
+// 管理画面: 全投稿を表示
+$posts = Post::withoutGlobalScope(PublishedScope::class)->latest()->get();
+```
+
+### `select` ではなく `addSelect` を使う
+
+<Warning>
+  グローバルスコープ内でカラムを追加するときは `select` ではなく `addSelect` を使ってください。`select` を使うと、呼び出し元のクエリが `select` しているカラムを上書きしてしまいます。
+
+  ```php
+  // 悪い例: 呼び出し元の select を上書きする
+  public function apply(Builder $builder, Model $model): void
+  {
+      $builder->select('id', 'tenant_id', 'name');
+  }
+
+  // 良い例: 既存の select に追記する
+  public function apply(Builder $builder, Model $model): void
+  {
+      $builder->addSelect('tenant_id');
+  }
+  ```
+</Warning>
+
+## 次のステップ
+
+<Card title="Eloquent カスタムキャスト" icon="wand-magic-sparkles" href="/jp/advanced/eloquent-casts">
+  属性の変換ロジックをカスタムキャストとして実装し、Value Objectパターンを活用する方法を学びます。
+</Card>

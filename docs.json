@@ -213,7 +213,9 @@
               {
                 "group": "Eloquent 深掘り",
                 "pages": [
-                  "jp/advanced/eloquent-observers"
+                  "jp/advanced/eloquent-observers",
+                  "jp/advanced/eloquent-scopes",
+                  "jp/advanced/eloquent-casts"
                 ]
               },
               {
