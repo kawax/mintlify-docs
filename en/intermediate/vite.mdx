@@ -1,0 +1,376 @@
+---
+title: "Vite and Asset Bundling"
+description: "Bundle JavaScript and CSS in your Laravel application using Vite, with hot module replacement for a fast development experience."
+---
+
+## What is Vite?
+
+[Vite](https://vitejs.dev) is a fast frontend build tool. During development it provides instant hot module replacement (HMR), and for production it generates optimized, versioned assets.
+
+Since Laravel 9, Vite is the default frontend build tool, integrated through `laravel-vite-plugin`. The plugin handles:
+
+- Entry point management
+- HMR support for the development server
+- The `@vite()` Blade directive
+- Asset versioning (cache-busting) for production builds
+
+<Info>
+  If you are using a Laravel starter kit such as Laravel Breeze, Vite and Tailwind are already configured. This page explains how to set things up from scratch.
+</Info>
+
+## Installation and setup
+
+### Check Node
+
+Vite requires Node.js 18 or later and npm. Verify your environment:
+
+```shell
+node -v
+npm -v
+```
+
+### Install packages
+
+New Laravel projects already include `vite` and `laravel-vite-plugin` in `package.json`. Install dependencies:
+
+```shell
+npm install
+```
+
+### Configure vite.config.js
+
+The project root contains a `vite.config.js` file. Specify your entry points — the files Vite uses as the starting points for bundling:
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+
+export default defineConfig({
+    plugins: [
+        laravel([
+            'resources/css/app.css',
+            'resources/js/app.js',
+        ]),
+    ],
+});
+```
+
+<Tip>
+  For SPAs and Inertia applications, it is common to import CSS from JavaScript. In that case, remove `resources/css/app.css` from the entry points and add `import '../css/app.css';` at the top of `resources/js/app.js`.
+</Tip>
+
+## Running the development server
+
+Start Vite's development server with `npm run dev`. Changes to your files are reflected in the browser instantly via HMR:
+
+```shell
+npm run dev
+```
+
+You can also start Laravel's built-in server and Vite together:
+
+```shell
+composer run dev
+```
+
+<Info>
+  `composer run dev` starts both `php artisan serve` and `npm run dev` simultaneously.
+</Info>
+
+### Auto-reload Blade views
+
+Set `refresh: true` to reload the browser automatically whenever you save a Blade view or route file:
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+            ],
+            refresh: true,
+        }),
+    ],
+});
+```
+
+With `refresh: true`, Vite watches these directories for changes:
+
+- `resources/views/**`
+- `app/Livewire/**`
+- `routes/**`
+- `lang/**`
+
+## Production build
+
+Before deploying, run `npm run build`. Vite bundles and versions your assets and outputs them to `public/build/`:
+
+```shell
+npm run build
+```
+
+The resulting directory looks like this:
+
+```text
+public/
+  build/
+    assets/
+      app-Cv82Mlke.css
+      app-DnAZBF4U.js
+    manifest.json
+```
+
+`manifest.json` maps file names to their hashed versions. The `@vite()` directive reads this file to load the correct asset.
+
+<Warning>
+  The `public/build/` directory contains build artifacts. Add it to `.gitignore` and run the build on your deployment server or in CI rather than committing the output.
+</Warning>
+
+## Loading assets in Blade
+
+Add the `@vite()` directive to the `<head>` of your layout:
+
+```blade
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ config('app.name') }}</title>
+
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+<body>
+    @yield('content')
+</body>
+</html>
+```
+
+If you import CSS from JavaScript, pass only the JavaScript entry point:
+
+```blade
+@vite('resources/js/app.js')
+```
+
+The directive switches behavior automatically depending on the environment:
+
+| Situation | Behavior |
+| --- | --- |
+| Dev server running | Loads assets from the Vite dev server with HMR enabled |
+| Production (built) | Reads `public/build/manifest.json` and loads versioned files |
+
+## JavaScript and CSS entry points
+
+### JavaScript
+
+`resources/js/app.js` is the main entry point. Import other modules from here:
+
+```js
+import './bootstrap';
+import '../css/app.css';
+
+import './components/modal';
+import './utils/format';
+```
+
+### CSS
+
+Write global styles in `resources/css/app.css`:
+
+```css
+/* When using Tailwind CSS */
+@import 'tailwindcss';
+
+/* Custom styles */
+body {
+    font-family: 'Inter', sans-serif;
+}
+```
+
+### Multiple entry points
+
+For pages with different asset bundles (for example, an admin panel), define multiple entry points:
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+
+export default defineConfig({
+    plugins: [
+        laravel([
+            'resources/css/app.css',
+            'resources/js/app.js',
+            'resources/css/admin.css',
+            'resources/js/admin.js',
+        ]),
+    ],
+});
+```
+
+Load only the relevant entry point in each Blade layout:
+
+```blade
+{{-- Admin layout --}}
+@vite(['resources/css/admin.css', 'resources/js/admin.js'])
+```
+
+## Tailwind CSS
+
+Tailwind CSS v4 integrates as a Vite plugin:
+
+<Steps>
+  <Step title="Install Tailwind">
+    ```shell
+    npm install tailwindcss @tailwindcss/vite
+    ```
+  </Step>
+
+  <Step title="Add the plugin to vite.config.js">
+    ```js
+    import { defineConfig } from 'vite';
+    import laravel from 'laravel-vite-plugin';
+    import tailwindcss from '@tailwindcss/vite';
+
+    export default defineConfig({
+        plugins: [
+            tailwindcss(),
+            laravel([
+                'resources/css/app.css',
+                'resources/js/app.js',
+            ]),
+        ],
+    });
+    ```
+  </Step>
+
+  <Step title="Import Tailwind in your CSS">
+    ```css
+    /* resources/css/app.css */
+    @import 'tailwindcss';
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  Tailwind CSS v4 does not require `tailwind.config.js` or `postcss.config.js`. If you are using Tailwind CSS v3, those files are still needed.
+</Info>
+
+## Path aliases
+
+`laravel-vite-plugin` automatically sets up an `@` alias pointing to `resources/js`:
+
+```js
+// Using the alias
+import UserCard from '@/components/UserCard.vue';
+
+// Equivalent to:
+import UserCard from '/resources/js/components/UserCard.vue';
+```
+
+Add custom aliases with `resolve.alias`:
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import path from 'path';
+
+export default defineConfig({
+    plugins: [
+        laravel(['resources/js/app.js']),
+    ],
+    resolve: {
+        alias: {
+            '@': '/resources/js',
+            '@css': '/resources/css',
+            '@images': '/resources/images',
+        },
+    },
+});
+```
+
+## Framework-specific configuration
+
+### Vue
+
+```shell
+npm install --save-dev @vitejs/plugin-vue
+```
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import vue from '@vitejs/plugin-vue';
+
+export default defineConfig({
+    plugins: [
+        laravel(['resources/js/app.js']),
+        vue({
+            template: {
+                transformAssetUrls: {
+                    base: null,
+                    includeAbsolute: false,
+                },
+            },
+        }),
+    ],
+});
+```
+
+### React
+
+```shell
+npm install --save-dev @vitejs/plugin-react
+```
+
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+    plugins: [
+        laravel(['resources/js/app.jsx']),
+        react(),
+    ],
+});
+```
+
+When using React, add `@viteReactRefresh` before `@vite` in your Blade layout:
+
+```blade
+@viteReactRefresh
+@vite('resources/js/app.jsx')
+```
+
+## Static assets
+
+To version images or fonts referenced in Blade templates, specify the directories with the `assets` option:
+
+```js
+laravel({
+    input: 'resources/js/app.js',
+    assets: ['resources/images/**', 'resources/fonts/**'],
+})
+```
+
+Retrieve the versioned URL in Blade with `Vite::asset()`:
+
+```blade
+<img src="{{ Vite::asset('resources/images/logo.png') }}" alt="Logo">
+```
+
+## Quick reference
+
+| Task | How |
+| --- | --- |
+| Start the dev server | `npm run dev` |
+| Build for production | `npm run build` |
+| Load assets in Blade | `@vite(['resources/css/app.css', 'resources/js/app.js'])` |
+| Auto-reload on Blade changes | Set `refresh: true` in `vite.config.js` |
+| Use Tailwind CSS | Add `@tailwindcss/vite` plugin |
+| Use the `@` alias | Points to `resources/js` by default |
+| Version static assets | Use the `assets` option and `Vite::asset()` |

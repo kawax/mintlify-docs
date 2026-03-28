@@ -1,0 +1,384 @@
+---
+title: "Logging"
+description: "Record application events to files, Slack, and external services using Laravel's channel-based logging system built on Monolog."
+---
+
+## What is logging?
+
+Laravel's logging system is organized around **channels** — named configurations that define where and how log messages are written. A single log call can write to multiple channels simultaneously: a rotating daily file, a Slack webhook, or a custom handler.
+
+Internally, Laravel uses the [Monolog](https://github.com/Seldaek/monolog) library, giving you access to a wide range of handlers and formatters.
+
+<Info>
+  The default channel is `stack`. A `stack` channel aggregates multiple channels so one log call reaches all of them.
+</Info>
+
+## Configuration
+
+Logging configuration lives in `config/logging.php`. Set the default channel with the `LOG_CHANNEL` environment variable:
+
+```php
+// config/logging.php
+'default' => env('LOG_CHANNEL', 'stack'),
+```
+
+### Available channel drivers
+
+| Driver | Description |
+| --- | --- |
+| `single` | Writes all log messages to one file |
+| `daily` | Rotates log files daily and removes old ones |
+| `slack` | Sends messages to a Slack Incoming Webhook |
+| `stack` | Aggregates multiple channels into one |
+| `syslog` | Writes to the system syslog |
+| `errorlog` | Writes to PHP's error log |
+| `monolog` | Uses a Monolog handler directly |
+| `custom` | Calls a factory class to build the channel |
+
+### Log levels
+
+Laravel supports the eight log levels defined in [RFC 5424](https://tools.ietf.org/html/rfc5424), from highest to lowest severity:
+
+| Level | When to use |
+| --- | --- |
+| `emergency` | System is unusable; immediate action required |
+| `alert` | Action must be taken immediately (e.g., database down) |
+| `critical` | Critical conditions; a core feature has stopped working |
+| `error` | Runtime errors that require attention |
+| `warning` | Unexpected behavior that is not yet an error |
+| `notice` | Normal but significant events |
+| `info` | Informational messages (logins, orders confirmed, etc.) |
+| `debug` | Detailed debug information for development |
+
+A channel's `level` setting is a **minimum threshold**. A channel set to `error` only records `error`, `critical`, `alert`, and `emergency` messages.
+
+## Writing log messages
+
+### The Log facade
+
+```php
+use Illuminate\Support\Facades\Log;
+
+Log::emergency('System is down.');
+Log::alert('Database connection lost.');
+Log::critical('Payment service is not responding.');
+Log::error('Failed to update user data.');
+Log::warning('Deprecated method called.');
+Log::notice('Configuration file reloaded.');
+Log::info('User logged in.');
+Log::debug('Query time: 42ms');
+```
+
+Use context to include structured data alongside the message:
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
+
+class UserController extends Controller
+{
+    public function show(string $id): View
+    {
+        Log::info('Showing user profile.', ['user_id' => $id]);
+
+        return view('user.profile', [
+            'user' => User::findOrFail($id),
+        ]);
+    }
+}
+```
+
+### The `log` helper
+
+Write a log entry without importing the facade:
+
+```php
+log('Message from the helper.');
+
+// With a level and context
+log('User created.', 'info', ['user_id' => $user->id]);
+```
+
+### Contextual information
+
+Pass an array as the second argument to include related data:
+
+```php
+Log::info('Login failed.', [
+    'user_id' => $user->id,
+    'ip'      => $request->ip(),
+    'reason'  => 'Password mismatch',
+]);
+```
+
+#### withContext — add context to a channel
+
+Attach context that will appear on all subsequent log entries for the current channel. Useful for request IDs:
+
+```php
+Log::withContext(['request-id' => (string) Str::uuid()]);
+
+// Both entries below include request-id automatically
+Log::info('Processing started.');
+Log::error('An error occurred.');
+```
+
+#### shareContext — add context to all channels
+
+`withContext` affects only the current channel. `shareContext` applies to all channels:
+
+```php
+Log::shareContext(['app-version' => config('app.version')]);
+```
+
+## Channel configuration
+
+### The stack channel
+
+Write to multiple channels with a single log call:
+
+```php
+// config/logging.php
+'channels' => [
+    'stack' => [
+        'driver'   => 'stack',
+        'channels' => ['daily', 'slack'],
+    ],
+
+    'daily' => [
+        'driver' => 'daily',
+        'path'   => storage_path('logs/laravel.log'),
+        'level'  => env('LOG_LEVEL', 'debug'),
+        'days'   => 14,
+    ],
+
+    'slack' => [
+        'driver'   => 'slack',
+        'url'      => env('LOG_SLACK_WEBHOOK_URL'),
+        'username' => env('LOG_SLACK_USERNAME', 'Laravel Log'),
+        'emoji'    => env('LOG_SLACK_EMOJI', ':boom:'),
+        'level'    => 'critical',
+    ],
+],
+```
+
+With this configuration, all `debug`-and-above messages go to the daily file, while only `critical` and higher are sent to Slack.
+
+<Tip>
+  In production, set the Slack channel level to `error` or `critical`. Routing every log message to Slack creates noise and buries the alerts that matter.
+</Tip>
+
+### The daily channel
+
+Rotate log files by date and delete old ones automatically:
+
+```php
+'daily' => [
+    'driver' => 'daily',
+    'path'   => storage_path('logs/laravel.log'),
+    'level'  => env('LOG_LEVEL', 'debug'),
+    'days'   => env('LOG_DAILY_DAYS', 14),
+],
+```
+
+<Warning>
+  A short `days` value means old logs are deleted quickly. Keep enough history to diagnose production incidents.
+</Warning>
+
+### Slack error notifications
+
+Get your [Incoming Webhook URL](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks) from Slack and add it to `.env`:
+
+```ini
+LOG_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz
+```
+
+```php
+// config/logging.php
+'slack' => [
+    'driver'   => 'slack',
+    'url'      => env('LOG_SLACK_WEBHOOK_URL'),
+    'username' => 'Laravel Error Bot',
+    'emoji'    => ':fire:',
+    'level'    => 'error',
+],
+```
+
+Include `slack` in the `stack` channel and set `LOG_CHANNEL=stack` to receive automatic Slack alerts when errors occur.
+
+### Writing to a specific channel
+
+```php
+// Write only to the Slack channel
+Log::channel('slack')->error('Payment service is not responding.');
+
+// Write to multiple channels at once
+Log::stack(['daily', 'slack'])->critical('Database connection failed.');
+```
+
+## On-demand channels
+
+Build a channel at runtime with `Log::build()` — no configuration file entry needed. Useful for temporary output or isolated log files per job:
+
+```php
+use Illuminate\Support\Facades\Log;
+
+$channel = Log::build([
+    'driver' => 'single',
+    'path'   => storage_path('logs/import-' . now()->format('Ymd') . '.log'),
+]);
+
+Log::stack([$channel])->info('CSV import started.');
+```
+
+## Practical example: attaching a request ID in middleware
+
+Adding a unique request ID to every log entry makes it easy to trace a single request through your logs.
+
+<Steps>
+  <Step title="Create the middleware">
+    ```shell
+    php artisan make:middleware AssignRequestId
+    ```
+  </Step>
+
+  <Step title="Implement handle()">
+    ```php
+    <?php
+
+    namespace App\Http\Middleware;
+
+    use Closure;
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\Log;
+    use Illuminate\Support\Str;
+    use Symfony\Component\HttpFoundation\Response;
+
+    class AssignRequestId
+    {
+        public function handle(Request $request, Closure $next): Response
+        {
+            $requestId = (string) Str::uuid();
+
+            Log::withContext(['request-id' => $requestId]);
+
+            $response = $next($request);
+
+            $response->headers->set('X-Request-Id', $requestId);
+
+            return $response;
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Register the middleware globally">
+    ```php
+    // bootstrap/app.php
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->append(\App\Http\Middleware\AssignRequestId::class);
+    })
+    ```
+  </Step>
+</Steps>
+
+Every log entry for that request now includes `request-id`:
+
+```
+[2026-03-01 12:00:00] local.INFO: User logged in. {"request-id":"550e8400-...","user_id":1}
+[2026-03-01 12:00:00] local.INFO: Dashboard viewed. {"request-id":"550e8400-..."}
+```
+
+## Deprecation warnings
+
+Log PHP and Laravel deprecation warnings to catch them before they become breaking changes:
+
+```php
+// config/logging.php
+'deprecations' => [
+    'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
+    'trace'   => env('LOG_DEPRECATIONS_TRACE', false),
+],
+```
+
+```ini
+LOG_DEPRECATIONS_CHANNEL=daily
+```
+
+## Laravel Pail — real-time log tailing
+
+[Laravel Pail](https://github.com/laravel/pail) streams your application's log output directly in the terminal.
+
+<Info>
+  Pail requires the PHP [PCNTL](https://www.php.net/manual/en/book.pcntl.php) extension.
+</Info>
+
+### Install
+
+```shell
+composer require --dev laravel/pail
+```
+
+### Tail logs
+
+```shell
+# Stream all logs
+php artisan pail
+
+# Verbose output (no truncation)
+php artisan pail -v
+
+# Include stack traces
+php artisan pail -vv
+```
+
+### Filter output
+
+```shell
+# Filter by keyword
+php artisan pail --filter="QueryException"
+
+# Filter by message text
+php artisan pail --message="Login"
+
+# Filter by log level
+php artisan pail --level=error
+
+# Filter by user
+php artisan pail --user=1
+```
+
+## Summary
+
+<AccordionGroup>
+  <Accordion title="Choosing a log level">
+    | Level | Use when |
+    | --- | --- |
+    | `emergency` | The system is completely unusable |
+    | `alert` | A human must act immediately |
+    | `critical` | A core feature has stopped working |
+    | `error` | An unexpected runtime error occurred |
+    | `warning` | Something unexpected that is not yet an error |
+    | `notice` | A normal but notable event |
+    | `info` | A user action or business event to track |
+    | `debug` | Detailed information for debugging (not for production) |
+  </Accordion>
+
+  <Accordion title="Choosing a channel">
+    - **Development**: `single` or `daily` to write to a file
+    - **Production**: `stack` combining `daily` (file) and `slack` (critical alerts)
+    - **Isolated processes**: `Log::build()` for a dedicated log file per job or import
+    - **Real-time monitoring**: `php artisan pail` in the terminal
+  </Accordion>
+
+  <Accordion title="Production considerations">
+    - `debug` logs may contain sensitive data. Use `LOG_LEVEL=error` or higher in production.
+    - Rotate log files regularly with the `daily` channel and an appropriate `days` value.
+    - Be mindful of rate limits on external services like Slack — route only critical alerts there.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,436 @@
+---
+title: "File Storage"
+description: "Read, write, and manage files across local disks and cloud storage like Amazon S3 using Laravel's unified filesystem API."
+---
+
+## What is file storage?
+
+Laravel provides a powerful filesystem abstraction built on top of [Flysystem](https://github.com/thephpleague/flysystem). A single, consistent API works across local storage, SFTP, Amazon S3, and compatible services — switching drivers requires no changes to your application code.
+
+<Info>
+  Changing the driver doesn't change your code. Use the local driver in development and S3 in production without touching your application logic.
+</Info>
+
+## Configuration
+
+Filesystem configuration lives in `config/filesystems.php`. A **disk** is a named combination of a driver and a storage location.
+
+| Driver | Use case |
+| --- | --- |
+| `local` | Server's local filesystem |
+| `public` | Publicly accessible local disk |
+| `s3` | Amazon S3 or S3-compatible services |
+| `sftp` | SFTP servers |
+| `ftp` | FTP servers |
+
+### The local driver
+
+The `local` driver operates relative to the `root` directory defined in your filesystems configuration. The default root is `storage/app/private`:
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+Storage::disk('local')->put('example.txt', 'Contents');
+// Writes to storage/app/private/example.txt
+```
+
+### Change the default disk
+
+Set the `FILESYSTEM_DISK` environment variable to switch the default disk:
+
+```ini
+FILESYSTEM_DISK=s3
+```
+
+## The public disk and symbolic links
+
+The `public` disk is for files that should be accessible from the web. By default it uses `storage/app/public`. To make those files accessible, create a symbolic link from `public/storage` to `storage/app/public`:
+
+<Steps>
+  <Step title="Create the symbolic link">
+    ```shell
+    php artisan storage:link
+    ```
+  </Step>
+
+  <Step title="Generate a URL to the file">
+    After the link is created, use the `asset` helper to build a URL:
+
+    ```php
+    echo asset('storage/file.txt');
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  You can add extra symbolic links in the `links` array in `config/filesystems.php`:
+
+  ```php
+  'links' => [
+      public_path('storage') => storage_path('app/public'),
+      public_path('images')  => storage_path('app/images'),
+  ],
+  ```
+</Tip>
+
+Remove all symbolic links with:
+
+```shell
+php artisan storage:unlink
+```
+
+## Basic operations
+
+### Reading files
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// Get file contents as a string
+$contents = Storage::get('file.jpg');
+
+// Read and decode a JSON file
+$data = Storage::json('orders.json');
+
+// Check existence
+if (Storage::exists('file.jpg')) {
+    // File exists
+}
+
+if (Storage::missing('file.jpg')) {
+    // File does not exist
+}
+```
+
+### Writing files
+
+```php
+// Write content to a file
+Storage::put('file.jpg', $contents);
+
+// Write a stream resource
+Storage::put('file.jpg', $resource);
+
+// Append to a file
+Storage::prepend('file.log', 'Prepended text');
+Storage::append('file.log', 'Appended text');
+
+// Copy and move files
+Storage::copy('old/file.jpg', 'new/file.jpg');
+Storage::move('old/file.jpg', 'new/file.jpg');
+```
+
+<Info>
+  When `put` fails it returns `false` by default. Set `'throw' => true` on the disk configuration to throw an exception instead.
+</Info>
+
+### Deleting files
+
+```php
+// Delete a single file
+Storage::delete('file.jpg');
+
+// Delete multiple files
+Storage::delete(['file.jpg', 'file2.jpg']);
+
+// Delete from a specific disk
+Storage::disk('s3')->delete('path/file.jpg');
+```
+
+### Download responses
+
+```php
+// Prompt the browser to download the file
+return Storage::download('file.jpg');
+
+// With a custom file name and headers
+return Storage::download('file.jpg', 'my-file.jpg', $headers);
+```
+
+## Generating URLs
+
+### Regular URLs
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+$url = Storage::url('file.jpg');
+```
+
+The `local` driver returns a relative URL such as `/storage/file.jpg`. The `s3` driver returns the full remote URL.
+
+### Temporary URLs
+
+Generate a time-limited URL for private files. Available for the `local` and `s3` drivers:
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+$url = Storage::temporaryUrl(
+    'file.jpg',
+    now()->addMinutes(5)
+);
+```
+
+Pass additional S3 request parameters when needed:
+
+```php
+$url = Storage::temporaryUrl(
+    'file.jpg',
+    now()->addMinutes(5),
+    [
+        'ResponseContentType'        => 'application/octet-stream',
+        'ResponseContentDisposition' => 'attachment; filename=file.jpg',
+    ]
+);
+```
+
+<Tip>
+  For client-side direct uploads to S3, use `temporaryUploadUrl`:
+
+  ```php
+  ['url' => $url, 'headers' => $headers] = Storage::temporaryUploadUrl(
+      'file.jpg',
+      now()->addMinutes(5)
+  );
+  ```
+</Tip>
+
+## Uploading files
+
+### Automatic file name (store)
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+
+class UserAvatarController extends Controller
+{
+    public function update(Request $request): string
+    {
+        // File name is generated automatically from the MIME type
+        $path = $request->file('avatar')->store('avatars');
+
+        return $path;
+    }
+}
+```
+
+### Explicit file name (storeAs)
+
+```php
+$path = $request->file('avatar')->storeAs(
+    'avatars',
+    $request->user()->id
+);
+```
+
+### Upload to a specific disk
+
+```php
+$path = $request->file('avatar')->store(
+    'avatars/' . $request->user()->id,
+    's3'
+);
+```
+
+### Using the Storage facade
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// Auto-generated file name
+$path = Storage::putFile('avatars', $request->file('avatar'));
+
+// Explicit file name
+$path = Storage::putFileAs(
+    'avatars',
+    $request->file('avatar'),
+    $request->user()->id
+);
+```
+
+<Warning>
+  `getClientOriginalName()` and `getClientOriginalExtension()` can be tampered with by the user. Use `hashName()` for the file name and `extension()` to determine the extension from the MIME type:
+
+  ```php
+  $file      = $request->file('avatar');
+  $name      = $file->hashName();   // Unique random name
+  $extension = $file->extension(); // Derived from MIME type
+  ```
+</Warning>
+
+## File visibility
+
+Flysystem controls public and private access through visibility:
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// Set visibility when writing
+Storage::put('file.jpg', $contents, 'public');
+
+// Get or change visibility
+$visibility = Storage::getVisibility('file.jpg');
+Storage::setVisibility('file.jpg', 'public');
+```
+
+Upload and immediately mark a file as public:
+
+```php
+$path = $request->file('avatar')->storePublicly('avatars', 's3');
+```
+
+## Working with multiple disks
+
+```php
+// Write to the default disk
+Storage::put('avatars/1', $content);
+
+// Write to the s3 disk
+Storage::disk('s3')->put('avatars/1', $content);
+
+// Create a disk on the fly
+$disk = Storage::build([
+    'driver' => 'local',
+    'root'   => '/path/to/root',
+]);
+$disk->put('image.jpg', $content);
+```
+
+## Amazon S3 configuration
+
+### Install the package
+
+```shell
+composer require league/flysystem-aws-s3-v3 "^3.0" --with-all-dependencies
+```
+
+### Environment variables
+
+```ini
+AWS_ACCESS_KEY_ID=your-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=your-bucket-name
+AWS_USE_PATH_STYLE_ENDPOINT=false
+```
+
+<Info>
+  S3-compatible services such as DigitalOcean Spaces, Cloudflare R2, and Vultr Object Storage work with the `s3` driver. Add an `endpoint` option pointing to the service's URL:
+
+  ```php
+  'endpoint' => env('AWS_ENDPOINT', 'https://your-endpoint.example.com'),
+  ```
+</Info>
+
+## File metadata
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// File size in bytes
+$size = Storage::size('file.jpg');
+
+// Last modified timestamp (Unix)
+$time = Storage::lastModified('file.jpg');
+
+// MIME type
+$mime = Storage::mimeType('file.jpg');
+
+// Absolute path (local driver only)
+$path = Storage::path('file.jpg');
+```
+
+## Directory operations
+
+```php
+use Illuminate\Support\Facades\Storage;
+
+// List files in a directory
+$files = Storage::files($directory);
+
+// List files recursively
+$files = Storage::allFiles($directory);
+
+// List directories
+$directories = Storage::directories($directory);
+
+// Create a directory
+Storage::makeDirectory($directory);
+
+// Delete a directory and its contents
+Storage::deleteDirectory($directory);
+```
+
+## Testing
+
+Use `Storage::fake()` to test file operations without touching a real disk:
+
+```php
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+test('users can upload an avatar', function () {
+    Storage::fake('avatars');
+
+    $file = UploadedFile::fake()->image('avatar.jpg');
+
+    $this->post('/user/avatar', ['avatar' => $file]);
+
+    Storage::disk('avatars')->assertExists('avatar.jpg');
+    Storage::disk('avatars')->assertMissing('other.jpg');
+});
+```
+
+<Info>
+  `UploadedFile::fake()->image()` requires PHP's [GD extension](https://www.php.net/manual/en/book.image.php).
+</Info>
+
+## Practical example: profile avatar upload
+
+A complete controller that validates the upload, replaces an existing avatar, stores the file, and saves the path to the database:
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
+
+class ProfileController extends Controller
+{
+    public function updateAvatar(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'avatar' => ['required', 'image', 'max:2048'],
+        ]);
+
+        $user = $request->user();
+
+        // Delete the existing avatar
+        if ($user->avatar_path) {
+            Storage::disk('public')->delete($user->avatar_path);
+        }
+
+        // Store the new avatar
+        $path = $request->file('avatar')->store('avatars', 'public');
+
+        // Save the path
+        $user->update(['avatar_path' => $path]);
+
+        return back()->with('status', 'avatar-updated');
+    }
+}
+```
+
+Display the avatar in a template:
+
+```blade
+<img src="{{ Storage::disk('public')->url($user->avatar_path) }}" alt="Avatar">
+```
