@@ -305,7 +305,8 @@
                 "pages": [
                   "en/intermediate/service-container",
                   "en/intermediate/service-providers",
-                  "en/intermediate/facades"
+                  "en/intermediate/facades",
+                  "en/intermediate/contracts"
                 ]
               },
               {
@@ -325,13 +326,27 @@
                 "group": "Async Processing",
                 "pages": [
                   "en/intermediate/queues",
-                  "en/intermediate/events"
+                  "en/intermediate/events",
+                  "en/intermediate/concurrency",
+                  "en/intermediate/scheduling"
                 ]
               },
               {
                 "group": "Caching",
                 "pages": [
                   "en/intermediate/cache"
+                ]
+              },
+              {
+                "group": "HTTP & External",
+                "pages": [
+                  "en/intermediate/http-client"
+                ]
+              },
+              {
+                "group": "Console & CLI",
+                "pages": [
+                  "en/intermediate/artisan"
                 ]
               }
             ]
