@@ -1,0 +1,516 @@
+---
+title: "Error Handling"
+description: "Learn how to report, render, and customize exception handling in Laravel, including custom error pages and HTTP error responses."
+---
+
+## Overview
+
+When you create a new Laravel project, error and exception handling is already configured. You customize it through the `withExceptions` method in `bootstrap/app.php`:
+
+```php
+// bootstrap/app.php
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withExceptions(function (Exceptions $exceptions): void {
+        // Configure exception reporting and rendering here
+    })->create();
+```
+
+The `$exceptions` object passed to the closure is an instance of `Illuminate\Foundation\Configuration\Exceptions` and manages all exception handling for your application.
+
+### Debug mode
+
+The `debug` option in `config/app.php` controls how much error detail is shown to users. It reads from the `APP_DEBUG` environment variable:
+
+```ini
+# Local development
+APP_DEBUG=true
+
+# Production
+APP_DEBUG=false
+```
+
+<Warning>
+  Always set `APP_DEBUG=false` in production. Leaving it `true` risks exposing sensitive configuration values to your users.
+</Warning>
+
+## Reporting exceptions
+
+Reporting means logging exceptions or sending them to an external service like [Sentry](https://github.com/getsentry/sentry-laravel) or [Flare](https://flareapp.io). By default, exceptions are logged according to your `config/logging.php` configuration.
+
+### Custom report callbacks
+
+Register a closure to handle specific exception types differently. Laravel infers the exception type from the closure's type-hint:
+
+```php
+use App\Exceptions\InvalidOrderException;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->report(function (InvalidOrderException $e) {
+        // Notify an external service, etc.
+    });
+})
+```
+
+The default logging still runs after the callback. To stop propagation, call `stop()` or return `false`:
+
+```php
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->report(function (InvalidOrderException $e) {
+        // ...
+    })->stop();
+})
+```
+
+### The `report` helper
+
+Report an exception without interrupting the current request:
+
+```php
+public function isValid(string $value): bool
+{
+    try {
+        // Validate the value...
+    } catch (Throwable $e) {
+        report($e);
+
+        return false;
+    }
+}
+```
+
+<Tip>
+  The `report` helper is useful for background jobs and non-critical operations where you want to record the error without returning an error page to the user.
+</Tip>
+
+### Deduplicating reported exceptions
+
+Calling `report` multiple times with the same exception instance can create duplicate log entries. Use `dontReportDuplicates` to ensure each instance is reported only once:
+
+```php
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->dontReportDuplicates();
+})
+```
+
+```php
+$original = new RuntimeException('Whoops!');
+
+report($original); // reported
+
+try {
+    throw $original;
+} catch (Throwable $caught) {
+    report($caught); // ignored (same instance)
+}
+```
+
+### Global log context
+
+Add shared context data to every exception log entry. If available, the current user's ID is included automatically:
+
+```php
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->context(fn () => [
+        'app_version' => config('app.version'),
+    ]);
+})
+```
+
+### Exception-level context
+
+Define a `context()` method on an exception class to include data specific to that exception:
+
+```php
+<?php
+
+namespace App\Exceptions;
+
+use Exception;
+
+class InvalidOrderException extends Exception
+{
+    public function __construct(
+        private readonly int $orderId,
+        string $message = '',
+    ) {
+        parent::__construct($message);
+    }
+
+    /**
+     * Get context information for this exception.
+     *
+     * @return array<string, mixed>
+     */
+    public function context(): array
+    {
+        return ['order_id' => $this->orderId];
+    }
+}
+```
+
+### Changing log levels
+
+Log a specific exception at a particular log level using the `level` method:
+
+```php
+use PDOException;
+use Psr\Log\LogLevel;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->level(PDOException::class, LogLevel::CRITICAL);
+})
+```
+
+### Throttling exception reports
+
+Limit how many exceptions are reported when a large number occur in a short period:
+
+```php
+use Illuminate\Support\Lottery;
+use Throwable;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    // Report 1 in every 1000 randomly
+    $exceptions->throttle(function (Throwable $e) {
+        return Lottery::odds(1, 1000);
+    });
+})
+```
+
+Rate-limit by time using `Limit`:
+
+```php
+use Illuminate\Broadcasting\BroadcastException;
+use Illuminate\Cache\RateLimiting\Limit;
+use Throwable;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->throttle(function (Throwable $e) {
+        if ($e instanceof BroadcastException) {
+            return Limit::perMinute(300);
+        }
+    });
+})
+```
+
+## Rendering exceptions
+
+Rendering converts an exception into an HTTP response. Laravel handles this automatically, but you can customize it per exception type.
+
+### Custom render callbacks
+
+```php
+use App\Exceptions\InvalidOrderException;
+use Illuminate\Http\Request;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->render(function (InvalidOrderException $e, Request $request) {
+        return response()->view('errors.invalid-order', status: 500);
+    });
+})
+```
+
+Override built-in exceptions such as `NotFoundHttpException`. If the closure returns nothing, Laravel's default rendering is used:
+
+```php
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+        if ($request->is('api/*')) {
+            return response()->json([
+                'message' => 'Record not found.',
+            ], 404);
+        }
+    });
+})
+```
+
+### JSON or HTML auto-detection
+
+Laravel detects whether to render HTML or JSON based on the `Accept` request header. Customize this logic with `shouldRenderJsonWhen`:
+
+```php
+use Illuminate\Http\Request;
+use Throwable;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {
+        if ($request->is('admin/*')) {
+            return true; // Always return JSON for admin routes
+        }
+
+        return $request->expectsJson();
+    });
+})
+```
+
+### Customizing the full response
+
+Use `respond` to modify the response after it has been rendered:
+
+```php
+use Symfony\Component\HttpFoundation\Response;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->respond(function (Response $response) {
+        if ($response->getStatusCode() === 419) {
+            return back()->with([
+                'message' => 'The page expired, please try again.',
+            ]);
+        }
+
+        return $response;
+    });
+})
+```
+
+## Custom exception classes
+
+Create exception classes in `app/Exceptions/`. Define `report()` and `render()` methods directly on the class instead of in `bootstrap/app.php` — Laravel calls them automatically.
+
+<Steps>
+  <Step title="Generate the exception class">
+    ```shell
+    php artisan make:exception InvalidOrderException
+    ```
+  </Step>
+
+  <Step title="Implement report() and render()">
+    ```php
+    <?php
+
+    namespace App\Exceptions;
+
+    use Exception;
+    use Illuminate\Http\Request;
+    use Illuminate\Http\Response;
+
+    class InvalidOrderException extends Exception
+    {
+        public function __construct(
+            private readonly int $orderId,
+            string $message = 'Invalid order.',
+        ) {
+            parent::__construct($message);
+        }
+
+        /**
+         * Report the exception.
+         */
+        public function report(): void
+        {
+            // Notify an external service, etc.
+        }
+
+        /**
+         * Render the exception as an HTTP response.
+         */
+        public function render(Request $request): Response
+        {
+            return response()->view('errors.invalid-order', [
+                'orderId' => $this->orderId,
+            ], 422);
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  You can type-hint dependencies in the `report()` method and Laravel's service container will inject them automatically.
+</Info>
+
+### The `ShouldntReport` interface
+
+Implement `ShouldntReport` on exceptions that should never be reported:
+
+```php
+<?php
+
+namespace App\Exceptions;
+
+use Exception;
+use Illuminate\Contracts\Debug\ShouldntReport;
+
+class PodcastProcessingException extends Exception implements ShouldntReport
+{
+    //
+}
+```
+
+## Throwing HTTP errors
+
+### The `abort` helper
+
+Throw an HTTP error response from anywhere in your application:
+
+```php
+// 404 Not Found
+abort(404);
+
+// With a message
+abort(403, 'This action is unauthorized.');
+```
+
+### `abort_if` and `abort_unless`
+
+Abort conditionally:
+
+```php
+// Abort when the condition is true
+abort_if(! $user->isAdmin(), 403);
+
+// Abort when the condition is false
+abort_unless($user->hasPermission('edit'), 403, 'Permission denied.');
+```
+
+<Tip>
+  These helpers are useful for authorization checks in controllers and middleware, often alongside gates and policies.
+</Tip>
+
+## Controlling exception reporting globally
+
+### Ignoring exceptions
+
+Prevent specific exception types from being reported with `dontReport`:
+
+```php
+use App\Exceptions\InvalidOrderException;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->dontReport([
+        InvalidOrderException::class,
+    ]);
+})
+```
+
+Ignore exceptions conditionally with `dontReportWhen`:
+
+```php
+use Throwable;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->dontReportWhen(function (Throwable $e) {
+        return $e instanceof PodcastProcessingException &&
+               $e->reason() === 'Subscription expired';
+    });
+})
+```
+
+<Info>
+  Laravel automatically ignores certain exceptions by default, including 404 errors, 419 CSRF token mismatches, and 403 origin mismatches.
+</Info>
+
+### Re-enabling ignored exceptions
+
+Use `stopIgnoring` to report an exception that Laravel ignores by default:
+
+```php
+use Symfony\Component\HttpKernel\Exception\HttpException;
+
+->withExceptions(function (Exceptions $exceptions): void {
+    $exceptions->stopIgnoring(HttpException::class);
+})
+```
+
+## HTTP error pages
+
+Laravel lets you define custom Blade views for any HTTP status code.
+
+### Creating custom error views
+
+Place Blade templates named after the status code in `resources/views/errors/`:
+
+```
+resources/
+└── views/
+    └── errors/
+        ├── 404.blade.php
+        ├── 403.blade.php
+        └── 500.blade.php
+```
+
+Access error details through the `$exception` variable:
+
+```blade
+{{-- resources/views/errors/404.blade.php --}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Page Not Found</title>
+</head>
+<body>
+    <h1>404 - Page Not Found</h1>
+    <p>{{ $exception->getMessage() }}</p>
+    <a href="{{ url('/') }}">Return to home</a>
+</body>
+</html>
+```
+
+### Publish the default templates
+
+Customize Laravel's built-in error pages by publishing them first:
+
+```shell
+php artisan vendor:publish --tag=laravel-errors
+```
+
+### Fallback error pages
+
+Create `4xx.blade.php` and `5xx.blade.php` as fallbacks when no page exists for a specific status code:
+
+```
+resources/
+└── views/
+    └── errors/
+        ├── 4xx.blade.php
+        └── 5xx.blade.php
+```
+
+<Warning>
+  Fallback pages do not apply to `404`, `500`, and `503` responses — Laravel has dedicated internal pages for those. Create individual files such as `404.blade.php` to customize them.
+</Warning>
+
+## Summary
+
+<AccordionGroup>
+  <Accordion title="Exception reporting">
+    | Method | Purpose |
+    | --- | --- |
+    | `$exceptions->report()` | Register a custom report callback per exception type |
+    | `$exceptions->context()` | Add shared context to all exception log entries |
+    | `context()` method | Add exception-specific context to log entries |
+    | `report()` helper | Report an exception without interrupting the request |
+    | `dontReportDuplicates()` | Prevent duplicate entries for the same exception instance |
+    | `ShouldntReport` interface | Mark an exception class as never reportable |
+  </Accordion>
+
+  <Accordion title="Exception rendering">
+    | Method | Purpose |
+    | --- | --- |
+    | `$exceptions->render()` | Return a custom response per exception type |
+    | `render()` method | Define rendering logic on the exception class itself |
+    | `shouldRenderJsonWhen()` | Customize the JSON vs. HTML decision |
+    | `respond()` | Post-process the rendered response |
+  </Accordion>
+
+  <Accordion title="HTTP error pages">
+    - Create `resources/views/errors/404.blade.php` (and so on) to override error pages automatically
+    - Access error details through the `$exception` variable in the view
+    - Run `php artisan vendor:publish --tag=laravel-errors` to get the default templates
+    - Use `4xx.blade.php` and `5xx.blade.php` as fallbacks for unhandled status codes
+  </Accordion>
+
+  <Accordion title="Production best practices">
+    - Set `APP_DEBUG=false` so stack traces are never shown to users
+    - Integrate with Sentry or Flare for centralized error tracking
+    - Use `throttle()` to prevent log flooding during error spikes
+    - Return consistent JSON error responses on all API endpoints
+  </Accordion>
+</AccordionGroup>

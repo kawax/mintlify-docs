@@ -362,6 +362,25 @@
                 "pages": [
                   "en/intermediate/artisan"
                 ]
+              },
+              {
+                "group": "Frontend",
+                "pages": [
+                  "en/intermediate/vite"
+                ]
+              },
+              {
+                "group": "File Storage",
+                "pages": [
+                  "en/intermediate/filesystem"
+                ]
+              },
+              {
+                "group": "Debug & Monitoring",
+                "pages": [
+                  "en/intermediate/error-handling",
+                  "en/intermediate/logging"
+                ]
               }
             ]
           }
