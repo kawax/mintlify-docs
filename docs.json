@@ -169,6 +169,12 @@
                 "pages": [
                   "jp/intermediate/broadcasting"
                 ]
+              },
+              {
+                "group": "AI開発",
+                "pages": [
+                  "jp/intermediate/mcp"
+                ]
               }
             ]
           },
