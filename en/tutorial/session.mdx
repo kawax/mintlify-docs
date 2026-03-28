@@ -1,0 +1,308 @@
+---
+title: "Session"
+description: "Store and retrieve data across requests using Laravel's HTTP session."
+---
+
+## What is a session?
+
+HTTP is a stateless protocol — it has no built-in way to retain information between requests. Laravel's session feature provides a way to store data about a user across multiple requests.
+
+You'll use sessions for things like login state, shopping cart contents, and flash messages after form submissions.
+
+## Session driver configuration
+
+Session settings live in `config/session.php`. Switch drivers by setting the `SESSION_DRIVER` environment variable in your `.env` file:
+
+```ini
+SESSION_DRIVER=database
+```
+
+Laravel supports the following drivers:
+
+| Driver | Description |
+| --- | --- |
+| `file` | Stored as files in `storage/framework/sessions` (default for new projects) |
+| `cookie` | Stored as encrypted cookies in the browser |
+| `database` | Stored in a database table |
+| `redis` | Stored in Redis (fast; good for production) |
+| `array` | Stored in a PHP array; not persisted across requests (use in tests) |
+
+<Info>
+  New Laravel projects use the `database` driver by default. The required `sessions` table is created by the default migrations, so it works out of the box.
+</Info>
+
+## Accessing the session
+
+There are two ways to interact with the session: via the `Request` instance or the global `session()` helper.
+
+### Via the Request instance
+
+Type-hint `Request` in your controller and call `$request->session()`:
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class DashboardController extends Controller
+{
+    public function index(Request $request): View
+    {
+        $username = $request->session()->get('username');
+
+        return view('dashboard', ['username' => $username]);
+    }
+}
+```
+
+### Via the `session()` helper
+
+The `session()` helper is available anywhere — controllers, views, or other classes:
+
+```php
+// Retrieve a value
+$value = session('key');
+
+// Retrieve with a default
+$value = session('key', 'default');
+
+// Store a value
+session(['key' => 'value']);
+```
+
+<Tip>
+  In controllers, using `$request->session()` makes your dependencies explicit and easier to test. The `session()` helper is convenient in Blade templates.
+</Tip>
+
+## Working with session data
+
+### Retrieving data
+
+```php
+// Retrieve by key
+$value = $request->session()->get('key');
+
+// Retrieve with a default value
+$value = $request->session()->get('key', 'default');
+
+// Default as a closure
+$value = $request->session()->get('key', function () {
+    return 'default';
+});
+
+// Retrieve all session data
+$data = $request->session()->all();
+```
+
+### Checking for data
+
+```php
+// True if the key exists and is not null
+if ($request->session()->has('user_id')) {
+    // ...
+}
+
+// True if the key exists even if the value is null
+if ($request->session()->exists('user_id')) {
+    // ...
+}
+
+// True if the key is missing
+if ($request->session()->missing('user_id')) {
+    // ...
+}
+```
+
+Note the difference between `has` and `exists`:
+
+| Method | When value is `null` |
+| --- | --- |
+| `has` | Returns `false` |
+| `exists` | Returns `true` |
+
+### Storing data
+
+```php
+// Via the Request instance
+$request->session()->put('username', 'Alice');
+
+// Via the global helper
+session(['username' => 'Alice']);
+
+// Append to an array stored in the session
+$request->session()->push('cart.items', ['id' => 1, 'name' => 'Widget']);
+```
+
+### Removing data
+
+```php
+// Remove a specific key
+$request->session()->forget('username');
+
+// Remove multiple keys at once
+$request->session()->forget(['username', 'cart']);
+
+// Clear all session data
+$request->session()->flush();
+```
+
+## Flash data
+
+Flash data is available only for the **next request** and then deleted automatically. It's ideal for success messages, error notices, or any information that should be shown once.
+
+### Storing flash data
+
+```php
+$request->session()->flash('status', 'Post saved successfully.');
+```
+
+### Extending flash data
+
+```php
+// Keep all flash data for one more request
+$request->session()->reflash();
+
+// Keep specific keys for one more request
+$request->session()->keep(['status', 'message']);
+```
+
+### Displaying flash messages in Blade
+
+```blade
+{{-- resources/views/layouts/app.blade.php --}}
+
+@if (session('success'))
+    <div class="alert alert-success">
+        {{ session('success') }}
+    </div>
+@endif
+
+@if (session('error'))
+    <div class="alert alert-danger">
+        {{ session('error') }}
+    </div>
+@endif
+```
+
+<Tip>
+  Place flash message display in your layout file so it appears consistently on every page that uses that layout.
+</Tip>
+
+## Example: flash messages after a form submission
+
+Storing a success message after a form submission and showing it on the next page is one of the most common session patterns in Laravel.
+
+<Steps>
+  <Step title="Define the routes">
+    ```php
+    use App\Http\Controllers\PostController;
+
+    Route::get('/posts', [PostController::class, 'index'])->name('posts.index');
+    Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
+    Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+    ```
+  </Step>
+  <Step title="Store the flash message in the controller">
+    After saving the post, redirect with a success message attached:
+
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use App\Models\Post;
+    use Illuminate\Http\RedirectResponse;
+    use Illuminate\Http\Request;
+    use Illuminate\View\View;
+
+    class PostController extends Controller
+    {
+        public function index(): View
+        {
+            return view('posts.index', ['posts' => Post::latest()->get()]);
+        }
+
+        public function create(): View
+        {
+            return view('posts.create');
+        }
+
+        public function store(Request $request): RedirectResponse
+        {
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'body'  => 'required|string',
+            ]);
+
+            Post::create($validated);
+
+            return redirect()
+                ->route('posts.index')
+                ->with('success', 'Post created successfully.');
+        }
+    }
+    ```
+
+    `redirect()->with('success', '...')` is a shortcut that flashes the value to the session before redirecting.
+  </Step>
+  <Step title="Show the message in the layout">
+    Add flash message display to `resources/views/layouts/app.blade.php`:
+
+    ```blade
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>My App</title>
+    </head>
+    <body>
+        @if (session('success'))
+            <div class="alert alert-success">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="alert alert-danger">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        @yield('content')
+    </body>
+    </html>
+    ```
+  </Step>
+  <Step title="Create the list view">
+    ```blade
+    {{-- resources/views/posts/index.blade.php --}}
+
+    @extends('layouts.app')
+
+    @section('content')
+    <h1>Posts</h1>
+
+    @foreach ($posts as $post)
+        <div>
+            <h2>{{ $post->title }}</h2>
+            <p>{{ $post->body }}</p>
+        </div>
+    @endforeach
+    @endsection
+    ```
+
+    After a successful save, the success message appears at the top of this page exactly once.
+  </Step>
+</Steps>
+
+<Warning>
+  `flush()` removes **all** session data, including login state. If you only want to remove specific data, use `forget()` with the relevant keys.
+</Warning>
+
+## Next steps
+
+<Card title="Validation" icon="check-circle" href="/en/tutorial/validation">
+  Validate incoming request data before processing or storing it.
+</Card>
