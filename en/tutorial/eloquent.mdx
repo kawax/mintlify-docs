@@ -1,0 +1,293 @@
+---
+title: "Eloquent ORM"
+description: "How to use Laravel's Eloquent ORM to query and manipulate database records through expressive model classes."
+---
+
+## What is Eloquent?
+
+Laravel includes Eloquent, an object-relational mapper (ORM) that makes database interaction straightforward. Eloquent implements the **Active Record** pattern.
+
+With Eloquent, each database table has a corresponding "model" class. You use the model to retrieve, insert, update, and delete records in that table.
+
+<Info>
+  Before using Eloquent, configure your database connection in `config/database.php`. By default, Laravel reads the `DB_*` values from your `.env` file.
+</Info>
+
+## Creating a model
+
+Use the `make:model` Artisan command to generate a new model:
+
+```shell
+php artisan make:model Post
+```
+
+To create a model together with its migration file, add the `-m` flag:
+
+```shell
+php artisan make:model Post -m
+```
+
+Models are created in the `app/Models` directory:
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Post extends Model
+{
+    // ...
+}
+```
+
+## Table naming conventions
+
+Eloquent automatically infers the table name from the class name — it converts the class name to snake_case and pluralizes it:
+
+| Model | Table |
+| --- | --- |
+| `Post` | `posts` |
+| `User` | `users` |
+| `AirTrafficController` | `air_traffic_controllers` |
+
+If your table name does not follow this convention, define a `$table` property on the model:
+
+```php
+class Post extends Model
+{
+    protected $table = 'blog_posts';
+}
+```
+
+### Timestamps
+
+Eloquent automatically manages `created_at` and `updated_at` columns. If you add `$table->timestamps()` in your migration, Eloquent sets the values automatically when you save or update a model.
+
+To disable automatic timestamp management:
+
+```php
+class Post extends Model
+{
+    public $timestamps = false;
+}
+```
+
+## Mass assignment protection
+
+When inserting records in bulk, you need to configure mass assignment protection.
+
+### fillable
+
+Specify which columns are mass-assignable using the `$fillable` property:
+
+```php
+class Post extends Model
+{
+    protected $fillable = [
+        'user_id',
+        'title',
+        'body',
+        'published',
+    ];
+}
+```
+
+### guarded
+
+Alternatively, use `$guarded` to specify which columns should *not* be mass-assignable:
+
+```php
+class Post extends Model
+{
+    // Protect only the primary key; allow all others
+    protected $guarded = ['id'];
+}
+```
+
+<Warning>
+  Setting `$guarded` to an empty array allows mass assignment for every column. If you pass user-supplied data directly, unintended columns could be overwritten. Prefer `$fillable` to explicitly allow only the columns you expect.
+</Warning>
+
+## Basic CRUD operations
+
+### Reading records
+
+Retrieve all records:
+
+```php
+use App\Models\Post;
+
+$posts = Post::all();
+```
+
+Retrieve records with conditions:
+
+```php
+// Get published posts
+$publishedPosts = Post::where('published', true)->get();
+
+// Get the first matching record
+$post = Post::where('published', true)->first();
+
+// Find by primary key
+$post = Post::find(1);
+
+// Find by primary key or throw a 404
+$post = Post::findOrFail(1);
+```
+
+### Creating records
+
+Use the `create` method to insert a single record (requires `$fillable` to be configured):
+
+```php
+$post = Post::create([
+    'title' => 'My first post',
+    'body' => 'Laravel makes web development enjoyable.',
+    'published' => true,
+]);
+```
+
+You can also instantiate a model and assign properties individually:
+
+```php
+$post = new Post;
+$post->title = 'My first post';
+$post->body = 'Laravel makes web development enjoyable.';
+$post->save();
+```
+
+### Updating records
+
+Retrieve the model, change its properties, then call `save`:
+
+```php
+$post = Post::find(1);
+$post->title = 'Updated title';
+$post->save();
+```
+
+Use the `update` method to update multiple columns at once:
+
+```php
+Post::find(1)->update([
+    'title' => 'Updated title',
+    'published' => true,
+]);
+```
+
+Update multiple matching records in a single query:
+
+```php
+Post::where('published', false)->update(['published' => true]);
+```
+
+### Deleting records
+
+Call `delete` on a retrieved model:
+
+```php
+$post = Post::find(1);
+$post->delete();
+```
+
+Delete by primary key directly:
+
+```php
+Post::destroy(1);
+
+// Delete multiple records
+Post::destroy([1, 2, 3]);
+```
+
+## Common query methods
+
+| Method | Description |
+| --- | --- |
+| `Post::all()` | Retrieve all records |
+| `Post::find($id)` | Find by primary key (returns `null` if not found) |
+| `Post::findOrFail($id)` | Find by primary key (throws 404 if not found) |
+| `Post::where('column', 'value')->get()` | Retrieve records matching a condition |
+| `Post::where('column', 'value')->first()` | Get the first matching record |
+| `Post::where('column', 'value')->count()` | Count matching records |
+| `Post::orderBy('created_at', 'desc')->get()` | Retrieve records in a specific order |
+| `Post::latest()->get()` | Retrieve records ordered by `created_at` descending |
+| `Post::limit(10)->get()` | Limit the number of results |
+
+## Practical example: a PostController
+
+Here is a controller that uses the `Post` model to handle typical blog post operations:
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Post;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class PostController extends Controller
+{
+    // List published posts
+    public function index(): View
+    {
+        $posts = Post::where('published', true)
+            ->latest()
+            ->get();
+
+        return view('posts.index', ['posts' => $posts]);
+    }
+
+    // Store a new post
+    public function store(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'body' => ['required', 'string'],
+            'published' => ['boolean'],
+        ]);
+
+        Post::create([
+            ...$validated,
+            'user_id' => $request->user()->id,
+        ]);
+
+        return redirect('/posts');
+    }
+
+    // Update a post
+    public function update(Request $request, Post $post): RedirectResponse
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'body' => ['required', 'string'],
+        ]);
+
+        $post->update($validated);
+
+        return redirect('/posts');
+    }
+
+    // Delete a post
+    public function destroy(Post $post): RedirectResponse
+    {
+        $post->delete();
+
+        return redirect('/posts');
+    }
+}
+```
+
+<Tip>
+  When a controller method type-hints a model like `Post $post`, Laravel automatically fetches the matching record from the database based on the route parameter. This is called route model binding, and it removes the need to write `Post::findOrFail($id)` yourself.
+</Tip>
+
+## Next steps
+
+<Card title="Database migrations" icon="table" href="/en/tutorial/migrations">
+  Review how to create the tables that Eloquent models map to.
+</Card>
