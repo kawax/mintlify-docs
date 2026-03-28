@@ -238,6 +238,18 @@
                 ]
               },
               {
+                "group": "テスト",
+                "pages": [
+                  "jp/advanced/testing-pest"
+                ]
+              },
+              {
+                "group": "セキュリティ",
+                "pages": [
+                  "jp/advanced/rate-limiting"
+                ]
+              },
+              {
                 "group": "AI上級",
                 "pages": [
                   "jp/advanced/boost-custom-agent",

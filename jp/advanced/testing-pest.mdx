@@ -1,0 +1,465 @@
+---
+title: "Pestを使った高度なテスト"
+description: "Laravel 11以降でデフォルトになったPestの高度な使い方を、Expectation API・データセット・フェイク・Mockeryまで体系的に解説します。"
+---
+
+## Pestとは
+
+[Pest](https://pestphp.com) はPHPUnit上に構築されたテストフレームワークで、Laravel 11以降の新規プロジェクトにデフォルトで採用されています。PHPUnitの豊富なアサーション群をそのまま利用しながら、クロージャベースの簡潔な構文でテストを記述できます。
+
+PHPUnitとの主な違い：
+
+| 観点 | Pest | PHPUnit |
+|---|---|---|
+| テスト定義 | `test()` / `it()` クロージャ | メソッドで定義するクラス |
+| アサーション | Expectation API (`expect()->toBe()`) | `$this->assert*()` |
+| データセット | `dataset()` / `with()` | `@dataProvider` |
+| フック | `beforeEach()` / `afterEach()` | `setUp()` / `tearDown()` |
+| ネスト | `describe()` でグループ化 | クラスで分離 |
+
+<Info>
+  PestのテストはPHPUnitで実行されるため、既存のPHPUnitテストと共存できます。`php artisan test` または `vendor/bin/pest` で実行します。
+</Info>
+
+## `describe` / `it` / `test` の使い分け
+
+### `test()`
+
+最もシンプルな定義。テスト名をそのまま説明文として使います。
+
+```php
+test('ユーザーはメールアドレスでログインできる', function () {
+    $user = User::factory()->create();
+
+    $response = $this->post('/login', [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $response->assertRedirect('/dashboard');
+});
+```
+
+### `it()`
+
+「it should...」のような英語的な文体で自然言語に近い記述ができます。
+
+```php
+it('認証されていないユーザーをログインページにリダイレクトする', function () {
+    $response = $this->get('/dashboard');
+
+    $response->assertRedirect('/login');
+});
+```
+
+### `describe()`
+
+関連するテストをグループ化します。`beforeEach()` の共有やファイル内での論理的な整理に使います。
+
+```php
+describe('注文管理', function () {
+    beforeEach(function () {
+        $this->user = User::factory()->create();
+        $this->actingAs($this->user);
+    });
+
+    it('注文一覧を取得できる', function () {
+        Order::factory(3)->for($this->user)->create();
+
+        $response = $this->get('/orders');
+
+        $response->assertOk()->assertJsonCount(3, 'data');
+    });
+
+    it('他のユーザーの注文は取得できない', function () {
+        $other = User::factory()->create();
+        Order::factory()->for($other)->create();
+
+        $response = $this->get('/orders');
+
+        $response->assertOk()->assertJsonCount(0, 'data');
+    });
+});
+```
+
+<Tip>
+  `describe()` はネストできます。ただし深すぎるネストはテストを読みにくくするため、2階層までを目安にしましょう。
+</Tip>
+
+## Expectation API
+
+`expect()` はPest独自のアサーション構文です。メソッドチェーンで条件を積み重ねられます。
+
+### 基本的なアサーション
+
+```php
+expect($value)->toBe(42);               // 厳密な等価（===）
+expect($value)->toEqual(['a' => 1]);    // 緩やかな等価（==）
+expect($value)->toBeTrue();
+expect($value)->toBeFalse();
+expect($value)->toBeNull();
+expect($value)->not->toBeNull();
+
+expect($string)->toContain('Laravel');
+expect($array)->toHaveCount(3);
+expect($array)->toHaveKey('email');
+expect($array)->toContain('admin');
+
+expect($number)->toBeGreaterThan(0);
+expect($number)->toBeLessThanOrEqual(100);
+```
+
+### モデルに対するアサーション
+
+```php
+expect($user)->toBeInstanceOf(User::class);
+expect($user->email)->toMatchRegex('/^.+@.+\..+$/');
+
+// データベースへの保存を確認
+expect(User::where('email', 'test@example.com')->exists())->toBeTrue();
+```
+
+### `and()` チェーン
+
+```php
+expect($response->status())->toBe(200)
+    ->and($response->json('name'))->toBe('Laravel')
+    ->and($response->json('version'))->toBeGreaterThan(12);
+```
+
+### `each()` で配列の各要素を検証
+
+```php
+$users = User::factory(3)->create();
+
+expect($users)->each(function ($user) {
+    $user->toBeInstanceOf(User::class)
+        ->email->not->toBeNull();
+});
+```
+
+## データセットを使ったパラメータ化テスト
+
+同じロジックを複数の入力値でテストするには `dataset()` またはインライン `with()` を使います。
+
+### インラインデータセット
+
+```php
+it('無効なメールアドレスはバリデーションエラーになる', function (string $email) {
+    $response = $this->post('/register', ['email' => $email]);
+
+    $response->assertInvalid('email');
+})->with([
+    'プレーンテキスト' => ['not-an-email'],
+    'ドメインなし' => ['user@'],
+    '空文字' => [''],
+]);
+```
+
+### 名前付きデータセット
+
+`tests/Datasets` ディレクトリにデータセットを定義します。
+
+```php
+// tests/Datasets/InvalidEmails.php
+dataset('invalid_emails', [
+    'plain' => ['not-an-email'],
+    'no-domain' => ['user@'],
+    'empty' => [''],
+    'spaces' => ['user @example.com'],
+]);
+```
+
+```php
+it('無効なメールアドレスはバリデーションエラーになる', function (string $email) {
+    $response = $this->post('/register', ['email' => $email]);
+
+    $response->assertInvalid('email');
+})->with('invalid_emails');
+```
+
+### クロージャを使った動的データセット
+
+```php
+it('ユーザープランごとに異なる制限がある', function (string $plan, int $limit) {
+    $user = User::factory()->create(['plan' => $plan]);
+
+    expect($user->requestLimit())->toBe($limit);
+})->with([
+    ['free', 100],
+    ['pro', 1000],
+    ['enterprise', 10000],
+]);
+```
+
+## Mockeryを使ったユニットテスト
+
+### サービスのモック
+
+```php
+use App\Services\PaymentGateway;
+use Mockery\MockInterface;
+
+test('決済サービスが呼び出される', function () {
+    $mock = $this->mock(PaymentGateway::class, function (MockInterface $mock) {
+        $mock->expects('charge')
+            ->with(1000, 'jpy')
+            ->andReturn(['status' => 'succeeded']);
+    });
+
+    $result = app(PaymentGateway::class)->charge(1000, 'jpy');
+
+    expect($result['status'])->toBe('succeeded');
+});
+```
+
+### スパイ
+
+スパイはモックと違い、実装を呼び出しながら呼び出し記録を残します。
+
+```php
+use App\Services\NotificationService;
+
+test('通知サービスが呼び出されたか確認する', function () {
+    $spy = $this->spy(NotificationService::class);
+
+    $this->post('/orders', ['amount' => 1000]);
+
+    $spy->shouldHaveReceived('send')->once()->with('order.created');
+});
+```
+
+### 部分モック
+
+一部のメソッドだけモックし、他は実際の実装を使います。
+
+```php
+use App\Services\ReportService;
+use Mockery\MockInterface;
+
+test('レポートのファイル書き込みをスキップする', function () {
+    $mock = $this->partialMock(ReportService::class, function (MockInterface $mock) {
+        $mock->expects('writeFile')->andReturnNull();
+    });
+
+    $result = $mock->generate();
+
+    expect($result)->not->toBeNull();
+});
+```
+
+## HTTPフェイクによる外部API呼び出しのテスト
+
+`Http::fake()` を使うと実際のHTTPリクエストを送らずにレスポンスをスタブできます。
+
+### 基本的なフェイク
+
+```php
+use Illuminate\Support\Facades\Http;
+
+test('外部APIからユーザー情報を取得する', function () {
+    Http::fake([
+        'https://api.example.com/users/*' => Http::response([
+            'id' => 1,
+            'name' => 'Laravel User',
+        ], 200),
+    ]);
+
+    $result = app(UserApiClient::class)->find(1);
+
+    expect($result['name'])->toBe('Laravel User');
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.example.com/users/1');
+});
+```
+
+### エラーレスポンスのテスト
+
+```php
+test('APIがエラーを返したときに例外が発生する', function () {
+    Http::fake([
+        'api.example.com/*' => Http::response([], 503),
+    ]);
+
+    expect(fn () => app(UserApiClient::class)->find(1))
+        ->toThrow(\App\Exceptions\ApiUnavailableException::class);
+});
+```
+
+### ネットワーク障害のシミュレーション
+
+```php
+use Illuminate\Http\Client\ConnectionException;
+
+test('接続エラーをハンドリングする', function () {
+    Http::fake(fn () => throw new ConnectionException('Connection refused'));
+
+    $result = app(UserApiClient::class)->findWithFallback(1);
+
+    expect($result)->toBeNull();
+});
+```
+
+## イベント・メール・通知のフェイク
+
+### `Event::fake()`
+
+```php
+use Illuminate\Support\Facades\Event;
+use App\Events\OrderCreated;
+
+test('注文作成時にイベントが発行される', function () {
+    Event::fake();
+
+    $this->post('/orders', ['product_id' => 1, 'amount' => 1000]);
+
+    Event::assertDispatched(OrderCreated::class, function ($event) {
+        return $event->order->amount === 1000;
+    });
+});
+```
+
+特定のイベントだけフェイクし、他は実際に処理させることもできます。
+
+```php
+Event::fake([OrderCreated::class]);
+```
+
+### `Mail::fake()`
+
+```php
+use Illuminate\Support\Facades\Mail;
+use App\Mail\WelcomeEmail;
+
+test('ユーザー登録時にウェルカムメールが送信される', function () {
+    Mail::fake();
+
+    $this->post('/register', [
+        'name' => 'Test User',
+        'email' => 'test@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    Mail::assertSent(WelcomeEmail::class, function ($mail) {
+        return $mail->hasTo('test@example.com');
+    });
+});
+```
+
+### `Notification::fake()`
+
+```php
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\OrderShipped;
+
+test('出荷時に通知が送られる', function () {
+    Notification::fake();
+
+    $user = User::factory()->create();
+    $order = Order::factory()->for($user)->create();
+
+    $this->post("/orders/{$order->id}/ship");
+
+    Notification::assertSentTo($user, OrderShipped::class, function ($notification) use ($order) {
+        return $notification->order->id === $order->id;
+    });
+});
+```
+
+## Artisanコマンドのテスト
+
+```php
+use Illuminate\Support\Facades\Artisan;
+
+test('不要なデータを削除するコマンドが動作する', function () {
+    $expired = Order::factory()->create(['expires_at' => now()->subDay()]);
+    $valid = Order::factory()->create(['expires_at' => now()->addDay()]);
+
+    $this->artisan('orders:cleanup')
+        ->assertSuccessful()
+        ->expectsOutput('Cleaned up 1 expired order(s).');
+
+    expect(Order::find($expired->id))->toBeNull();
+    expect(Order::find($valid->id))->not->toBeNull();
+});
+```
+
+### 対話型コマンドのテスト
+
+```php
+test('対話型コマンドで確認後に処理が実行される', function () {
+    $this->artisan('reports:generate')
+        ->expectsQuestion('実行しますか？', 'yes')
+        ->expectsOutput('レポートを生成しました。')
+        ->assertExitCode(0);
+});
+```
+
+## `RefreshDatabase` と `LazilyRefreshDatabase`
+
+### `RefreshDatabase`
+
+各テスト後にデータベースをロールバックし、クリーンな状態を保ちます。テストスイート開始時にマイグレーションを実行します。
+
+```php
+// tests/Pest.php
+uses(RefreshDatabase::class)->in('Feature');
+```
+
+```php
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+test('ユーザーを作成できる', function () {
+    $user = User::factory()->create(['name' => 'Laravel']);
+
+    expect(User::count())->toBe(1);
+    expect($user->name)->toBe('Laravel');
+});
+```
+
+### `LazilyRefreshDatabase`
+
+`RefreshDatabase` はすべてのテストでマイグレーションを確認しますが、`LazilyRefreshDatabase` はデータベースを実際に変更するテストが実行されるまでマイグレーションを遅延させます。データベースに触れないテストが多い場合に高速化できます。
+
+```php
+// tests/Pest.php
+uses(LazilyRefreshDatabase::class)->in('Feature');
+```
+
+<Tip>
+  ほとんどのプロジェクトでは `RefreshDatabase` が安全な選択肢です。`LazilyRefreshDatabase` はテストスイートが大きくなりデータベース操作のないテストが多い場合に検討しましょう。
+</Tip>
+
+| 観点 | `RefreshDatabase` | `LazilyRefreshDatabase` |
+|---|---|---|
+| マイグレーション実行タイミング | テストスイート開始時 | 最初のDB操作時 |
+| DBに触れないテストのオーバーヘッド | あり | なし |
+| 推奨場面 | 一般的なケース | テスト数が多くDBを使わないテストが多い場合 |
+
+## コードカバレッジの計測
+
+XdebugまたはPCOVが必要です。
+
+```bash
+# カバレッジをターミナルに表示
+php artisan test --coverage
+
+# 最低カバレッジを強制（下回るとCIが失敗）
+php artisan test --coverage --min=80
+
+# HTMLレポートを出力
+vendor/bin/pest --coverage-html=coverage/
+
+# 低速なテストを確認
+php artisan test --profile
+```
+
+<Warning>
+  コードカバレッジの計測はテスト実行時間を大幅に増加させます。CI環境では専用ジョブに分けるか、プルリクエスト時のみ実行するように設定することをおすすめします。
+</Warning>
+
+## 関連ページ
+
+<Card title="テスト入門" icon="flask" href="/jp/tutorial/testing">
+  Laravelでのテストの基本的な書き方と `php artisan test` の使い方を確認します。
+</Card>
