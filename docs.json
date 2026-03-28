@@ -174,7 +174,8 @@
                 "group": "AI開発",
                 "pages": [
                   "jp/intermediate/boost",
-                  "jp/intermediate/mcp"
+                  "jp/intermediate/mcp",
+                  "jp/intermediate/ai-sdk"
                 ]
               },
               {
@@ -218,6 +219,7 @@
               {
                 "group": "AI上級",
                 "pages": [
+                  "jp/advanced/boost-custom-agent",
                   "jp/advanced/mcp-server"
                 ]
               }
