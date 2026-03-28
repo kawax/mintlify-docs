@@ -1,0 +1,468 @@
+---
+title: "Livewire 3入門 — JavaScriptなしでリアクティブなUIを作る"
+description: "LaravelのファーストパーティパッケージLivewire 3を使って、JavaScriptを書かずにインタラクティブなUIを構築する方法を、インストールから実践的なコード例まで解説します。"
+---
+
+## Livewireとは
+
+Laravelで動的なUIを作ろうとすると、以前はVue.jsやReactなどのJavaScriptフレームワークを組み合わせるか、自分でAJAXリクエストを書くしかありませんでした。
+
+**Livewire**はその問題を解決するLaravelのファーストパーティパッケージです。PHPとBladeだけでリアクティブなUIを構築できます。フォームのリアルタイムバリデーション、ライブ検索、カウンターなど、従来であればJavaScriptが必要だった機能を、すべてPHPで実装できます。
+
+<Info>
+  Livewire 3はLaravel 10以降、PHP 8.1以降で動作します。現在の最新バージョンはLivewire 3です。
+</Info>
+
+### 仕組みの概要
+
+Livewireコンポーネントはサーバー上のPHPクラスとBladeテンプレートの組み合わせです。ユーザーがボタンをクリックしたりフォームに入力したりすると、Livewireは裏側でAJAXリクエストを送り、PHPを実行し、変更された部分だけをページに反映します。開発者はこの仕組みを意識することなく、PHPのみで記述できます。
+
+---
+
+## インストール
+
+Laravelアプリケーションのルートディレクトリで以下のコマンドを実行します。
+
+```shell
+composer require livewire/livewire
+```
+
+Laravelのパッケージ自動検出が有効なので、追加の設定は不要です。
+
+### レイアウトファイルの作成
+
+フルページコンポーネントとして使う場合はレイアウトファイルが必要です。以下のArtisanコマンドで生成できます。
+
+```shell
+php artisan livewire:layout
+```
+
+`resources/views/layouts/app.blade.php` が生成されます。
+
+```blade
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <title>{{ $title ?? config('app.name') }}</title>
+
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+        @livewireStyles
+    </head>
+    <body>
+        {{ $slot }}
+
+        @livewireScripts
+    </body>
+</html>
+```
+
+`@livewireStyles` と `@livewireScripts` が、LiverwireとAlpine.jsのアセットを自動で読み込みます。
+
+---
+
+## 最初のコンポーネント
+
+Livewireコンポーネントを生成するArtisanコマンドが用意されています。シンプルなカウンターを作ってみましょう。
+
+```shell
+php artisan make:livewire Counter
+```
+
+このコマンドで `resources/views/components/⚡counter.blade.php` という単一ファイルコンポーネントが生成されます。
+
+<Tip>
+  ファイル名の ⚡ はLivewireコンポーネントをひと目で識別するためのものです。エディタでの視認性が上がります。不要であれば設定で無効にできます。
+</Tip>
+
+生成されたファイルを次のように編集します。
+
+```blade
+<?php
+
+use Livewire\Component;
+
+new class extends Component {
+    public int $count = 0;
+
+    public function increment(): void
+    {
+        $this->count++;
+    }
+
+    public function decrement(): void
+    {
+        $this->count--;
+    }
+};
+?>
+
+<div>
+    <h1>カウント: {{ $count }}</h1>
+
+    <button wire:click="increment">+1</button>
+    <button wire:click="decrement">-1</button>
+</div>
+```
+
+Bladeテンプレートにこのコンポーネントを埋め込むには、通常のBladeコンポーネント構文を使います。
+
+```blade
+<livewire:counter />
+```
+
+ボタンをクリックするたびにページリロードなしでカウントが更新されます。`wire:click` がJavaScriptの代わりにPHPメソッドを呼び出す仕組みです。
+
+---
+
+## プロパティとアクション
+
+### プロパティ — `wire:model`
+
+`wire:model` ディレクティブで、入力要素とコンポーネントのプロパティを双方向バインドできます。
+
+```blade
+<?php
+
+use Livewire\Component;
+
+new class extends Component {
+    public string $name = '';
+    public string $email = '';
+};
+?>
+
+<div>
+    <input type="text" wire:model="name" placeholder="名前">
+    <input type="email" wire:model="email" placeholder="メール">
+
+    <p>こんにちは、{{ $name }}さん ({{ $email }})</p>
+</div>
+```
+
+デフォルトでは入力のたびにサーバーへリクエストが送られます。リクエストを減らしたい場合は修飾子を使います。
+
+| 記法 | 挙動 |
+|------|------|
+| `wire:model` | アクション実行時（フォーム送信など）にのみ同期（デフォルト） |
+| `wire:model.live` | 入力のたびにリクエストを送信 |
+| `wire:model.blur` | フォーカスを外れたときに同期（リクエストは発生しない） |
+| `wire:model.live.blur` | フォーカスを外れたときにリクエストを送信 |
+
+### アクション — `wire:click`、`wire:submit`
+
+`wire:click` はクリックイベント、`wire:submit` はフォームの送信イベントにメソッドを紐付けます。
+
+```blade
+<?php
+
+use Livewire\Component;
+use App\Models\Task;
+
+new class extends Component {
+    public string $taskName = '';
+
+    public function addTask(): void
+    {
+        Task::create(['name' => $this->taskName]);
+        $this->taskName = '';
+    }
+
+    public function render()
+    {
+        return $this->view([
+            'tasks' => Task::latest()->get(),
+        ]);
+    }
+};
+?>
+
+<div>
+    <form wire:submit="addTask">
+        <input type="text" wire:model="taskName" placeholder="タスク名">
+        <button type="submit">追加</button>
+    </form>
+
+    <ul>
+        @foreach ($tasks as $task)
+            <li>{{ $task->name }}</li>
+        @endforeach
+    </ul>
+</div>
+```
+
+---
+
+## リアルタイムバリデーション
+
+Livewire 3では `#[Validate]` アトリビュートでプロパティにバリデーションルールを直接定義できます。
+
+```blade
+<?php
+
+use Livewire\Attributes\Validate;
+use Livewire\Component;
+use App\Models\Post;
+
+new class extends Component {
+    #[Validate('required|min:3')]
+    public string $title = '';
+
+    #[Validate('required|min:10')]
+    public string $content = '';
+
+    public function save(): void
+    {
+        $this->validate();
+
+        Post::create([
+            'title' => $this->title,
+            'content' => $this->content,
+        ]);
+
+        $this->reset(['title', 'content']);
+
+        session()->flash('message', '記事を保存しました。');
+    }
+};
+?>
+
+<div>
+    @if (session('message'))
+        <div>{{ session('message') }}</div>
+    @endif
+
+    <form wire:submit="save">
+        <div>
+            <input type="text" wire:model.live.blur="title" placeholder="タイトル">
+            @error('title') <span style="color: red;">{{ $message }}</span> @enderror
+        </div>
+
+        <div>
+            <textarea wire:model.live.blur="content" placeholder="本文"></textarea>
+            @error('content') <span style="color: red;">{{ $message }}</span> @enderror
+        </div>
+
+        <button type="submit">保存</button>
+    </form>
+</div>
+```
+
+`#[Validate]` を付けたプロパティは更新のたびに自動バリデーションが走ります。`wire:model.live.blur` と組み合わせることで、フォーカスを外れた瞬間にエラーメッセージが表示されるリアルタイムバリデーション体験を実現できます。
+
+<Info>
+  `$this->validate()` はフォーム送信時に全プロパティをまとめて検証します。`#[Validate]` による自動バリデーションと二段階で使うのが推奨パターンです。
+</Info>
+
+---
+
+## ライフサイクルフック
+
+Livewireコンポーネントにはいくつかのライフサイクルフックがあります。
+
+| フック | タイミング |
+|--------|-----------|
+| `mount()` | コンポーネントが最初に生成されたとき（一度だけ） |
+| `boot()` | 毎リクエストの開始時（初回・後続リクエスト両方） |
+| `updating($property, $value)` | プロパティが更新される直前 |
+| `updated($property)` | プロパティが更新された直後 |
+| `rendering()` | ビューのレンダリング前 |
+| `rendered()` | ビューのレンダリング後 |
+| `dehydrate()` | 毎リクエストの終了時 |
+
+### `mount()` — 初期化
+
+`mount()` はコンポーネントの初期化に使います。コンストラクタの代わりです。
+
+```blade
+<?php
+
+use Illuminate\Support\Facades\Auth;
+use Livewire\Component;
+
+new class extends Component {
+    public string $name = '';
+    public string $email = '';
+
+    public function mount(): void
+    {
+        $this->name = Auth::user()->name;
+        $this->email = Auth::user()->email;
+    }
+};
+?>
+
+<div>
+    <p>名前: {{ $name }}</p>
+    <p>メール: {{ $email }}</p>
+</div>
+```
+
+### `updated()` — プロパティ変更後の処理
+
+プロパティが更新されたあとに処理を挟みたい場合は `updated()` を使います。特定のプロパティに絞る場合はメソッド名に含めます。
+
+```blade
+<?php
+
+use Livewire\Component;
+
+new class extends Component {
+    public string $username = '';
+
+    public function updatedUsername(): void
+    {
+        $this->username = strtolower($this->username);
+    }
+};
+?>
+
+<div>
+    <input type="text" wire:model.live="username">
+    <p>ユーザー名: {{ $username }}</p>
+</div>
+```
+
+入力するたびに自動的に小文字へ変換されます。
+
+---
+
+## Laravelとの統合
+
+### Eloquentモデルの活用
+
+Livewireはプロパティに直接Eloquentモデルを保持できます。
+
+```blade
+<?php
+
+use Livewire\Attributes\Validate;
+use Livewire\Component;
+use App\Models\User;
+
+new class extends Component {
+    public User $user;
+
+    public function mount(User $user): void
+    {
+        $this->user = $user;
+    }
+
+    #[Validate('required|min:2')]
+    public string $name = '';
+
+    public function save(): void
+    {
+        $this->validate();
+        $this->user->update(['name' => $this->name]);
+        session()->flash('message', 'プロフィールを更新しました。');
+    }
+
+    public function render()
+    {
+        return $this->view();
+    }
+};
+?>
+
+<div>
+    @if (session('message'))
+        <div>{{ session('message') }}</div>
+    @endif
+
+    <form wire:submit="save">
+        <input type="text" wire:model="name" placeholder="名前">
+        @error('name') <span style="color: red;">{{ $message }}</span> @enderror
+        <button type="submit">更新</button>
+    </form>
+</div>
+```
+
+### フォームオブジェクト
+
+複雑なフォームはフォームオブジェクトに切り出すことで、コンポーネントをシンプルに保てます。
+
+```shell
+php artisan livewire:form PostForm
+```
+
+```php
+namespace App\Livewire\Forms;
+
+use Livewire\Attributes\Validate;
+use Livewire\Form;
+use App\Models\Post;
+
+class PostForm extends Form
+{
+    #[Validate('required|min:3')]
+    public string $title = '';
+
+    #[Validate('required|min:10')]
+    public string $content = '';
+
+    public function store(): void
+    {
+        Post::create($this->only(['title', 'content']));
+    }
+}
+```
+
+フォームオブジェクトをコンポーネントから使います。
+
+```blade
+<?php
+
+use App\Livewire\Forms\PostForm;
+use Livewire\Component;
+
+new class extends Component {
+    public PostForm $form;
+
+    public function save(): void
+    {
+        $this->form->validate();
+        $this->form->store();
+        $this->form->reset();
+        session()->flash('message', '投稿を作成しました。');
+    }
+};
+?>
+
+<div>
+    <form wire:submit="save">
+        <input type="text" wire:model="form.title" placeholder="タイトル">
+        @error('form.title') <span style="color: red;">{{ $message }}</span> @enderror
+
+        <textarea wire:model="form.content" placeholder="本文"></textarea>
+        @error('form.content') <span style="color: red;">{{ $message }}</span> @enderror
+
+        <button type="submit">投稿</button>
+    </form>
+</div>
+```
+
+---
+
+## まとめ
+
+Livewireが特に向いているユースケースをまとめます。
+
+| ユースケース | Livewireで実現できること |
+|-------------|------------------------|
+| フォーム処理 | リアルタイムバリデーション、エラー表示 |
+| データ一覧 | ライブ検索、ソート、ページネーション |
+| カウンターやトグル | ページリロードなしのUI更新 |
+| 管理画面 | Eloquentとの直接連携でCRUD操作 |
+| ウィザード型フォーム | ステップ管理をPHPで実装 |
+
+Livewireは「Bladeを使ったことがある」Laravelエンジニアなら今日から使い始められます。JavaScriptフレームワークの学習コストなしで、インタラクティブなUIを実現できるのが最大の強みです。
+
+SPA並みの高度なインタラクションが必要な場面ではInertia.jsが向いていますが、フォームや管理画面、データテーブルのような用途であればLivewireの方がシンプルに実装できることが多いです。まず小さなコンポーネント一つから試してみてください。
+
+<Card title="Livewire公式ドキュメント" icon="book-open" href="https://livewire.laravel.com/docs">
+  Livewireの全機能（ファイルアップロード、ページネーション、テストなど）については公式ドキュメントを参照してください。
+</Card>

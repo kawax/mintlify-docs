@@ -240,7 +240,8 @@
               {
                 "group": "パッケージ紹介",
                 "pages": [
-                  "jp/blog/laravel-pennant"
+                  "jp/blog/laravel-pennant",
+                  "jp/blog/livewire-introduction"
                 ]
               },
               {
