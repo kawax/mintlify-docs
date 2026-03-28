@@ -1,0 +1,597 @@
+---
+title: "Laravel AI SDK"
+description: "OpenAI・Anthropic・Geminiなど複数のAIプロバイダーを統一インターフェースで扱える Laravel AI SDK の使い方を学びましょう。エージェント、画像生成、ストリーミングなど主要機能を解説します。"
+---
+
+## はじめに
+
+[Laravel AI SDK](https://github.com/laravel/ai) は、OpenAI・Anthropic・Gemini などの AI プロバイダーと対話するための統一された表現力豊かな API を提供します。エージェントの構築、画像生成、音声合成・認識、ベクター埋め込みなど、多彩な AI 機能を一貫した Laravel らしいインターフェースで実現できます。
+
+<Info>
+  Laravel AI SDK は Laravel 13 で追加された公式パッケージです。`laravel/ai` として提供されており、複数の AI プロバイダーを統一 API で扱えます。
+</Info>
+
+主な機能は次のとおりです。
+
+| 機能 | 対応プロバイダー |
+| --- | --- |
+| テキスト生成 | OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama |
+| 画像生成 | OpenAI, Gemini, xAI |
+| 音声合成（TTS） | OpenAI, ElevenLabs |
+| 音声認識（STT） | OpenAI, ElevenLabs, Mistral |
+| 埋め込み | OpenAI, Gemini, Azure, Cohere, Mistral, Jina, VoyageAI |
+| リランキング | Cohere, Jina |
+| ファイル | OpenAI, Anthropic, Gemini |
+
+## インストール
+
+<Steps>
+  <Step title="パッケージのインストール">
+    Composer で Laravel AI SDK をインストールします。
+
+    ```shell
+    composer require laravel/ai
+    ```
+  </Step>
+  <Step title="設定ファイルとマイグレーションの公開">
+    `vendor:publish` Artisan コマンドで設定ファイルとマイグレーションを公開します。
+
+    ```shell
+    php artisan vendor:publish --provider="Laravel\Ai\AiServiceProvider"
+    ```
+  </Step>
+  <Step title="マイグレーションの実行">
+    データベースマイグレーションを実行します。`agent_conversations` と `agent_conversation_messages` テーブルが作成され、会話履歴の保存に使われます。
+
+    ```shell
+    php artisan migrate
+    ```
+  </Step>
+</Steps>
+
+## プロバイダーの設定
+
+APIキーは `config/ai.php` または `.env` ファイルで設定します。
+
+```ini
+ANTHROPIC_API_KEY=
+COHERE_API_KEY=
+ELEVENLABS_API_KEY=
+GEMINI_API_KEY=
+MISTRAL_API_KEY=
+OLLAMA_API_KEY=
+OPENAI_API_KEY=
+JINA_API_KEY=
+VOYAGEAI_API_KEY=
+XAI_API_KEY=
+```
+
+### カスタムベース URL
+
+プロキシサービス（LiteLLM や Azure OpenAI Gateway など）を経由する場合は、プロバイダーごとにカスタム URL を設定できます。
+
+```php
+'providers' => [
+    'openai' => [
+        'driver' => 'openai',
+        'key' => env('OPENAI_API_KEY'),
+        'url' => env('OPENAI_BASE_URL'),
+    ],
+
+    'anthropic' => [
+        'driver' => 'anthropic',
+        'key' => env('ANTHROPIC_API_KEY'),
+        'url' => env('ANTHROPIC_BASE_URL'),
+    ],
+],
+```
+
+カスタムベース URL は OpenAI・Anthropic・Gemini・Groq・Cohere・DeepSeek・xAI・OpenRouter で利用できます。
+
+### プロバイダーの参照
+
+コード内でプロバイダーを参照するには `Lab` enum を使うと便利です。
+
+```php
+use Laravel\Ai\Enums\Lab;
+
+Lab::Anthropic;
+Lab::OpenAI;
+Lab::Gemini;
+```
+
+## エージェント
+
+エージェントは Laravel AI SDK の中核となる仕組みです。各エージェントは専用の PHP クラスで、システムプロンプト、会話コンテキスト、ツール、出力スキーマを一つにまとめます。
+
+### エージェントの作成
+
+`make:agent` Artisan コマンドでエージェントクラスを生成します。
+
+```shell
+php artisan make:agent SalesCoach
+```
+
+構造化出力が必要な場合は `--structured` オプションを付けます。
+
+```shell
+php artisan make:agent SalesCoach --structured
+```
+
+生成されたクラスには、システムプロンプトや会話履歴、ツール、出力スキーマを定義できます。
+
+```php
+<?php
+
+namespace App\Ai\Agents;
+
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Promptable;
+use Stringable;
+
+class SalesCoach implements Agent
+{
+    use Promptable;
+
+    /**
+     * エージェントが従うべき指示を返す。
+     */
+    public function instructions(): Stringable|string
+    {
+        return 'あなたはセールスコーチです。商談のトランスクリプトを分析し、フィードバックと総合スコアを提供してください。';
+    }
+}
+```
+
+### プロンプトの実行
+
+エージェントのインスタンスを作成して `prompt` メソッドを呼び出します。
+
+```php
+$response = (new SalesCoach)
+    ->prompt('この商談トランスクリプトを分析してください...');
+
+return (string) $response;
+```
+
+`make` メソッドを使うとコンテナから解決されるため、依存注入が利用できます。
+
+```php
+$agent = SalesCoach::make(user: $user);
+```
+
+プロバイダーやモデルをオーバーライドする場合は、`prompt` メソッドの引数で指定します。
+
+```php
+use Laravel\Ai\Enums\Lab;
+
+$response = (new SalesCoach)->prompt(
+    'この商談トランスクリプトを分析してください...',
+    provider: Lab::Anthropic,
+    model: 'claude-haiku-4-5-20251001',
+    timeout: 120,
+);
+```
+
+## 会話コンテキスト（チャット）
+
+チャット形式で会話履歴を保持するには `Conversational` インターフェースを実装します。
+
+### 手動で履歴を管理する
+
+`messages` メソッドで過去のメッセージ一覧を返します。
+
+```php
+use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Messages\Message;
+
+class SalesCoach implements Agent, Conversational
+{
+    use Promptable;
+
+    public function messages(): iterable
+    {
+        return History::where('user_id', $this->user->id)
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->reverse()
+            ->map(fn ($message) => new Message($message->role, $message->content))
+            ->all();
+    }
+}
+```
+
+### 会話を自動で記録する
+
+`RemembersConversations` トレイトを使うと、会話履歴をデータベースに自動的に保存・取得できます。
+
+```php
+use Laravel\Ai\Concerns\RemembersConversations;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Promptable;
+
+class SalesCoach implements Agent, Conversational
+{
+    use Promptable, RemembersConversations;
+
+    public function instructions(): string
+    {
+        return 'あなたはセールスコーチです...';
+    }
+}
+```
+
+新しい会話を開始するには `forUser` メソッドを使います。
+
+```php
+$response = (new SalesCoach)->forUser($user)->prompt('こんにちは！');
+
+$conversationId = $response->conversationId;
+```
+
+既存の会話を継続するには `continue` メソッドを使います。
+
+```php
+$response = (new SalesCoach)
+    ->continue($conversationId, as: $user)
+    ->prompt('もう少し詳しく教えてください。');
+```
+
+## ストリーミング
+
+`stream` メソッドを使うと、AI の応答をリアルタイムでストリーミング配信できます。返り値の `StreamableAgentResponse` をルートから直接返すと、SSE（Server-Sent Events）として自動送信されます。
+
+```php
+use App\Ai\Agents\SalesCoach;
+
+Route::get('/coach', function () {
+    return (new SalesCoach)->stream('この商談トランスクリプトを分析してください...');
+});
+```
+
+`then` メソッドで、ストリーミングが完了した後に呼び出されるクロージャを登録できます。
+
+```php
+use Laravel\Ai\Responses\StreamedAgentResponse;
+
+Route::get('/coach', function () {
+    return (new SalesCoach)
+        ->stream('この商談トランスクリプトを分析してください...')
+        ->then(function (StreamedAgentResponse $response) {
+            // $response->text, $response->events, $response->usage
+        });
+});
+```
+
+### Vercel AI SDK プロトコル
+
+[Vercel AI SDK](https://ai-sdk.dev/) のストリームプロトコルを使う場合は `usingVercelDataProtocol` メソッドを呼び出します。
+
+```php
+Route::get('/coach', function () {
+    return (new SalesCoach)
+        ->stream('この商談トランスクリプトを分析してください...')
+        ->usingVercelDataProtocol();
+});
+```
+
+## エージェントの高度な機能
+
+### 構造化出力
+
+JSON スキーマに沿った構造化出力を返すには `HasStructuredOutput` インターフェースを実装します。
+
+```php
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasStructuredOutput;
+use Laravel\Ai\Promptable;
+
+class SalesCoach implements Agent, HasStructuredOutput
+{
+    use Promptable;
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'feedback' => $schema->string()->required(),
+            'score' => $schema->integer()->min(1)->max(10)->required(),
+        ];
+    }
+}
+```
+
+レスポンスは配列としてアクセスできます。
+
+```php
+$response = (new SalesCoach)->prompt('この商談トランスクリプトを分析してください...');
+
+return $response['score'];
+```
+
+### ツール
+
+ツールを使うと、エージェントがプロンプトへの応答時に追加の機能（外部 API 呼び出し、検索、計算など）を利用できます。
+
+```shell
+php artisan make:tool RandomNumberGenerator
+```
+
+生成されたツールは `app/Ai/Tools` ディレクトリに配置されます。
+
+```php
+<?php
+
+namespace App\Ai\Tools;
+
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
+use Stringable;
+
+class RandomNumberGenerator implements Tool
+{
+    public function description(): Stringable|string
+    {
+        return '暗号的に安全な乱数を生成するツールです。';
+    }
+
+    public function handle(Request $request): Stringable|string
+    {
+        return (string) random_int($request['min'], $request['max']);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'min' => $schema->integer()->min(0)->required(),
+            'max' => $schema->integer()->required(),
+        ];
+    }
+}
+```
+
+エージェントの `tools` メソッドでツールを返します。
+
+```php
+use Laravel\Ai\Contracts\HasTools;
+
+class SalesCoach implements Agent, HasTools
+{
+    use Promptable;
+
+    public function tools(): iterable
+    {
+        return [
+            new RandomNumberGenerator,
+        ];
+    }
+}
+```
+
+### キューイング
+
+`queue` メソッドを使うと、エージェントの処理をバックグラウンドで実行できます。
+
+```php
+use Laravel\Ai\Responses\AgentResponse;
+
+Route::post('/coach', function (Request $request) {
+    (new SalesCoach)
+        ->queue($request->input('transcript'))
+        ->then(function (AgentResponse $response) {
+            // 処理完了後の後続処理
+        })
+        ->catch(function (Throwable $e) {
+            // エラー処理
+        });
+
+    return back();
+});
+```
+
+### 添付ファイル
+
+プロンプトにドキュメントや画像を添付できます。
+
+```php
+use Laravel\Ai\Files;
+
+$response = (new SalesCoach)->prompt(
+    '添付のトランスクリプトを分析してください...',
+    attachments: [
+        Files\Document::fromStorage('transcript.pdf'),
+        Files\Document::fromPath('/home/laravel/transcript.md'),
+        $request->file('transcript'),
+    ]
+);
+```
+
+画像を添付する場合は `Files\Image` クラスを使います。
+
+```php
+use Laravel\Ai\Files;
+
+// SalesCoach と同様に作成した画像解析用エージェント
+$response = (new SalesCoach)->prompt(
+    'この画像に何が写っていますか？',
+    attachments: [
+        Files\Image::fromStorage('photo.jpg'),
+        Files\Image::fromPath('/home/laravel/photo.jpg'),
+        $request->file('photo'),
+    ]
+);
+```
+
+## 画像生成
+
+`Image` クラスで画像を生成できます。`openai`・`gemini`・`xai` プロバイダーが対応しています。
+
+```php
+use Laravel\Ai\Image;
+
+$image = Image::of('キッチンのカウンターにドーナツが置いてある')->generate();
+
+$rawContent = (string) $image;
+```
+
+アスペクト比や品質を指定することもできます。
+
+```php
+$image = Image::of('キッチンのカウンターにドーナツが置いてある')
+    ->quality('high')    // 'high', 'medium', 'low'
+    ->landscape()        // square(), portrait(), landscape()
+    ->timeout(120)
+    ->generate();
+```
+
+### 画像の保存
+
+生成した画像はストレージに直接保存できます。
+
+```php
+$image = Image::of('キッチンのカウンターにドーナツが置いてある');
+
+$path = $image->store();
+$path = $image->storeAs('image.jpg');
+$path = $image->storePublicly();
+$path = $image->storePubliclyAs('image.jpg');
+```
+
+### キューで画像生成
+
+画像生成をキューで非同期処理することもできます。
+
+```php
+use Laravel\Ai\Image;
+use Laravel\Ai\Responses\ImageResponse;
+
+Image::of('キッチンのカウンターにドーナツが置いてある')
+    ->portrait()
+    ->queue()
+    ->then(function (ImageResponse $image) {
+        $path = $image->store();
+    });
+```
+
+## 実用的なユースケース
+
+### チャットボット
+
+`RemembersConversations` トレイトを使ったシンプルなチャットボットの例です。
+
+```php
+// app/Ai/Agents/SupportBot.php
+class SupportBot implements Agent, Conversational
+{
+    use Promptable, RemembersConversations;
+
+    public function instructions(): string
+    {
+        return 'あなたは親切なカスタマーサポート担当者です。ユーザーの質問に丁寧に答えてください。';
+    }
+}
+
+// routes/web.php
+Route::post('/chat', function (Request $request) {
+    $conversationId = $request->input('conversation_id');
+
+    $agent = new SupportBot;
+
+    if ($conversationId) {
+        $agent = $agent->continue($conversationId, as: $request->user());
+    } else {
+        $agent = $agent->forUser($request->user());
+    }
+
+    $response = $agent->prompt($request->input('message'));
+
+    return response()->json([
+        'message' => (string) $response,
+        'conversation_id' => $response->conversationId,
+    ]);
+});
+```
+
+### ストリーミングチャット（Vercel AI SDK との連携）
+
+フロントエンドで Vercel AI SDK を使う場合のバックエンド実装例です。
+
+```php
+use App\Ai\Agents\SupportBot;
+
+Route::post('/api/chat', function (Request $request) {
+    return (new SupportBot)
+        ->forUser($request->user())
+        ->stream($request->input('message'))
+        ->usingVercelDataProtocol();
+});
+```
+
+### ドキュメント分析（構造化出力）
+
+PDF などのドキュメントを添付して構造化データを返す例です。
+
+```php
+use Laravel\Ai\Contracts\HasStructuredOutput;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Files;
+
+class DocumentAnalyzer implements Agent, HasStructuredOutput
+{
+    use Promptable;
+
+    public function instructions(): string
+    {
+        return '添付されたドキュメントを分析し、要約、キーポイント、感情スコアを返してください。';
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'summary' => $schema->string()->required(),
+            'key_points' => $schema->array()->items($schema->string())->required(),
+            'sentiment' => $schema->string()->enum(['positive', 'neutral', 'negative'])->required(),
+        ];
+    }
+}
+
+// 使用例
+$response = (new DocumentAnalyzer)->prompt(
+    'このドキュメントを分析してください。',
+    attachments: [
+        Files\Document::fromStorage('report.pdf'),
+    ]
+);
+
+$summary = $response['summary'];
+$sentiment = $response['sentiment'];
+```
+
+<Tip>
+  エージェントはルートから直接返すことができるほか、サービスクラスに注入して使うことも可能です。大規模なアプリケーションでは、`SalesCoach::make()` を使ってコンテナから解決することでテストを容易にできます。
+</Tip>
+
+## テスト
+
+Laravel AI SDK はテスト用のフェイク機能を提供します。`Ai::fake()` を使うと実際の API を呼び出さずにテストできます。
+
+```php
+use Laravel\Ai\Facades\Ai;
+use Laravel\Ai\Testing\AgentFake;
+
+Ai::fake([
+    SalesCoach::class => AgentFake::make()
+        ->withTextResponse('スコアは8点です。')
+]);
+
+$response = (new SalesCoach)->prompt('トランスクリプトを分析してください。');
+
+expect((string) $response)->toBe('スコアは8点です。');
+```
+
+<Warning>
+  テストで実際の API キーが使われないよう、必ず `Ai::fake()` を使用してください。API 呼び出しのコストやレート制限を回避できます。
+</Warning>
