@@ -173,19 +173,14 @@
               {
                 "group": "AI開発",
                 "pages": [
-                  "jp/intermediate/boost"
+                  "jp/intermediate/boost",
+                  "jp/intermediate/mcp"
                 ]
               },
               {
                 "group": "リアルタイム通信",
                 "pages": [
                   "jp/intermediate/broadcasting"
-                ]
-              },
-              {
-                "group": "AI開発",
-                "pages": [
-                  "jp/intermediate/mcp"
                 ]
               }
             ]
