@@ -69,7 +69,6 @@ There are no build, test, or lint commands beyond the above.
 
 - `docs.json` — central config: navigation structure, theme, logos, navbar, footer, and anchors. Every new page must be added to the `navigation` section here or it won't appear in the site.
 - `snippets/` — reusable MDX fragments imported into other pages with `<Snippet file="snippet-intro.mdx" />`.
-- `api-reference/openapi.json` — OpenAPI 3.1 spec that auto-generates the API reference pages.
 - `images/` and `logo/` — static assets referenced from MDX pages and `docs.json`.
 - `.mintignore` — files excluded from the Mintlify build (similar to `.gitignore` syntax). `drafts/`[copilot-instructions.md](copilot-instructions.md) and `*.draft.mdx` are ignored.
 
@@ -114,4 +113,4 @@ Do not use raw HTML for layout when a Mintlify component exists.
 
 ## デプロイ
 
-mainブランチへのマージでMintlifyに自動的に公開されるので特別な手順は不要。
+mainブランチへのマージでMintlifyに自動的に公開されるはずだけどコーディングエージェントからのプルリクでは動かないので管理者が手動デプロイする。
