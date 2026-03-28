@@ -230,6 +230,24 @@
                 ]
               }
             ]
+          },
+          {
+            "tab": "Intermediate",
+            "groups": [
+              {
+                "group": "Architecture",
+                "pages": [
+                  "en/intermediate/service-container",
+                  "en/intermediate/facades"
+                ]
+              },
+              {
+                "group": "Async Processing",
+                "pages": [
+                  "en/intermediate/queues"
+                ]
+              }
+            ]
           }
         ]
       }
