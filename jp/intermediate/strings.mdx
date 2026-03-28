@@ -1,0 +1,567 @@
+---
+title: "文字列操作（Str クラス）"
+description: "Laravel の Str クラスと Stringable（Fluent Strings）を使った文字列操作を実用例とともに解説します。"
+---
+
+## Str クラスとは
+
+`Illuminate\Support\Str` クラスは、文字列操作のための豊富なメソッドを提供します。PHPの標準文字列関数を個別に呼ぶ代わりに、統一されたインターフェースで直感的に文字列を処理できます。
+
+Laravelの文字列操作には2つのスタイルがあります。
+
+- **静的メソッドスタイル**: `Str::slug($title, '-')` — 単発の操作に向いています
+- **Fluentスタイル（メソッドチェーン）**: `Str::of($title)->slug('-')->limit(50)` — 複数の操作をつなげて書けます
+
+```php
+use Illuminate\Support\Str;
+
+// 静的メソッド
+$slug = Str::slug('My New Blog Post', '-');
+// 'my-new-blog-post'
+
+// Fluent（Str::of）
+$result = Str::of('  My New Blog Post: Part 1  ')
+    ->trim()
+    ->slug('-')
+    ->limit(30);
+// 'my-new-blog-post-part-1'
+```
+
+<Info>
+  `str()` グローバルヘルパー関数は `Str::of()` と同等です。`str('hello')->upper()` のように書けます。
+</Info>
+
+## ケース変換
+
+文字列のケース（大文字・小文字・記法）を変換するメソッドです。データベースのカラム名やAPIレスポンスのキー変換でよく使います。
+
+### `Str::camel()` / `Str::snake()` / `Str::kebab()` / `Str::studly()`
+
+```php
+use Illuminate\Support\Str;
+
+// camelCase（先頭小文字）
+Str::camel('foo_bar');        // 'fooBar'
+Str::camel('user_profile_id'); // 'userProfileId'
+
+// snake_case
+Str::snake('fooBar');         // 'foo_bar'
+Str::snake('UserProfile');    // 'user_profile'
+
+// kebab-case
+Str::kebab('fooBar');         // 'foo-bar'
+
+// StudlyCase（PascalCase）
+Str::studly('foo_bar');       // 'FooBar'
+Str::studly('user-profile');  // 'UserProfile'
+```
+
+### `Str::lower()` / `Str::upper()` / `Str::title()`
+
+```php
+use Illuminate\Support\Str;
+
+Str::lower('LARAVEL');         // 'laravel'
+Str::upper('laravel');         // 'LARAVEL'
+Str::title('hello world');     // 'Hello World'
+```
+
+## スラッグとURL
+
+### `Str::slug()` — URLフレンドリーなスラッグを生成
+
+記事やページのURLを生成するときに必須のメソッドです。スペースや特殊文字を変換し、URLに安全な文字列を作ります。
+
+```php
+use Illuminate\Support\Str;
+
+Str::slug('Laravel フレームワーク', '-');
+// 'laravel'（日本語はASCIIに変換されないため除去される）
+
+Str::slug('My New Blog Post', '-');
+// 'my-new-blog-post'
+
+Str::slug('Hello World!', '_');
+// 'hello_world'
+```
+
+<Tip>
+  日本語を含む場合はスラッグが空になることがあります。日本語のスラッグを使いたい場合は、別途ローマ字変換ライブラリを組み合わせるか、IDやタイムスタンプをURLに使うことを検討してください。
+</Tip>
+
+### `Str::of()` でスラッグ生成からバリデーションまで一括処理
+
+```php
+use Illuminate\Support\Str;
+
+$title = '  My New Blog Post: Part 1!  ';
+
+$slug = Str::of($title)
+    ->trim()
+    ->slug('-')
+    ->limit(50);
+// 'my-new-blog-post-part-1'
+```
+
+## 文字列の切り詰め
+
+### `Str::limit()` — 文字数で切り詰める
+
+記事の本文やコメントを一覧表示するときにプレビューテキストを生成するメソッドです。
+
+```php
+use Illuminate\Support\Str;
+
+$text = 'Laravelは美しいWebアプリケーションを作るためのPHPフレームワークです。';
+
+// 20文字で切り詰め（デフォルトで末尾に "..." を追加）
+Str::limit($text, 20);
+// 'Laravelは美しいWebアプリケー...'
+
+// 末尾文字列をカスタマイズ
+Str::limit($text, 20, ' → 続きを読む');
+// 'Laravelは美しいWebアプリケー → 続きを読む'
+
+// 単語の途中で切らない（英語テキスト向け）
+Str::limit('The quick brown fox jumps over the lazy dog', 20, preserveWords: true);
+// 'The quick brown fox...'
+```
+
+### `Str::words()` — 単語数で切り詰める
+
+```php
+use Illuminate\Support\Str;
+
+Str::words('Perfectly balanced, as all things should be.', 3, ' >>>');
+// 'Perfectly balanced, as >>>'
+```
+
+## 文字列の検索と確認
+
+### `Str::contains()` — 文字列を含むか確認
+
+```php
+use Illuminate\Support\Str;
+
+Str::contains('This is my name', 'my');
+// true
+
+// 配列で複数の候補をチェック（いずれかを含む）
+Str::contains('This is my name', ['my', 'your']);
+// true
+
+// 大文字・小文字を無視
+Str::contains('This is my name', 'MY', ignoreCase: true);
+// true
+```
+
+### `Str::startsWith()` / `Str::endsWith()`
+
+```php
+use Illuminate\Support\Str;
+
+Str::startsWith('https://laravel.com', 'https://');
+// true
+
+Str::startsWith('https://laravel.com', ['https://', 'http://']);
+// true
+
+Str::endsWith('photo.jpg', '.jpg');
+// true
+
+Str::endsWith('photo.jpg', ['.jpg', '.png', '.gif']);
+// true
+```
+
+### `Str::is()` — ワイルドカードパターンマッチ
+
+```php
+use Illuminate\Support\Str;
+
+Str::is('foo*', 'foobar');
+// true
+
+Str::is('*/user/*', '/admin/user/profile');
+// true
+
+// 大文字・小文字を無視
+Str::is('F*', 'foo', ignoreCase: true);
+// true
+```
+
+## 文字列の変換と置換
+
+### `Str::replace()` — 文字列を置換
+
+```php
+use Illuminate\Support\Str;
+
+Str::replace('8.x', '13.x', 'Laravel 8.x');
+// 'Laravel 13.x'
+
+// 大文字・小文字を無視して置換
+Str::replace('laravel', 'Symphony', 'I love Laravel', caseSensitive: false);
+// 'I love Symphony'
+```
+
+### `Str::replaceArray()` — 配列で順番に置換
+
+```php
+use Illuminate\Support\Str;
+
+$string = '予定は ? から ? まで';
+
+$result = Str::replaceArray('?', ['午前9時', '午後5時'], $string);
+// '予定は 午前9時 から 午後5時 まで'
+```
+
+### `Str::replaceMatches()` — 正規表現で置換
+
+```php
+use Illuminate\Support\Str;
+
+// 電話番号から数字以外を除去
+Str::replaceMatches('/[^0-9]/', '', '(03) 1234-5678');
+// '0312345678'
+
+// クロージャで置換内容を動的に生成
+Str::replaceMatches('/\d+/', fn ($matches) => '[' . $matches[0] . ']', '1つ 2個 3本');
+// '[1]つ [2]個 [3]本'
+```
+
+### `Str::remove()` — 文字列を削除
+
+```php
+use Illuminate\Support\Str;
+
+Str::remove('e', 'Peter Piper picked a peck of pickled peppers.');
+// 'Ptr Pipr pickd a pck of pickld ppprs.'
+
+// 配列で複数文字列を削除
+Str::remove(['foo', 'bar'], 'foo and bar and baz');
+// ' and  and baz'
+```
+
+### `Str::squish()` — 余分な空白を除去
+
+```php
+use Illuminate\Support\Str;
+
+Str::squish('  Laravel   Framework  ');
+// 'Laravel Framework'
+```
+
+## 文字列の前後操作
+
+### `Str::before()` / `Str::after()`
+
+```php
+use Illuminate\Support\Str;
+
+// 指定文字列より前の部分
+Str::before('test@example.com', '@');
+// 'test'
+
+// 指定文字列より後の部分
+Str::after('test@example.com', '@');
+// 'example.com'
+
+// 最後の出現箇所を基準にする
+Str::afterLast('App\Http\Controllers\UserController', '\\');
+// 'UserController'
+
+Str::beforeLast('App\Http\Controllers\UserController', '\\');
+// 'App\Http\Controllers'
+```
+
+### `Str::between()` — 2つの文字列の間を取得
+
+```php
+use Illuminate\Support\Str;
+
+Str::between('[debug] Error occurred in module', '[', ']');
+// 'debug'
+```
+
+### `Str::start()` / `Str::finish()` — 特定文字で始まる・終わるようにする
+
+すでにその文字で始まっていれば追加しません（二重化しない）。
+
+```php
+use Illuminate\Support\Str;
+
+// '/' で始まるようにする
+Str::start('users/profile', '/');
+// '/users/profile'
+
+Str::start('/users/profile', '/');
+// '/users/profile'（二重にならない）
+
+// '/' で終わるようにする
+Str::finish('https://example.com', '/');
+// 'https://example.com/'
+```
+
+### `Str::chopStart()` / `Str::chopEnd()` — 特定の接頭辞・接尾辞を除去
+
+```php
+use Illuminate\Support\Str;
+
+Str::chopStart('https://laravel.com', 'https://');
+// 'laravel.com'
+
+// 配列で複数パターンに対応
+Str::chopStart('http://laravel.com', ['https://', 'http://']);
+// 'laravel.com'
+
+Str::chopEnd('UserController.php', '.php');
+// 'UserController'
+```
+
+## マスキングとセキュリティ
+
+### `Str::mask()` — 文字列をマスクする
+
+メールアドレスや電話番号の一部を隠す処理に使います。
+
+```php
+use Illuminate\Support\Str;
+
+// 4文字目以降を '*' でマスク
+Str::mask('yamada@example.com', '*', 4);
+// 'yama**************'
+
+// 末尾4文字だけ表示（負の値でオフセット）
+Str::mask('1234-5678-9012-3456', '*', -4);
+// '***************3456'
+
+// 範囲を指定してマスク
+Str::mask('yamada@example.com', '*', 3, 5);
+// 'yam*****example.com'
+```
+
+### `Str::excerpt()` — 文脈付きで文字列を抜き出す
+
+検索結果のスニペット表示などに使います。
+
+```php
+use Illuminate\Support\Str;
+
+$text = 'Laravelは美しいWebアプリケーションを構築するためのPHPフレームワークです。';
+
+Str::excerpt($text, 'PHP', ['radius' => 10]);
+// '...ためのPHPフレームワー...'
+```
+
+## ランダム文字列と識別子
+
+### `Str::random()` — ランダム文字列を生成
+
+トークンやパスワードのリセット用のキーを生成するときに使います。
+
+```php
+use Illuminate\Support\Str;
+
+Str::random(32);
+// 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' （英数字32文字）
+```
+
+### `Str::uuid()` / `Str::ulid()` — UUID・ULID生成
+
+```php
+use Illuminate\Support\Str;
+
+(string) Str::uuid();
+// '550e8400-e29b-41d4-a716-446655440000'
+
+// 時系列ソート可能なUUID (UUIDv7)
+(string) Str::uuid7();
+
+// ULID（ソート可能なID）
+(string) Str::ulid();
+// '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+```
+
+### `Str::password()` — セキュアなパスワード生成
+
+```php
+use Illuminate\Support\Str;
+
+Str::password(12);
+// 大文字・小文字・数字・記号を含む12文字のランダム文字列
+```
+
+## Fluent Strings（メソッドチェーン）
+
+`Str::of()` または `str()` で始めると、`Stringable` インスタンスが返り、メソッドをチェーンできます。最終的に文字列として使いたい場合は `(string)` でキャストするか、文字列コンテキストで使います。
+
+```php
+use Illuminate\Support\Str;
+
+$result = Str::of('  hello world  ')
+    ->trim()
+    ->title()
+    ->append('!')
+    ->toString();
+// 'Hello World!'
+```
+
+### 実用的なメソッドチェーンの例
+
+**ブログ記事のスラッグ生成**
+
+```php
+use Illuminate\Support\Str;
+
+$slug = Str::of('  My New Blog Post: Part 1  ')
+    ->trim()
+    ->lower()
+    ->slug('-')
+    ->limit(50);
+// 'my-new-blog-post-part-1'
+```
+
+**URLからドメインを抽出**
+
+```php
+use Illuminate\Support\Str;
+
+$domain = Str::of('https://www.example.com/path/to/page')
+    ->after('//')
+    ->before('/')
+    ->chopStart('www.');
+// 'example.com'
+```
+
+**ユーザー入力のサニタイズ**
+
+```php
+use Illuminate\Support\Str;
+
+$clean = Str::of($userInput)
+    ->squish()          // 余分な空白を除去
+    ->limit(255)        // 長さを制限
+    ->toString();
+```
+
+**クラス名からファイルパスを生成**
+
+```php
+use Illuminate\Support\Str;
+
+$path = Str::of('App\Http\Controllers\UserController')
+    ->replace('\\', '/')
+    ->append('.php')
+    ->toString();
+// 'App/Http/Controllers/UserController.php'
+```
+
+### 条件付きメソッドチェーン（`when()`）
+
+```php
+use Illuminate\Support\Str;
+
+$result = Str::of('Laravel')
+    ->when($isUppercase, fn ($str) => $str->upper())
+    ->append(' Framework');
+// $isUppercase が true なら 'LARAVEL Framework'
+// false なら 'Laravel Framework'
+```
+
+### `pipe()` — 任意のコールバックを挟む
+
+```php
+use Illuminate\Support\Str;
+
+$result = Str::of('my-slug')
+    ->pipe(fn ($str) => $str->replace('-', '_'))
+    ->upper()
+    ->toString();
+// 'MY_SLUG'
+```
+
+## `Str::of()` で使える主要メソッド一覧
+
+Fluent Strings で使えるメソッドは静的メソッドとほぼ同じセットです。以下は代表的なものです。
+
+```php
+use Illuminate\Support\Str;
+
+$str = Str::of('Hello, World!');
+
+$str->length();           // 13
+$str->upper();            // 'HELLO, WORLD!'
+$str->lower();            // 'hello, world!'
+$str->trim();             // 'Hello, World!'
+$str->slug();             // 'hello-world'
+$str->camel();            // 'hello,World!'（記号除去なし）
+$str->contains('World'); // true
+$str->startsWith('Hello'); // true
+$str->endsWith('!');      // true
+$str->replace(',', '');   // 'Hello World!'
+$str->prepend('>>> ');    // '>>> Hello, World!'
+$str->append(' <<<');     // 'Hello, World! <<<'
+$str->reverse();          // '!dlroW ,olleH'
+$str->wordCount();        // 2
+```
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="よく使う Str メソッド一覧">
+    | メソッド | 用途 |
+    | --- | --- |
+    | `Str::slug($str)` | URLフレンドリーなスラッグ生成 |
+    | `Str::limit($str, $n)` | 文字数で切り詰め |
+    | `Str::contains($str, $needle)` | 文字列を含むか確認 |
+    | `Str::startsWith($str, $needle)` | 指定文字列で始まるか確認 |
+    | `Str::endsWith($str, $needle)` | 指定文字列で終わるか確認 |
+    | `Str::replace($search, $replace, $str)` | 文字列を置換 |
+    | `Str::camel($str)` | camelCase に変換 |
+    | `Str::snake($str)` | snake_case に変換 |
+    | `Str::kebab($str)` | kebab-case に変換 |
+    | `Str::studly($str)` | StudlyCase に変換 |
+    | `Str::upper($str)` | 大文字に変換 |
+    | `Str::lower($str)` | 小文字に変換 |
+    | `Str::squish($str)` | 余分な空白を除去 |
+    | `Str::after($str, $search)` | 指定文字列以降を取得 |
+    | `Str::before($str, $search)` | 指定文字列以前を取得 |
+    | `Str::between($str, $from, $to)` | 2文字列間を取得 |
+    | `Str::mask($str, '*', $index)` | 文字列をマスク |
+    | `Str::random($length)` | ランダム文字列生成 |
+    | `Str::uuid()` | UUID生成 |
+    | `Str::of($str)` | Fluentスタイルの開始 |
+  </Accordion>
+
+  <Accordion title="静的メソッド vs Fluent（Str::of）">
+    **静的メソッドを使う場面**:
+    - 1〜2回の変換だけでよい場合
+    - シンプルで読みやすいコード
+
+    ```php
+    $slug = Str::slug($title);
+    ```
+
+    **Fluent（Str::of）を使う場面**:
+    - 3つ以上の変換をまとめて行う場合
+    - 条件分岐（`when()`）を含む場合
+    - 処理の流れを上から下に読めるようにしたい場合
+
+    ```php
+    $slug = Str::of($title)
+        ->trim()
+        ->lower()
+        ->slug()
+        ->limit(50);
+    ```
+  </Accordion>
+
+  <Accordion title="Str クラス vs PHP標準関数">
+    PHPの `strtolower()`, `substr()`, `str_replace()` などの標準関数の代わりに `Str` クラスを使うことで:
+
+    - マルチバイト文字（日本語）を安全に扱える（`mb_*` 関数を内部で使用）
+    - メソッドチェーンで処理をまとめられる
+    - 引数の順序を覚えなくてよい（一貫したインターフェース）
+    - Laravelのコードスタイルに統一できる
+  </Accordion>
+</AccordionGroup>

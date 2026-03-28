@@ -135,9 +135,11 @@
                 ]
               },
               {
-                "group": "コレクション",
+                "group": "コレクションとヘルパー",
                 "pages": [
-                  "jp/intermediate/collections"
+                  "jp/intermediate/collections",
+                  "jp/intermediate/helpers",
+                  "jp/intermediate/strings"
                 ]
               },
               {
