@@ -1,0 +1,462 @@
+---
+title: "Queues"
+description: "Run time-consuming tasks in the background with Laravel queues—covering setup, job creation, chaining, batches, and failed job handling."
+---
+
+## What are queues?
+
+Web applications often need to perform tasks that take several seconds to complete: sending emails, resizing images, calling external APIs, or generating reports. Running these tasks synchronously during an HTTP request means users wait until the work finishes.
+
+Laravel's queue system lets you push these tasks to a **background queue** and return a response immediately. A worker process picks up the jobs and executes them separately.
+
+<Info>
+  Laravel supports multiple queue backends—database, Redis, Amazon SQS, and more. During development, the `sync` driver executes jobs immediately without a real queue, so no worker is required.
+</Info>
+
+## Queue setup and configuration
+
+### config/queue.php
+
+All queue configuration lives in `config/queue.php`. Switch the backend by setting the `QUEUE_CONNECTION` environment variable:
+
+```php
+// config/queue.php
+'default' => env('QUEUE_CONNECTION', 'database'),
+```
+
+### .env settings
+
+```ini
+# Use the database driver
+QUEUE_CONNECTION=database
+
+# Or switch to Redis
+# QUEUE_CONNECTION=redis
+# REDIS_HOST=127.0.0.1
+# REDIS_PORT=6379
+```
+
+### Setting up the database driver
+
+The `database` driver stores jobs in a database table. In Laravel 11+, new projects already include the required migration. If yours doesn't, run:
+
+```shell
+php artisan make:queue-table
+php artisan migrate
+```
+
+### Setting up the Redis driver
+
+Install the Predis package and configure a Redis connection in `config/database.php`:
+
+```shell
+composer require predis/predis
+```
+
+Then set `QUEUE_CONNECTION=redis` in `.env`.
+
+## Creating and dispatching jobs
+
+### Generating a job class
+
+Create a job with the `make:job` Artisan command:
+
+```shell
+php artisan make:job SendWelcomeEmail
+```
+
+This generates `app/Jobs/SendWelcomeEmail.php`.
+
+### Job class structure
+
+```php
+<?php
+
+namespace App\Jobs;
+
+use App\Models\User;
+use App\Mail\WelcomeMail;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Mail;
+
+class SendWelcomeEmail implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(
+        public User $user,
+    ) {}
+
+    public function handle(): void
+    {
+        Mail::to($this->user->email)->send(new WelcomeMail($this->user));
+    }
+}
+```
+
+Implementing `ShouldQueue` tells Laravel to push the job onto the queue instead of running it synchronously. The `Queueable` trait provides the methods needed to configure and dispatch the job.
+
+<Tip>
+  When you pass an Eloquent model to a job constructor, Laravel serializes only the model's ID. The worker re-fetches fresh data from the database at execution time, keeping the queue payload small.
+</Tip>
+
+### Dispatching a job
+
+Push a job onto the queue by calling `dispatch`:
+
+```php
+use App\Jobs\SendWelcomeEmail;
+
+public function register(Request $request): RedirectResponse
+{
+    $user = User::create($request->validated());
+
+    SendWelcomeEmail::dispatch($user);
+
+    return redirect('/dashboard');
+}
+```
+
+### Dispatching to a specific queue
+
+Send a job to a named queue to separate different priorities:
+
+```php
+SendWelcomeEmail::dispatch($user)->onQueue('emails');
+```
+
+### Synchronous dispatch (for testing and development)
+
+Skip the queue and run a job immediately with `dispatchSync`:
+
+```php
+SendWelcomeEmail::dispatchSync($user);
+```
+
+## Delayed dispatching
+
+Delay job execution with the `delay` method. Pass a `DateTime` or a duration:
+
+```php
+// Run 5 minutes from now
+SendWelcomeEmail::dispatch($user)->delay(now()->addMinutes(5));
+```
+
+`dispatchAfterResponse` runs the job right after Laravel sends the HTTP response to the browser, so the user isn't kept waiting:
+
+```php
+SendWelcomeEmail::dispatchAfterResponse($user);
+```
+
+## Job chaining
+
+Chain jobs so they run sequentially. If one job in the chain fails, subsequent jobs are not run:
+
+```php
+use App\Jobs\ProcessPodcast;
+use App\Jobs\OptimizePodcast;
+use App\Jobs\ReleasePodcast;
+use Illuminate\Support\Facades\Bus;
+
+Bus::chain([
+    new ProcessPodcast($podcast),
+    new OptimizePodcast($podcast),
+    new ReleasePodcast($podcast),
+])->dispatch();
+```
+
+You can also attach a callback that runs when the entire chain completes:
+
+```php
+Bus::chain([
+    new ProcessPodcast($podcast),
+    new ReleasePodcast($podcast),
+])->catch(function (Throwable $e) {
+    // A job in the chain failed...
+})->dispatch();
+```
+
+## Job batches
+
+Batching lets you dispatch a collection of jobs and track their collective progress. Start by creating a migration for the `job_batches` table:
+
+```shell
+php artisan make:batches-table
+php artisan migrate
+```
+
+Implement the `Batchable` trait in your job class:
+
+```php
+<?php
+
+namespace App\Jobs;
+
+use Illuminate\Bus\Batchable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+
+class ImportContacts implements ShouldQueue
+{
+    use Batchable, Queueable;
+
+    public function handle(): void
+    {
+        if ($this->batch()->cancelled()) {
+            return;
+        }
+
+        // Import a chunk of contacts...
+    }
+}
+```
+
+Dispatch a batch using `Bus::batch`:
+
+```php
+use App\Jobs\ImportContacts;
+use Illuminate\Bus\Batch;
+use Illuminate\Support\Facades\Bus;
+use Throwable;
+
+$batch = Bus::batch([
+    new ImportContacts($chunkA),
+    new ImportContacts($chunkB),
+    new ImportContacts($chunkC),
+])->then(function (Batch $batch) {
+    // All jobs completed successfully
+})->catch(function (Batch $batch, Throwable $e) {
+    // A job failed
+})->finally(function (Batch $batch) {
+    // The batch has finished executing
+})->dispatch();
+```
+
+Inspect a batch by its ID:
+
+```php
+$batch = Bus::findBatch($batchId);
+
+$batch->totalJobs;      // Total job count
+$batch->pendingJobs;    // Jobs still waiting
+$batch->failedJobs;     // Jobs that failed
+$batch->progress();     // Completion percentage (0–100)
+```
+
+## Running the queue worker
+
+Start a worker process with:
+
+```shell
+php artisan queue:work
+```
+
+Target a specific connection or queue:
+
+```shell
+# Process only the 'emails' queue on Redis
+php artisan queue:work redis --queue=emails
+
+# Use the database connection
+php artisan queue:work database
+```
+
+<Warning>
+  `queue:work` runs continuously. After deploying new code, run `php artisan queue:restart` to reload workers with the latest changes. In production, use a process manager like Supervisor to keep workers running.
+</Warning>
+
+### Worker options
+
+| Option | Description |
+|---|---|
+| `--tries=N` | Maximum attempts before a job is marked as failed |
+| `--timeout=N` | Maximum seconds a single job may run |
+| `--sleep=N` | Seconds to sleep when the queue is empty (default: 3) |
+| `--max-jobs=N` | Stop the worker after processing N jobs |
+| `--max-time=N` | Stop the worker after N seconds |
+| `--queue=A,B` | Process queues in priority order |
+
+### Setting retries and timeouts on the job class
+
+You can configure retry and timeout behavior directly on the job using PHP attributes:
+
+```php
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Attributes\Timeout;
+
+#[Tries(3)]
+#[Timeout(60)]
+class SendWelcomeEmail implements ShouldQueue
+{
+    use Queueable;
+
+    // ...
+}
+```
+
+## Failed jobs
+
+### Preparing the failed_jobs table
+
+When a job exceeds its maximum attempt count, Laravel records it in the `failed_jobs` table. Create the table if it doesn't exist:
+
+```shell
+php artisan make:queue-failed-table
+php artisan migrate
+```
+
+### Handling failure in the job
+
+Define a `failed` method to run cleanup logic when a job fails:
+
+```php
+use Throwable;
+
+public function failed(?Throwable $exception): void
+{
+    // Notify an admin, clean up resources, etc.
+}
+```
+
+### Managing failed jobs
+
+```shell
+# List all failed jobs
+php artisan queue:failed
+
+# Retry a specific job
+php artisan queue:retry ce7bb17c-cdd8-41f0-a8ec-7b4fef4e5ece
+
+# Retry all failed jobs
+php artisan queue:retry all
+
+# Delete a specific failed job
+php artisan queue:forget ce7bb17c-cdd8-41f0-a8ec-7b4fef4e5ece
+
+# Delete all failed jobs
+php artisan queue:flush
+```
+
+## Queue drivers compared
+
+| Driver | Best for | Notes |
+|---|---|---|
+| `sync` | Local development | Runs jobs inline, no worker needed |
+| `database` | Simple setups | Uses an existing RDBMS; not ideal for high throughput |
+| `redis` | Production workloads | Fast, scalable; requires a Redis server |
+| `sqs` | AWS environments | Managed, highly scalable |
+
+<Tip>
+  For production Redis queues, consider [Laravel Horizon](https://laravel.com/docs/horizon). It provides a real-time dashboard to monitor job throughput, wait times, and failures.
+</Tip>
+
+## Example: order confirmation email
+
+<Steps>
+  <Step title="Create the job">
+    ```shell
+    php artisan make:job SendOrderConfirmation
+    ```
+  </Step>
+
+  <Step title="Implement the job logic">
+    ```php
+    <?php
+
+    namespace App\Jobs;
+
+    use App\Models\Order;
+    use App\Mail\OrderConfirmed;
+    use Illuminate\Contracts\Queue\ShouldQueue;
+    use Illuminate\Foundation\Queue\Queueable;
+    use Illuminate\Queue\Attributes\Tries;
+    use Illuminate\Queue\Attributes\Timeout;
+    use Illuminate\Support\Facades\Mail;
+
+    #[Tries(3)]
+    #[Timeout(30)]
+    class SendOrderConfirmation implements ShouldQueue
+    {
+        use Queueable;
+
+        public function __construct(
+            public Order $order,
+        ) {}
+
+        public function handle(): void
+        {
+            Mail::to($this->order->user->email)
+                ->send(new OrderConfirmed($this->order));
+        }
+
+        public function failed(?Throwable $exception): void
+        {
+            // Notify the team about the failure
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Dispatch from the controller">
+    ```php
+    use App\Jobs\SendOrderConfirmation;
+
+    public function store(Request $request): RedirectResponse
+    {
+        $order = Order::create($request->validated());
+
+        SendOrderConfirmation::dispatch($order);
+
+        return redirect()->route('orders.show', $order)
+            ->with('success', 'Order placed successfully.');
+    }
+    ```
+  </Step>
+
+  <Step title="Start the worker">
+    ```shell
+    php artisan queue:work --tries=3 --timeout=30
+    ```
+  </Step>
+</Steps>
+
+## Common use cases
+
+<AccordionGroup>
+  <Accordion title="When to use queues">
+    - Sending email, SMS, or push notifications
+    - Resizing or converting images and video
+    - Calling slow external APIs or webhooks
+    - Generating reports or exporting CSV files
+    - Indexing records in a search engine
+  </Accordion>
+
+  <Accordion title="Development tip">
+    Set `QUEUE_CONNECTION=sync` in your `.env` during development. Jobs run immediately without a worker, making it easy to test the full flow without extra processes.
+
+    ```ini
+    QUEUE_CONNECTION=sync
+    ```
+  </Accordion>
+
+  <Accordion title="Common commands reference">
+    ```shell
+    # Start the worker
+    php artisan queue:work
+
+    # Restart workers after deployment
+    php artisan queue:restart
+
+    # List failed jobs
+    php artisan queue:failed
+
+    # Retry all failed jobs
+    php artisan queue:retry all
+
+    # Delete all failed jobs
+    php artisan queue:flush
+    ```
+  </Accordion>
+</AccordionGroup>
