@@ -236,6 +236,12 @@
                 ]
               },
               {
+                "group": "パッケージ紹介",
+                "pages": [
+                  "jp/blog/laravel-pennant"
+                ]
+              },
+              {
                 "group": "アップグレードガイド",
                 "pages": [
                   "jp/blog/upgrade-12-to-13",

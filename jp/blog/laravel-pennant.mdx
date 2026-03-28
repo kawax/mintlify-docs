@@ -1,0 +1,501 @@
+---
+title: "Laravel Pennantで機能フラグ(Feature Flags)を実装する"
+description: "Laravelの公式機能フラグパッケージPennantを使って、段階的ロールアウト・A/Bテスト・ベータ機能の管理を実現する方法を解説します。"
+---
+
+## はじめに
+
+「この機能を全ユーザーに一気に公開したら、何かあったときに手が打てない」——大規模サービスを運用しているなら、誰しも一度はこの不安を抱えたことがあるはずです。
+
+**機能フラグ (Feature Flags / Feature Toggles)** は、コードのデプロイとフィーチャーのリリースを切り離すための仕組みです。新しい UI を特定のユーザーにだけ見せたり、全トラフィックの 5% だけに新 API を適用したり、管理者だけがアクセスできるベータ機能を作ったりできます。デプロイのリスクが下がり、実験と段階的リリースが当たり前の開発スタイルになります。
+
+**Laravel Pennant** は、Laravel 10 以降で公式に提供されているファーストパーティの機能フラグパッケージです。Laravelらしいシンプルな API で機能フラグを定義・管理でき、データベースへの永続化、Blade ディレクティブ、スコープ指定、テストサポートまでひと通り揃っています。
+
+<Info>
+  Pennant は Laravel 10.0 とともに 2023 年にリリースされました。Laravel 13 では最新の API が利用可能です。
+</Info>
+
+---
+
+## インストールと基本設定
+
+### インストール
+
+```shell
+composer require laravel/pennant
+```
+
+次に、設定ファイルとマイグレーションを公開します。
+
+```shell
+php artisan vendor:publish --provider="Laravel\Pennant\PennantServiceProvider"
+```
+
+データベースに `features` テーブルを作成します。
+
+```shell
+php artisan migrate
+```
+
+### 設定ファイル
+
+`config/pennant.php` が生成されます。デフォルトのストレージドライバは `database` です。
+
+```php
+// config/pennant.php
+return [
+    'default' => env('PENNANT_STORE', 'database'),
+
+    'stores' => [
+        'array' => [
+            'driver' => 'array',
+        ],
+        'database' => [
+            'driver' => 'database',
+            'connection' => null,
+            'table' => 'features',
+        ],
+    ],
+];
+```
+
+---
+
+## 基本的な使い方
+
+### フィーチャーの定義
+
+機能フラグは `Feature::define()` で定義します。通常は `AppServiceProvider` の `boot()` メソッドで定義します。クロージャはスコープ(デフォルトは認証済みユーザー)を受け取り、フラグの値を返します。
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Models\User;
+use Illuminate\Support\ServiceProvider;
+use Laravel\Pennant\Feature;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        Feature::define('new-dashboard', fn (User $user) => $user->isInternalTeamMember());
+    }
+}
+```
+
+クロージャが `true` を返せばフラグはアクティブ、`false` を返せば非アクティブです。最初にチェックされたとき、その結果がストレージに保存されます。以降は同じスコープに対してストレージから値を取得するため、クロージャは再実行されません。
+
+### クラスベースのフィーチャー
+
+クロージャの代わりに専用クラスで定義することもできます。
+
+```shell
+php artisan pennant:feature NewDashboard
+```
+
+`app/Features/NewDashboard.php` が生成されます。`resolve()` メソッドで値を返します。
+
+```php
+<?php
+
+namespace App\Features;
+
+use App\Models\User;
+
+class NewDashboard
+{
+    public function resolve(User $user): mixed
+    {
+        return $user->isInternalTeamMember();
+    }
+}
+```
+
+クラスベースのフィーチャーは、サービスプロバイダへの登録は不要です。コンテナ経由で解決されるため、コンストラクタで依存注入も使えます。
+
+### チェック方法
+
+```php
+use Laravel\Pennant\Feature;
+
+// 現在のユーザーに対してチェック
+if (Feature::active('new-dashboard')) {
+    // 新しいダッシュボードを表示
+}
+
+// 特定のユーザーに対してチェック
+if (Feature::for($user)->active('new-dashboard')) {
+    // ...
+}
+
+// 複数フィーチャーのチェック
+Feature::allAreActive(['new-dashboard', 'beta-reporting']); // すべてアクティブか
+Feature::someAreActive(['new-dashboard', 'beta-reporting']); // いずれかがアクティブか
+Feature::inactive('new-dashboard');                          // 非アクティブか
+```
+
+クラスベースのフィーチャーはクラス名を渡します。
+
+```php
+use App\Features\NewDashboard;
+
+Feature::active(NewDashboard::class);
+```
+
+### when / unless による条件実行
+
+```php
+return Feature::when('new-dashboard',
+    fn () => $this->renderNewDashboard(),
+    fn () => $this->renderLegacyDashboard(),
+);
+```
+
+### HasFeatures トレイト
+
+`User` モデルに `HasFeatures` トレイトを追加すると、モデルから直接フィーチャーを操作できます。
+
+```php
+use Laravel\Pennant\Concerns\HasFeatures;
+
+class User extends Authenticatable
+{
+    use HasFeatures;
+}
+```
+
+```php
+if ($user->features()->active('new-dashboard')) {
+    // ...
+}
+```
+
+### Blade ディレクティブ
+
+Blade テンプレートで手軽にフィーチャーを確認できます。
+
+```blade
+@feature('new-dashboard')
+    {{-- 新ダッシュボードのコンテンツ --}}
+@else
+    {{-- 旧ダッシュボードのコンテンツ --}}
+@endfeature
+
+@featureany(['new-dashboard', 'beta'])
+    {{-- new-dashboard または beta がアクティブなときに表示 --}}
+@endfeatureany
+```
+
+### ミドルウェアによるアクセス制御
+
+ルートレベルでフィーチャーフラグをガードできます。フィーチャーが非アクティブなら `400 Bad Request` を返します。
+
+```php
+use Illuminate\Support\Facades\Route;
+use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
+
+Route::get('/api/v2/servers', function () {
+    // ...
+})->middleware(EnsureFeaturesAreActive::using('new-api', 'servers-v2'));
+```
+
+---
+
+## ストレージドライバ
+
+### array ドライバ（テスト用）
+
+リクエスト中のメモリのみに保存します。テスト環境や単体テストに適しています。
+
+```php
+// .env.testing
+PENNANT_STORE=array
+```
+
+### database ドライバ（本番用）
+
+`features` テーブルに永続化します。本番環境のデフォルトです。ユーザーごとのフラグ値が一度解決されると保存され、次回から DBから直接取得されます。
+
+### カスタムドライバ
+
+`Laravel\Pennant\Contracts\Driver` インターフェースを実装し、サービスプロバイダの `boot()` で `Feature::extend()` を使って登録します。
+
+```php
+use App\Extensions\RedisFeatureDriver;
+use Illuminate\Contracts\Foundation\Application;
+use Laravel\Pennant\Feature;
+
+public function boot(): void
+{
+    Feature::extend('redis', function (Application $app) {
+        return new RedisFeatureDriver(
+            $app->make('redis'),
+            $app->make('events'),
+            []
+        );
+    });
+}
+```
+
+登録後は `config/pennant.php` でドライバを指定して使えます。
+
+---
+
+## 実践的なユースケース
+
+### 段階的ロールアウト：全ユーザーの20%に新機能を公開
+
+`Illuminate\Support\Lottery` を使うと、確率ベースのロールアウトを簡単に実現できます。
+
+```php
+use App\Models\User;
+use Illuminate\Support\Lottery;
+use Laravel\Pennant\Feature;
+
+Feature::define('new-checkout', fn (User $user) => match (true) {
+    $user->isInternalTeamMember() => true,   // 社内メンバーは常に有効
+    $user->isPremium()            => true,   // プレミアム会員は常に有効
+    default                       => Lottery::odds(1 / 5), // その他は20%
+});
+```
+
+<Tip>
+  `Lottery::odds(1 / 5)` は「5回に1回 true を返す」ことを意味します。最初にチェックされたとき結果が DBに保存されるため、同じユーザーには常に同じ結果が返ります。ユーザー体験の一貫性が保たれます。
+</Tip>
+
+フィーチャー定義のみで Lottery を使う場合、クロージャを省略できます。
+
+```php
+Feature::define('site-redesign', Lottery::odds(1, 10)); // 10%
+```
+
+### ユーザーセグメント別フラグ：ベータ会員・管理者向け機能
+
+```php
+use App\Models\User;
+use Laravel\Pennant\Feature;
+
+Feature::define('analytics-v2', fn (User $user) => match (true) {
+    $user->hasRole('admin')      => true,
+    $user->isBetaMember()        => true,
+    $user->plan === 'enterprise' => true,
+    default                      => false,
+});
+```
+
+コントローラーでの使用例:
+
+```php
+use Laravel\Pennant\Feature;
+use Illuminate\Http\Request;
+
+class AnalyticsController
+{
+    public function index(Request $request)
+    {
+        return Feature::when('analytics-v2',
+            fn () => view('analytics.v2.index'),
+            fn () => view('analytics.legacy.index'),
+        );
+    }
+}
+```
+
+### A/Bテスト：ボタンの色をランダムに割り当てる
+
+Pennant の「リッチな値」機能を使うと、`true`/`false` 以外の値をフラグに持たせられます。
+
+```php
+use App\Models\User;
+use Illuminate\Support\Arr;
+use Laravel\Pennant\Feature;
+
+Feature::define('purchase-button', fn (User $user) => Arr::random([
+    'blue-sapphire',
+    'seafoam-green',
+    'tart-orange',
+]));
+```
+
+Blade でリッチな値を使う場合:
+
+```blade
+@php
+    $buttonColor = Feature::value('purchase-button');
+@endphp
+
+<button class="btn btn-{{ $buttonColor }}">
+    今すぐ購入
+</button>
+```
+
+A/Bテストの結果を集計するために、`FeatureRetrieved` イベントをリッスンしてアナリティクスに送ることもできます。
+
+```php
+use Laravel\Pennant\Events\FeatureRetrieved;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(function (FeatureRetrieved $event) {
+    if ($event->feature === 'purchase-button') {
+        // アナリティクスサービスに記録
+        analytics()->track('feature_checked', [
+            'feature' => $event->feature,
+            'value'   => $event->value,
+            'scope'   => $event->scope?->id,
+        ]);
+    }
+});
+```
+
+### フィーチャー値の手動更新
+
+管理画面やArtisanコマンドから手動でフラグを切り替える場合:
+
+```php
+use Laravel\Pennant\Feature;
+
+// 特定ユーザーに対して有効化
+Feature::for($user)->activate('new-checkout');
+
+// 特定ユーザーに対して無効化
+Feature::for($user)->deactivate('new-checkout');
+
+// 全ユーザーに対して一括有効化
+Feature::activateForEveryone('new-checkout');
+
+// 全ユーザーに対して一括無効化
+Feature::deactivateForEveryone('new-checkout');
+```
+
+機能の廃止時は、ストレージから完全に削除できます。
+
+```shell
+php artisan pennant:purge new-checkout
+```
+
+### イーガーロード：パフォーマンスの最適化
+
+多くのユーザーに対してループでフィーチャーをチェックする場合は、N+1 問題に注意が必要です。
+
+```php
+// ❌ ユーザーごとにクエリが発生する可能性がある
+foreach ($users as $user) {
+    if (Feature::for($user)->active('new-checkout')) {
+        // ...
+    }
+}
+
+// ✅ 事前にまとめてロードする
+Feature::for($users)->load(['new-checkout']);
+
+foreach ($users as $user) {
+    if (Feature::for($user)->active('new-checkout')) {
+        // ...
+    }
+}
+```
+
+---
+
+## テスト
+
+テストでは、フィーチャーフラグを再定義してコントロールするのが最も簡単な方法です。
+
+```php tab=Pest
+use Laravel\Pennant\Feature;
+
+test('新しいダッシュボードが表示される', function () {
+    Feature::define('new-dashboard', true);
+
+    $response = $this->actingAs($this->user)->get('/dashboard');
+
+    $response->assertViewIs('dashboard.new');
+});
+
+test('旧ダッシュボードが表示される', function () {
+    Feature::define('new-dashboard', false);
+
+    $response = $this->actingAs($this->user)->get('/dashboard');
+
+    $response->assertViewIs('dashboard.legacy');
+});
+```
+
+```php tab=PHPUnit
+use Laravel\Pennant\Feature;
+
+public function test_shows_new_dashboard()
+{
+    Feature::define('new-dashboard', true);
+
+    $response = $this->actingAs($this->user)->get('/dashboard');
+
+    $response->assertViewIs('dashboard.new');
+}
+
+public function test_shows_legacy_dashboard()
+{
+    Feature::define('new-dashboard', false);
+
+    $response = $this->actingAs($this->user)->get('/dashboard');
+
+    $response->assertViewIs('dashboard.legacy');
+}
+```
+
+クラスベースのフィーチャーも同様に再定義できます。
+
+```php tab=Pest
+use App\Features\NewDashboard;
+use Laravel\Pennant\Feature;
+
+test('クラスベースのフィーチャーをコントロールできる', function () {
+    Feature::define(NewDashboard::class, true);
+
+    expect(Feature::active(NewDashboard::class))->toBeTrue();
+});
+```
+
+`Lottery` を使ったフィーチャーをテストする場合は、Laravel の Lottery テストヘルパーが使えます。
+
+```php
+use Illuminate\Support\Lottery;
+
+Lottery::fix([true]); // 常に true を返す
+
+// ... テスト ...
+
+Lottery::determineResultsNormally(); // リセット
+```
+
+テスト環境では `array` ドライバを使うことを推奨します。`phpunit.xml` で設定します。
+
+```xml
+<php>
+    <env name="PENNANT_STORE" value="array"/>
+</php>
+```
+
+---
+
+## まとめ
+
+Laravel Pennant を使うべきシーンをまとめます。
+
+| シーン | Pennantで実現できること |
+|-------|----------------------|
+| 段階的ロールアウト | `Lottery::odds()` で確率ベースの公開 |
+| ベータ機能 | ロール・プランで対象ユーザーを絞る |
+| A/Bテスト | リッチな値でバリアントを管理 |
+| キルスイッチ | `Feature::deactivateForEveryone()` で即時無効化 |
+| トランクベース開発 | 未完成機能をフラグで隠してメインブランチにマージ |
+
+機能フラグがあれば、デプロイ直後に問題が発生してもコードロールバックなしで機能を無効化できます。リリースの恐怖が減り、デプロイの頻度を上げることができます。
+
+Pennantは設定が少なく、Laravelの開発スタイルとよく馴染みます。まだ使っていなければ、次の新機能開発で試してみてください。
+
+<Card title="公式ドキュメント — Laravel Pennant" icon="book-open" href="https://laravel.com/docs/pennant">
+  Pennant の全機能についての詳細は公式ドキュメントを参照してください。
+</Card>
