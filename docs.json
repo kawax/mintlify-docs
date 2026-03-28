@@ -14,7 +14,7 @@
         "language": "jp",
         "tabs": [
           {
-            "tab": "入門チュートリアル",
+            "tab": "チュートリアル",
             "groups": [
               {
                 "group": "はじめに",
@@ -78,7 +78,7 @@
             ]
           },
           {
-            "tab": "中級",
+            "tab": "ガイド",
             "groups": [
               {
                 "group": "アーキテクチャ",
@@ -187,7 +187,7 @@
             ]
           },
           {
-            "tab": "上級",
+            "tab": "応用トピック",
             "groups": [
               {
                 "group": "デザインパターン",
@@ -297,7 +297,7 @@
             ]
           },
           {
-            "tab": "Intermediate",
+            "tab": "Guide",
             "groups": [
               {
                 "group": "Architecture",
