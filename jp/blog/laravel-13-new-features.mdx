@@ -1,0 +1,274 @@
+---
+title: "Laravel 13 新機能まとめ"
+description: "2026年3月にリリースされたLaravel 13の主要な新機能と改善点を解説します。"
+---
+
+## はじめに
+
+Laravel 13 は 2026年3月17日にリリースされました。毎年恒例のメジャーリリースですが、Laravel 13 は特に **AI ネイティブなワークフロー**、**より安全なデフォルト**、**より表現力豊かな開発者向け API** に焦点を当てています。
+
+破壊的変更は最小限に抑えられており、ほとんどのアプリケーションは少ない修正でアップグレードできます。一方で、Laravel AI SDK やセマンティック検索など、モダンなアプリケーション開発を大きく変える新機能が多数追加されています。
+
+<Info>
+  Laravel 13 のサポートポリシー: バグフィックスは 2027年 Q3 まで、セキュリティフィックスは **2028年3月17日** まで提供されます。
+</Info>
+
+---
+
+## PHP 要件の更新
+
+Laravel 13 では **PHP 8.3 以上** が必要です。PHP 8.2 のサポートは終了しています。
+
+| バージョン | PHP          | リリース日     | バグフィックス期限 | セキュリティフィックス期限 |
+|-----------|--------------|--------------|----------------|------------------|
+| 11        | 8.2 - 8.4    | 2024年3月12日 | 2025年9月3日   | 2026年3月12日    |
+| 12        | 8.2 - 8.5    | 2025年2月24日 | 2026年8月13日  | 2027年2月24日    |
+| **13**    | **8.3 - 8.5** | **2026年3月17日** | **2027年 Q3** | **2028年3月17日** |
+
+PHP 8.3 の主な恩恵として、型付き定数、`json_validate()` 関数、`#[\Override]` アトリビュートなどが利用できるようになります。
+
+---
+
+## 主要な新機能
+
+### Laravel AI SDK
+
+Laravel 13 の目玉機能は **ファーストパーティの AI SDK** です。テキスト生成、ツール呼び出しエージェント、埋め込み、音声、画像生成、ベクターストア統合を統一した API で提供します。
+
+プロバイダーに依存しない形で AI 機能を構築しながら、Laravel らしい開発者体験を保てます。
+
+**テキスト生成 (エージェント)**
+
+```php
+use App\Ai\Agents\SalesCoach;
+
+$response = SalesCoach::make()->prompt('このセールストランスクリプトを分析してください...');
+
+return (string) $response;
+```
+
+**画像生成**
+
+```php
+use Laravel\Ai\Image;
+
+$image = Image::of('キッチンカウンターの上のドーナツ')->generate();
+
+$rawContent = (string) $image;
+```
+
+**音声合成**
+
+```php
+use Laravel\Ai\Audio;
+
+$audio = Audio::of('Laravelでのコーディングが大好きです。')->generate();
+
+$rawContent = (string) $audio;
+```
+
+**埋め込み生成**
+
+```php
+use Illuminate\Support\Str;
+
+$embeddings = Str::of('ナパバレーのワインは最高です。')->toEmbeddings();
+```
+
+詳細は [Laravel AI SDK ドキュメント](https://laravel.com/ai) を参照してください。
+
+---
+
+### セマンティック / ベクター検索
+
+AI SDK と連携したネイティブなベクタークエリサポートが追加されました。PostgreSQL + `pgvector` を使ったセマンティック検索を、クエリビルダーから直接実行できます。
+
+```php
+$documents = DB::table('documents')
+    ->whereVectorSimilarTo('embedding', 'ナパバレーの最高のワイナリー')
+    ->limit(10)
+    ->get();
+```
+
+埋め込み列の追加からクエリまで、Laravel のエコシステム内で完結できます。
+
+---
+
+### JSON:API リソース
+
+Laravel にファーストパーティの [JSON:API](https://jsonapi.org/) リソースサポートが追加されました。JSON:API 仕様に準拠したレスポンスを簡単に返せるようになります。
+
+- リソースオブジェクトのシリアライゼーション
+- リレーションシップのインクルード
+- スパースフィールドセット
+- リンク
+- JSON:API 準拠のレスポンスヘッダー
+
+---
+
+### PHP アトリビュートの拡張
+
+Laravel 13 は PHP アトリビュートによる宣言的な設定をフレームワーク全体に拡大しました。
+
+**コントローラーへの適用**
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Comment;
+use App\Models\Post;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
+use Illuminate\Routing\Attributes\Controllers\Middleware;
+
+#[Middleware('auth')]
+class CommentController
+{
+    #[Middleware('subscribed')]
+    #[Authorize('create', [Comment::class, 'post'])]
+    public function store(Post $post)
+    {
+        // ...
+    }
+}
+```
+
+**キュージョブへの適用**
+
+```php
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\FailOnTimeout;
+
+#[Tries(3)]
+#[Backoff(60)]
+#[Timeout(120)]
+#[FailOnTimeout]
+class ProcessPodcast implements ShouldQueue
+{
+    // ...
+}
+```
+
+新しく追加された主なアトリビュート:
+
+| アトリビュート | 用途 |
+|-------------|------|
+| `#[Middleware]` | コントローラー・メソッドへのミドルウェア適用 |
+| `#[Authorize]` | コントローラーへのポリシーチェック |
+| `#[Tries]` | キュージョブの最大試行回数 |
+| `#[Backoff]` | キュージョブのバックオフ時間 |
+| `#[Timeout]` | キュージョブのタイムアウト時間 |
+| `#[FailOnTimeout]` | タイムアウト時のジョブ失敗フラグ |
+
+Eloquent、イベント、通知、バリデーション、テスト、リソースシリアライゼーション API などにも追加のアトリビュートが導入されています。
+
+---
+
+### キュールーティング
+
+`Queue::route(...)` を使って、特定のジョブに対してデフォルトのキュー・接続ルーティングルールを一箇所で定義できるようになりました。
+
+```php
+use App\Jobs\ProcessPodcast;
+use Illuminate\Support\Facades\Queue;
+
+Queue::route(ProcessPodcast::class, connection: 'redis', queue: 'podcasts');
+```
+
+ジョブクラスにキュー名をハードコードする必要がなくなり、インフラ設定をコードから分離できます。
+
+---
+
+### キャッシュ TTL 延長
+
+`Cache::touch(...)` を使って、キャッシュアイテムの値を取得・再保存することなく TTL を延長できるようになりました。
+
+```php
+// 現在の値を変えずに TTL を 3600 秒延長
+Cache::touch('expensive-computation', 3600);
+```
+
+---
+
+## セキュリティ強化
+
+### CSRF 保護の強化 (`PreventRequestForgery`)
+
+CSRF ミドルウェアが `VerifyCsrfToken` から `PreventRequestForgery` にリネームされ、`Sec-Fetch-Site` ヘッダーを使ったリクエスト発信元の検証が追加されました。
+
+```php
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+
+// テストでのミドルウェア除外
+->withoutMiddleware([PreventRequestForgery::class]);
+```
+
+`VerifyCsrfToken` は非推奨のエイリアスとして残りますが、新しいクラス名への移行が推奨されます。
+
+### キャッシュのデシリアライゼーション制限
+
+`config/cache.php` に `serializable_classes` オプションが追加され、デフォルトは `false` です。これにより `APP_KEY` が漏洩した場合の PHP デシリアライゼーション攻撃を防ぎます。
+
+```php
+// config/cache.php
+'serializable_classes' => [
+    App\Data\CachedDashboardStats::class,
+    App\Support\CachedPricingSnapshot::class,
+],
+```
+
+キャッシュに PHP オブジェクトを保存している場合は、明示的にクラスを許可リストに追加する必要があります。
+
+---
+
+## スターターキットの変更
+
+Laravel 12 で刷新されたスターターキット（React/Vue/Livewire ベース）は Laravel 13 でも引き続き利用可能です。
+
+Laravel 13 のリリース時期に合わせて **Inertia v3** もリリースされました。主な変更点:
+
+- よりシンプルなレイアウト props
+- Vite 8 サポート
+- `withApp` コールバックの追加
+- 新しい Blade コンポーネント
+
+Inertia v3 を使用している場合は、合わせてアップグレードを検討してください。
+
+---
+
+## その他の改善点
+
+### AI アシストアップグレード (Laravel Boost)
+
+[Laravel Boost](https://github.com/laravel/boost) はファーストパーティの MCP サーバーです。Claude Code、Cursor、OpenCode、Gemini、VS Code などの AI エディターと連携して、`/upgrade-laravel-v13` スラッシュコマンドでアップグレードを半自動化できます。
+
+```shell
+composer require laravel/boost:^2.0 --dev
+```
+
+### コントラクトの追加
+
+以下のコントラクトに新しいメソッドが追加されました:
+
+| コントラクト | 追加メソッド |
+|------------|-----------|
+| `Bus\Dispatcher` | `dispatchAfterResponse` |
+| `Routing\ResponseFactory` | `eventStream` (SSE サポート) |
+| `Auth\MustVerifyEmail` | `markEmailAsUnverified` |
+| `Queue\Queue` | `pendingSize`, `delayedSize`, `reservedSize`, `creationTimeOfOldestPendingJob` |
+| `Cache\Store` / `Cache\Repository` | `touch` |
+
+---
+
+## まとめ
+
+Laravel 13 は「少ない破壊的変更、多くの新機能」というリリースです。アップグレード作業は最小限で済む一方、特に **AI SDK** と **セマンティック検索** は現代のアプリケーション開発のあり方を変える可能性を持っています。
+
+既存のアプリケーションを Laravel 12 から 13 へアップグレードする準備ができたら、詳細な手順は以下のガイドを参照してください。
+
+<Card title="Laravel 12 から 13 へのアップグレードガイド" icon="arrow-up-right" href="/jp/blog/upgrade-12-to-13">
+  破壊的変更の一覧と、ステップバイステップのアップグレード手順を解説しています。
+</Card>
