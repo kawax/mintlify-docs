@@ -1,0 +1,257 @@
+---
+title: "Conditionableトレイト"
+description: "when()/unless()メソッドの内部実装と活用パターンを解説します"
+---
+
+## Conditionableトレイトとは
+
+`Illuminate\Support\Traits\Conditionable` トレイトは、オブジェクトに `when()` と `unless()` メソッドを追加します。条件に応じて処理を分岐しながらメソッドチェーンを続けられるのが特徴です。
+
+<Info>
+  実際のソースは `src/Illuminate/Conditionable/Traits/Conditionable.php` にあります。`Illuminate\Support\Traits\Conditionable` というエイリアスから参照されています。
+</Info>
+
+QueryBuilder・EloquentBuilder・Mail・Notification など、Laravelの多くのクラスがこのトレイトを使っています。
+
+## 基本的な使い方
+
+### when() — 条件が真のとき実行する
+
+```php
+use Illuminate\Support\Collection;
+
+$results = collect([1, 2, 3, 4, 5])
+    ->when(true, function (Collection $collection) {
+        return $collection->filter(fn ($n) => $n > 2);
+    });
+// [3, 4, 5]
+```
+
+第1引数の値が真のとき、第2引数のコールバックが実行されます。偽のときは第3引数のコールバック(デフォルト)が実行されます。
+
+```php
+$results = collect([1, 2, 3, 4, 5])
+    ->when(false, function (Collection $collection) {
+        return $collection->filter(fn ($n) => $n > 2);
+    }, function (Collection $collection) {
+        return $collection->filter(fn ($n) => $n < 3);
+    });
+// [1, 2]
+```
+
+### unless() — 条件が偽のとき実行する
+
+`unless()` は `when()` の逆です。条件が偽のときにコールバックが実行されます。
+
+```php
+$results = collect([1, 2, 3, 4, 5])
+    ->unless(false, function (Collection $collection) {
+        return $collection->take(3);
+    });
+// [1, 2, 3]
+```
+
+## メソッドチェーンが続く理由
+
+コールバックの戻り値が `null` の場合、`$this`（トレイトを使っているオブジェクト）が返ります。コールバックが `null` を返さない場合はその戻り値が返ります。
+
+```php
+// $this が返るのでチェーンが続く
+$query = User::query()
+    ->when($request->has('active'), function ($query) {
+        $query->where('active', true); // void / null を返す
+    })
+    ->when($request->filled('name'), function ($query) use ($request) {
+        $query->where('name', 'like', "%{$request->name}%");
+    })
+    ->orderBy('created_at', 'desc');
+```
+
+ソースコードでは次のように実装されています。
+
+```php
+if ($value) {
+    return $callback($this, $value) ?? $this;
+} elseif ($default) {
+    return $default($this, $value) ?? $this;
+}
+
+return $this;
+```
+
+コールバックが明示的な値を返した場合はその値がチェーンの次に渡ります。何も返さない（`null`）場合は `$this` が返ります。
+
+## 引数なしで呼ぶ — HigherOrderWhenProxy
+
+引数ゼロで `when()` を呼ぶと `HigherOrderWhenProxy` が返ります。これを使うと条件を後から設定できます。
+
+```php
+$query = User::query()
+    ->when()->isActive()  // isActive() を条件として評価
+    ->where('role', 'admin');
+```
+
+引数1つで呼ぶと、その値を条件として持つプロキシが返ります。
+
+```php
+// 引数1つ: 条件だけを渡してプロキシを得る
+$proxy = collect([1, 2, 3])->when($request->has('filter'));
+// $proxy->methodName() で条件が真のときだけ methodName() を呼び出せる
+```
+
+## クロージャを値として渡す
+
+第1引数にクロージャを渡すと、そのクロージャが実行された戻り値が条件として使われます。
+
+```php
+$results = User::query()
+    ->when(
+        fn ($query) => $request->filled('role'),
+        fn ($query) => $query->where('role', $request->role)
+    )
+    ->get();
+```
+
+これにより条件の評価ロジックをコールバックに切り出せます。
+
+## QueryBuilderでの典型パターン
+
+`when()` を使った動的クエリ構築は最も一般的なユースケースです。
+
+```php
+public function index(Request $request)
+{
+    $users = User::query()
+        ->when($request->filled('search'), function ($query) use ($request) {
+            $query->where('name', 'like', "%{$request->search}%")
+                  ->orWhere('email', 'like', "%{$request->search}%");
+        })
+        ->when($request->filled('role'), fn ($q) => $q->where('role', $request->role))
+        ->when($request->boolean('verified'), fn ($q) => $q->whereNotNull('email_verified_at'))
+        ->when(
+            $request->filled('sort'),
+            fn ($q) => $q->orderBy($request->sort, $request->get('direction', 'asc')),
+            fn ($q) => $q->latest()
+        )
+        ->paginate();
+
+    return UserResource::collection($users);
+}
+```
+
+## Conditionableを自前のクラスに適用する
+
+トレイトを `use` するだけで `when()` / `unless()` が使えるようになります。
+
+```php
+namespace App\Services;
+
+use Illuminate\Support\Traits\Conditionable;
+
+class ReportBuilder
+{
+    use Conditionable;
+
+    protected array $filters = [];
+    protected bool $includeArchived = false;
+    protected ?string $groupBy = null;
+
+    public function withArchived(): static
+    {
+        $this->includeArchived = true;
+
+        return $this;
+    }
+
+    public function groupBy(string $column): static
+    {
+        $this->groupBy = $column;
+
+        return $this;
+    }
+
+    public function addFilter(string $column, mixed $value): static
+    {
+        $this->filters[$column] = $value;
+
+        return $this;
+    }
+
+    public function build(): \Illuminate\Database\Eloquent\Builder
+    {
+        return Report::query()
+            ->when($this->includeArchived, fn ($q) => $q->withTrashed())
+            ->when($this->groupBy, fn ($q) => $q->groupBy($this->groupBy))
+            ->when($this->filters, function ($q) {
+                foreach ($this->filters as $column => $value) {
+                    $q->where($column, $value);
+                }
+            });
+    }
+}
+```
+
+```php
+// 使用例
+$query = (new ReportBuilder)
+    ->when($request->boolean('archived'), fn ($b) => $b->withArchived())
+    ->when($request->filled('group'), fn ($b) => $b->groupBy($request->group))
+    ->addFilter('status', 'published')
+    ->build();
+```
+
+## Mail・Notification・Responseでの活用
+
+`when()` はメール・通知・レスポンス構築でも使えます。
+
+```php
+use Illuminate\Mail\Mailable;
+use Illuminate\Support\Traits\Conditionable;
+
+class OrderConfirmation extends Mailable
+{
+    public function build(): static
+    {
+        return $this
+            ->subject('ご注文を承りました')
+            ->view('emails.order.confirmation')
+            ->when($this->order->hasDiscount(), function (Mailable $mail) {
+                $mail->attach(storage_path('discounts/coupon.pdf'));
+            })
+            ->when(app()->environment('production'), function (Mailable $mail) {
+                $mail->bcc('archive@example.com');
+            });
+    }
+}
+```
+
+## tap() との使い分け
+
+`tap()` と `when()` は似ていますが目的が異なります。
+
+| | `tap()` | `when()` |
+|---|---|---|
+| 目的 | 副作用(ログ・デバッグ) | 条件分岐 |
+| 戻り値 | 常に `$this` | 条件付きで `$this` またはコールバックの戻り値 |
+| 条件 | なし | あり |
+
+```php
+// tap: 副作用のために使う。戻り値は常に $this
+$user = User::find($id)
+    ->tap(fn ($user) => Log::info("User {$user->id} loaded"));
+
+// when: 条件分岐に使う
+$user = User::query()
+    ->when($isAdmin, fn ($q) => $q->where('role', 'admin'))
+    ->first();
+```
+
+<Tip>
+  デバッグや副作用のためにチェーン中で何かしたいだけなら `tap()` を使います。条件によって処理を切り替えたいなら `when()` / `unless()` を使います。
+</Tip>
+
+## 次のステップ
+
+<Card title="コレクションの高階メッセージ" icon="layers" href="/jp/advanced/higher-order-messages">
+  `$collection->map->method()` のような構文の仕組みと実践的な使い方を学びます。
+</Card>
