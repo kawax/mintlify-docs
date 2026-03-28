@@ -1,0 +1,115 @@
+---
+title: "LaravelとAI開発"
+description: "LaravelはAI支援開発に最適なフレームワークです。Laravel BoostによるMCPサーバー連携、AIガイドライン、ドキュメント検索APIを活用して、AIコーディングエージェントの能力を最大限に引き出しましょう。"
+---
+
+## LaravelがAI開発に向いている理由
+
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Cursor](https://cursor.com)、[GitHub Copilot](https://github.com/features/copilot) などのAIコーディングエージェントは、コード生成・デバッグ・リファクタリングを劇的に加速させます。しかし、エージェントの能力を最大限に発揮するには、コードベースをエージェントが正確に理解できる必要があります。
+
+Laravelはその点で他のフレームワークより優位に立っています。規約に基づいた設計のため、「コントローラーを追加して」と頼めばエージェントは置き場所を把握しています。「マイグレーションを作って」と頼めば命名規則もファイルの場所も予測できます。この一貫性が、AIツールを迷わせる「曖昧さ」を取り除きます。
+
+Eloquentのリレーション、フォームリクエスト、ミドルウェアといった機能は、エージェントが確実に理解して再現できるパターンに従っています。結果として生成されるコードは、汎用的なPHPスニペットの寄せ集めではなく、熟練のLaravel開発者が書いたようなイディオマティックなコードになります。
+
+## Laravel Boost
+
+[Laravel Boost](https://github.com/laravel/boost) は、AIコーディングエージェントとLaravelアプリケーションの橋渡しをするパッケージです。Boostは **MCP（Model Context Protocol）サーバー** として動作し、15以上の専用ツールを通じてエージェントにアプリケーションの構造・データベース・ルートなどを深く理解させます。
+
+Boostが提供する主な機能は3つです。
+
+<Columns>
+  <Card title="MCPツール群" icon="wrench">
+    アプリケーションの検査・操作に使える15以上のツール。データベーススキーマ確認からArtisanコマンド実行まで対応。
+  </Card>
+  <Card title="AIガイドライン" icon="book-open">
+    Laravelエコシステム向けに設計されたAIガイドライン。慣用的なコードを書くためのベストプラクティスをエージェントに伝達。
+  </Card>
+  <Card title="ドキュメント検索API" icon="magnifying-glass">
+    17,000件以上のLaravel固有ドキュメントを検索。インストール済みパッケージのバージョンに合った正確な情報を提供。
+  </Card>
+</Columns>
+
+### インストール
+
+BoostはLaravel 10、11、12、13、PHP 8.1以上で動作します。まず開発依存として追加しましょう。
+
+<Steps>
+  <Step title="パッケージをインストールする">
+    ```shell
+    composer require laravel/boost --dev
+    ```
+  </Step>
+  <Step title="インタラクティブインストーラーを実行する">
+    ```shell
+    php artisan boost:install
+    ```
+
+    インストーラーがIDEとAIエージェントを自動検出します。使用する統合を選択すると、MCPサーバー用の `.mcp.json` やガイドラインファイルなど、必要な設定ファイルが生成されます。
+  </Step>
+</Steps>
+
+<Info>
+  `.mcp.json`、`CLAUDE.md`、`boost.json` などの生成ファイルは、開発者ごとに環境を設定したい場合、`.gitignore` に追加しても問題ありません。
+</Info>
+
+### 利用可能なMCPツール
+
+Boostがエージェントに公開するツールには以下のものがあります。
+
+| ツール | 説明 |
+| --- | --- |
+| アプリケーション検査 | PHPとLaravelのバージョン、インストール済みパッケージ、設定・環境変数を確認 |
+| データベースツール | スキーマ確認、読み取り専用クエリ実行、データ構造の把握 |
+| ルート検査 | ミドルウェア・コントローラー・パラメーターを含む全登録ルートを一覧表示 |
+| Artisanコマンド | 利用可能なArtisanコマンドと引数を探索。適切なコマンドをエージェントが提案・実行 |
+| ログ解析 | アプリケーションログファイルの読み込みと解析でデバッグを支援 |
+| ブラウザログ | Laravelのフロントエンドツール使用時のブラウザコンソールログとエラーにアクセス |
+| Tinker統合 | Laravel Tinker経由でアプリケーションコンテキスト内のPHPコードを実行し、動作を検証 |
+| ドキュメント検索 | インストール済みパッケージバージョンに対応したLaravelエコシステムのドキュメントを検索 |
+
+### AIガイドライン
+
+BoostのAIガイドラインは、Laravelエコシステム向けに設計されたコーディング規約集です。慣用的なLaravelコードの書き方、フレームワーク規約、よくある落とし穴を避ける方法をエージェントに伝えます。ガイドラインはインストール済みパッケージのバージョンに応じて自動的に組み合わされます。
+
+対応パッケージの例：
+
+- Livewire（2.x、3.x、4.x）
+- Inertia.js（React、Svelte、Vueバリアント）
+- Tailwind CSS（3.x、4.x）
+- Filament（3.x、4.x）
+- PHPUnit・Pest PHP・Laravel Pint など
+
+`boost:install` を実行すると、`composer.json` に基づいて使用中のパッケージを自動検出し、関連するガイドラインをAIコンテキストファイルに組み込みます。
+
+### Agent Skills
+
+[Agent Skills](https://agentskills.io/home) は、エージェントが必要なときにオンデマンドで読み込む軽量な知識モジュールです。ガイドラインとは異なり、最初からすべてを読み込むのではなく、特定のドメインで作業するときだけ関連するスキルを有効化します。これによりコンテキストの肥大化を防ぎ、生成コードの精度を高めます。
+
+Livewire、Inertia、Tailwind CSS、Pestなどの人気パッケージ向けスキルが用意されています。`boost:install` でスキル機能を選択すると、`composer.json` の内容に基づいて自動的にインストールされます。
+
+### ドキュメント検索API
+
+BoostのドキュメントAPIは、17,000件以上のLaravelエコシステムドキュメントをエージェントが検索できるようにします。一般的なウェブ検索とは異なり、インストール済みパッケージのバージョンに合わせてインデックス化・ベクトル化されています。
+
+エージェントがある機能の動作を調べたいとき、このAPIを使ってバージョン固有の正確な情報を取得できます。古いフレームワークバージョンの非推奨メソッドや構文をエージェントが提案してしまう問題を解消します。
+
+### 対応エージェント
+
+Boostは Model Context Protocol をサポートする主要なIDEとAIツールに対応しています。
+
+<Columns>
+  <Card title="Cursor" icon="arrow-pointer" href="https://cursor.com" />
+  <Card title="Claude Code" icon="terminal" href="https://docs.anthropic.com/en/docs/claude-code" />
+  <Card title="GitHub Copilot" icon="github" href="https://github.com/features/copilot" />
+  <Card title="Gemini CLI" icon="arrow-right" href="https://github.com/google-gemini/gemini-cli" />
+  <Card title="Codex" icon="arrow-right" href="https://openai.com/codex" />
+  <Card title="Junie" icon="arrow-right" href="https://www.jetbrains.com/junie/" />
+</Columns>
+
+各エージェントの詳細なセットアップ手順は [Boostドキュメントの「Set Up Your Agents」セクション](https://laravel.com/docs/boost#set-up-your-agents) を参照してください。
+
+## 次のステップ
+
+<Card title="Laravel Boost 公式ドキュメント" icon="book-open-cover" href="https://laravel.com/docs/boost">
+  各エージェントとの詳細な連携方法、MCPツールのリファレンス、ガイドラインのカスタマイズについては公式ドキュメントを参照してください。
+</Card>
