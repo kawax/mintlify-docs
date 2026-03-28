@@ -1,0 +1,645 @@
+---
+title: "Laravelパッケージ開発"
+description: "サービスプロバイダーを核としたLaravelパッケージの開発方法を、設定・ビュー・マイグレーション・ファサードの公開から自動検出・遅延読み込みまで網羅します。"
+---
+
+## パッケージとは
+
+Laravelにおけるパッケージとは、アプリケーションに機能を追加するComposerパッケージです。パッケージには大きく2種類あります。
+
+- **スタンドアロンパッケージ** — Laravelに依存しない汎用PHPライブラリ（例：Carbon、Pest）
+- **Laravelパッケージ** — ルート、コントローラー、ビュー、設定など、Laravelと統合された機能を持つパッケージ
+
+このガイドでは後者、Laravel専用パッケージの開発を扱います。パッケージ開発にはサービスプロバイダー、ファサード、設定ファイルの公開など、Laravelの内部構造を深く理解する必要があります。
+
+<Info>
+  パッケージのテストを書く場合は、[Orchestra Testbench](https://github.com/orchestral/testbench) を使います。通常のLaravelアプリケーションと同じようにパッケージのテストを記述できます。
+</Info>
+
+## パッケージの自動検出
+
+Laravelはパッケージをインストールした際に、`composer.json` の `extra.laravel` セクションを読み取ってサービスプロバイダーとファサードを自動登録します。
+
+```json
+"extra": {
+    "laravel": {
+        "providers": [
+            "Acme\\Courier\\CourierServiceProvider"
+        ],
+        "aliases": {
+            "Courier": "Acme\\Courier\\Facades\\Courier"
+        }
+    }
+}
+```
+
+この設定を加えると、ユーザーは `bootstrap/providers.php` を手動で編集しなくてもパッケージが自動的に読み込まれます。
+
+### 自動検出を無効にする
+
+ユーザー側で特定のパッケージの自動検出を無効にしたい場合は、アプリケーションの `composer.json` に設定します。
+
+```json
+"extra": {
+    "laravel": {
+        "dont-discover": [
+            "acme/courier"
+        ]
+    }
+}
+```
+
+## サービスプロバイダーの役割
+
+サービスプロバイダーはパッケージのエントリポイントです。ビュー、設定、マイグレーション、ルートなどのリソースをLaravelに登録する処理をここに集約します。
+
+サービスプロバイダーは `Illuminate\Support\ServiceProvider` を継承し、`register` と `boot` の2つのメソッドを持ちます。
+
+```php
+<?php
+
+namespace Acme\Courier;
+
+use Illuminate\Support\ServiceProvider;
+
+class CourierServiceProvider extends ServiceProvider
+{
+    /**
+     * パッケージのサービスを登録する
+     */
+    public function register(): void
+    {
+        // サービスコンテナへのバインディングはここで行う
+        $this->mergeConfigFrom(
+            __DIR__.'/../config/courier.php', 'courier'
+        );
+
+        $this->app->singleton(CourierManager::class, function ($app) {
+            return new CourierManager($app['config']['courier']);
+        });
+    }
+
+    /**
+     * パッケージのサービスをブートストラップする
+     */
+    public function boot(): void
+    {
+        // リソースの登録はここで行う
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'courier');
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'courier');
+
+        $this->publishesMigrations([
+            __DIR__.'/../database/migrations' => database_path('migrations'),
+        ]);
+
+        $this->publishes([
+            __DIR__.'/../config/courier.php' => config_path('courier.php'),
+        ], 'courier-config');
+
+        $this->publishes([
+            __DIR__.'/../resources/views' => resource_path('views/vendor/courier'),
+        ], 'courier-views');
+    }
+}
+```
+
+<Warning>
+  `register` メソッド内でイベントリスナー、ルート、ビューなどを登録しないでください。まだ読み込まれていない別のサービスプロバイダーのサービスを誤って使ってしまう可能性があります。バインディング以外の処理は必ず `boot` メソッドで行います。
+</Warning>
+
+## 設定ファイルのPublish
+
+### publishes() — ファイルを公開する
+
+`boot` メソッドで `publishes()` を呼び出すと、ユーザーが `vendor:publish` コマンドで設定ファイルを自分のアプリケーションにコピーできるようになります。
+
+```php
+public function boot(): void
+{
+    $this->publishes([
+        __DIR__.'/../config/courier.php' => config_path('courier.php'),
+    ]);
+}
+```
+
+公開後の設定値は通常のconfigアクセスと同じ方法で取得できます。
+
+```php
+$value = config('courier.option');
+```
+
+### mergeConfigFrom() — デフォルト値とマージする
+
+`register` メソッドで `mergeConfigFrom()` を使うと、ユーザーが設定ファイルを公開していない場合にもパッケージのデフォルト値が使われます。
+
+```php
+public function register(): void
+{
+    $this->mergeConfigFrom(
+        __DIR__.'/../config/courier.php', 'courier'
+    );
+}
+```
+
+<Warning>
+  `mergeConfigFrom()` はネストした配列の深いレベルまではマージしません。多次元配列を持つ設定では、ユーザーが一部だけ定義した場合に残りのオプションがマージされないことがあります。
+</Warning>
+
+### タグで公開グループを分ける
+
+`publishes()` の第2引数にタグを指定すると、ユーザーが必要なリソースだけを選んで公開できます。
+
+```php
+public function boot(): void
+{
+    $this->publishes([
+        __DIR__.'/../config/courier.php' => config_path('courier.php'),
+    ], 'courier-config');
+
+    $this->publishesMigrations([
+        __DIR__.'/../database/migrations/' => database_path('migrations'),
+    ], 'courier-migrations');
+}
+```
+
+```shell
+# 設定ファイルだけを公開する
+php artisan vendor:publish --tag=courier-config
+
+# プロバイダーが提供するすべてのファイルを公開する
+php artisan vendor:publish --provider="Acme\Courier\CourierServiceProvider"
+```
+
+## ルートの登録
+
+`loadRoutesFrom()` を使ってルートファイルを読み込みます。アプリケーションのルートキャッシュが有効な場合は自動的にスキップされます。
+
+```php
+public function boot(): void
+{
+    $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+}
+```
+
+ルートファイルではパッケージのコントローラーを指定します。
+
+```php
+// routes/web.php
+use Acme\Courier\Http\Controllers\TrackingController;
+use Illuminate\Support\Facades\Route;
+
+Route::prefix('courier')->group(function () {
+    Route::get('/track/{id}', [TrackingController::class, 'show'])
+        ->name('courier.track');
+});
+```
+
+## マイグレーションのPublish
+
+`publishesMigrations()` を使うと、マイグレーションファイルを公開できます。公開時にLaravelが自動的にタイムスタンプを更新します。
+
+```php
+public function boot(): void
+{
+    $this->publishesMigrations([
+        __DIR__.'/../database/migrations' => database_path('migrations'),
+    ]);
+}
+```
+
+## ビューのPublish
+
+### loadViewsFrom() — ビューを登録する
+
+`loadViewsFrom()` でビューディレクトリを登録します。第2引数の名前空間を使って `package::view` の形式でビューを参照します。
+
+```php
+public function boot(): void
+{
+    $this->loadViewsFrom(__DIR__.'/../resources/views', 'courier');
+}
+```
+
+登録後、ビューはパッケージ名前空間で参照します。
+
+```php
+Route::get('/dashboard', function () {
+    return view('courier::dashboard');
+});
+```
+
+Laravelはビューを2か所から探します。まずアプリケーションの `resources/views/vendor/courier` ディレクトリを確認し、なければパッケージのビューディレクトリを使います。これによりユーザーがビューをカスタマイズできます。
+
+### ビューを公開する
+
+```php
+public function boot(): void
+{
+    $this->loadViewsFrom(__DIR__.'/../resources/views', 'courier');
+
+    $this->publishes([
+        __DIR__.'/../resources/views' => resource_path('views/vendor/courier'),
+    ], 'courier-views');
+}
+```
+
+### Bladeコンポーネントを登録する
+
+コンポーネントをパッケージに含める場合は、`boot` メソッドで登録します。
+
+```php
+use Illuminate\Support\Facades\Blade;
+use Acme\Courier\View\Components\AlertComponent;
+
+public function boot(): void
+{
+    Blade::component('courier-alert', AlertComponent::class);
+}
+```
+
+コンポーネント名前空間を使って一括登録することもできます。
+
+```php
+use Illuminate\Support\Facades\Blade;
+
+public function boot(): void
+{
+    Blade::componentNamespace('Acme\\Courier\\View\\Components', 'courier');
+}
+```
+
+```blade
+{{-- 個別登録の場合 --}}
+<x-courier-alert />
+
+{{-- 名前空間登録の場合 --}}
+<x-courier::alert />
+```
+
+## 翻訳ファイルのPublish
+
+`loadTranslationsFrom()` で翻訳ファイルを登録します。翻訳は `package::file.key` の形式で参照します。
+
+```php
+public function boot(): void
+{
+    $this->loadTranslationsFrom(__DIR__.'/../lang', 'courier');
+
+    $this->publishes([
+        __DIR__.'/../lang' => $this->app->langPath('vendor/courier'),
+    ]);
+}
+```
+
+```php
+// 翻訳の使用
+echo trans('courier::messages.welcome');
+```
+
+JSONの翻訳ファイルを使う場合は `loadJsonTranslationsFrom()` を使います。
+
+```php
+public function boot(): void
+{
+    $this->loadJsonTranslationsFrom(__DIR__.'/../lang');
+}
+```
+
+## コマンドの登録
+
+パッケージのArtisanコマンドは `commands()` メソッドで登録します。コンソール環境でのみ登録するのが一般的です。
+
+```php
+use Acme\Courier\Console\Commands\InstallCommand;
+use Acme\Courier\Console\Commands\SyncCommand;
+
+public function boot(): void
+{
+    if ($this->app->runningInConsole()) {
+        $this->commands([
+            InstallCommand::class,
+            SyncCommand::class,
+        ]);
+    }
+}
+```
+
+### optimize コマンドへの統合
+
+パッケージが独自のキャッシュを持つ場合、`optimizes()` メソッドで `php artisan optimize` と `php artisan optimize:clear` に統合できます。
+
+```php
+public function boot(): void
+{
+    if ($this->app->runningInConsole()) {
+        $this->optimizes(
+            optimize: 'courier:cache',
+            clear: 'courier:clear-cache',
+        );
+    }
+}
+```
+
+### `about` コマンドへの情報追加
+
+`php artisan about` の出力にパッケージ情報を追加するには `AboutCommand::add()` を使います。
+
+```php
+use Illuminate\Foundation\Console\AboutCommand;
+
+public function boot(): void
+{
+    AboutCommand::add('Courier Package', fn () => ['Version' => '1.0.0']);
+}
+```
+
+## ファサードの作成
+
+ファサードを使うと、サービスコンテナのバインディングを静的メソッドのように呼び出せます。
+
+<Steps>
+  <Step title="サービスクラスを作成する">
+    ```php
+    <?php
+
+    namespace Acme\Courier;
+
+    class CourierManager
+    {
+        public function __construct(
+            protected array $config,
+        ) {}
+
+        public function send(string $to, string $message): bool
+        {
+            // メッセージ送信処理
+            return true;
+        }
+
+        public function track(string $id): array
+        {
+            // 追跡情報取得処理
+            return ['status' => 'delivered'];
+        }
+    }
+    ```
+  </Step>
+  <Step title="ファサードクラスを作成する">
+    `Illuminate\Support\Facades\Facade` を継承し、`getFacadeAccessor()` でサービスコンテナのバインディングキーを返します。
+
+    ```php
+    <?php
+
+    namespace Acme\Courier\Facades;
+
+    use Illuminate\Support\Facades\Facade;
+
+    /**
+     * @method static bool send(string $to, string $message)
+     * @method static array track(string $id)
+     *
+     * @see \Acme\Courier\CourierManager
+     */
+    class Courier extends Facade
+    {
+        protected static function getFacadeAccessor(): string
+        {
+            return \Acme\Courier\CourierManager::class;
+        }
+    }
+    ```
+  </Step>
+  <Step title="サービスプロバイダーでバインドする">
+    ```php
+    public function register(): void
+    {
+        $this->app->singleton(\Acme\Courier\CourierManager::class, function ($app) {
+            return new \Acme\Courier\CourierManager($app['config']['courier']);
+        });
+    }
+    ```
+  </Step>
+  <Step title="composer.json に登録する">
+    ```json
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Acme\\Courier\\CourierServiceProvider"
+            ],
+            "aliases": {
+                "Courier": "Acme\\Courier\\Facades\\Courier"
+            }
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+ファサードのメソッドにはPHPDocの `@method` アノテーションを付けることで、IDEの補完が有効になります。
+
+```php
+// ファサード経由でサービスを呼び出す
+use Acme\Courier\Facades\Courier;
+
+Courier::send('user@example.com', 'パッケージが届きました');
+$status = Courier::track('ABC-123');
+```
+
+## DeferrableProvider — 遅延読み込みの実装
+
+サービスコンテナへのバインディングのみを行うプロバイダーは、`DeferrableProvider` インターフェースを実装することで遅延読み込みを実現できます。サービスが実際に必要になるまでプロバイダーが読み込まれないため、アプリケーションのパフォーマンスが向上します。
+
+```php
+<?php
+
+namespace Acme\Courier;
+
+use Illuminate\Contracts\Support\DeferrableProvider;
+use Illuminate\Support\ServiceProvider;
+
+class CourierServiceProvider extends ServiceProvider implements DeferrableProvider
+{
+    public function register(): void
+    {
+        $this->app->singleton(CourierManager::class, function ($app) {
+            return new CourierManager($app['config']['courier']);
+        });
+    }
+
+    /**
+     * このプロバイダーが提供するサービスの一覧を返す
+     *
+     * @return array<int, string>
+     */
+    public function provides(): array
+    {
+        return [CourierManager::class];
+    }
+}
+```
+
+Laravelは遅延プロバイダーが提供するサービスのリストをコンパイルして保存します。`provides()` に列挙したサービスが解決されるときだけプロバイダーが読み込まれます。
+
+<Warning>
+  リソースの登録（ビュー、ルート、イベントリスナーなど）が必要なプロバイダーには `DeferrableProvider` を使わないでください。遅延読み込みされると、それらのリソースが登録されないままになります。
+</Warning>
+
+## パッケージのテスト
+
+パッケージ単体でテストする場合は [Orchestra Testbench](https://github.com/orchestral/testbench) を使います。通常のLaravelアプリケーション内にいるかのようにパッケージのテストを記述できます。
+
+```shell
+composer require --dev orchestra/testbench
+```
+
+テストケースで `getPackageProviders()` をオーバーライドしてパッケージのサービスプロバイダーを登録します。
+
+```php
+<?php
+
+namespace Acme\Courier\Tests;
+
+use Acme\Courier\CourierServiceProvider;
+use Orchestra\Testbench\TestCase as BaseTestCase;
+
+class TestCase extends BaseTestCase
+{
+    /**
+     * パッケージのサービスプロバイダーを登録する
+     */
+    protected function getPackageProviders($app): array
+    {
+        return [
+            CourierServiceProvider::class,
+        ];
+    }
+
+    /**
+     * パッケージのファサードエイリアスを登録する
+     */
+    protected function getPackageAliases($app): array
+    {
+        return [
+            'Courier' => \Acme\Courier\Facades\Courier::class,
+        ];
+    }
+
+    /**
+     * テスト用の環境設定
+     */
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('courier.api_key', 'test-key');
+    }
+}
+```
+
+```php
+<?php
+
+namespace Acme\Courier\Tests\Feature;
+
+use Acme\Courier\Facades\Courier;
+use Acme\Courier\Tests\TestCase;
+
+class CourierTest extends TestCase
+{
+    public function test_can_send_message(): void
+    {
+        $result = Courier::send('user@example.com', 'テストメッセージ');
+
+        $this->assertTrue($result);
+    }
+}
+```
+
+## Composerへの公開
+
+パッケージを [Packagist](https://packagist.org/) に公開するためのベストプラクティスです。
+
+**`composer.json` の基本設定**
+
+```json
+{
+    "name": "acme/courier",
+    "description": "A Laravel courier package",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0||^12.0||^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0||^10.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Acme\\Courier\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Acme\\Courier\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Acme\\Courier\\CourierServiceProvider"
+            ],
+            "aliases": {
+                "Courier": "Acme\\Courier\\Facades\\Courier"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
+```
+
+<Tip>
+  `illuminate/support` に依存することで、`illuminate/framework` 全体ではなくLaravelの必要なコンポーネントだけを依存に含められます。パッケージの依存ツリーを小さく保ちましょう。
+</Tip>
+
+**ディレクトリ構造の例**
+
+```
+acme/courier/
+├── config/
+│   └── courier.php
+├── database/
+│   └── migrations/
+│       └── 2024_01_01_000000_create_courier_logs_table.php
+├── lang/
+│   └── ja/
+│       └── messages.php
+├── resources/
+│   └── views/
+│       └── dashboard.blade.php
+├── routes/
+│   └── web.php
+├── src/
+│   ├── Console/
+│   │   └── Commands/
+│   │       └── InstallCommand.php
+│   ├── Facades/
+│   │   └── Courier.php
+│   ├── Http/
+│   │   └── Controllers/
+│   │       └── TrackingController.php
+│   ├── CourierManager.php
+│   └── CourierServiceProvider.php
+├── tests/
+│   ├── Feature/
+│   └── TestCase.php
+├── composer.json
+└── README.md
+```
+
+## 関連ページ
+
+<Card title="サービスプロバイダー" icon="plug" href="/jp/intermediate/service-providers">
+  サービスプロバイダーの `register` と `boot` メソッド、遅延プロバイダーの詳細を確認します。
+</Card>

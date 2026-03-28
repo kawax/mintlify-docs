@@ -225,6 +225,12 @@
                 ]
               },
               {
+                "group": "パッケージ開発",
+                "pages": [
+                  "jp/advanced/package-development"
+                ]
+              },
+              {
                 "group": "AI上級",
                 "pages": [
                   "jp/advanced/boost-custom-agent",
