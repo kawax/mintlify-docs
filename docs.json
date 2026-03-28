@@ -68,6 +68,12 @@
                 "pages": [
                   "jp/tutorial/testing"
                 ]
+              },
+              {
+                "group": "AI開発支援",
+                "pages": [
+                  "jp/tutorial/ai"
+                ]
               }
             ]
           },
