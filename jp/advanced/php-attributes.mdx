@@ -1,0 +1,642 @@
+---
+title: "PHPアトリビュート"
+description: "Laravel 13で導入・強化されたPHPアトリビュートを使って、ジョブやモデルの設定をより宣言的に記述する方法を解説します。"
+---
+
+## PHPアトリビュートとは
+
+PHPアトリビュート（PHP Attributes）は、PHP 8.0で導入されたネイティブのメタデータ構文です。クラス、メソッド、プロパティ、関数などに対して、`#[AttributeName]` の形式でメタ情報を付与できます。
+
+Laravelはフレームワーク本体でPHPアトリビュートを積極的に採用しており、ジョブやEloquentモデルの設定を宣言的に記述できます。Laravel 13（v13.2.0）ではキューアトリビュートがenumを受け入れるようになりました。従来のクラスプロパティやメソッドオーバーライドの代わりに、アトリビュートを使ってより読みやすく簡潔なコードを書けます。
+
+```php
+// 従来の書き方
+class ProcessOrder implements ShouldQueue
+{
+    public string $queue = 'orders';
+    public string $connection = 'redis';
+    public int $tries = 3;
+    public array $backoff = [30, 60, 120];
+}
+
+// アトリビュートを使った書き方
+#[Queue('orders')]
+#[Connection('redis')]
+#[Tries(3)]
+#[Backoff(30, 60, 120)]
+class ProcessOrder implements ShouldQueue
+{
+}
+```
+
+<Tip>
+  アトリビュートはPHP 8.0以降で利用できます。Laravel 13はPHP 8.2以上を必要とするため、すべての環境でアトリビュートを使用できます。
+</Tip>
+
+## キュー関連アトリビュート
+
+キュージョブに関するアトリビュートはすべて `Illuminate\Queue\Attributes` 名前空間にあります。
+
+### `#[Queue]` — キュー名を指定する
+
+ジョブが送られるデフォルトのキュー名を指定します。
+
+```php
+use Illuminate\Queue\Attributes\Queue;
+
+#[Queue('emails')]
+class SendWelcomeEmail implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function handle(): void
+    {
+        // ...
+    }
+}
+```
+
+v13.2.0以降、文字列の代わりにenumを渡すこともできます。
+
+```php
+enum QueueName: string
+{
+    case Emails = 'emails';
+    case Orders = 'orders';
+    case Notifications = 'notifications';
+}
+
+#[Queue(QueueName::Emails)]
+class SendWelcomeEmail implements ShouldQueue
+{
+    // ...
+}
+```
+
+<Info>
+  `#[Queue]` アトリビュートは `Attribute::TARGET_CLASS` をターゲットに設定されているため、クラスに対してのみ適用できます。
+</Info>
+
+### `#[Connection]` — コネクションを指定する
+
+ジョブが使用するデフォルトのキューコネクションを指定します。
+
+```php
+use Illuminate\Queue\Attributes\Connection;
+
+#[Connection('sqs')]
+class ProcessPayment implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function handle(): void
+    {
+        // ...
+    }
+}
+```
+
+こちらもenumを使えます。
+
+```php
+enum QueueConnection: string
+{
+    case Redis = 'redis';
+    case Sqs = 'sqs';
+    case Database = 'database';
+}
+
+#[Connection(QueueConnection::Sqs)]
+class ProcessPayment implements ShouldQueue
+{
+    // ...
+}
+```
+
+### `#[Backoff]` — リトライのバックオフ時間を指定する
+
+ジョブが失敗したときのリトライまでの待機時間（秒）を指定します。複数の値を渡すと、リトライごとに異なる待機時間を設定できます（可変長引数対応）。
+
+```php
+use Illuminate\Queue\Attributes\Backoff;
+
+// 固定の待機時間（全リトライ共通で60秒待機）
+#[Backoff(60)]
+class SendEmail implements ShouldQueue
+{
+    // ...
+}
+
+// リトライごとに異なる待機時間（指数バックオフ）
+#[Backoff(30, 60, 120)]
+class ProcessOrder implements ShouldQueue
+{
+    // ...
+}
+```
+
+`Backoff` クラスの実装を見ると、可変長引数を受け取る設計になっています。
+
+```php
+// Illuminate\Queue\Attributes\Backoff の実装
+#[Attribute(Attribute::TARGET_CLASS)]
+class Backoff
+{
+    public array|int $backoff;
+
+    public function __construct(array|int ...$backoff)
+    {
+        $this->backoff = count($backoff) === 1 ? $backoff[0] : $backoff;
+    }
+}
+```
+
+単一の値の場合は `int` として、複数の場合は `array` として格納されます。
+
+### `#[Tries]` — リトライ回数を指定する
+
+ジョブが失敗したときの最大リトライ回数を指定します。
+
+```php
+use Illuminate\Queue\Attributes\Tries;
+
+#[Tries(5)]
+class ProcessPayment implements ShouldQueue
+{
+    // ...
+}
+```
+
+### `#[Timeout]` — タイムアウトを指定する
+
+ジョブの最大実行時間（秒）を指定します。この時間を超えるとジョブは強制終了されます。
+
+```php
+use Illuminate\Queue\Attributes\Timeout;
+
+#[Timeout(120)]
+class GenerateReport implements ShouldQueue
+{
+    // ...
+}
+```
+
+### `#[MaxExceptions]` — 許容例外数を指定する
+
+指定した回数以上の例外が発生した場合にジョブを失敗とみなします。`#[Tries]` と組み合わせて使います。
+
+```php
+use Illuminate\Queue\Attributes\MaxExceptions;
+use Illuminate\Queue\Attributes\Tries;
+
+#[Tries(10)]
+#[MaxExceptions(3)]
+class ProcessWebhook implements ShouldQueue
+{
+    // ...
+}
+```
+
+### `#[UniqueFor]` — ユニーク期間を指定する
+
+ジョブの重複実行を防ぐロック期間（秒）を指定します。`ShouldBeUnique` と組み合わせて使います。
+
+```php
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Queue\Attributes\UniqueFor;
+
+#[UniqueFor(3600)]
+class SyncUserData implements ShouldQueue, ShouldBeUnique
+{
+    // ...
+}
+```
+
+### `#[DeleteWhenMissingModels]` — モデル未存在時に削除する
+
+ジョブが依存するEloquentモデルが見つからない場合、ジョブを失敗ではなく削除（スキップ）として処理します。
+
+```php
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+
+#[DeleteWhenMissingModels]
+class SendOrderConfirmation implements ShouldQueue
+{
+    public function __construct(
+        protected Order $order,
+    ) {}
+
+    public function handle(): void
+    {
+        // $order が存在しない場合はこのジョブが削除される
+    }
+}
+```
+
+### `#[WithoutRelations]` — リレーションを除外する
+
+ジョブのシリアライズ時にモデルのリレーションを含めないようにします。キューへの送信データを軽量化できます。
+
+```php
+use Illuminate\Queue\Attributes\WithoutRelations;
+
+#[WithoutRelations]
+class ExportUser implements ShouldQueue
+{
+    public function __construct(
+        protected User $user,
+    ) {}
+}
+```
+
+### `#[FailOnTimeout]` — タイムアウト時に失敗とする
+
+タイムアウトが発生した場合にジョブを失敗として記録します（デフォルトではタイムアウトは失敗として記録されません）。
+
+```php
+use Illuminate\Queue\Attributes\FailOnTimeout;
+use Illuminate\Queue\Attributes\Timeout;
+
+#[Timeout(30)]
+#[FailOnTimeout]
+class ProcessLongTask implements ShouldQueue
+{
+    // ...
+}
+```
+
+## 複数のキューアトリビュートを組み合わせる
+
+これらのアトリビュートを組み合わせて、ジョブの挙動を宣言的に設定できます。
+
+```php
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Connection;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Queue\Attributes\FailOnTimeout;
+use Illuminate\Queue\Attributes\MaxExceptions;
+use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\Tries;
+
+#[Queue('payments')]
+#[Connection('redis')]
+#[Tries(3)]
+#[Backoff(30, 60, 120)]
+#[Timeout(60)]
+#[MaxExceptions(2)]
+#[DeleteWhenMissingModels]
+class ProcessPayment implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function __construct(
+        protected Order $order,
+    ) {}
+
+    public function handle(PaymentService $payment): void
+    {
+        $payment->charge($this->order);
+    }
+}
+```
+
+## Eloquent関連アトリビュート
+
+Eloquentモデルのアトリビュートは `Illuminate\Database\Eloquent\Attributes` 名前空間にあります。Laravel 13では多数のアトリビュートが追加されています。
+
+### `#[ScopedBy]` — グローバルスコープを指定する
+
+モデルに自動的に適用するグローバルスコープクラスをアトリビュートで指定します。継承をサポートしており、`IS_REPEATABLE` フラグで複数のスコープを指定できます。
+
+```php
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+
+#[ScopedBy(ActiveScope::class)]
+class User extends Model
+{
+    // booted() でスコープを登録する必要がなくなる
+}
+```
+
+複数のスコープを付与する場合、アトリビュートを繰り返すか配列で渡します。
+
+```php
+// 繰り返し指定（IS_REPEATABLE 対応）
+#[ScopedBy(ActiveScope::class)]
+#[ScopedBy(VerifiedScope::class)]
+class User extends Model
+{
+}
+
+// 配列でまとめて指定
+#[ScopedBy([ActiveScope::class, VerifiedScope::class])]
+class User extends Model
+{
+}
+```
+
+従来の `booted()` メソッドとの比較です。
+
+```php
+// 従来の書き方
+class User extends Model
+{
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ActiveScope);
+        static::addGlobalScope(new VerifiedScope);
+    }
+}
+```
+
+### `#[ObservedBy]` — オブザーバーを指定する
+
+モデルに関連付けるオブザーバークラスをアトリビュートで指定します。`ScopedBy` と同様に `IS_REPEATABLE` です。
+
+```php
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+
+#[ObservedBy(UserObserver::class)]
+class User extends Model
+{
+}
+```
+
+複数のオブザーバーも指定できます。
+
+```php
+#[ObservedBy(UserObserver::class)]
+#[ObservedBy(AuditObserver::class)]
+class User extends Model
+{
+}
+```
+
+従来の `AppServiceProvider` での登録が不要になります。
+
+```php
+// 従来の書き方（AppServiceProvider）
+public function boot(): void
+{
+    User::observe(UserObserver::class);
+}
+```
+
+### `#[UseEloquentBuilder]` — カスタムクエリビルダーを指定する
+
+モデルが使用するカスタムEloquentビルダーをアトリビュートで指定します。
+
+```php
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+
+#[UseEloquentBuilder(UserQueryBuilder::class)]
+class User extends Model
+{
+}
+```
+
+```php
+namespace App\Builders;
+
+use Illuminate\Database\Eloquent\Builder;
+
+class UserQueryBuilder extends Builder
+{
+    public function active(): static
+    {
+        return $this->where('active', true);
+    }
+
+    public function verified(): static
+    {
+        return $this->whereNotNull('email_verified_at');
+    }
+}
+```
+
+```php
+// 使用例（型安全にカスタムメソッドを呼べる）
+$users = User::query()->active()->verified()->get();
+```
+
+### `#[CollectedBy]` — カスタムコレクションを指定する
+
+モデルのコレクションとして使用するカスタムコレクションクラスをアトリビュートで指定します。
+
+```php
+use Illuminate\Database\Eloquent\Attributes\CollectedBy;
+
+#[CollectedBy(UserCollection::class)]
+class User extends Model
+{
+}
+```
+
+```php
+namespace App\Collections;
+
+use Illuminate\Database\Eloquent\Collection;
+
+class UserCollection extends Collection
+{
+    public function admins(): static
+    {
+        return $this->filter(fn (User $user) => $user->is_admin);
+    }
+
+    public function active(): static
+    {
+        return $this->filter(fn (User $user) => $user->active);
+    }
+}
+```
+
+### `#[Table]` — テーブル設定をまとめて指定する
+
+テーブル名、主キー、タイムスタンプなど、複数のテーブル関連設定を1つのアトリビュートで指定できます。
+
+```php
+use Illuminate\Database\Eloquent\Attributes\Table;
+
+#[Table(name: 'system_users', key: 'user_id', timestamps: false)]
+class SystemUser extends Model
+{
+}
+```
+
+`Table` アトリビュートで設定できるオプションは以下のとおりです。
+
+| パラメーター | 対応するプロパティ | 説明 |
+|---|---|---|
+| `name` | `$table` | テーブル名 |
+| `key` | `$primaryKey` | 主キーのカラム名 |
+| `keyType` | `$keyType` | 主キーの型（`'int'`、`'string'` など） |
+| `incrementing` | `$incrementing` | 主キーの自動インクリメント |
+| `timestamps` | `$timestamps` | タイムスタンプの有効/無効 |
+| `dateFormat` | `$dateFormat` | 日付フォーマット |
+
+### `#[Scope]` — メソッドをローカルスコープとして定義する
+
+`scope` プレフィックスなしのメソッドをEloquentのローカルスコープとして定義できます。
+
+```php
+use Illuminate\Database\Eloquent\Attributes\Scope;
+
+class User extends Model
+{
+    #[Scope]
+    public function active(Builder $query): void
+    {
+        $query->where('active', true);
+    }
+
+    #[Scope]
+    public function verified(Builder $query): void
+    {
+        $query->whereNotNull('email_verified_at');
+    }
+}
+```
+
+```php
+// 従来はメソッド名に「scope」プレフィックスが必要だった
+// public function scopeActive(Builder $query): void
+
+// アトリビュートを使うと、メソッド名がそのままスコープ名になる
+User::query()->active()->verified()->get();
+```
+
+### `#[UseFactory]` — ファクトリクラスを指定する
+
+モデルが使用するカスタムファクトリクラスをアトリビュートで指定します。
+
+```php
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+
+#[UseFactory(UserFactory::class)]
+class User extends Model
+{
+}
+```
+
+### その他のEloquentアトリビュート
+
+| アトリビュート | 説明 |
+|---|---|
+| `#[Fillable(...$attributes)]` | マスアサインメントで許可するカラムを指定 |
+| `#[Guarded(...$attributes)]` | マスアサインメントで保護するカラムを指定 |
+| `#[Unguarded]` | マスアサインメントの保護を無効化 |
+| `#[Hidden(...$attributes)]` | シリアライズ時に除外するカラムを指定 |
+| `#[Visible(...$attributes)]` | シリアライズ時に含めるカラムを指定 |
+| `#[Appends(...$attributes)]` | シリアライズ時に追加するアクセサを指定 |
+| `#[Touches(...$relations)]` | 更新時に `updated_at` を更新するリレーションを指定 |
+| `#[WithoutTimestamps]` | タイムスタンプを無効化 |
+| `#[WithoutIncrementing]` | 主キーの自動インクリメントを無効化 |
+| `#[DateFormat(format: '...')]` | 日付フォーマットを指定 |
+| `#[UsePolicy(policyClass: '...')]` | 関連するポリシークラスを指定 |
+| `#[UseResource(resourceClass: '...')]` | 関連するAPIリソースクラスを指定 |
+| `#[UseResourceCollection(resourceCollectionClass: '...')]` | 関連するリソースコレクションクラスを指定 |
+
+## Enumサポート（v13.2.0で追加）
+
+v13.2.0では、`#[Queue]` と `#[Connection]` がenumを受け入れるようになりました。これにより、文字列リテラルの代わりにPHP enumを使って型安全にキューとコネクションを指定できます。
+
+```php
+// キュー名のenum定義
+enum Queue: string
+{
+    case Default = 'default';
+    case High = 'high';
+    case Low = 'low';
+    case Emails = 'emails';
+    case Orders = 'orders';
+}
+
+// コネクションのenum定義
+enum Connection: string
+{
+    case Redis = 'redis';
+    case Sqs = 'sqs';
+    case Database = 'database';
+    case Sync = 'sync';
+}
+```
+
+```php
+use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Queue\Attributes\Connection;
+
+// enumを使った型安全な指定
+#[Queue(Queue::Orders)]
+#[Connection(Connection::Redis)]
+class ProcessOrder implements ShouldQueue
+{
+    // ...
+}
+```
+
+<Tip>
+  enumを使うことで、キュー名やコネクション名のタイポを防ぎ、IDEの補完も利用できます。アプリケーション全体でキュー名とコネクション名を一元管理するのに便利です。
+</Tip>
+
+## 従来のクラスプロパティとの比較
+
+### アトリビュートのメリット
+
+- **宣言的** — クラスの冒頭を見ればジョブの挙動が一目でわかる
+- **型安全** — enumを使えばIDEの補完と型チェックが効く
+- **継承との親和性** — 親クラスのアトリビュートを子クラスで上書きできる
+- **コードの削減** — プロパティ宣言やメソッドオーバーライドが不要
+
+### アトリビュートのデメリット
+
+- **動的な値を設定できない** — アトリビュートの引数はコンパイル時定数のみ。変数や設定ファイルの値は使えない
+- **読み慣れが必要** — チームでPHP 8のアトリビュート構文に慣れが必要な場合もある
+
+### 動的な値が必要な場合
+
+実行時に値を決定したい場合は、従来のメソッドオーバーライドを使います。
+
+```php
+class ProcessOrder implements ShouldQueue
+{
+    // 動的なバックオフはメソッドで定義する
+    public function backoff(): array
+    {
+        return [
+            config('queue.backoff.first'),
+            config('queue.backoff.second'),
+        ];
+    }
+}
+```
+
+<Warning>
+  アトリビュートはPHPのコンパイル時に解析されます。`config()` や `env()` のような実行時の値を使うことはできません。動的な設定が必要な場合は、引き続きクラスプロパティやメソッドを使用してください。
+</Warning>
+
+## 実装の仕組み
+
+Laravelは内部でReflection APIを使ってアトリビュートを読み取ります。キューワーカーがジョブをディスパッチする際に、`ReadsQueueAttributes` トレイト（`InteractsWithQueue` に含まれる）がリフレクションでアトリビュートを検出し、対応するプロパティに値を設定します。
+
+```php
+// 内部での読み取りイメージ（簡略化）
+$reflection = new ReflectionClass($job);
+$attributes = $reflection->getAttributes(Queue::class);
+
+foreach ($attributes as $attribute) {
+    $instance = $attribute->newInstance();
+    $job->queue = $instance->queue instanceof UnitEnum
+        ? $instance->queue->value
+        : $instance->queue;
+}
+```
+
+Eloquentモデルのアトリビュートも同様に、`Model::booted()` 相当のタイミングでリフレクションにより読み取られます。
+
+## 次のステップ
+
+<Card title="中級: キューとジョブ" icon="layer-group" href="/jp/intermediate/queues">
+  Laravelのキューシステムの基本的な使い方を学びます。
+</Card>

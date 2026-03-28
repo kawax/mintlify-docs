@@ -183,6 +183,12 @@
                   "jp/advanced/conditionable",
                   "jp/advanced/higher-order-messages"
                 ]
+              },
+              {
+                "group": "Laravel 13 新機能",
+                "pages": [
+                  "jp/advanced/php-attributes"
+                ]
               }
             ]
           },
