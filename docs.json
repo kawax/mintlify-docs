@@ -303,13 +303,34 @@
                 "group": "Architecture",
                 "pages": [
                   "en/intermediate/service-container",
+                  "en/intermediate/service-providers",
                   "en/intermediate/facades"
+                ]
+              },
+              {
+                "group": "Security",
+                "pages": [
+                  "en/intermediate/authorization"
+                ]
+              },
+              {
+                "group": "Mail & Notifications",
+                "pages": [
+                  "en/intermediate/mail",
+                  "en/intermediate/notifications"
                 ]
               },
               {
                 "group": "Async Processing",
                 "pages": [
-                  "en/intermediate/queues"
+                  "en/intermediate/queues",
+                  "en/intermediate/events"
+                ]
+              },
+              {
+                "group": "Caching",
+                "pages": [
+                  "en/intermediate/cache"
                 ]
               }
             ]
