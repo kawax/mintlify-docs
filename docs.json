@@ -220,7 +220,8 @@
                 "group": "AI上級",
                 "pages": [
                   "jp/advanced/boost-custom-agent",
-                  "jp/advanced/mcp-server"
+                  "jp/advanced/mcp-server",
+                  "jp/advanced/ai-sdk-custom-provider"
                 ]
               }
             ]

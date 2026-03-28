@@ -1,0 +1,436 @@
+---
+title: "AI SDKのカスタムプロバイダーを作る"
+description: "Laravel AI SDKのソースコードを読み解き、標準で提供されていないAIサービスに対応するカスタムプロバイダーを実装する方法を解説します。"
+---
+
+## カスタムプロバイダーが必要な場面
+
+Laravel AI SDKは OpenAI、Anthropic、Gemini、Mistral など主要なAIサービスを標準でサポートしています。しかし次のようなケースでは標準プロバイダーでは対応できません。
+
+- 社内に構築したオンプレミスの推論サーバー（OpenAI互換APIを持つものを含む）
+- まだ公式対応されていない新興のAIサービス
+- 社内のモデルゲートウェイや課金管理レイヤーを経由させたい
+
+このような場合に、カスタムプロバイダーを実装してSDKの `AiManager` に登録することで、標準プロバイダーと同じAPIで利用できます。
+
+## アーキテクチャの概要
+
+### 2層構造
+
+Laravel AI SDKはプロバイダーとゲートウェイの2層で構成されています。
+
+| レイヤー | 役割 | 例 |
+| --- | --- | --- |
+| **Provider** | アプリ側のインターフェース。モデル名の解決、設定の保持 | `OpenAiProvider`、`AnthropicProvider` |
+| **Gateway** | 実際のAPIリクエストを送信する | `PrismGateway`、`OpenAiGateway` |
+
+すべてのプロバイダーは抽象クラス `Laravel\Ai\Providers\Provider` を継承し、機能ごとのコントラクト（インターフェース）を実装します。
+
+### コントラクト一覧
+
+提供したい機能に応じて必要なコントラクトだけを実装します。
+
+| コントラクト | 名前空間 | 機能 |
+| --- | --- | --- |
+| `TextProvider` | `Laravel\Ai\Contracts\Providers\TextProvider` | テキスト生成・エージェント |
+| `EmbeddingProvider` | `Laravel\Ai\Contracts\Providers\EmbeddingProvider` | ベクトル埋め込み生成 |
+| `ImageProvider` | `Laravel\Ai\Contracts\Providers\ImageProvider` | 画像生成 |
+| `AudioProvider` | `Laravel\Ai\Contracts\Providers\AudioProvider` | 音声合成（TTS） |
+| `TranscriptionProvider` | `Laravel\Ai\Contracts\Providers\TranscriptionProvider` | 音声認識（STT） |
+
+<Info>
+  ほとんどの場合は `TextProvider` だけ実装すれば十分です。
+</Info>
+
+## TextProviderコントラクト
+
+テキスト生成プロバイダーが実装するインターフェースです（`src/Contracts/Providers/TextProvider.php`）。
+
+```php
+interface TextProvider
+{
+    public function prompt(AgentPrompt $prompt): AgentResponse;
+    public function stream(AgentPrompt $prompt): StreamableAgentResponse;
+    public function textGateway(): TextGateway;
+    public function useTextGateway(TextGateway $gateway): self;
+    public function defaultTextModel(): string;
+    public function cheapestTextModel(): string;
+    public function smartestTextModel(): string;
+}
+```
+
+`prompt()` と `stream()` の実装は既存のトレイト（`GeneratesText`、`StreamsText`）に任せられるため、実際に実装が必要なのはモデル名を返す3つのメソッドだけです。
+
+## 実装例：OpenAI互換APIのカスタムプロバイダー
+
+社内構築のOpenAI互換推論サーバーを `my-inference` というプロバイダーとして登録する例です。
+
+<Steps>
+  <Step title="プロバイダークラスを作成する">
+    `app/Ai/Providers/MyInferenceProvider.php` を作成します。
+
+    ```php
+    <?php
+
+    declare(strict_types=1);
+
+    namespace App\Ai\Providers;
+
+    use Illuminate\Contracts\Events\Dispatcher;
+    use Laravel\Ai\Contracts\Providers\EmbeddingProvider;
+    use Laravel\Ai\Contracts\Providers\TextProvider;
+    use Laravel\Ai\Gateway\Prism\PrismGateway;
+    use Laravel\Ai\Providers\Concerns\GeneratesEmbeddings;
+    use Laravel\Ai\Providers\Concerns\GeneratesText;
+    use Laravel\Ai\Providers\Concerns\HasEmbeddingGateway;
+    use Laravel\Ai\Providers\Concerns\HasTextGateway;
+    use Laravel\Ai\Providers\Concerns\StreamsText;
+    use Laravel\Ai\Providers\Provider;
+
+    class MyInferenceProvider extends Provider implements EmbeddingProvider, TextProvider
+    {
+        use GeneratesEmbeddings;
+        use GeneratesText;
+        use HasEmbeddingGateway;
+        use HasTextGateway;
+        use StreamsText;
+
+        public function __construct(array $config, Dispatcher $events)
+        {
+            parent::__construct(new PrismGateway($events), $config, $events);
+        }
+
+        public function defaultTextModel(): string
+        {
+            return $this->config['models']['text']['default'] ?? 'llama3.3-70b';
+        }
+
+        public function cheapestTextModel(): string
+        {
+            return $this->config['models']['text']['cheapest'] ?? 'llama3.2-3b';
+        }
+
+        public function smartestTextModel(): string
+        {
+            return $this->config['models']['text']['smartest'] ?? 'llama3.3-70b';
+        }
+
+        public function defaultEmbeddingsModel(): string
+        {
+            return $this->config['models']['embeddings']['default'] ?? 'nomic-embed-text';
+        }
+
+        public function defaultEmbeddingsDimensions(): int
+        {
+            return $this->config['models']['embeddings']['dimensions'] ?? 768;
+        }
+    }
+    ```
+
+    <Info>
+      `PrismGateway` は [Prism](https://github.com/prism-php/prism) を使いOpenAI互換APIに対応しています。独自の非互換APIを持つサービスには、後述するカスタムゲートウェイを使います。
+    </Info>
+  </Step>
+
+  <Step title="AppServiceProviderに登録する">
+    `App\Providers\AppServiceProvider` の `boot` メソッドで `extend()` を使って登録します。
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Ai\Providers\MyInferenceProvider;
+    use Illuminate\Contracts\Events\Dispatcher;
+    use Illuminate\Support\ServiceProvider;
+    use Laravel\Ai\AiManager;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            $this->app->make(AiManager::class)->extend(
+                'my-inference',
+                fn (array $config) => new MyInferenceProvider(
+                    $config,
+                    $this->app->make(Dispatcher::class)
+                )
+            );
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="config/ai.phpにプロバイダーを追加する">
+    ```php
+    'providers' => [
+        // ...既存のプロバイダー...
+
+        'my-inference' => [
+            'driver' => 'my-inference',
+            'key'    => env('MY_INFERENCE_API_KEY'),
+            'url'    => env('MY_INFERENCE_URL', 'http://localhost:8080/v1'),
+        ],
+    ],
+    ```
+
+    `.env` にも追加します。
+
+    ```ini
+    MY_INFERENCE_API_KEY=your-api-key
+    MY_INFERENCE_URL=https://inference.example.internal/v1
+    ```
+  </Step>
+
+  <Step title="エージェントから使う">
+    登録後は `provider()` でプロバイダー名を指定するだけで標準プロバイダーと同じように使えます。
+
+    ```php
+    use App\Ai\Agents\SummaryAgent;
+    use Laravel\Ai\Ai;
+
+    $response = Ai::agent(SummaryAgent::class)
+        ->provider('my-inference')
+        ->prompt('この記事を要約してください。');
+
+    echo $response->text;
+    ```
+
+    デフォルトのプロバイダーとして使う場合は `config/ai.php` の `default` キーを変更します。
+
+    ```php
+    'default' => 'my-inference',
+    ```
+  </Step>
+</Steps>
+
+## カスタムゲートウェイの実装
+
+OpenAI互換ではない独自APIを持つサービスには、`TextGateway` コントラクトを実装したカスタムゲートウェイが必要です。
+
+### TextGatewayコントラクト
+
+`src/Contracts/Gateway/TextGateway.php` が定義するインターフェースです。
+
+```php
+interface TextGateway
+{
+    public function generateText(
+        Provider $provider,
+        ?string $model,
+        string $systemPrompt,
+        array $messages,
+        array $tools,
+        ?ObjectSchema $schema,
+        TextGenerationOptions $options,
+        ?int $timeout,
+    ): GatewayResponse;
+
+    public function stream(
+        Provider $provider,
+        ?string $model,
+        string $systemPrompt,
+        array $messages,
+        array $tools,
+        ?ObjectSchema $schema,
+        TextGenerationOptions $options,
+        ?int $timeout,
+    ): Generator;
+
+    public function onToolInvocation(
+        Closure $invoking,
+        Closure $invoked,
+    ): void;
+}
+```
+
+### カスタムゲートウェイの実装例
+
+独自の推論APIにHTTPリクエストを送るシンプルなゲートウェイの骨格です。
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Ai\Gateway;
+
+use Closure;
+use Generator;
+use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Support\Facades\Http;
+use Laravel\Ai\Contracts\Gateway\TextGateway;
+use Laravel\Ai\Gateway\TextGenerationOptions;
+use Laravel\Ai\ObjectSchema;
+use Laravel\Ai\Providers\Provider;
+use Laravel\Ai\Responses\GatewayResponse;
+use Laravel\Ai\Responses\Usage;
+
+class MyInferenceGateway implements TextGateway
+{
+    protected ?Closure $onInvoking = null;
+    protected ?Closure $onInvoked = null;
+
+    public function generateText(
+        Provider $provider,
+        ?string $model,
+        string $systemPrompt,
+        array $messages,
+        array $tools,
+        ?ObjectSchema $schema,
+        TextGenerationOptions $options,
+        ?int $timeout,
+    ): GatewayResponse {
+        $credentials = $provider->providerCredentials();
+        $config      = $provider->additionalConfiguration();
+
+        $response = Http::withToken($credentials['key'])
+            ->baseUrl($config['url'])
+            ->post('/chat/completions', [
+                'model'    => $model ?? $provider->defaultTextModel(),
+                'messages' => $this->formatMessages($systemPrompt, $messages),
+            ]);
+
+        $data = $response->json();
+
+        return new GatewayResponse(
+            text: $data['choices'][0]['message']['content'] ?? '',
+            usage: new Usage(
+                inputTokens: $data['usage']['prompt_tokens'] ?? 0,
+                outputTokens: $data['usage']['completion_tokens'] ?? 0,
+            ),
+        );
+    }
+
+    public function stream(
+        Provider $provider,
+        ?string $model,
+        string $systemPrompt,
+        array $messages,
+        array $tools,
+        ?ObjectSchema $schema,
+        TextGenerationOptions $options,
+        ?int $timeout,
+    ): Generator {
+        // ストリーミングの実装（省略）
+        yield '';
+    }
+
+    public function onToolInvocation(Closure $invoking, Closure $invoked): void
+    {
+        $this->onInvoking = $invoking;
+        $this->onInvoked  = $invoked;
+    }
+
+    protected function formatMessages(string $systemPrompt, array $messages): array
+    {
+        $formatted = [['role' => 'system', 'content' => $systemPrompt]];
+
+        foreach ($messages as $message) {
+            $formatted[] = [
+                'role'    => $message->role->value,
+                'content' => $message->content,
+            ];
+        }
+
+        return $formatted;
+    }
+}
+```
+
+カスタムゲートウェイを使うようにプロバイダーを修正します。
+
+```php
+public function __construct(array $config, Dispatcher $events)
+{
+    parent::__construct(new MyInferenceGateway, $config, $events);
+}
+```
+
+<Warning>
+  ツール呼び出し（function calling）をサポートする場合は `generateText()` の中でツールの実行と再帰的なメッセージ送信も実装が必要です。`PrismGateway` の実装（`src/Gateway/Prism/PrismGateway.php`）を参照してください。
+</Warning>
+
+## テスト方法
+
+### Ai::fake() を使う
+
+カスタムプロバイダーを使うエージェントのテストには、SDKが提供する `Ai::fake()` をそのまま使えます。カスタムプロバイダーかどうかに関係なく、フェイクゲートウェイがプロバイダーにセットされます。
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Ai\Agents\SummaryAgent;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Ai\Ai;
+use Tests\TestCase;
+
+class SummaryAgentTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_summary_agent_returns_text(): void
+    {
+        Ai::fake([
+            SummaryAgent::class => 'これは要約です。',
+        ]);
+
+        $response = Ai::agent(SummaryAgent::class)
+            ->provider('my-inference')
+            ->prompt('長い記事のテキスト...');
+
+        $this->assertEquals('これは要約です。', $response->text);
+
+        Ai::assertPrompted(SummaryAgent::class);
+    }
+}
+```
+
+### extend() を使ったモックプロバイダー
+
+`extend()` を使って、テスト用のプロバイダーをコンテナから登録することもできます。
+
+```php
+public function test_with_mock_provider(): void
+{
+    $this->app->make(AiManager::class)->extend(
+        'my-inference',
+        function (array $config) {
+            $gateway = $this->app->make(\Laravel\Ai\Gateway\Prism\PrismGateway::class);
+            $events  = $this->app->make(\Illuminate\Contracts\Events\Dispatcher::class);
+
+            return new MyInferenceProvider($config, $events);
+        }
+    );
+
+    // テストコード
+}
+```
+
+## 参考リンク
+
+<Card
+  title="OllamaProvider.php — シンプルな実装例"
+  icon="github"
+  href="https://github.com/laravel/ai/blob/0.x/src/Providers/OllamaProvider.php"
+>
+  ローカルモデルサーバーに接続するプロバイダーの最小構成です。カスタムプロバイダー実装の参考になります。
+</Card>
+
+<Card
+  title="PrismGateway.php — ゲートウェイの実装例"
+  icon="github"
+  href="https://github.com/laravel/ai/blob/0.x/src/Gateway/Prism/PrismGateway.php"
+>
+  ツール呼び出しやストリーミングを含む本格的なゲートウェイの実装です。
+</Card>
+
+<Card
+  title="TextProvider Contract"
+  icon="github"
+  href="https://github.com/laravel/ai/blob/0.x/src/Contracts/Providers/TextProvider.php"
+>
+  テキスト生成プロバイダーが実装するインターフェースの定義です。
+</Card>
