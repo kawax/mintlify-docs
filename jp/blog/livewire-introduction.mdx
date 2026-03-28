@@ -1,6 +1,6 @@
 ---
-title: "Livewire 3入門 — JavaScriptなしでリアクティブなUIを作る"
-description: "LaravelのファーストパーティパッケージLivewire 3を使って、JavaScriptを書かずにインタラクティブなUIを構築する方法を、インストールから実践的なコード例まで解説します。"
+title: "Livewire 4入門 — JavaScriptなしでリアクティブなUIを作る"
+description: "LaravelのファーストパーティパッケージLivewire 4を使って、JavaScriptを書かずにインタラクティブなUIを構築する方法を、インストールから実践的なコード例まで解説します。"
 ---
 
 ## Livewireとは
@@ -10,7 +10,7 @@ Laravelで動的なUIを作ろうとすると、以前はVue.jsやReactなどの
 **Livewire**はその問題を解決するLaravelのファーストパーティパッケージです。PHPとBladeだけでリアクティブなUIを構築できます。フォームのリアルタイムバリデーション、ライブ検索、カウンターなど、従来であればJavaScriptが必要だった機能を、すべてPHPで実装できます。
 
 <Info>
-  Livewire 3はLaravel 10以降、PHP 8.1以降で動作します。現在の最新バージョンはLivewire 3です。
+  Livewire 4はLaravel 10以降、PHP 8.1以降で動作します。現在の最新バージョンはLivewire 4です。
 </Info>
 
 ### 仕組みの概要
@@ -143,7 +143,7 @@ new class extends Component {
 </div>
 ```
 
-デフォルトでは入力のたびにサーバーへリクエストが送られます。リクエストを減らしたい場合は修飾子を使います。
+デフォルトでは `wire:model` はアクション（フォーム送信など）が実行されたときにのみサーバーと同期します。入力のたびに同期させたい場合は `.live` 修飾子を追加します。
 
 | 記法 | 挙動 |
 |------|------|
@@ -198,7 +198,7 @@ new class extends Component {
 
 ## リアルタイムバリデーション
 
-Livewire 3では `#[Validate]` アトリビュートでプロパティにバリデーションルールを直接定義できます。
+Livewire 4では `#[Validate]` アトリビュートでプロパティにバリデーションルールを直接定義できます。
 
 ```blade
 <?php
