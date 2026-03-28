@@ -1,0 +1,411 @@
+---
+title: "Laravel 10 から 11 へのアップグレード"
+description: "Laravel 10から11へのアップグレード手順と主要な変更点の解説"
+---
+
+## はじめに
+
+Laravel 11 は 2024年3月にリリースされました。このガイドでは Laravel 10.x から 11.x へのアップグレード手順を説明します。
+
+<Info>
+  アップグレードに必要な推定時間は **約15分** です。ただし、破壊的変更がアプリケーションに与える影響は規模や使用している機能によって異なります。
+</Info>
+
+### Laravel Shift を使った自動アップグレード
+
+[Laravel Shift](https://laravelshift.com/) を使ってアップグレードを自動化することもできます。Shift はアプリケーションの依存関係や設定ファイルを自動的に更新してくれます。
+
+---
+
+## 影響度別の変更点
+
+### 影響度: 高
+
+- 依存関係の更新
+- アプリケーション構造の変更
+- 浮動小数点型の変更
+- カラム変更時の属性保持
+- SQLite 最小バージョン
+- Sanctum の更新
+
+### 影響度: 中
+
+- Carbon 3
+- パスワードの再ハッシュ
+- 秒単位のレート制限
+- Spatie Once パッケージ
+
+### 影響度: 低
+
+- Doctrine DBAL の削除
+- Eloquent モデルの `casts` メソッド
+- 空間型の変更
+- `Enumerable` コントラクト
+- `UserProvider` コントラクト
+- `Authenticatable` コントラクト
+
+---
+
+## アップグレード手順
+
+### 依存関係の更新
+
+**影響度: 高**
+
+`composer.json` の以下の依存関係を更新してください。
+
+```json
+{
+  "require": {
+    "laravel/framework": "^11.0",
+    "nunomaduro/collision": "^8.1"
+  }
+}
+```
+
+パッケージを使用している場合はあわせて更新してください。
+
+```json
+{
+  "require": {
+    "laravel/breeze": "^2.0",
+    "laravel/cashier": "^15.0",
+    "laravel/dusk": "^8.0",
+    "laravel/jetstream": "^5.0",
+    "laravel/octane": "^2.3",
+    "laravel/passport": "^12.0",
+    "laravel/sanctum": "^4.0",
+    "laravel/scout": "^10.0",
+    "laravel/spark-stripe": "^5.0",
+    "laravel/telescope": "^5.0",
+    "livewire/livewire": "^3.4",
+    "inertiajs/inertia-laravel": "^1.0"
+  }
+}
+```
+
+更新後、以下のコマンドで依存関係をインストールします。
+
+```shell
+composer update
+```
+
+Cashier Stripe、Passport、Sanctum、Spark Stripe、Telescope を使用している場合は、マイグレーションをアプリケーションにパブリッシュする必要があります。
+
+```shell
+php artisan vendor:publish --tag=cashier-migrations
+php artisan vendor:publish --tag=passport-migrations
+php artisan vendor:publish --tag=sanctum-migrations
+php artisan vendor:publish --tag=spark-migrations
+php artisan vendor:publish --tag=telescope-migrations
+```
+
+Laravel インストーラーを使用している場合は、あわせて更新してください。
+
+```shell
+composer global require laravel/installer:^5.6
+```
+
+以前 `doctrine/dbal` を手動で追加していた場合は削除できます。Laravel 11 ではこのパッケージへの依存がなくなりました。
+
+---
+
+## PHPバージョン要件
+
+**影響度: 高**
+
+Laravel 11 では **PHP 8.2.0 以上** が必要です。また、Laravel の HTTP クライアントには **curl 7.34.0 以上** が必要です。
+
+---
+
+## アプリケーション構造の変更
+
+**影響度: 高**
+
+Laravel 11 ではデフォルトのアプリケーション構造が簡素化されました。サービスプロバイダー、ミドルウェア、設定ファイルの数が大幅に削減されています。
+
+ただし、Laravel 10 のアプリケーションを Laravel 11 にアップグレードする際に、アプリケーション構造の移行を試みることは **推奨しません**。Laravel 11 は Laravel 10 のアプリケーション構造もサポートするように設計されています。
+
+主な構造的変更点:
+
+- `bootstrap/app.php` でミドルウェア、例外ハンドラー、ルーティングを直接設定するように変更
+- `app/Http/Kernel.php` が廃止され `bootstrap/app.php` に統合
+- デフォルトのサービスプロバイダー数が削減され `bootstrap/providers.php` で管理
+- `config/` ディレクトリのファイル数が削減（必要に応じて `php artisan config:publish` で公開可能）
+
+---
+
+## 破壊的変更 (Breaking Changes)
+
+### 認証
+
+#### パスワードの再ハッシュ
+
+**影響度: 中**
+
+Laravel 11 では、認証時にハッシュアルゴリズムの「ワークファクター」が変更されていた場合、自動的にパスワードを再ハッシュします。
+
+`User` モデルのパスワードフィールドの名前が `password` 以外の場合は、モデルの `authPasswordName` プロパティで指定してください。
+
+```php
+class User extends Authenticatable
+{
+    protected $authPasswordName = 'custom_password_field';
+}
+```
+
+この機能を無効にするには、`config/hashing.php` に以下を追加してください。
+
+```php
+'rehash_on_login' => false,
+```
+
+#### `UserProvider` コントラクト
+
+**影響度: 低**
+
+`Illuminate\Contracts\Auth\UserProvider` コントラクトに `rehashPasswordIfRequired` メソッドが追加されました。このインターフェースを実装しているクラスがある場合は、メソッドを追加してください。
+
+```php
+public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false);
+```
+
+#### `Authenticatable` コントラクト
+
+**影響度: 低**
+
+`Illuminate\Contracts\Auth\Authenticatable` コントラクトに `getAuthPasswordName` メソッドが追加されました。このインターフェースを実装しているクラスがある場合は、メソッドを追加してください。
+
+```php
+public function getAuthPasswordName()
+{
+    return 'password';
+}
+```
+
+---
+
+### データベース
+
+#### SQLite 最小バージョン
+
+**影響度: 高**
+
+SQLite を使用している場合は **SQLite 3.26.0 以上** が必要です。
+
+なお、Laravel 11 の新規プロジェクトではデフォルトのデータベースドライバーが SQLite に変更されました。
+
+#### カラム変更時の属性保持
+
+**影響度: 高**
+
+カラムを変更する際、変更後も保持したいすべての修飾子を明示的に指定する必要があります。指定されていない属性は削除されます。
+
+```php
+// Laravel 10 では unsigned、default、comment が保持された
+Schema::table('users', function (Blueprint $table) {
+    $table->integer('votes')->nullable()->change();
+});
+
+// Laravel 11 では明示的にすべての属性を指定する必要がある
+Schema::table('users', function (Blueprint $table) {
+    $table->integer('votes')
+        ->unsigned()
+        ->default(1)
+        ->comment('The vote count')
+        ->nullable()
+        ->change();
+});
+```
+
+既存のマイグレーションをすべて更新したくない場合は、マイグレーションをスカッシュしてください。
+
+```shell
+php artisan schema:dump
+```
+
+#### 浮動小数点型の変更
+
+**影響度: 高**
+
+`double` と `float` のマイグレーションカラム型が全データベースで統一されました。
+
+```php
+// double: 合計桁数・小数点以下桁数の引数が不要に
+$table->double('amount');
+
+// float: 精度を指定する任意の引数のみ
+$table->float('amount', precision: 53);
+```
+
+`unsignedDecimal`、`unsignedDouble`、`unsignedFloat` メソッドは削除されました。引き続き `unsigned` 属性を使う場合はメソッドチェーンで指定してください。
+
+```php
+$table->decimal('amount', total: 8, places: 2)->unsigned();
+$table->double('amount')->unsigned();
+$table->float('amount', precision: 53)->unsigned();
+```
+
+#### Eloquent モデルの `casts` メソッド
+
+**影響度: 低**
+
+基底の Eloquent モデルクラスに `casts` メソッドが定義されました。アプリケーションのモデルで `casts` というリレーションを定義している場合は名前が競合するため変更が必要です。
+
+#### MariaDB 専用ドライバー
+
+**影響度: 非常に低**
+
+Laravel 11 では MariaDB 用の専用データベースドライバーが追加されました。MariaDB に接続する場合は、設定で `mariadb` ドライバーを使用できます。
+
+```php
+'driver' => 'mariadb',
+```
+
+#### 空間型の変更
+
+**影響度: 低**
+
+空間カラム型が全データベースで統一されました。`point`、`lineString`、`polygon` などのメソッドの代わりに `geometry` または `geography` を使用してください。
+
+```php
+$table->geometry('shapes');
+$table->geography('coordinates');
+```
+
+型や空間参照システムを明示的に指定する場合は `subtype` と `srid` を渡してください。
+
+```php
+$table->geometry('dimension', subtype: 'polygon', srid: 0);
+$table->geography('latitude', subtype: 'point', srid: 4326);
+```
+
+#### Doctrine DBAL の削除
+
+**影響度: 低**
+
+Laravel は Doctrine DBAL への依存をなくしました。以下のクラスやメソッドが削除されています。
+
+- `Schema\Builder::useNativeSchemaOperationsIfPossible()`
+- `Connection::getDoctrineConnection()`
+- `Connection::getDoctrineSchemaManager()`
+- `Connection::registerDoctrineType()`
+- `DatabaseManager::registerDoctrineType()`
+- `Schema\Grammars\ChangeColumn` クラス
+- `Schema\Grammars\RenameColumn` クラス
+
+データベースの検査には `Schema::getTables()`、`Schema::getColumns()`、`Schema::getIndexes()`、`Schema::getForeignKeys()` などの新しいネイティブメソッドを使用してください。
+
+---
+
+### 日付
+
+#### Carbon 3
+
+**影響度: 中**
+
+Laravel 11 は Carbon 2 と Carbon 3 の両方をサポートします。Carbon 3 にアップグレードする場合、`diffIn*` メソッドが浮動小数点数を返すようになり、負の値で時間の方向を表すことに注意してください。
+
+---
+
+### レート制限
+
+#### 秒単位のレート制限
+
+**影響度: 中**
+
+Laravel 11 では分単位ではなく秒単位のレート制限がサポートされました。`GlobalLimit`、`Limit` クラスのコンストラクターが秒単位を受け取るようになっています。
+
+```php
+// 変更前 (分単位)
+new GlobalLimit($attempts, 2); // 2分
+
+// 変更後 (秒単位)
+new GlobalLimit($attempts, 2 * 60); // 120秒
+```
+
+`Limit` クラスの `decayMinutes` プロパティは `decaySeconds` に改名され、秒単位になりました。
+
+`ThrottlesExceptions` と `ThrottlesExceptionsWithRedis` のコンストラクターも秒単位を受け取るようになりました。
+
+```php
+new ThrottlesExceptions($attempts, 2 * 60);
+new ThrottlesExceptionsWithRedis($attempts, 2 * 60);
+```
+
+---
+
+### パッケージ
+
+#### サービスプロバイダーのパブリッシュ
+
+**影響度: 非常に低**
+
+Laravel 11 の新規アプリケーションには `config/app.php` の `providers` 配列がありません。パッケージでサービスプロバイダーをパブリッシュしている場合は、`ServiceProvider::addProviderToBootstrapFile` メソッドを使用してください。
+
+```php
+use Illuminate\Support\ServiceProvider;
+
+ServiceProvider::addProviderToBootstrapFile(Provider::class);
+```
+
+---
+
+### Sanctum
+
+#### Sanctum のアップデート
+
+**影響度: 高**
+
+Laravel 11 は Sanctum 3.x をサポートしません。`composer.json` の Sanctum 依存関係を `^4.0` に更新してください。
+
+Sanctum 4.0 はマイグレーションを自動でロードしなくなりました。以下のコマンドでパブリッシュしてください。
+
+```shell
+php artisan vendor:publish --tag=sanctum-migrations
+```
+
+また、`config/sanctum.php` のミドルウェア設定を更新してください。
+
+```php
+'middleware' => [
+    'authenticate_session' => Laravel\Sanctum\Http\Middleware\AuthenticateSession::class,
+    'encrypt_cookies' => Illuminate\Cookie\Middleware\EncryptCookies::class,
+    'validate_csrf_token' => Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+],
+```
+
+---
+
+### Spatie Once パッケージ
+
+**影響度: 中**
+
+Laravel 11 は独自の [`once` 関数](https://laravel.com/docs/11.x/helpers#method-once) を提供するようになりました。`spatie/once` パッケージを使用している場合は、競合を避けるために `composer.json` から削除してください。
+
+---
+
+## まとめ
+
+Laravel 11 は大きな構造変更を含むバージョンですが、Laravel 10 のアプリケーション構造はそのまま動作するため、段階的に移行できます。
+
+| 変更点 | 影響度 | 対応 |
+|--------|--------|------|
+| `composer.json` の依存関係更新 | 高 | `laravel/framework ^11.0` に変更 |
+| PHP 8.2 必須 | 高 | PHP のバージョンを確認 |
+| カラム変更時の属性保持 | 高 | `change()` 使用箇所を確認 |
+| 浮動小数点型の変更 | 高 | `double`/`float` カラムの定義を確認 |
+| SQLite 3.26.0+ 必須 | 高 | SQLite のバージョンを確認 |
+| Sanctum `^4.0` | 高 | マイグレーションをパブリッシュ |
+| Carbon 3 | 中 | `diffIn*` メソッドの戻り値を確認 |
+| 秒単位のレート制限 | 中 | `decayMinutes` を `decaySeconds` に変更 |
+| Doctrine DBAL の削除 | 低 | ネイティブスキーマメソッドに移行 |
+
+---
+
+## 参考資料
+
+- [公式アップグレードガイド (英語)](https://laravel.com/docs/11.x/upgrade)
+- [laravel/laravel リポジトリの差分 (10.x → 11.x)](https://github.com/laravel/laravel/compare/10.x...11.x)
+- [Laravel Shift](https://laravelshift.com) — アップグレードを自動化するコミュニティサービス
+- [Carbon 3 変更ログ](https://github.com/briannesbitt/Carbon/releases/tag/3.0.0)
