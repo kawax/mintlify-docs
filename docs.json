@@ -185,6 +185,12 @@
                 ]
               },
               {
+                "group": "バリデーション拡張",
+                "pages": [
+                  "jp/advanced/custom-validation-rules"
+                ]
+              },
+              {
                 "group": "Laravel 13 新機能",
                 "pages": [
                   "jp/advanced/php-attributes"
