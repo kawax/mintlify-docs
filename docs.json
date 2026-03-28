@@ -196,6 +196,12 @@
             "tab": "ブログ",
             "groups": [
               {
+                "group": "Laravel 13",
+                "pages": [
+                  "jp/blog/laravel-13-new-features"
+                ]
+              },
+              {
                 "group": "アップグレードガイド",
                 "pages": [
                   "jp/blog/upgrade-11-to-12",
