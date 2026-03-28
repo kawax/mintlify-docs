@@ -1,0 +1,389 @@
+---
+title: "Mail"
+description: "Send beautifully formatted emails from your Laravel application using mailable classes, Blade templates, Markdown components, and popular mail services."
+---
+
+## Introduction
+
+Laravel's mail system is powered by [Symfony Mailer](https://symfony.com/doc/current/mailer.html) and supports SMTP, Mailgun, Postmark, Resend, Amazon SES, and `sendmail` out of the box.
+
+Each type of email you send is represented as a **mailable** class. Mailables encapsulate all the configuration—who it's from, the subject, the view, and attachments—in one place.
+
+## Configuration
+
+Mail configuration lives in `config/mail.php`. Set the default driver and credentials via `.env`:
+
+```ini
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.mailgun.org
+MAIL_PORT=587
+MAIL_USERNAME=your-username
+MAIL_PASSWORD=your-password
+MAIL_FROM_ADDRESS=hello@example.com
+MAIL_FROM_NAME="My App"
+```
+
+### Popular mail drivers
+
+| Driver | Install |
+|---|---|
+| Mailgun | `composer require symfony/mailgun-mailer symfony/http-client` |
+| Postmark | `composer require symfony/postmark-mailer symfony/http-client` |
+| Resend | `composer require resend/resend-php` |
+| Amazon SES | `composer require aws/aws-sdk-php` |
+
+After installing the package, set `MAIL_MAILER` in `.env` to the driver name (`mailgun`, `postmark`, `resend`, or `ses`) and add the corresponding credentials to `config/services.php`.
+
+## Generating mailables
+
+Create a mailable class with Artisan:
+
+```shell
+php artisan make:mail OrderShipped
+```
+
+This generates `app/Mail/OrderShipped.php`.
+
+## Writing mailables
+
+A mailable class defines three methods:
+
+- `envelope()` — from address and subject
+- `content()` — the Blade view to render
+- `attachments()` — files to attach
+
+```php
+<?php
+
+namespace App\Mail;
+
+use App\Models\Order;
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\SerializesModels;
+
+class OrderShipped extends Mailable
+{
+    use Queueable, SerializesModels;
+
+    /**
+     * Create a new message instance.
+     */
+    public function __construct(
+        public Order $order,
+    ) {}
+
+    /**
+     * Get the message envelope.
+     */
+    public function envelope(): Envelope
+    {
+        return new Envelope(
+            subject: 'Your Order Has Shipped',
+        );
+    }
+
+    /**
+     * Get the message content definition.
+     */
+    public function content(): Content
+    {
+        return new Content(
+            view: 'emails.orders.shipped',
+        );
+    }
+
+    /**
+     * Get the attachments for the message.
+     *
+     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     */
+    public function attachments(): array
+    {
+        return [];
+    }
+}
+```
+
+Public properties of the mailable are automatically available in the Blade view:
+
+```blade
+{{-- resources/views/emails/orders/shipped.blade.php --}}
+<p>Your order #{{ $order->id }} has shipped!</p>
+<p>Estimated delivery: {{ $order->estimated_delivery->format('M j, Y') }}</p>
+```
+
+### Adding attachments
+
+Attach files using the `Attachment` class:
+
+```php
+use Illuminate\Mail\Mailables\Attachment;
+
+public function attachments(): array
+{
+    return [
+        Attachment::fromPath(storage_path('invoices/'.$this->order->id.'.pdf'))
+            ->as('invoice.pdf')
+            ->withMime('application/pdf'),
+    ];
+}
+```
+
+## Markdown mailables
+
+Markdown mailables use Laravel's pre-built email components to produce responsive, well-designed emails without writing custom HTML.
+
+Generate a Markdown mailable:
+
+```shell
+php artisan make:mail OrderShipped --markdown=emails.orders.shipped
+```
+
+This creates the mailable class and a Markdown Blade template at `resources/views/emails/orders/shipped.blade.php`:
+
+```blade
+<x-mail::message>
+# Order Shipped
+
+Your order #{{ $order->id }} has shipped.
+
+<x-mail::button :url="route('orders.show', $order)">
+View Order
+</x-mail::button>
+
+Thanks,<br>
+{{ config('app.name') }}
+</x-mail::message>
+```
+
+The `content` method uses `markdown` instead of `view`:
+
+```php
+public function content(): Content
+{
+    return new Content(
+        markdown: 'emails.orders.shipped',
+    );
+}
+```
+
+<Tip>
+  Markdown mailables are the easiest way to create good-looking transactional emails. Laravel handles the responsive HTML and plain-text fallback automatically.
+</Tip>
+
+## Sending mail
+
+Use the `Mail` facade to send a mailable:
+
+```php
+use App\Mail\OrderShipped;
+use Illuminate\Support\Facades\Mail;
+
+Mail::to($request->user())->send(new OrderShipped($order));
+```
+
+Send to multiple recipients:
+
+```php
+Mail::to($order->user)
+    ->cc($manager)
+    ->bcc('archive@example.com')
+    ->send(new OrderShipped($order));
+```
+
+### Queueing mail
+
+Email sending can be slow. Queue the mailable to return a response immediately:
+
+```php
+Mail::to($request->user())->queue(new OrderShipped($order));
+```
+
+To make a mailable always queue when sent, implement `ShouldQueue` on the class:
+
+```php
+use Illuminate\Contracts\Queue\ShouldQueue;
+
+class OrderShipped extends Mailable implements ShouldQueue
+{
+    use Queueable, SerializesModels;
+
+    // ...
+}
+```
+
+Now `Mail::to(...)->send(new OrderShipped($order))` queues automatically.
+
+### Sending after the response
+
+Use `Mail::to(...)->sendNow()` or `Mail::later()` to control timing. To send right after Laravel returns the HTTP response:
+
+```php
+Mail::to($request->user())
+    ->queue((new OrderShipped($order))->delay(now()->addMinutes(5)));
+```
+
+## Previewing mailables in the browser
+
+Return a mailable from a route to inspect it during development:
+
+```php
+use App\Mail\OrderShipped;
+use App\Models\Order;
+
+Route::get('/mailable', function () {
+    $order = Order::first();
+    return new OrderShipped($order);
+});
+```
+
+## Testing mailables
+
+Assert a mailable was sent without actually sending email:
+
+```php tab=Pest
+use App\Mail\OrderShipped;
+use Illuminate\Support\Facades\Mail;
+
+test('order confirmation is emailed', function () {
+    Mail::fake();
+
+    $order = Order::factory()->create();
+
+    $this->post("/orders/{$order->id}/ship");
+
+    Mail::assertSent(OrderShipped::class, function ($mail) use ($order) {
+        return $mail->order->id === $order->id;
+    });
+});
+```
+
+```php tab=PHPUnit
+use App\Mail\OrderShipped;
+use Illuminate\Support\Facades\Mail;
+
+public function test_order_confirmation_is_emailed(): void
+{
+    Mail::fake();
+
+    $order = Order::factory()->create();
+
+    $this->post("/orders/{$order->id}/ship");
+
+    Mail::assertSent(OrderShipped::class, function ($mail) use ($order) {
+        return $mail->order->id === $order->id;
+    });
+}
+```
+
+## Local development
+
+During development, set the `log` mailer to write all outgoing emails to your log file instead of sending them:
+
+```ini
+MAIL_MAILER=log
+```
+
+Or use [Mailpit](https://github.com/axllent/mailpit) to catch emails locally:
+
+```ini
+MAIL_MAILER=smtp
+MAIL_HOST=127.0.0.1
+MAIL_PORT=1025
+```
+
+## A complete example
+
+<Steps>
+  <Step title="Generate the mailable">
+    ```shell
+    php artisan make:mail WelcomeMail --markdown=emails.welcome
+    ```
+  </Step>
+
+  <Step title="Define the mailable class">
+    ```php
+    <?php
+
+    namespace App\Mail;
+
+    use App\Models\User;
+    use Illuminate\Bus\Queueable;
+    use Illuminate\Contracts\Queue\ShouldQueue;
+    use Illuminate\Mail\Mailable;
+    use Illuminate\Mail\Mailables\Content;
+    use Illuminate\Mail\Mailables\Envelope;
+    use Illuminate\Queue\SerializesModels;
+
+    class WelcomeMail extends Mailable implements ShouldQueue
+    {
+        use Queueable, SerializesModels;
+
+        public function __construct(
+            public User $user,
+        ) {}
+
+        public function envelope(): Envelope
+        {
+            return new Envelope(
+                subject: 'Welcome to '.config('app.name'),
+            );
+        }
+
+        public function content(): Content
+        {
+            return new Content(
+                markdown: 'emails.welcome',
+            );
+        }
+
+        public function attachments(): array
+        {
+            return [];
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Write the Blade template">
+    ```blade
+    {{-- resources/views/emails/welcome.blade.php --}}
+    <x-mail::message>
+    # Welcome, {{ $user->name }}!
+
+    Thanks for signing up. Click below to get started.
+
+    <x-mail::button :url="url('/')">
+    Go to Dashboard
+    </x-mail::button>
+
+    Thanks,<br>
+    {{ config('app.name') }}
+    </x-mail::message>
+    ```
+  </Step>
+
+  <Step title="Send after user registration">
+    ```php
+    use App\Mail\WelcomeMail;
+    use Illuminate\Support\Facades\Mail;
+
+    public function store(Request $request): RedirectResponse
+    {
+        $user = User::create($request->validated());
+
+        Mail::to($user)->send(new WelcomeMail($user));
+
+        return redirect('/dashboard');
+    }
+    ```
+  </Step>
+</Steps>
+
+<Card title="Notifications" icon="bell" href="/en/intermediate/notifications">
+  Send multi-channel notifications—email, SMS, Slack, and database—with a single notification class.
+</Card>
