@@ -219,6 +219,12 @@
                 ]
               },
               {
+                "group": "認証の拡張",
+                "pages": [
+                  "jp/advanced/custom-auth-guard"
+                ]
+              },
+              {
                 "group": "AI上級",
                 "pages": [
                   "jp/advanced/boost-custom-agent",
