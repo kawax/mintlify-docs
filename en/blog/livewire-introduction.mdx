@@ -1,0 +1,462 @@
+---
+title: "Livewire 4 — Reactive UIs without JavaScript"
+description: "Learn how to build interactive, reactive UI components in Laravel using Livewire 4, all in PHP and Blade — no JavaScript framework required."
+---
+
+## What is Livewire?
+
+Before Livewire, building dynamic UIs in a Laravel application meant reaching for Vue.js, React, or writing AJAX requests by hand. Livewire removes that requirement.
+
+**Livewire** is a Laravel first-party package that lets you build reactive, interactive components entirely in PHP and Blade. Real-time form validation, live search, counters, and modals — everything that previously needed JavaScript can now be written in PHP.
+
+<Info>
+  Livewire 4 requires Laravel 10 or higher and PHP 8.1 or higher.
+</Info>
+
+### How it works
+
+A Livewire component is a PHP class combined with a Blade template. When a user clicks a button or types in an input, Livewire sends an AJAX request in the background, runs the PHP logic, and updates only the changed parts of the page. You write pure PHP — Livewire handles the rest.
+
+---
+
+## Installation
+
+Run the following command in your Laravel project root:
+
+```shell
+composer require livewire/livewire
+```
+
+Laravel's package auto-discovery takes care of registration. No additional configuration is needed.
+
+### Create a layout file
+
+If you plan to use Livewire as full-page components, you need a layout file. Generate one with Artisan:
+
+```shell
+php artisan livewire:layout
+```
+
+This creates `resources/views/layouts/app.blade.php`:
+
+```blade
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <title>{{ $title ?? config('app.name') }}</title>
+
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+        @livewireStyles
+    </head>
+    <body>
+        {{ $slot }}
+
+        @livewireScripts
+    </body>
+</html>
+```
+
+`@livewireStyles` and `@livewireScripts` automatically inject Livewire and Alpine.js assets.
+
+---
+
+## Your first component
+
+Generate a component using Artisan. Let's build a simple counter:
+
+```shell
+php artisan make:livewire Counter
+```
+
+This creates a single-file component at `resources/views/livewire/counter.blade.php`. Edit it to look like this:
+
+```blade
+<?php
+
+use Livewire\Component;
+
+new class extends Component {
+    public int $count = 0;
+
+    public function increment(): void
+    {
+        $this->count++;
+    }
+
+    public function decrement(): void
+    {
+        $this->count--;
+    }
+};
+?>
+
+<div>
+    <h1>Count: {{ $count }}</h1>
+
+    <button wire:click="increment">+1</button>
+    <button wire:click="decrement">-1</button>
+</div>
+```
+
+Embed the component in any Blade template:
+
+```blade
+<livewire:counter />
+```
+
+Every button click updates the count without a page reload. `wire:click` wires a DOM event directly to a PHP method — no JavaScript required on your end.
+
+---
+
+## Properties and actions
+
+### Properties — `wire:model`
+
+The `wire:model` directive binds an input element to a component property bidirectionally.
+
+```blade
+<?php
+
+use Livewire\Component;
+
+new class extends Component {
+    public string $name = '';
+    public string $email = '';
+};
+?>
+
+<div>
+    <input type="text" wire:model="name" placeholder="Name">
+    <input type="email" wire:model="email" placeholder="Email">
+
+    <p>Hello, {{ $name }} ({{ $email }})</p>
+</div>
+```
+
+By default, `wire:model` syncs on form actions (such as submit). Add modifiers to control sync timing:
+
+| Syntax | Behavior |
+|--------|----------|
+| `wire:model` | Syncs only on action (default) |
+| `wire:model.live` | Sends a request on every keystroke |
+| `wire:model.blur` | Syncs when the input loses focus (no extra request) |
+| `wire:model.live.blur` | Sends a request when focus leaves the input |
+
+### Actions — `wire:click` and `wire:submit`
+
+`wire:click` maps click events to PHP methods. `wire:submit` maps form submissions.
+
+```blade
+<?php
+
+use Livewire\Component;
+use App\Models\Task;
+
+new class extends Component {
+    public string $taskName = '';
+
+    public function addTask(): void
+    {
+        Task::create(['name' => $this->taskName]);
+        $this->taskName = '';
+    }
+
+    public function render()
+    {
+        return $this->view([
+            'tasks' => Task::latest()->get(),
+        ]);
+    }
+};
+?>
+
+<div>
+    <form wire:submit="addTask">
+        <input type="text" wire:model="taskName" placeholder="Task name">
+        <button type="submit">Add</button>
+    </form>
+
+    <ul>
+        @foreach ($tasks as $task)
+            <li>{{ $task->name }}</li>
+        @endforeach
+    </ul>
+</div>
+```
+
+---
+
+## Real-time validation
+
+Livewire 4 lets you attach validation rules directly to properties using the `#[Validate]` attribute.
+
+```blade
+<?php
+
+use Livewire\Attributes\Validate;
+use Livewire\Component;
+use App\Models\Post;
+
+new class extends Component {
+    #[Validate('required|min:3')]
+    public string $title = '';
+
+    #[Validate('required|min:10')]
+    public string $content = '';
+
+    public function save(): void
+    {
+        $this->validate();
+
+        Post::create([
+            'title' => $this->title,
+            'content' => $this->content,
+        ]);
+
+        $this->reset(['title', 'content']);
+
+        session()->flash('message', 'Post saved.');
+    }
+};
+?>
+
+<div>
+    @if (session('message'))
+        <div>{{ session('message') }}</div>
+    @endif
+
+    <form wire:submit="save">
+        <div>
+            <input type="text" wire:model.live.blur="title" placeholder="Title">
+            @error('title') <span style="color: red;">{{ $message }}</span> @enderror
+        </div>
+
+        <div>
+            <textarea wire:model.live.blur="content" placeholder="Content"></textarea>
+            @error('content') <span style="color: red;">{{ $message }}</span> @enderror
+        </div>
+
+        <button type="submit">Save</button>
+    </form>
+</div>
+```
+
+<Info>
+  `$this->validate()` validates all properties at once on form submission. Using it alongside `#[Validate]` attribute-level validation gives you a two-step approach: per-field validation on blur, and full validation on submit.
+</Info>
+
+Pair `wire:model.live.blur` with `#[Validate]` to display error messages the moment a user leaves an invalid input — without a page reload.
+
+---
+
+## Lifecycle hooks
+
+Livewire components expose lifecycle hooks you can use to run code at specific points:
+
+| Hook | When it runs |
+|------|-------------|
+| `mount()` | When the component is first initialized (once only) |
+| `boot()` | At the start of every request (initial and subsequent) |
+| `updating($property, $value)` | Before a property is updated |
+| `updated($property)` | After a property is updated |
+| `rendering()` | Before the view renders |
+| `rendered()` | After the view renders |
+| `dehydrate()` | At the end of every request |
+
+### `mount()` — initialization
+
+Use `mount()` to initialize the component, similar to a constructor.
+
+```blade
+<?php
+
+use Illuminate\Support\Facades\Auth;
+use Livewire\Component;
+
+new class extends Component {
+    public string $name = '';
+    public string $email = '';
+
+    public function mount(): void
+    {
+        $this->name = Auth::user()->name;
+        $this->email = Auth::user()->email;
+    }
+};
+?>
+
+<div>
+    <p>Name: {{ $name }}</p>
+    <p>Email: {{ $email }}</p>
+</div>
+```
+
+### `updated()` — react to property changes
+
+Use `updated()` to run logic after a property changes. Scope it to a specific property by including the property name in the method name.
+
+```blade
+<?php
+
+use Livewire\Component;
+
+new class extends Component {
+    public string $username = '';
+
+    public function updatedUsername(): void
+    {
+        $this->username = strtolower($this->username);
+    }
+};
+?>
+
+<div>
+    <input type="text" wire:model.live="username">
+    <p>Username: {{ $username }}</p>
+</div>
+```
+
+Every keystroke automatically converts the input to lowercase.
+
+---
+
+## Integration with Laravel
+
+### Eloquent models as properties
+
+Livewire can hold Eloquent model instances directly as component properties.
+
+```blade
+<?php
+
+use Livewire\Attributes\Validate;
+use Livewire\Component;
+use App\Models\User;
+
+new class extends Component {
+    public User $user;
+
+    public function mount(User $user): void
+    {
+        $this->user = $user;
+    }
+
+    #[Validate('required|min:2')]
+    public string $name = '';
+
+    public function save(): void
+    {
+        $this->validate();
+        $this->user->update(['name' => $this->name]);
+        session()->flash('message', 'Profile updated.');
+    }
+
+    public function render()
+    {
+        return $this->view();
+    }
+};
+?>
+
+<div>
+    @if (session('message'))
+        <div>{{ session('message') }}</div>
+    @endif
+
+    <form wire:submit="save">
+        <input type="text" wire:model="name" placeholder="Name">
+        @error('name') <span style="color: red;">{{ $message }}</span> @enderror
+        <button type="submit">Update</button>
+    </form>
+</div>
+```
+
+### Form objects
+
+For complex forms, extract form state into a dedicated Form Object to keep your component lean.
+
+```shell
+php artisan livewire:form PostForm
+```
+
+```php
+namespace App\Livewire\Forms;
+
+use Livewire\Attributes\Validate;
+use Livewire\Form;
+use App\Models\Post;
+
+class PostForm extends Form
+{
+    #[Validate('required|min:3')]
+    public string $title = '';
+
+    #[Validate('required|min:10')]
+    public string $content = '';
+
+    public function store(): void
+    {
+        Post::create($this->only(['title', 'content']));
+    }
+}
+```
+
+Use the form object in a component:
+
+```blade
+<?php
+
+use App\Livewire\Forms\PostForm;
+use Livewire\Component;
+
+new class extends Component {
+    public PostForm $form;
+
+    public function save(): void
+    {
+        $this->form->validate();
+        $this->form->store();
+        $this->form->reset();
+        session()->flash('message', 'Post created.');
+    }
+};
+?>
+
+<div>
+    <form wire:submit="save">
+        <input type="text" wire:model="form.title" placeholder="Title">
+        @error('form.title') <span style="color: red;">{{ $message }}</span> @enderror
+
+        <textarea wire:model="form.content" placeholder="Content"></textarea>
+        @error('form.content') <span style="color: red;">{{ $message }}</span> @enderror
+
+        <button type="submit">Publish</button>
+    </form>
+</div>
+```
+
+---
+
+## When to use Livewire
+
+| Use case | What Livewire handles well |
+|----------|---------------------------|
+| Form handling | Real-time validation, error display |
+| Data tables | Live search, sorting, pagination |
+| Toggles and counters | UI updates without page reloads |
+| Admin panels | CRUD directly against Eloquent |
+| Multi-step wizards | Step management in pure PHP |
+
+<Tip>
+  If you already know Blade, you can start using Livewire today. There is no JavaScript framework to learn.
+</Tip>
+
+For experiences that require SPA-level interactivity with a full JavaScript UI framework, Inertia.js is a better fit. But for forms, admin panels, and data tables, Livewire often results in simpler, more maintainable code. Start with a single small component and expand from there.
+
+<Card title="Livewire documentation" icon="book-open" href="https://livewire.laravel.com/docs">
+  Full coverage of file uploads, pagination, testing, Alpine.js integration, and more.
+</Card>

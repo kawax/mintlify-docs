@@ -506,6 +506,15 @@
                 ]
               },
               {
+                "group": "Package Introduction",
+                "pages": [
+                  "en/blog/livewire-introduction",
+                  "en/blog/inertia-introduction",
+                  "en/blog/pest-introduction",
+                  "en/blog/laravel-pennant"
+                ]
+              },
+              {
                 "group": "Upgrade Guides",
                 "pages": [
                   "en/blog/upgrade-12-to-13",
