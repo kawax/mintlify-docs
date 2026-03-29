@@ -75,9 +75,9 @@ Guidelines for choosing work:
 - Choose work that a coding agent can complete in a single session.
 - Be specific about what needs to be done — the coding agent needs clear instructions.
 
-### Step 3: Create an issue
+### Step 3: Create some issues
 
-Create **one** GitHub issue describing the work. The issue should include:
+Create GitHub issues describing the work. The issue should include:
 
 - A clear, descriptive title
 - Detailed description of what needs to be done
