@@ -384,7 +384,6 @@ use Illuminate\Support\Facades\Storage;
 $pdf = Pdf::loadView('invoices.pdf', ['invoice' => $invoice]);
 Storage::put("invoices/{$invoice->id}.pdf", $pdf->output());
 ```
-```
 
 <Tip>
   スキルは「必要なときだけ読み込む」設計です。常に必要な情報はガイドラインに、タスク固有の詳細なパターンはスキルに分けることで、AIのコンテキスト使用量を最適化できます。
