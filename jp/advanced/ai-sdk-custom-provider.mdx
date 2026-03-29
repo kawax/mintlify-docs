@@ -341,9 +341,17 @@ class MyInferenceGateway implements TextGateway
 カスタムゲートウェイを使うようにプロバイダーを修正します。
 
 ```php
-public function __construct(array $config, Dispatcher $events)
+public function __construct(
+    protected array $config,
+    protected Dispatcher $events,
+) {}
+
+/**
+ * Get the provider's text gateway.
+ */
+public function textGateway(): TextGateway
 {
-    parent::__construct(new MyInferenceGateway, $config, $events);
+    return $this->textGateway ??= new MyInferenceGateway;
 }
 ```
 
