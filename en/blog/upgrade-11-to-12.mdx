@@ -1,0 +1,353 @@
+---
+title: "Upgrade guide: Laravel 11 to 12"
+description: "Step-by-step instructions for upgrading from Laravel 11 to Laravel 12, including all breaking changes, deprecations, and new features."
+---
+
+## Introduction
+
+Laravel 12 was released in February 2025. This guide covers everything you need to upgrade a Laravel 11.x application to 12.x.
+
+<Info>
+  Estimated upgrade time: **about 5 minutes**. The actual impact depends on the size of your application and which features you use.
+</Info>
+
+### Automated upgrade with Laravel Shift
+
+You can automate much of the upgrade process using [Laravel Shift](https://laravelshift.com/). Shift automatically updates your dependencies and configuration files.
+
+---
+
+## Changes by impact level
+
+### High impact
+
+- Updating dependencies
+- Updating the Laravel installer
+
+### Medium impact
+
+- Eloquent `HasUuids` trait and UUIDv7
+
+### Low impact
+
+- Carbon 3
+- Concurrency result index mapping
+- Container class dependency resolution
+- Image validation SVG exclusion
+- Local filesystem disk default root path
+- Multi-schema database inspection
+- Nested array request merging
+
+---
+
+## Upgrade steps
+
+### Updating dependencies
+
+**High impact**
+
+Update the following entries in your `composer.json`:
+
+```json
+{
+  "require": {
+    "laravel/framework": "^12.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.0",
+    "pestphp/pest": "^3.0"
+  }
+}
+```
+
+Then install the updated dependencies:
+
+```shell
+composer update
+```
+
+---
+
+### Updating the Laravel installer
+
+**High impact**
+
+If you use the Laravel installer CLI to create new applications, update it to the version that supports Laravel 12.x and the [new starter kits](https://laravel.com/starter-kits).
+
+If you installed it with `composer global require`:
+
+```shell
+composer global update laravel/installer
+```
+
+If you installed it with `php.new`, re-run the install command for your OS:
+
+```shell tab=macOS
+/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.4)"
+```
+
+```shell tab=Windows PowerShell
+# Run as administrator
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.4'))
+```
+
+```shell tab=Linux
+/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.4)"
+```
+
+If you use the version bundled with [Laravel Herd](https://herd.laravel.com), update Herd itself to the latest release.
+
+---
+
+## New starter kits
+
+Laravel 12 introduces a new set of starter kits that replace the older Breeze and Jetstream packages. Running `laravel new` now interactively prompts you to select a frontend stack.
+
+Available starter kits:
+
+- **React** — Inertia 2, React 19, TypeScript, Tailwind 4, shadcn/ui
+- **Vue** — Inertia 2, Vue Composition API, TypeScript, Tailwind 4, shadcn-vue
+- **Svelte** — Inertia 2, Svelte 5, TypeScript, Tailwind 4, shadcn-svelte
+- **Livewire** — Livewire, Tailwind 4, Flux UI
+
+```shell
+laravel new my-app
+```
+
+After selecting a kit, install dependencies and start the dev server:
+
+```shell
+cd my-app
+npm install && npm run build
+composer run dev
+```
+
+<Info>
+  If you're upgrading an existing application, you don't need to adopt a starter kit. They are intended for new projects.
+</Info>
+
+---
+
+## Breaking changes
+
+### Eloquent
+
+#### `HasUuids` trait and UUIDv7
+
+**Medium impact**
+
+The `HasUuids` trait now generates UUID v7 (time-ordered UUIDs) instead of UUID v4. If you need to keep the previous UUID v4 behavior, switch to the `HasVersion4Uuids` trait.
+
+```php
+use Illuminate\Database\Eloquent\Concerns\HasUuids; // [tl! remove]
+use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids; // [tl! add]
+```
+
+If you were already using `HasVersion7Uuids`, you can switch to `HasUuids` — the behavior is now identical.
+
+---
+
+### Validation
+
+#### Image validation excludes SVG by default
+
+**Low impact**
+
+The `image` validation rule no longer accepts SVG files by default. To allow SVGs explicitly:
+
+```php
+use Illuminate\Validation\Rules\File;
+
+'photo' => 'required|image:allow_svg'
+
+// or
+'photo' => ['required', File::image(allowSvg: true)],
+```
+
+---
+
+### Storage
+
+#### Local filesystem disk default root path
+
+**Low impact**
+
+If you have not explicitly defined a `local` disk in your `filesystems` configuration, the default root path has changed from `storage/app` to `storage/app/private`.
+
+To keep the previous behavior, define the `local` disk explicitly:
+
+```php
+// config/filesystems.php
+'local' => [
+    'driver' => 'local',
+    'root' => storage_path('app'),
+],
+```
+
+---
+
+### Database
+
+#### Multi-schema database inspection
+
+**Low impact**
+
+`Schema::getTables()`, `Schema::getViews()`, and `Schema::getTypes()` now return results from all schemas by default. To target a specific schema, pass the `schema` argument:
+
+```php
+// All schemas
+$tables = Schema::getTables();
+
+// Only the 'main' schema
+$tables = Schema::getTables(schema: 'main');
+```
+
+`Schema::getTableListing()` now returns schema-qualified table names by default:
+
+```php
+$tables = Schema::getTableListing();
+// ['main.migrations', 'main.users', 'blog.posts']
+
+$tables = Schema::getTableListing(schema: 'main', schemaQualified: false);
+// ['migrations', 'users']
+```
+
+#### Database constructor signature changes
+
+**Very low impact**
+
+`Illuminate\Database\Schema\Blueprint` and `Illuminate\Database\Grammar` now require a `Connection` instance as their first constructor argument.
+
+```php
+// Laravel <= 11.x
+$grammar = new MySqlGrammar;
+$grammar->setConnection($connection);
+
+// Laravel >= 12.x
+$grammar = new MySqlGrammar($connection);
+```
+
+The following APIs have been removed or deprecated:
+
+| API                                   | Status     |
+| ------------------------------------- | ---------- |
+| `Blueprint::getPrefix()`              | Deprecated |
+| `Connection::withTablePrefix()`       | Removed    |
+| `Grammar::getTablePrefix()` / `setTablePrefix()` | Deprecated |
+| `Grammar::setConnection()`            | Removed    |
+
+Retrieve the table prefix directly from the connection:
+
+```php
+$prefix = $connection->getTablePrefix();
+```
+
+---
+
+### Concurrency
+
+#### Result index mapping
+
+**Low impact**
+
+When you pass an associative array to `Concurrency::run()`, results are now keyed by the same keys:
+
+```php
+$result = Concurrency::run([
+    'task-1' => fn () => 1 + 1,
+    'task-2' => fn () => 2 + 2,
+]);
+
+// ['task-1' => 2, 'task-2' => 4]
+```
+
+---
+
+### Container
+
+#### Class dependency resolution default values
+
+**Low impact**
+
+The DI container now respects default values when resolving class instances with nullable class properties.
+
+```php
+class Example
+{
+    public function __construct(public ?Carbon $date = null) {}
+}
+
+$example = resolve(Example::class);
+
+// Laravel <= 11.x: returns a Carbon instance
+// Laravel >= 12.x: returns null
+```
+
+---
+
+### Request
+
+#### Nested array request merging
+
+**Low impact**
+
+`$request->mergeIfMissing()` now correctly merges nested array data using dot notation. Previously, dot-notation keys were added as literal top-level keys.
+
+```php
+$request->mergeIfMissing([
+    'user.last_name' => 'Otwell',
+]);
+```
+
+---
+
+### Routing
+
+#### Route priority
+
+**Low impact**
+
+The behavior for multiple routes with the same name is now consistent whether or not the route cache is active. Without cache, the first registered route now wins — not the last.
+
+---
+
+### Authentication
+
+#### `DatabaseTokenRepository` constructor change
+
+**Very low impact**
+
+The `$expires` parameter in `Illuminate\Auth\Passwords\DatabaseTokenRepository` now expects seconds instead of minutes.
+
+---
+
+### Carbon 3
+
+**Low impact**
+
+Support for Carbon 2.x has been dropped. Laravel 12 applications require [Carbon 3.x](https://carbon.nesbot.com/guide/getting-started/migration.html).
+
+---
+
+## Summary
+
+Laravel 12 is a relatively smooth upgrade. Here's a quick reference for the key changes:
+
+| Change                               | Impact | Action required                           |
+| ------------------------------------ | ------ | ----------------------------------------- |
+| Update `composer.json` dependencies  | High   | Change to `laravel/framework ^12.0`       |
+| Update the Laravel installer         | High   | Run `composer global update`              |
+| `HasUuids` now generates UUIDv7      | Medium | Switch to `HasVersion4Uuids` if needed    |
+| `image` validation excludes SVG      | Low    | Add `allow_svg` if you need SVG support   |
+| Local disk default root path changed | Low    | Define the `local` disk explicitly        |
+| Carbon 3 required                    | Low    | Review API compatibility                  |
+
+---
+
+## References
+
+- [Official upgrade guide](https://laravel.com/docs/12.x/upgrade)
+- [laravel/laravel diff (11.x → 12.x)](https://github.com/laravel/laravel/compare/11.x...12.x)
+- [New starter kits](https://laravel.com/starter-kits)
+- [Laravel Shift](https://laravelshift.com) — automated upgrade service
+- [Carbon 3 migration guide](https://carbon.nesbot.com/guide/getting-started/migration.html)

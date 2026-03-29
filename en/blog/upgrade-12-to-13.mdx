@@ -1,0 +1,459 @@
+---
+title: "Upgrade guide: Laravel 12 to 13"
+description: "Step-by-step instructions for upgrading from Laravel 12 to Laravel 13, including all breaking changes, deprecations, and new features."
+---
+
+## Introduction
+
+Laravel 13 was released in March 2026. This guide covers everything you need to upgrade a Laravel 12.x application to 13.x.
+
+<Info>
+  Estimated upgrade time: **about 10 minutes**. The actual impact depends on the size of your application and which features you use.
+</Info>
+
+### AI-assisted upgrade
+
+You can automate much of the upgrade process using [Laravel Boost](https://github.com/laravel/boost), the official MCP server for AI-assisted Laravel upgrades. Install it in your Laravel 12 application, then run the `/upgrade-laravel-v13` slash command in Claude Code, Cursor, OpenCode, Gemini, or VS Code. Requires `laravel/boost ^2.0`.
+
+---
+
+## Changes by impact level
+
+### High impact
+
+- Updating dependencies
+- Updating the Laravel installer
+- Request forgery protection (CSRF)
+
+### Medium impact
+
+- Cache `serializable_classes` configuration
+
+### Low impact
+
+- Cache prefix and session cookie name
+- Collection model serialization
+- `Container::call` and nullable class defaults
+- Domain route registration priority
+- `JobAttempted` event exception payload
+- Manager `extend` callback binding
+- MySQL `DELETE` queries (JOIN / ORDER BY / LIMIT)
+- Pagination Bootstrap view names
+- Polymorphic pivot table name generation
+- `QueueBusy` event property rename
+- `Str` factory reset between tests
+
+---
+
+## Upgrade steps
+
+### Updating dependencies
+
+**High impact**
+
+Update the following entries in your `composer.json`:
+
+```json
+{
+  "require": {
+    "laravel/framework": "^13.0",
+    "laravel/tinker": "^3.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^12.0",
+    "pestphp/pest": "^4.0"
+  }
+}
+```
+
+If you use Laravel Boost, update it as well:
+
+```json
+{
+  "require": {
+    "laravel/boost": "^2.0"
+  }
+}
+```
+
+Then install the updated dependencies:
+
+```shell
+composer update
+```
+
+---
+
+### Updating the Laravel installer
+
+**High impact**
+
+If you use the Laravel installer CLI to create new applications, update it to the version that supports Laravel 13.x.
+
+If you installed it with `composer global require`:
+
+```shell
+composer global update laravel/installer
+```
+
+If you use the version bundled with [Laravel Herd](https://herd.laravel.com), update Herd itself to the latest release.
+
+---
+
+## Breaking changes
+
+### Security
+
+#### Request forgery protection
+
+**High impact**
+
+The CSRF middleware has been renamed from `VerifyCsrfToken` to `PreventRequestForgery`. It also adds origin validation using the `Sec-Fetch-Site` header.
+
+`VerifyCsrfToken` and `ValidateCsrfToken` remain as deprecated aliases, but any direct references — especially in tests or route definitions that exclude the middleware — must be updated to `PreventRequestForgery`.
+
+```php
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+
+// Laravel <= 12.x
+->withoutMiddleware([VerifyCsrfToken::class]);
+
+// Laravel >= 13.x
+->withoutMiddleware([PreventRequestForgery::class]);
+```
+
+The middleware configuration API also supports `preventRequestForgery(...)`.
+
+---
+
+### Cache
+
+#### Cache prefix and session cookie name
+
+**Low impact**
+
+The default cache and Redis key prefix now uses a hyphen-separated suffix, and the default session cookie name now uses `Str::snake(...)`.
+
+Most applications set these values explicitly in their config files and are not affected. Only applications that rely on the framework's fallback defaults will see a difference.
+
+```php
+// Laravel <= 12.x
+Str::slug((string) env('APP_NAME', 'laravel'), '_').'_cache_';
+Str::slug((string) env('APP_NAME', 'laravel'), '_').'_database_';
+Str::slug((string) env('APP_NAME', 'laravel'), '_').'_session';
+
+// Laravel >= 13.x
+Str::slug((string) env('APP_NAME', 'laravel')).'-cache-';
+Str::slug((string) env('APP_NAME', 'laravel')).'-database-';
+Str::snake((string) env('APP_NAME', 'laravel')).'_session';
+```
+
+To keep the previous behavior, set these values explicitly in your `.env`:
+
+```ini
+CACHE_PREFIX=myapp_cache_
+REDIS_PREFIX=myapp_database_
+SESSION_COOKIE=myapp_session
+```
+
+#### Cache `serializable_classes` configuration
+
+**Medium impact**
+
+A `serializable_classes` option has been added to the default `cache` configuration, defaulting to `false`. This prevents PHP deserialization gadget-chain attacks if `APP_KEY` is ever leaked.
+
+If your application intentionally stores PHP objects in the cache, you must explicitly list the classes that are allowed to be deserialized:
+
+```php
+// config/cache.php
+'serializable_classes' => [
+    App\Data\CachedDashboardStats::class,
+    App\Support\CachedPricingSnapshot::class,
+],
+```
+
+If you were caching arbitrary objects, migrate to an explicit allowlist or switch to non-object cache payloads (such as arrays).
+
+---
+
+### Container
+
+#### `Container::call` and nullable class defaults
+
+**Low impact**
+
+`Container::call` now respects the default value of nullable class parameters when no binding exists — consistent with the behavior introduced for constructor injection in Laravel 12.
+
+```php
+$container->call(function (?Carbon $date = null) {
+    return $date;
+});
+
+// Laravel <= 12.x: returns a Carbon instance
+// Laravel >= 13.x: returns null
+```
+
+---
+
+### Database
+
+#### MySQL `DELETE` queries
+
+**Low impact**
+
+Laravel now compiles full `DELETE ... JOIN` queries with `ORDER BY` and `LIMIT` clauses in MySQL grammar. Previously, those clauses were silently ignored in DELETE queries that included a JOIN.
+
+In Laravel 13, these clauses are included in the generated SQL. This may cause a `QueryException` on database engines that do not support this syntax.
+
+---
+
+### Eloquent
+
+#### Polymorphic pivot table name generation
+
+**Low impact**
+
+When a polymorphic pivot model class uses a custom pivot model, Laravel now generates a plural table name instead of a singular one.
+
+If your code relied on the singular inferred name, define the table name explicitly:
+
+```php
+class RoleUser extends MorphPivot
+{
+    protected $table = 'role_user';
+}
+```
+
+#### Collection model serialization
+
+**Low impact**
+
+When Eloquent model collections are serialized and restored (for example, in queued jobs), eager-loaded relationships are now restored along with the models.
+
+If any code depends on relationships being absent after deserialization, it will need to be updated.
+
+---
+
+### Queues
+
+#### `JobAttempted` event exception payload
+
+**Low impact**
+
+The `Illuminate\Queue\Events\JobAttempted` event now exposes the exception object (or `null`) via `$exception`, replacing the old boolean `$exceptionOccurred` property.
+
+```php
+// Laravel <= 12.x
+if ($event->exceptionOccurred) {
+    // an exception occurred
+}
+
+// Laravel >= 13.x
+if ($event->exception !== null) {
+    // an exception occurred
+    $exception = $event->exception;
+}
+```
+
+#### `QueueBusy` event property rename
+
+**Low impact**
+
+The `$connection` property on `Illuminate\Queue\Events\QueueBusy` has been renamed to `$connectionName` to align with other queue events.
+
+```php
+// Laravel <= 12.x
+$event->connection;
+
+// Laravel >= 13.x
+$event->connectionName;
+```
+
+---
+
+### Routing
+
+#### Domain route registration priority
+
+**Low impact**
+
+Routes with an explicit domain now take precedence over non-domain routes during route matching. This ensures catch-all subdomain routes behave consistently, even when non-domain routes are registered first.
+
+---
+
+### Support
+
+#### Manager `extend` callback binding
+
+**Low impact**
+
+Closures registered with a Manager's `extend` method are now bound to the manager instance.
+
+If you previously relied on a different object (such as a service provider instance) being available as `$this` inside these closures, move those values into `use (...)` captures:
+
+```php
+// Laravel <= 12.x
+Manager::extend('custom', function ($app) {
+    return $this->createCustomDriver($app); // $this was the service provider
+});
+
+// Laravel >= 13.x
+$provider = $this;
+Manager::extend('custom', function ($app) use ($provider) {
+    return $provider->createCustomDriver($app);
+});
+```
+
+#### `Str` factory reset between tests
+
+**Low impact**
+
+Laravel now resets custom `Str` factories during test teardown.
+
+If you relied on a custom UUID, ULID, or random string factory persisting across test methods, set it up in each relevant test or in a `setUp` hook.
+
+---
+
+### Views
+
+#### Pagination Bootstrap view names
+
+**Low impact**
+
+The internal pagination view names for Bootstrap 3 have been made explicit:
+
+```php
+// Laravel <= 12.x
+pagination::default
+pagination::simple-default
+
+// Laravel >= 13.x
+pagination::bootstrap-3
+pagination::simple-bootstrap-3
+```
+
+Update any code that references these view names directly.
+
+---
+
+## Deprecated features
+
+| Feature                          | Replacement                    |
+| -------------------------------- | ------------------------------ |
+| `VerifyCsrfToken` middleware     | `PreventRequestForgery`        |
+| `ValidateCsrfToken` middleware   | `PreventRequestForgery`        |
+| `JobAttempted::$exceptionOccurred` | `JobAttempted::$exception`   |
+| `QueueBusy::$connection`         | `QueueBusy::$connectionName`   |
+
+---
+
+## New contract methods
+
+**Very low impact** — only affects custom implementations of these contracts.
+
+### `Dispatcher` contract
+
+`Illuminate\Contracts\Bus\Dispatcher` now declares `dispatchAfterResponse($command, $handler = null)`.
+
+### `ResponseFactory` contract
+
+`Illuminate\Contracts\Routing\ResponseFactory` now declares the `eventStream` signature.
+
+### `MustVerifyEmail` contract
+
+`Illuminate\Contracts\Auth\MustVerifyEmail` now declares `markEmailAsUnverified()`.
+
+### `Queue` contract
+
+`Illuminate\Contracts\Queue\Queue` now formally declares the following queue-size inspection methods (previously only in docblocks):
+
+- `pendingSize`
+- `delayedSize`
+- `reservedSize`
+- `creationTimeOfOldestPendingJob`
+
+### `Store` / `Repository` contracts
+
+The cache contracts now declare a `touch` method for TTL extension:
+
+```php
+// Illuminate\Contracts\Cache\Store
+public function touch($key, $seconds);
+```
+
+---
+
+## Common upgrade issues
+
+### CSRF-related tests fail
+
+**Symptom:** Tests that reference `VerifyCsrfToken` fail with a class-not-found error.
+
+**Fix:** Replace all references with `PreventRequestForgery`.
+
+```php
+// Before
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+->withoutMiddleware([VerifyCsrfToken::class]);
+
+// After
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+->withoutMiddleware([PreventRequestForgery::class]);
+```
+
+### Objects can't be retrieved from the cache
+
+**Symptom:** Cached data comes back as `null`, or you see an `UnserializationFailedException`.
+
+**Fix:** Add the classes to `serializable_classes` in `config/cache.php`, or convert your cached values to arrays.
+
+```php
+'serializable_classes' => [
+    App\Models\User::class,
+    App\Data\SomeData::class,
+],
+```
+
+### `JobAttempted` listener stops working
+
+**Symptom:** `$event->exceptionOccurred` is undefined or always `null`.
+
+**Fix:** Switch to `$event->exception !== null`.
+
+```php
+// Before
+if ($event->exceptionOccurred) { ... }
+
+// After
+if ($event->exception !== null) { ... }
+```
+
+### Users are logged out after upgrading
+
+**Symptom:** All users are signed out immediately after the upgrade.
+
+**Fix:** The default session cookie name has changed. Set `SESSION_COOKIE` in your `.env` to preserve the previous value.
+
+```ini
+SESSION_COOKIE=laravel_session
+```
+
+### Cache miss rate spikes after upgrading
+
+**Symptom:** Cache misses increase significantly right after the upgrade.
+
+**Fix:** The default cache prefix has changed. Either set `CACHE_PREFIX` in your `.env` or clear the cache.
+
+```shell
+php artisan cache:clear
+```
+
+---
+
+## References
+
+- [Official upgrade guide](https://laravel.com/docs/13.x/upgrade)
+- [laravel/laravel diff (12.x → 13.x)](https://github.com/laravel/laravel/compare/12.x...13.x)
+- [Laravel Shift](https://laravelshift.com) — automated upgrade service
+- [Laravel Boost](https://github.com/laravel/boost) — MCP server for AI-assisted upgrades

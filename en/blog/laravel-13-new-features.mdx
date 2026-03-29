@@ -1,0 +1,272 @@
+---
+title: "What's New in Laravel 13"
+description: "A summary of the major new features and improvements introduced in Laravel 13, released in March 2026."
+---
+
+## Introduction
+
+Laravel 13 was released on March 17, 2026. As with every annual major release, it brings meaningful improvements — but this cycle is notable for its focus on **AI-native workflows**, **safer defaults**, and **more expressive developer APIs**.
+
+Breaking changes are minimal, so most applications can upgrade with little effort. At the same time, new features like the Laravel AI SDK and semantic search have the potential to change how modern applications are built.
+
+<Info>
+  Laravel 13 support policy: bug fixes through Q3 2027, security fixes until **March 17, 2028**.
+</Info>
+
+---
+
+## PHP requirements
+
+Laravel 13 requires **PHP 8.3 or higher**. Support for PHP 8.2 has been dropped.
+
+| Version | PHP         | Released       | Bug fixes until | Security fixes until |
+| ------- | ----------- | -------------- | --------------- | -------------------- |
+| 11      | 8.2–8.4     | Mar 12, 2024   | Sep 3, 2025     | Mar 12, 2026         |
+| 12      | 8.2–8.5     | Feb 24, 2025   | Aug 13, 2026    | Feb 24, 2027         |
+| **13**  | **8.3–8.5** | **Mar 17, 2026** | **Q3 2027** | **Mar 17, 2028**  |
+
+PHP 8.3 brings typed constants, `json_validate()`, the `#[\Override]` attribute, and more.
+
+---
+
+## Major new features
+
+### Laravel AI SDK
+
+The headline feature in Laravel 13 is a **first-party AI SDK**. It provides a unified API for text generation, tool-calling agents, embeddings, audio, image generation, and vector store integration.
+
+You can build AI-powered features without coupling your code to a specific provider, while keeping the Laravel developer experience you're used to.
+
+**Text generation (agent)**
+
+```php
+use App\Ai\Agents\SalesCoach;
+
+$response = SalesCoach::make()->prompt('Analyze this sales transcript...');
+
+return (string) $response;
+```
+
+**Image generation**
+
+```php
+use Laravel\Ai\Image;
+
+$image = Image::of('A donut on a kitchen counter')->generate();
+
+$rawContent = (string) $image;
+```
+
+**Text-to-speech**
+
+```php
+use Laravel\Ai\Audio;
+
+$audio = Audio::of('I love coding with Laravel.')->generate();
+
+$rawContent = (string) $audio;
+```
+
+**Embeddings**
+
+```php
+use Illuminate\Support\Str;
+
+$embeddings = Str::of('Napa Valley wines are the best.')->toEmbeddings();
+```
+
+See the [Laravel AI SDK documentation](https://laravel.com/ai) for full details.
+
+---
+
+### Semantic / vector search
+
+The AI SDK ships with native vector query support. You can run semantic searches against PostgreSQL with `pgvector` directly from the query builder.
+
+```php
+$documents = DB::table('documents')
+    ->whereVectorSimilarTo('embedding', 'Best wineries in Napa Valley')
+    ->limit(10)
+    ->get();
+```
+
+Everything from creating embedding columns to running similarity queries stays within the Laravel ecosystem.
+
+---
+
+### JSON:API resources
+
+Laravel 13 adds first-party support for [JSON:API](https://jsonapi.org/) resource responses. You can now return spec-compliant responses with:
+
+- Resource object serialization
+- Relationship includes
+- Sparse fieldsets
+- Links
+- JSON:API-compliant response headers
+
+---
+
+### Expanded PHP attribute support
+
+Laravel 13 extends declarative PHP attribute-based configuration across the entire framework.
+
+**On controllers**
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Comment;
+use App\Models\Post;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
+use Illuminate\Routing\Attributes\Controllers\Middleware;
+
+#[Middleware('auth')]
+class CommentController
+{
+    #[Middleware('subscribed')]
+    #[Authorize('create', [Comment::class, 'post'])]
+    public function store(Post $post)
+    {
+        // ...
+    }
+}
+```
+
+**On queued jobs**
+
+```php
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\FailOnTimeout;
+
+#[Tries(3)]
+#[Backoff(60)]
+#[Timeout(120)]
+#[FailOnTimeout]
+class ProcessPodcast implements ShouldQueue
+{
+    // ...
+}
+```
+
+New attributes at a glance:
+
+| Attribute          | Purpose                                    |
+| ------------------ | ------------------------------------------ |
+| `#[Middleware]`    | Apply middleware to a controller or method |
+| `#[Authorize]`     | Apply a policy check to a controller       |
+| `#[Tries]`         | Set the max attempt count for a queued job |
+| `#[Backoff]`       | Set the backoff delay for a queued job     |
+| `#[Timeout]`       | Set the execution timeout for a queued job |
+| `#[FailOnTimeout]` | Mark a job as failed when it times out     |
+
+Additional attributes have also been introduced for Eloquent, events, notifications, validation, testing, and resource serialization.
+
+---
+
+### Queue routing
+
+`Queue::route(...)` lets you define default queue and connection routing rules for specific jobs in one central place, without hardcoding queue names in the job class itself.
+
+```php
+use App\Jobs\ProcessPodcast;
+use Illuminate\Support\Facades\Queue;
+
+Queue::route(ProcessPodcast::class, connection: 'redis', queue: 'podcasts');
+```
+
+This separates infrastructure configuration from your application code.
+
+---
+
+### Cache TTL extension
+
+`Cache::touch(...)` extends the TTL of a cached item without fetching or re-storing its value.
+
+```php
+// Extend the TTL of this item by 3600 seconds without changing its value
+Cache::touch('expensive-computation', 3600);
+```
+
+---
+
+## Security improvements
+
+### CSRF protection renamed (`PreventRequestForgery`)
+
+The CSRF middleware has been renamed from `VerifyCsrfToken` to `PreventRequestForgery`, and it now validates the request origin using the `Sec-Fetch-Site` header.
+
+```php
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+
+// Excluding the middleware in tests
+->withoutMiddleware([PreventRequestForgery::class]);
+```
+
+`VerifyCsrfToken` remains as a deprecated alias, but you should migrate all references to the new class name.
+
+### Cache deserialization restrictions
+
+A `serializable_classes` option has been added to `config/cache.php` and defaults to `false`. This prevents PHP deserialization gadget-chain attacks in the event that `APP_KEY` is compromised.
+
+```php
+// config/cache.php
+'serializable_classes' => [
+    App\Data\CachedDashboardStats::class,
+    App\Support\CachedPricingSnapshot::class,
+],
+```
+
+If your application stores PHP objects in the cache, you must explicitly allowlist those classes.
+
+---
+
+## Starter kit changes
+
+The revamped starter kits introduced in Laravel 12 (React, Vue, Svelte, Livewire) continue to be the default in Laravel 13.
+
+**Inertia v3** also shipped alongside Laravel 13. Key changes include:
+
+- Simpler layout props
+- Vite 8 support
+- A new `withApp` callback
+- New Blade components
+
+If your project uses Inertia, consider upgrading it as well.
+
+---
+
+## Other improvements
+
+### AI-assisted upgrade (Laravel Boost)
+
+[Laravel Boost](https://github.com/laravel/boost) is a first-party MCP server that integrates with AI editors like Claude Code, Cursor, OpenCode, Gemini, and VS Code. Run the `/upgrade-laravel-v13` slash command to semi-automate your upgrade.
+
+```shell
+composer require laravel/boost:^2.0 --dev
+```
+
+### New contract methods
+
+| Contract                           | Added method(s)                                                                           |
+| ---------------------------------- | ----------------------------------------------------------------------------------------- |
+| `Bus\Dispatcher`                   | `dispatchAfterResponse`                                                                   |
+| `Routing\ResponseFactory`          | `eventStream` (SSE support)                                                               |
+| `Auth\MustVerifyEmail`             | `markEmailAsUnverified`                                                                   |
+| `Queue\Queue`                      | `pendingSize`, `delayedSize`, `reservedSize`, `creationTimeOfOldestPendingJob`            |
+| `Cache\Store` / `Cache\Repository` | `touch`                                                                                   |
+
+---
+
+## Summary
+
+Laravel 13 is a "few breaking changes, many new features" release. The upgrade path is straightforward for most applications, while the **AI SDK** and **semantic search** features open up entirely new possibilities for modern app development.
+
+Ready to upgrade from Laravel 12? See the step-by-step guide below.
+
+<Card title="Upgrade guide: Laravel 12 → 13" icon="arrow-up-right" href="/en/blog/upgrade-12-to-13">
+  A full list of breaking changes and a step-by-step upgrade walkthrough.
+</Card>

@@ -471,6 +471,24 @@
                 ]
               }
             ]
+          },
+          {
+            "tab": "Blog",
+            "groups": [
+              {
+                "group": "Laravel 13",
+                "pages": [
+                  "en/blog/laravel-13-new-features"
+                ]
+              },
+              {
+                "group": "Upgrade Guides",
+                "pages": [
+                  "en/blog/upgrade-12-to-13",
+                  "en/blog/upgrade-11-to-12"
+                ]
+              }
+            ]
           }
         ]
       }
