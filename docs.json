@@ -273,10 +273,10 @@
               {
                 "group": "パッケージ紹介",
                 "pages": [
-                  "jp/blog/laravel-pennant",
                   "jp/blog/livewire-introduction",
+                  "jp/blog/inertia-introduction",
                   "jp/blog/pest-introduction",
-                  "jp/blog/inertia-introduction"
+                  "jp/blog/laravel-pennant"
                 ]
               },
               {
