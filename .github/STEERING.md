@@ -19,5 +19,6 @@
 - [x] ページが増えてきたのでそろそろドメイン設定する準備。`index.mdx`はtabsの各カテゴリーに誘導する内容。日本語→英語の順で両方記載。トップの`/`を表示した時のデフォルト言語はnavigation.languagesの順番で決まる。どちらをデフォルトにするかは後で変えればいいので今は日本語で進める。
 - [x] URLとして最適化するためファイルを移動する。tutorialとintermediateは言語別ディレクトリ直下に移動。advancedとblogは変更なし。docs.jsonや各ファイルのリンクを修正。`mint broken-links`コマンドでリンク切れを確認できるので実行しながら修正。
 - [x] ドメイン設定して公開まで完了。引き続きページを増やしていく。
-- [ ] 手動実行でかなりページが増えたので元のデイリー実行に戻す。プレミアムリクエストは毎月余っているので、commander.mdの設定に従い必要と判断したら複数のissueを作る。
-- [ ] `lifecycle.md`のページを中級/ガイドに作成。docs.jsonではアーキテクチャグループをガイドの一番上に移動、lifecycleをアーキテクチャの一番上に配置。つまりlifecycleが中級のデフォルトページ。Laravelへの入門時はいきなりルーティングやコントローラーを触ってリクエストのライフサイクルを理解しなくても使えるけど、本格的に学ぶならライフサイクルの理解が一番重要。Laravelの入口は2つあって、`public/index.php`からのHttpと`artisan`からのConsole。MintlifyのMermaidも使って図解。
+- [x] 手動実行でかなりページが増えたので元のデイリー実行に戻す。プレミアムリクエストは毎月余っているので、commander.mdの設定に従い必要と判断したら複数のissueを作る。
+- [x] `lifecycle.md`のページを中級/ガイドに作成。docs.jsonではアーキテクチャグループをガイドの一番上に移動、lifecycleをアーキテクチャの一番上に配置。つまりlifecycleが中級のデフォルトページ。Laravelへの入門時はいきなりルーティングやコントローラーを触ってリクエストのライフサイクルを理解しなくても使えるけど、本格的に学ぶならライフサイクルの理解が一番重要。Laravelの入口は2つあって、`public/index.php`からのHttpと`artisan`からのConsole。MintlifyのMermaidも使って図解。
+- [ ] advancedにLaravel11以降のアプリケーション構造のページを追加。11.xブランチのreleases.mdにしか情報がないので現在は参照しにくくなっている。基本的な解説＋`Application::configure()`の先の`Illuminate\Foundation\Configuration\ApplicationBuilder`クラスまで深掘り。
