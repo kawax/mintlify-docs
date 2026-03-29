@@ -1,0 +1,276 @@
+---
+title: "Service Providers"
+description: "Learn how service providers bootstrap your Laravel application—registering bindings, booting services, and deferring providers for better performance."
+---
+
+## What are service providers?
+
+Service providers are the central place for bootstrapping all Laravel applications. Your own application, as well as every Laravel core service, is bootstrapped through service providers.
+
+"Bootstrapping" means **registering** things: service container bindings, event listeners, middleware, and routes. Service providers are where you configure your application.
+
+Laravel uses dozens of service providers internally to bootstrap core services like the mailer, queue, and cache. Many are "deferred" providers—they don't load on every request, only when their services are actually needed.
+
+All user-defined service providers are registered in `bootstrap/providers.php`.
+
+<Info>
+  To understand how service providers fit into the request lifecycle, read the [request lifecycle](https://laravel.com/docs/lifecycle) documentation.
+</Info>
+
+## Writing a service provider
+
+Every service provider extends `Illuminate\Support\ServiceProvider`. Most providers contain a `register` method and a `boot` method.
+
+Generate a new provider with Artisan—Laravel automatically adds it to `bootstrap/providers.php`:
+
+```shell
+php artisan make:provider RiakServiceProvider
+```
+
+### The register method
+
+Inside `register`, **only bind things into the service container**. Never register event listeners, routes, or other functionality here—another provider that hasn't loaded yet might provide a service you depend on.
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Services\Riak\Connection;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\ServiceProvider;
+
+class RiakServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        $this->app->singleton(Connection::class, function (Application $app) {
+            return new Connection(config('riak'));
+        });
+    }
+}
+```
+
+Inside any provider method you can access the container via `$this->app`.
+
+#### The bindings and singletons properties
+
+When registering many simple bindings, use the `bindings` and `singletons` properties instead of calling methods manually. The framework checks these properties automatically when loading the provider:
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Contracts\DowntimeNotifier;
+use App\Contracts\ServerProvider;
+use App\Services\DigitalOceanServerProvider;
+use App\Services\PingdomDowntimeNotifier;
+use App\Services\ServerToolsProvider;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * All of the container bindings that should be registered.
+     *
+     * @var array
+     */
+    public $bindings = [
+        ServerProvider::class => DigitalOceanServerProvider::class,
+    ];
+
+    /**
+     * All of the container singletons that should be registered.
+     *
+     * @var array
+     */
+    public $singletons = [
+        DowntimeNotifier::class => PingdomDowntimeNotifier::class,
+        ServerProvider::class => ServerToolsProvider::class,
+    ];
+}
+```
+
+### The boot method
+
+Use `boot` for everything else—registering view composers, event listeners, macros, or any other setup that depends on other services already being registered. The `boot` method is called after **all** other providers have been registered:
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
+
+class ComposerServiceProvider extends ServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        View::composer('profile', function ($view) {
+            // ...
+        });
+    }
+}
+```
+
+<Warning>
+  Don't mix up `register` and `boot`. Use `register` only for container bindings. Use `boot` for initialization that depends on other services.
+</Warning>
+
+#### Boot method dependency injection
+
+You can type-hint dependencies in `boot`—the service container injects them automatically:
+
+```php
+use Illuminate\Contracts\Routing\ResponseFactory;
+
+/**
+ * Bootstrap any application services.
+ */
+public function boot(ResponseFactory $response): void
+{
+    $response->macro('serialized', function (mixed $value) {
+        // ...
+    });
+}
+```
+
+## Registering providers
+
+All service providers are registered in `bootstrap/providers.php`. The file returns an array of class names:
+
+```php
+<?php
+
+return [
+    App\Providers\AppServiceProvider::class,
+];
+```
+
+`make:provider` adds the provider automatically. If you create a provider class by hand, add it to the array yourself:
+
+```php
+<?php
+
+return [
+    App\Providers\AppServiceProvider::class,
+    App\Providers\ComposerServiceProvider::class,
+];
+```
+
+## Building a payment service provider
+
+Here's a complete example of a custom service provider that registers a payment gateway:
+
+<Steps>
+  <Step title="Generate the provider">
+    ```shell
+    php artisan make:provider PaymentServiceProvider
+    ```
+  </Step>
+
+  <Step title="Register the binding">
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Contracts\PaymentGateway;
+    use App\Services\StripePaymentGateway;
+    use Illuminate\Contracts\Foundation\Application;
+    use Illuminate\Support\ServiceProvider;
+
+    class PaymentServiceProvider extends ServiceProvider
+    {
+        /**
+         * Register any application services.
+         */
+        public function register(): void
+        {
+            $this->app->singleton(PaymentGateway::class, function (Application $app) {
+                return new StripePaymentGateway(
+                    config('services.stripe.secret')
+                );
+            });
+        }
+
+        /**
+         * Bootstrap any application services.
+         */
+        public function boot(): void
+        {
+            //
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Confirm it's registered">
+    `make:provider` adds the provider for you. If you created the file manually, verify it appears in `bootstrap/providers.php`:
+
+    ```php
+    <?php
+
+    return [
+        App\Providers\AppServiceProvider::class,
+        App\Providers\PaymentServiceProvider::class,
+    ];
+    ```
+  </Step>
+</Steps>
+
+## Deferred providers
+
+If a provider only registers container bindings, you can defer loading it until one of its bindings is actually needed. This prevents it from loading on every request, improving performance.
+
+Implement `DeferrableProvider` and define a `provides` method that returns the bindings the provider registers:
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Services\Riak\Connection;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Support\DeferrableProvider;
+use Illuminate\Support\ServiceProvider;
+
+class RiakServiceProvider extends ServiceProvider implements DeferrableProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        $this->app->singleton(Connection::class, function (Application $app) {
+            return new Connection(config('riak'));
+        });
+    }
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array<int, string>
+     */
+    public function provides(): array
+    {
+        return [Connection::class];
+    }
+}
+```
+
+<Tip>
+  Deferred providers are well-suited for services that are only used in certain parts of the application. Avoiding unnecessary loads keeps boot time low.
+</Tip>
+
+<Card title="Service Container" icon="box" href="/en/service-container">
+  Learn how the container resolves classes and manages dependencies.
+</Card>

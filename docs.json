@@ -19,60 +19,60 @@
               {
                 "group": "はじめに",
                 "pages": [
-                  "jp/tutorial/introduction",
-                  "jp/tutorial/installation",
-                  "jp/tutorial/directory-structure"
+                  "jp/introduction",
+                  "jp/installation",
+                  "jp/directory-structure"
                 ]
               },
               {
                 "group": "基本",
                 "pages": [
-                  "jp/tutorial/routing",
-                  "jp/tutorial/views",
-                  "jp/tutorial/blade"
+                  "jp/routing",
+                  "jp/views",
+                  "jp/blade"
                 ]
               },
               {
                 "group": "コントローラー",
                 "pages": [
-                  "jp/tutorial/controllers"
+                  "jp/controllers"
                 ]
               },
               {
                 "group": "リクエスト処理",
                 "pages": [
-                  "jp/tutorial/middleware",
-                  "jp/tutorial/requests",
-                  "jp/tutorial/validation",
-                  "jp/tutorial/responses",
-                  "jp/tutorial/session"
+                  "jp/middleware",
+                  "jp/requests",
+                  "jp/validation",
+                  "jp/responses",
+                  "jp/session"
                 ]
               },
               {
                 "group": "データベース",
                 "pages": [
-                  "jp/tutorial/migrations",
-                  "jp/tutorial/eloquent",
-                  "jp/tutorial/eloquent-relationships"
+                  "jp/migrations",
+                  "jp/eloquent",
+                  "jp/eloquent-relationships"
                 ]
               },
               {
                 "group": "認証",
                 "pages": [
-                  "jp/tutorial/authentication",
-                  "jp/tutorial/starter-kits"
+                  "jp/authentication",
+                  "jp/starter-kits"
                 ]
               },
               {
                 "group": "テストとデプロイ",
                 "pages": [
-                  "jp/tutorial/testing"
+                  "jp/testing"
                 ]
               },
               {
                 "group": "AI開発支援",
                 "pages": [
-                  "jp/tutorial/ai"
+                  "jp/ai"
                 ]
               }
             ]
@@ -83,114 +83,114 @@
               {
                 "group": "データベース",
                 "pages": [
-                  "jp/intermediate/query-builder",
-                  "jp/intermediate/pagination"
+                  "jp/query-builder",
+                  "jp/pagination"
                 ]
               },
               {
                 "group": "アーキテクチャ",
                 "pages": [
-                  "jp/intermediate/service-container",
-                  "jp/intermediate/service-providers",
-                  "jp/intermediate/facades",
-                  "jp/intermediate/contracts"
+                  "jp/service-container",
+                  "jp/service-providers",
+                  "jp/facades",
+                  "jp/contracts"
                 ]
               },
               {
                 "group": "セキュリティ",
                 "pages": [
-                  "jp/intermediate/authorization"
+                  "jp/authorization"
                 ]
               },
               {
                 "group": "メールと通知",
                 "pages": [
-                  "jp/intermediate/mail",
-                  "jp/intermediate/notifications"
+                  "jp/mail",
+                  "jp/notifications"
                 ]
               },
               {
                 "group": "非同期処理",
                 "pages": [
-                  "jp/intermediate/queues",
-                  "jp/intermediate/concurrency"
+                  "jp/queues",
+                  "jp/concurrency"
                 ]
               },
               {
                 "group": "スケジューリング",
                 "pages": [
-                  "jp/intermediate/scheduling"
+                  "jp/scheduling"
                 ]
               },
               {
                 "group": "イベント",
                 "pages": [
-                  "jp/intermediate/events"
+                  "jp/events"
                 ]
               },
               {
                 "group": "キャッシュと最適化",
                 "pages": [
-                  "jp/intermediate/cache"
+                  "jp/cache"
                 ]
               },
               {
                 "group": "ヘルパーとコレクション",
                 "pages": [
-                  "jp/intermediate/helpers",
-                  "jp/intermediate/strings",
-                  "jp/intermediate/collections"
+                  "jp/helpers",
+                  "jp/strings",
+                  "jp/collections"
                 ]
               },
               {
                 "group": "国際化",
                 "pages": [
-                  "jp/intermediate/localization"
+                  "jp/localization"
                 ]
               },
               {
                 "group": "外部通信",
                 "pages": [
-                  "jp/intermediate/http-client"
+                  "jp/http-client"
                 ]
               },
               {
                 "group": "ファイルとストレージ",
                 "pages": [
-                  "jp/intermediate/filesystem"
+                  "jp/filesystem"
                 ]
               },
               {
                 "group": "デバッグと監視",
                 "pages": [
-                  "jp/intermediate/error-handling",
-                  "jp/intermediate/logging"
+                  "jp/error-handling",
+                  "jp/logging"
                 ]
               },
               {
                 "group": "コンソールとCLI",
                 "pages": [
-                  "jp/intermediate/artisan"
+                  "jp/artisan"
                 ]
               },
               {
                 "group": "フロントエンド",
                 "pages": [
-                  "jp/intermediate/vite"
+                  "jp/vite"
                 ]
               },
               {
                 "group": "AI開発",
                 "pages": [
-                  "jp/intermediate/boost",
-                  "jp/intermediate/mcp",
-                  "jp/intermediate/ai-sdk"
+                  "jp/boost",
+                  "jp/mcp",
+                  "jp/ai-sdk"
                 ]
               },
               {
                 "group": "リアルタイム通信",
                 "pages": [
-                  "jp/intermediate/broadcasting"
+                  "jp/broadcasting"
                 ]
               }
             ]
@@ -300,44 +300,44 @@
               {
                 "group": "Getting Started",
                 "pages": [
-                  "en/tutorial/introduction",
-                  "en/tutorial/installation",
-                  "en/tutorial/directory-structure"
+                  "en/introduction",
+                  "en/installation",
+                  "en/directory-structure"
                 ]
               },
               {
                 "group": "Basics",
                 "pages": [
-                  "en/tutorial/routing",
-                  "en/tutorial/views",
-                  "en/tutorial/blade",
-                  "en/tutorial/controllers",
-                  "en/tutorial/middleware",
-                  "en/tutorial/requests",
-                  "en/tutorial/validation",
-                  "en/tutorial/responses",
-                  "en/tutorial/session"
+                  "en/routing",
+                  "en/views",
+                  "en/blade",
+                  "en/controllers",
+                  "en/middleware",
+                  "en/requests",
+                  "en/validation",
+                  "en/responses",
+                  "en/session"
                 ]
               },
               {
                 "group": "Database",
                 "pages": [
-                  "en/tutorial/migrations",
-                  "en/tutorial/eloquent",
-                  "en/tutorial/eloquent-relationships"
+                  "en/migrations",
+                  "en/eloquent",
+                  "en/eloquent-relationships"
                 ]
               },
               {
                 "group": "Authentication",
                 "pages": [
-                  "en/tutorial/authentication",
-                  "en/tutorial/starter-kits"
+                  "en/authentication",
+                  "en/starter-kits"
                 ]
               },
               {
                 "group": "Testing and Deployment",
                 "pages": [
-                  "en/tutorial/testing"
+                  "en/testing"
                 ]
               }
             ]
@@ -348,94 +348,94 @@
               {
                 "group": "Architecture",
                 "pages": [
-                  "en/intermediate/service-container",
-                  "en/intermediate/service-providers",
-                  "en/intermediate/facades",
-                  "en/intermediate/contracts"
+                  "en/service-container",
+                  "en/service-providers",
+                  "en/facades",
+                  "en/contracts"
                 ]
               },
               {
                 "group": "Security",
                 "pages": [
-                  "en/intermediate/authorization"
+                  "en/authorization"
                 ]
               },
               {
                 "group": "Mail & Notifications",
                 "pages": [
-                  "en/intermediate/mail",
-                  "en/intermediate/notifications"
+                  "en/mail",
+                  "en/notifications"
                 ]
               },
               {
                 "group": "Async Processing",
                 "pages": [
-                  "en/intermediate/queues",
-                  "en/intermediate/events",
-                  "en/intermediate/concurrency",
-                  "en/intermediate/scheduling"
+                  "en/queues",
+                  "en/events",
+                  "en/concurrency",
+                  "en/scheduling"
                 ]
               },
               {
                 "group": "Caching",
                 "pages": [
-                  "en/intermediate/cache"
+                  "en/cache"
                 ]
               },
               {
                 "group": "Database",
                 "pages": [
-                  "en/intermediate/query-builder",
-                  "en/intermediate/pagination"
+                  "en/query-builder",
+                  "en/pagination"
                 ]
               },
               {
                 "group": "HTTP & External",
                 "pages": [
-                  "en/intermediate/http-client"
+                  "en/http-client"
                 ]
               },
               {
                 "group": "Console & CLI",
                 "pages": [
-                  "en/intermediate/artisan"
+                  "en/artisan"
                 ]
               },
               {
                 "group": "Frontend",
                 "pages": [
-                  "en/intermediate/vite"
+                  "en/vite"
                 ]
               },
               {
                 "group": "File Storage",
                 "pages": [
-                  "en/intermediate/filesystem"
+                  "en/filesystem"
                 ]
               },
               {
                 "group": "Debug & Monitoring",
                 "pages": [
-                  "en/intermediate/error-handling",
-                  "en/intermediate/logging"
+                  "en/error-handling",
+                  "en/logging"
                 ]
               },
               {
                 "group": "Collections",
                 "pages": [
-                  "en/intermediate/collections"
+                  "en/collections"
                 ]
               },
               {
                 "group": "Internationalization",
                 "pages": [
-                  "en/intermediate/localization"
+                  "en/localization"
                 ]
               },
               {
                 "group": "Real-time",
                 "pages": [
-                  "en/intermediate/broadcasting"
+                  "en/broadcasting"
                 ]
               }
             ]

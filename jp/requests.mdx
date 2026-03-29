@@ -1,0 +1,320 @@
+---
+title: "HTTPリクエスト"
+description: "LaravelのIlluminate\\Http\\Requestオブジェクトを使ってHTTPリクエストのデータを取得する方法を解説します。"
+---
+
+## Requestオブジェクトとは
+
+`Illuminate\Http\Request` は、アプリケーションが受け取るHTTPリクエストをオブジェクト指向で扱うためのクラスです。
+フォームデータ・クエリ文字列・ファイル・ヘッダーなど、リクエストに含まれるあらゆる情報にアクセスできます。
+
+## コントローラーへのリクエスト注入
+
+コントローラーのメソッドで `Illuminate\Http\Request` をタイプヒントすると、Laravelのサービスコンテナが自動的にリクエストインスタンスを注入します。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+
+class UserController extends Controller
+{
+    public function store(Request $request): RedirectResponse
+    {
+        $name = $request->input('name');
+
+        // ユーザーを保存する処理...
+
+        return redirect('/users');
+    }
+}
+```
+
+ルートクロージャでも同じようにタイプヒントできます。
+
+```php
+use Illuminate\Http\Request;
+
+Route::get('/', function (Request $request) {
+    // ...
+});
+```
+
+### ルートパラメーターとの併用
+
+コントローラーメソッドがルートパラメーターも受け取る場合は、`Request` の後にルートパラメーターを記述します。
+
+```php
+use App\Http\Controllers\UserController;
+
+Route::put('/user/{id}', [UserController::class, 'update']);
+```
+
+```php
+public function update(Request $request, string $id): RedirectResponse
+{
+    // $request でリクエストデータに、$id でルートパラメーターにアクセスできる
+
+    return redirect('/users');
+}
+```
+
+## リクエストデータの取得
+
+### すべての入力データを取得
+
+`all` メソッドで、すべての入力データを配列として取得します。
+HTMLフォームからのリクエストでも、XHRリクエストでも使えます。
+
+```php
+$input = $request->all();
+```
+
+### 特定のフィールドを取得
+
+`input` メソッドはHTTPメソッドに関わらず、リクエストペイロード全体（クエリ文字列を含む）から値を取得します。
+
+```php
+$name = $request->input('name');
+```
+
+値が存在しない場合のデフォルト値を第2引数で指定できます。
+
+```php
+$name = $request->input('name', 'Sally');
+```
+
+配列の入力にはドット記法でアクセスします。
+
+```php
+$name = $request->input('products.0.name');
+
+$names = $request->input('products.*.name');
+```
+
+### クエリ文字列の取得
+
+`query` メソッドはクエリ文字列（URLの `?` 以降）からのみ値を取得します。
+
+```php
+$name = $request->query('name');
+
+$name = $request->query('name', 'Helen');
+
+// すべてのクエリ文字列を配列で取得
+$query = $request->query();
+```
+
+<Info>
+  `input` はリクエストボディとクエリ文字列の両方を対象にしますが、`query` はクエリ文字列のみを対象にします。
+  フォームのPOSTデータとURLパラメーターを区別したい場合は `query` を使いましょう。
+</Info>
+
+### 型付きの取得
+
+`input` 以外にも、型を指定して入力値を取得するメソッドがあります。
+
+```php
+// 文字列として取得（Stringableインスタンス）
+$name = $request->string('name')->trim();
+
+// 整数として取得
+$perPage = $request->integer('per_page');
+
+// 真偽値として取得（"1", "true", "on", "yes" → true）
+$archived = $request->boolean('archived');
+
+// 配列として取得
+$versions = $request->array('versions');
+
+// 日付をCarbonインスタンスとして取得
+$birthday = $request->date('birthday');
+```
+
+### 動的プロパティ
+
+フィールド名をそのままプロパティとしてアクセスすることもできます。
+
+```php
+$name = $request->name;
+```
+
+<Tip>
+  動的プロパティでは、まずリクエストペイロードから値を探し、見つからなければルートパラメーターを検索します。
+</Tip>
+
+### 入力データの一部を取得
+
+`only` と `except` で入力データのサブセットを取得できます。
+
+```php
+$input = $request->only(['username', 'password']);
+
+$input = $request->except(['credit_card']);
+```
+
+## 入力の存在確認
+
+`has` メソッドで値がリクエストに含まれているか確認します。
+
+```php
+if ($request->has('name')) {
+    // ...
+}
+
+// 複数のキーをすべて含んでいるか確認
+if ($request->has(['name', 'email'])) {
+    // ...
+}
+```
+
+空文字を除いて値が存在するかは `filled` を使います。
+
+```php
+if ($request->filled('name')) {
+    // ...
+}
+```
+
+値が存在しない、または空文字の場合は `isNotFilled` を使います。
+
+```php
+if ($request->isNotFilled('name')) {
+    // ...
+}
+```
+
+## リクエストのパスとメソッド確認
+
+### パスの取得と確認
+
+```php
+// パスを取得（例: "foo/bar"）
+$uri = $request->path();
+
+// パターンと一致するか確認（ワイルドカード * が使える）
+if ($request->is('admin/*')) {
+    // ...
+}
+
+// 名前付きルートと一致するか確認
+if ($request->routeIs('admin.*')) {
+    // ...
+}
+```
+
+### URLの取得
+
+```php
+// クエリ文字列なしのURL
+$url = $request->url();
+
+// クエリ文字列を含むURL
+$urlWithQueryString = $request->fullUrl();
+```
+
+### HTTPメソッドの確認
+
+`isMethod` でHTTPメソッドを確認できます。
+
+```php
+$method = $request->method();
+
+if ($request->isMethod('post')) {
+    // POSTリクエストのみ処理する
+}
+```
+
+## ファイルアップロード
+
+### アップロードされたファイルの取得
+
+`file` メソッドでアップロードされたファイルを取得します。
+`Illuminate\Http\UploadedFile` インスタンスが返ります。
+
+```php
+$file = $request->file('photo');
+
+// 動的プロパティでも取得できる
+$file = $request->photo;
+```
+
+ファイルが存在するか確認するには `hasFile` を使います。
+
+```php
+if ($request->hasFile('photo')) {
+    // ...
+}
+```
+
+### ファイルの保存
+
+`store` メソッドでファイルをストレージに保存します。
+ファイル名は自動的に生成されます。
+
+```php
+// デフォルトディスクの "images" ディレクトリに保存
+$path = $request->photo->store('images');
+
+// S3に保存
+$path = $request->photo->store('images', 's3');
+```
+
+ファイル名を指定したい場合は `storeAs` を使います。
+
+```php
+$path = $request->photo->storeAs('images', 'filename.jpg');
+```
+
+<Warning>
+  ファイルアップロードを受け付ける場合は、必ずファイルの種類やサイズを検証してください。
+  バリデーションを使って安全に処理することを推奨します。
+</Warning>
+
+## 実例：フォームデータの受け取り
+
+ユーザー登録フォームのデータをコントローラーで受け取る例です。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+
+class RegisterController extends Controller
+{
+    public function store(Request $request): RedirectResponse
+    {
+        // フォームデータを取得
+        $name = $request->input('name');
+        $email = $request->input('email');
+        $password = $request->input('password');
+
+        // 必要なデータのみ取得
+        $data = $request->only(['name', 'email', 'password']);
+
+        // ユーザーを作成する処理...
+
+        return redirect('/dashboard');
+    }
+}
+```
+
+対応するルートを定義します。
+
+```php
+use App\Http\Controllers\RegisterController;
+
+Route::post('/register', [RegisterController::class, 'store']);
+```
+
+## 次のステップ
+
+<Card title="ミドルウェア" icon="shield" href="/jp/middleware">
+  リクエストをフィルタリングするミドルウェアの使い方を振り返ります。
+</Card>

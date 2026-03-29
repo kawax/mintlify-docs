@@ -1,0 +1,599 @@
+---
+title: "認可(ゲートとポリシー)"
+description: "Laravelのゲートとポリシーを使ってユーザーのアクション権限を管理する方法を解説します。"
+---
+
+## 認証と認可の違い
+
+**認証(Authentication)**はユーザーが「誰であるか」を確認します。ログイン処理がその代表です。
+**認可(Authorization)**はそのユーザーが「何をできるか」を判断します。たとえば、自分の投稿だけを編集できる、管理者だけが設定を変更できる、といった制御です。
+
+認証ページ(`jp/authentication`)でログイン機能を実装したら、次のステップが認可です。
+
+<Info>
+  Laravelの認可機能は、ゲート(Gates)とポリシー(Policies)の2つのアプローチを提供します。どちらを使うかはユースケースによって判断します。
+</Info>
+
+**使い分けの基準**
+
+| シナリオ | 推奨 |
+| --- | --- |
+| 特定のモデルに紐づかないシンプルな判定 | ゲート |
+| モデルに対するCRUD操作の権限管理 | ポリシー |
+| 管理者ダッシュボードへのアクセス制御 | ゲート |
+| ブログ記事の投稿・編集・削除権限 | ポリシー |
+
+## ゲート(Gates)
+
+ゲートはクロージャベースのシンプルな認可チェックです。特定のモデルに紐づかない権限判定に向いています。
+
+### ゲートを定義する
+
+ゲートは `App\Providers\AppServiceProvider` の `boot` メソッド内で `Gate::define()` を使って定義します。
+
+```php
+// app/Providers/AppServiceProvider.php
+
+use App\Models\Post;
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+
+public function boot(): void
+{
+    Gate::define('update-post', function (User $user, Post $post) {
+        return $user->id === $post->user_id;
+    });
+}
+```
+
+ゲートのクロージャは常に第1引数で現在認証中のユーザーを受け取ります。第2引数以降に対象のモデルなど追加情報を渡せます。
+
+### ゲートで権限を確認する
+
+コントローラーでゲートを使って権限を確認するには `Gate::allows()` または `Gate::denies()` を使います。
+
+```php
+use Illuminate\Support\Facades\Gate;
+
+public function update(Request $request, Post $post): RedirectResponse
+{
+    if (! Gate::allows('update-post', $post)) {
+        abort(403);
+    }
+
+    // 投稿を更新する処理...
+
+    return redirect('/posts');
+}
+```
+
+### Gate::authorize() で例外を投げる
+
+権限がない場合に自動で403レスポンスを返すには `Gate::authorize()` を使います。`abort(403)` を書く手間が省けます。
+
+```php
+public function update(Request $request, Post $post): RedirectResponse
+{
+    Gate::authorize('update-post', $post);
+
+    // 権限があればここに到達する
+    // 投稿を更新する処理...
+
+    return redirect('/posts');
+}
+```
+
+<Tip>
+  `Gate::authorize()` は権限がない場合に `Illuminate\Auth\Access\AuthorizationException` を投げます。Laravelはこれを自動的に403 HTTPレスポンスに変換します。
+</Tip>
+
+### 管理者バイパス(before メソッド)
+
+管理者ユーザーにすべての権限を与えたい場合は `Gate::before()` を使います。
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
+
+public function boot(): void
+{
+    // $ability には実行しようとしているゲート名('update-post' など)が入る
+    Gate::before(function (User $user, string $ability) {
+        if ($user->isAdministrator()) {
+            return true;
+        }
+    });
+
+    Gate::define('update-post', function (User $user, Post $post) {
+        return $user->id === $post->user_id;
+    });
+}
+```
+
+`before` のクロージャが `null` 以外の値を返すと、その結果が最終的な権限判定になります。`null` を返すか何も返さない場合は、通常のゲート判定に進みます。
+
+### Bladeテンプレートでの @can / @cannot
+
+テンプレートでゲート判定を使うには `@can` と `@cannot` ディレクティブが便利です。
+
+```blade
+@can('update-post', $post)
+    <a href="{{ route('posts.edit', $post) }}">編集</a>
+@endcan
+
+@cannot('update-post', $post)
+    <p>この投稿を編集する権限がありません。</p>
+@endcannot
+```
+
+## ポリシー(Policies)
+
+ポリシーは特定のモデルに関連する認可ロジックをクラスにまとめたものです。`Post` モデルに対する作成・閲覧・編集・削除の権限管理には、ゲートよりもポリシーが適しています。
+
+### ポリシーを生成する
+
+`make:policy` Artisanコマンドでポリシークラスを生成します。
+
+```shell
+php artisan make:policy PostPolicy
+```
+
+モデルに対応するCRUDメソッドをすべて含むひな型を生成するには `--model` オプションを使います。
+
+```shell
+php artisan make:policy PostPolicy --model=Post
+```
+
+`app/Policies/PostPolicy.php` が生成されます。
+
+### モデルとポリシーの自動検出
+
+Laravelはデフォルトで命名規則に従ってポリシーを自動的に検出します。
+
+- モデル: `app/Models/Post.php`
+- ポリシー: `app/Policies/PostPolicy.php`
+
+この命名規則を守れば、ポリシーの登録作業は不要です。
+
+<Info>
+  命名規則に従わない場合や手動で登録したい場合は、`AppServiceProvider` の `boot` メソッドで `Gate::policy()` を使います。
+
+  ```php
+  use App\Models\Post;
+  use App\Policies\PostPolicy;
+  use Illuminate\Support\Facades\Gate;
+
+  Gate::policy(Post::class, PostPolicy::class);
+  ```
+
+  Laravel 13では、モデルに `#[UsePolicy]` アトリビュートを付けて宣言的に登録することもできます。
+
+  ```php
+  use App\Policies\PostPolicy;
+  use Illuminate\Database\Eloquent\Attributes\UsePolicy;
+
+  #[UsePolicy(PostPolicy::class)]
+  class Post extends Model {}
+  ```
+</Info>
+
+### ポリシーメソッドを実装する
+
+`--model` オプションで生成したポリシーには、標準的なCRUDアクションに対応するメソッドが含まれています。
+
+```php
+<?php
+
+namespace App\Policies;
+
+use App\Models\Post;
+use App\Models\User;
+
+class PostPolicy
+{
+    /**
+     * 投稿一覧を閲覧できるか
+     */
+    public function viewAny(User $user): bool
+    {
+        return true; // 認証済みユーザーは誰でも閲覧可能
+    }
+
+    /**
+     * 特定の投稿を閲覧できるか
+     */
+    public function view(User $user, Post $post): bool
+    {
+        return true; // 認証済みユーザーは誰でも閲覧可能
+    }
+
+    /**
+     * 投稿を作成できるか
+     */
+    public function create(User $user): bool
+    {
+        return true; // 認証済みユーザーは誰でも投稿可能
+    }
+
+    /**
+     * 投稿を更新できるか
+     */
+    public function update(User $user, Post $post): bool
+    {
+        return $user->id === $post->user_id; // 自分の投稿のみ編集可能
+    }
+
+    /**
+     * 投稿を削除できるか
+     */
+    public function delete(User $user, Post $post): bool
+    {
+        return $user->id === $post->user_id; // 自分の投稿のみ削除可能
+    }
+}
+```
+
+### 管理者バイパス(before メソッド)
+
+ポリシーでも `before` メソッドを定義することで、管理者にすべての権限を与えられます。
+
+```php
+/**
+ * 他のポリシーメソッドより先に実行される事前チェック
+ * $ability にはポリシーメソッド名('update', 'delete' など)が入る
+ */
+public function before(User $user, string $ability): bool|null
+{
+    if ($user->isAdministrator()) {
+        return true; // 管理者はすべての操作を許可
+    }
+
+    return null; // null を返すと通常のポリシーメソッドへ進む
+}
+```
+
+<Warning>
+  `before` メソッドはポリシークラスに対応するメソッドが存在する場合にのみ呼び出されます。たとえば `update` メソッドが存在しない場合、`before` も呼び出されません。
+</Warning>
+
+## コントローラーでポリシーを使う
+
+### authorize() メソッド
+
+Laravelのコントローラーには `authorize()` ヘルパーメソッドがあります(ベースコントローラーを使わない場合は `Gate::authorize()` を使います)。
+
+<Tabs>
+  <Tab title="Gate::authorize()">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use App\Models\Post;
+    use Illuminate\Http\RedirectResponse;
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\Gate;
+
+    class PostController extends Controller
+    {
+        public function update(Request $request, Post $post): RedirectResponse
+        {
+            Gate::authorize('update', $post);
+
+            // 投稿を更新する処理...
+
+            return redirect()->route('posts.index');
+        }
+
+        public function store(Request $request): RedirectResponse
+        {
+            Gate::authorize('create', Post::class);
+
+            // 投稿を作成する処理...
+
+            return redirect()->route('posts.index');
+        }
+
+        public function destroy(Post $post): RedirectResponse
+        {
+            Gate::authorize('delete', $post);
+
+            $post->delete();
+
+            return redirect()->route('posts.index');
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="User::can() / cannot()">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use App\Models\Post;
+    use Illuminate\Http\RedirectResponse;
+    use Illuminate\Http\Request;
+
+    class PostController extends Controller
+    {
+        public function update(Request $request, Post $post): RedirectResponse
+        {
+            if ($request->user()->cannot('update', $post)) {
+                abort(403);
+            }
+
+            // 投稿を更新する処理...
+
+            return redirect()->route('posts.index');
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### authorizeResource() でRESTfulポリシーを一括登録
+
+`authorizeResource()` をコンストラクターで呼ぶと、コントローラーの各アクションに対応するポリシーメソッドを自動的に紐付けます。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Post;
+
+class PostController extends Controller
+{
+    public function __construct()
+    {
+        $this->authorizeResource(Post::class, 'post');
+    }
+
+    // index(), show(), create(), store(), edit(), update(), destroy() に
+    // 対応するポリシーメソッドが自動で適用される
+}
+```
+
+コントローラーアクションとポリシーメソッドの対応関係:
+
+| コントローラーアクション | ポリシーメソッド |
+| --- | --- |
+| `index` | `viewAny` |
+| `show` | `view` |
+| `create` / `store` | `create` |
+| `edit` / `update` | `update` |
+| `destroy` | `delete` |
+
+<Tip>
+  `authorizeResource()` を使うと、各アクションに個別で `authorize()` を書く必要がなくなります。RESTfulなリソースコントローラーと組み合わせると特に便利です。
+</Tip>
+
+## ミドルウェアでの認可
+
+ルートレベルで認可チェックを行うには `can` ミドルウェアを使います。
+
+```php
+use App\Models\Post;
+
+// 投稿の更新権限があるユーザーのみアクセス可能
+Route::put('/posts/{post}', [PostController::class, 'update'])
+    ->middleware('can:update,post');
+
+// 投稿の作成権限があるユーザーのみアクセス可能
+Route::post('/posts', [PostController::class, 'store'])
+    ->middleware('can:create,App\Models\Post');
+```
+
+`can` メソッドを使ったより簡潔な記述:
+
+```php
+Route::put('/posts/{post}', [PostController::class, 'update'])
+    ->can('update', 'post');
+```
+
+## Bladeテンプレートでポリシーを使う
+
+ポリシーを登録すると、Bladeの `@can` / `@cannot` ディレクティブでもポリシーが自動的に使われます。
+
+```blade
+{{-- 投稿の編集ボタンは権限を持つユーザーにのみ表示 --}}
+@can('update', $post)
+    <a href="{{ route('posts.edit', $post) }}" class="btn">編集</a>
+@endcan
+
+{{-- 投稿の削除ボタンも同様 --}}
+@can('delete', $post)
+    <form method="POST" action="{{ route('posts.destroy', $post) }}">
+        @csrf
+        @method('DELETE')
+        <button type="submit">削除</button>
+    </form>
+@endcan
+
+{{-- 新規投稿ボタン --}}
+@can('create', App\Models\Post::class)
+    <a href="{{ route('posts.create') }}">新規投稿</a>
+@endcan
+```
+
+## 実践例: ブログ記事の権限管理
+
+ブログアプリで「投稿者だけが自分の記事を編集・削除できる」権限を実装する例です。
+
+<Steps>
+  <Step title="ポリシーを生成する">
+    ```shell
+    php artisan make:policy PostPolicy --model=Post
+    ```
+  </Step>
+
+  <Step title="ポリシーメソッドを実装する">
+    ```php
+    <?php
+
+    namespace App\Policies;
+
+    use App\Models\Post;
+    use App\Models\User;
+
+    class PostPolicy
+    {
+        /**
+         * 管理者にすべての権限を付与する
+         */
+        public function before(User $user, string $ability): bool|null
+        {
+            if ($user->is_admin) {
+                return true;
+            }
+
+            return null;
+        }
+
+        public function viewAny(User $user): bool
+        {
+            return true;
+        }
+
+        public function view(User $user, Post $post): bool
+        {
+            return true;
+        }
+
+        public function create(User $user): bool
+        {
+            return true;
+        }
+
+        public function update(User $user, Post $post): bool
+        {
+            return $user->id === $post->user_id;
+        }
+
+        public function delete(User $user, Post $post): bool
+        {
+            return $user->id === $post->user_id;
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="コントローラーに authorizeResource() を追加する">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use App\Models\Post;
+    use Illuminate\Http\RedirectResponse;
+    use Illuminate\Http\Request;
+    use Illuminate\View\View;
+
+    class PostController extends Controller
+    {
+        public function __construct()
+        {
+            $this->authorizeResource(Post::class, 'post');
+        }
+
+        public function index(): View
+        {
+            $posts = Post::latest()->paginate(10);
+            return view('posts.index', compact('posts'));
+        }
+
+        public function store(Request $request): RedirectResponse
+        {
+            $post = $request->user()->posts()->create(
+                $request->validate([
+                    'title' => ['required', 'string', 'max:255'],
+                    'body'  => ['required', 'string'],
+                ])
+            );
+
+            return redirect()->route('posts.show', $post);
+        }
+
+        public function update(Request $request, Post $post): RedirectResponse
+        {
+            $post->update(
+                $request->validate([
+                    'title' => ['required', 'string', 'max:255'],
+                    'body'  => ['required', 'string'],
+                ])
+            );
+
+            return redirect()->route('posts.show', $post);
+        }
+
+        public function destroy(Post $post): RedirectResponse
+        {
+            $post->delete();
+
+            return redirect()->route('posts.index');
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Bladeテンプレートに権限チェックを追加する">
+    ```blade
+    {{-- resources/views/posts/show.blade.php --}}
+    <h1>{{ $post->title }}</h1>
+    <p>{{ $post->body }}</p>
+    <p>投稿者: {{ $post->user->name }}</p>
+
+    @can('update', $post)
+        <a href="{{ route('posts.edit', $post) }}">編集</a>
+    @endcan
+
+    @can('delete', $post)
+        <form method="POST" action="{{ route('posts.destroy', $post) }}">
+            @csrf
+            @method('DELETE')
+            <button type="submit">削除</button>
+        </form>
+    @endcan
+    ```
+  </Step>
+</Steps>
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="ゲートとポリシーの使い分け">
+    - **ゲート**: 特定のモデルに紐づかないシンプルな権限判定。管理者ダッシュボードへのアクセスや、グローバルな設定の変更権限など。
+    - **ポリシー**: モデルに対するCRUD操作の権限管理。`Post`、`Order`、`Comment` といったリソースごとにポリシークラスを作成する。
+  </Accordion>
+
+  <Accordion title="よく使うAPIまとめ">
+    ```php
+    // ゲートで確認
+    Gate::allows('update-post', $post);      // true/false
+    Gate::denies('update-post', $post);      // true/false
+    Gate::authorize('update-post', $post);   // 失敗時に例外
+
+    // ユーザーモデルで確認
+    $user->can('update', $post);     // true/false
+    $user->cannot('update', $post);  // true/false
+
+    // コントローラーで確認
+    Gate::authorize('update', $post);        // 失敗時に403
+
+    // Bladeで確認
+    @can('update', $post) ... @endcan
+    @cannot('update', $post) ... @endcannot
+    ```
+  </Accordion>
+
+  <Accordion title="よく使うArtisanコマンド">
+    ```shell
+    # 空のポリシーを生成
+    php artisan make:policy PostPolicy
+
+    # モデルに対応するCRUDメソッド付きで生成
+    php artisan make:policy PostPolicy --model=Post
+    ```
+  </Accordion>
+</AccordionGroup>

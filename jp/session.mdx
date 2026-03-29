@@ -1,0 +1,381 @@
+---
+title: "セッション"
+description: "LaravelのHTTPセッションを使ってリクエスト間でデータを保持する方法"
+---
+
+## セッションとは
+
+HTTPはステートレスなプロトコルです。つまり、リクエストをまたいでユーザーの情報を保持する仕組みがHTTP自体にはありません。
+Laravelのセッション機能は、複数のリクエストにわたってユーザーのデータを保持する手段を提供します。
+
+ログイン状態、カート内の商品、フォーム入力中のデータなど、リクエストをまたいで保持したい情報をセッションに保存します。
+
+## セッションドライバの設定
+
+セッションの設定は `config/session.php` に記述されています。
+`SESSION_DRIVER` 環境変数（`.env` ファイル）でドライバを切り替えられます。
+
+```ini
+SESSION_DRIVER=database
+```
+
+Laravelが標準でサポートするドライバは以下のとおりです。
+
+| ドライバ | 概要 |
+| --- | --- |
+| `file` | `storage/framework/sessions` にファイルとして保存する（デフォルト） |
+| `cookie` | 暗号化されたCookieとしてブラウザに保存する |
+| `database` | データベースのテーブルに保存する |
+| `redis` | Redisに保存する（高速） |
+| `array` | PHPの配列に保存する（テスト用。リクエストをまたいで保持されない） |
+
+<Info>
+  Laravelのデフォルトプロジェクトでは `database` ドライバが設定されています。`database` ドライバを使う場合は `sessions` テーブルが必要ですが、デフォルトのマイグレーションに含まれているのでそのまま使えます。
+</Info>
+
+## セッションへのアクセス方法
+
+セッションにアクセスするには、`Request` インスタンスのメソッドを使う方法と、グローバルヘルパー `session()` を使う方法の2つがあります。
+
+### Requestインスタンスを使う方法
+
+コントローラーのメソッドに `Request` をタイプヒントとして受け取り、`$request->session()` でセッションにアクセスします。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class DashboardController extends Controller
+{
+    public function index(Request $request): View
+    {
+        $username = $request->session()->get('username');
+
+        return view('dashboard', ['username' => $username]);
+    }
+}
+```
+
+### グローバルヘルパー `session()` を使う方法
+
+`session()` ヘルパー関数はコントローラーやビューなど、どこからでも呼び出せます。
+
+```php
+// 値を取得する
+$value = session('key');
+
+// デフォルト値付きで取得する
+$value = session('key', 'デフォルト値');
+
+// 値を保存する
+session(['key' => 'value']);
+```
+
+<Tip>
+  どちらの方法でもテスト時に `assertSessionHas` メソッドで検証できます。コントローラー内では `$request->session()` を使うと依存関係が明示されてわかりやすくなります。
+</Tip>
+
+## セッションの操作
+
+### データの取得
+
+```php
+// キーを指定して取得する
+$value = $request->session()->get('key');
+
+// デフォルト値を指定する
+$value = $request->session()->get('key', 'default');
+
+// デフォルト値をクロージャで指定する
+$value = $request->session()->get('key', function () {
+    return 'default';
+});
+
+// すべてのセッションデータを取得する
+$data = $request->session()->all();
+```
+
+### データの存在チェック
+
+```php
+// 値が存在し、かつ null でない場合に true
+if ($request->session()->has('user_id')) {
+    // ...
+}
+
+// null でも存在すれば true
+if ($request->session()->exists('user_id')) {
+    // ...
+}
+
+// 存在しない場合に true
+if ($request->session()->missing('user_id')) {
+    // ...
+}
+```
+
+`has` と `exists` の違いに注意してください。
+
+| メソッド | `null` の場合 |
+| --- | --- |
+| `has` | `false` を返す |
+| `exists` | `true` を返す |
+
+### データの保存
+
+```php
+// Requestインスタンス経由
+$request->session()->put('user_name', '田中');
+
+// グローバルヘルパー経由
+session(['user_name' => '田中']);
+
+// 配列への追加
+$request->session()->push('cart.items', ['id' => 1, 'name' => '商品A']);
+```
+
+### データの削除
+
+```php
+// 特定のキーを削除する
+$request->session()->forget('user_name');
+
+// 複数のキーをまとめて削除する
+$request->session()->forget(['user_name', 'cart']);
+
+// すべてのセッションデータを削除する
+$request->session()->flush();
+```
+
+## フラッシュデータ
+
+フラッシュデータは**次のリクエストだけ**有効なセッションデータです。
+フォームの送信完了メッセージやエラーメッセージなど、一度だけ表示したい情報に使います。
+
+### `flash()` でデータを保存する
+
+```php
+$request->session()->flash('status', '投稿を保存しました。');
+```
+
+このデータは次のリクエストで参照できますが、その後は自動的に削除されます。
+
+### フラッシュデータを延長する
+
+```php
+// すべてのフラッシュデータをもう1リクエスト延長する
+$request->session()->reflash();
+
+// 特定のキーだけ延長する
+$request->session()->keep(['status', 'message']);
+```
+
+### Bladeでフラッシュメッセージを表示する
+
+```blade
+{{-- resources/views/layouts/app.blade.php --}}
+
+@if (session('success'))
+    <div class="alert alert-success">
+        {{ session('success') }}
+    </div>
+@endif
+
+@if (session('error'))
+    <div class="alert alert-danger">
+        {{ session('error') }}
+    </div>
+@endif
+```
+
+<Tip>
+  フラッシュメッセージの表示はレイアウトファイル（`layouts/app.blade.php` など）に書いておくと、すべてのページで一貫して表示されます。
+</Tip>
+
+## 実用例：フォーム送信後のメッセージ表示
+
+フォームを送信したあと、成功メッセージをセッションに保存してリダイレクトし、次のページで表示するのはWebアプリの定番パターンです。
+
+<Steps>
+  <Step title="ルートの定義">
+    ```php
+    use App\Http\Controllers\PostController;
+
+    Route::get('/posts', [PostController::class, 'index'])->name('posts.index');
+    Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
+    Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+    ```
+  </Step>
+  <Step title="コントローラーの実装">
+    フォーム送信を受け付ける `store` メソッドで、保存後に成功メッセージを付けてリダイレクトします。
+
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use App\Models\Post;
+    use Illuminate\Http\RedirectResponse;
+    use Illuminate\Http\Request;
+    use Illuminate\View\View;
+
+    class PostController extends Controller
+    {
+        public function index(): View
+        {
+            $posts = Post::latest()->get();
+
+            return view('posts.index', ['posts' => $posts]);
+        }
+
+        public function create(): View
+        {
+            return view('posts.create');
+        }
+
+        public function store(Request $request): RedirectResponse
+        {
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'body'  => 'required|string',
+            ]);
+
+            Post::create($validated);
+
+            return redirect()
+                ->route('posts.index')
+                ->with('success', '投稿を作成しました。');
+        }
+    }
+    ```
+
+    `redirect()->with('success', '...')` はリダイレクト先へフラッシュデータを渡すショートカットです。
+  </Step>
+  <Step title="レイアウトでメッセージを表示する">
+    `resources/views/layouts/app.blade.php` にフラッシュメッセージの表示部分を追加します。
+
+    ```blade
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>My App</title>
+    </head>
+    <body>
+        {{-- フラッシュメッセージ --}}
+        @if (session('success'))
+            <div class="alert alert-success">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="alert alert-danger">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        @yield('content')
+    </body>
+    </html>
+    ```
+  </Step>
+  <Step title="一覧ページのビューを作成する">
+    ```blade
+    {{-- resources/views/posts/index.blade.php --}}
+
+    @extends('layouts.app')
+
+    @section('content')
+    <h1>投稿一覧</h1>
+
+    @foreach ($posts as $post)
+        <div>
+            <h2>{{ $post->title }}</h2>
+            <p>{{ $post->body }}</p>
+        </div>
+    @endforeach
+    @endsection
+    ```
+
+    投稿が保存されてリダイレクトされると、この一覧ページの上部に「投稿を作成しました。」というメッセージが1回だけ表示されます。
+  </Step>
+</Steps>
+
+### バリデーションエラーと組み合わせたパターン
+
+バリデーション失敗時は `back()->withErrors()` と組み合わせて使います。
+Laravelはバリデーション失敗時に自動でエラーをフラッシュデータとして保持するため、Bladeで `$errors` 変数を使えます。
+
+```php
+public function store(Request $request): RedirectResponse
+{
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'body'  => 'required|string',
+    ]);
+
+    Post::create($validated);
+
+    // 成功時: フラッシュメッセージ付きでリダイレクト
+    return redirect()
+        ->route('posts.index')
+        ->with('success', '投稿を作成しました。');
+
+    // バリデーション失敗時はLaravelが自動的に back()->withErrors()->withInput() を実行する
+}
+```
+
+```blade
+{{-- フォームページ --}}
+
+@if ($errors->any())
+    <div class="alert alert-danger">
+        <ul>
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
+<form method="POST" action="{{ route('posts.store') }}">
+    @csrf
+
+    <div>
+        <label for="title">タイトル</label>
+        <input
+            id="title"
+            type="text"
+            name="title"
+            value="{{ old('title') }}"
+        />
+        @error('title')
+            <span>{{ $message }}</span>
+        @enderror
+    </div>
+
+    <div>
+        <label for="body">本文</label>
+        <textarea id="body" name="body">{{ old('body') }}</textarea>
+        @error('body')
+            <span>{{ $message }}</span>
+        @enderror
+    </div>
+
+    <button type="submit">投稿する</button>
+</form>
+```
+
+<Warning>
+  `flush()` はセッションのすべてのデータを削除します。ログイン状態なども失われるため、ユーザーのデータだけを削除したい場合は `forget()` で特定のキーを指定してください。
+</Warning>
+
+## 次のステップ
+
+<Card title="バリデーション" icon="check-circle" href="/jp/validation">
+  フォームの入力データをバリデーションで検証する方法を確認します。
+</Card>

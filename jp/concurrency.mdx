@@ -1,0 +1,255 @@
+---
+title: "並行処理"
+description: "Laravel 13のConcurrencyファサードを使って複数の処理を同時実行し、アプリケーションのパフォーマンスを向上させる方法を解説します。"
+---
+
+## 並行処理とは
+
+複数の外部APIへのリクエストやデータベースの集計処理など、互いに依存しない複数の処理を**順番に実行**すると、合計時間はそれぞれの処理時間の合計になります。
+これらを**同時に実行**すれば、合計時間は最も時間のかかる処理1件分に短縮できます。
+
+Laravelの `Concurrency` ファサードは、こうした並行実行をシンプルなAPIで実現します。
+
+<Info>
+  `Concurrency` ファサードはLaravel 11で導入され、Laravel 13でも引き続き利用できます。
+  デフォルトドライバは子PHPプロセスを使用するため、追加パッケージなしで動作します。
+</Info>
+
+## 仕組み
+
+`Concurrency` ファサードは、渡されたクロージャをシリアライズして隠しArtisanコマンドに送り、それぞれ別のPHPプロセスとして実行します。
+処理が完了すると戻り値をシリアライズして親プロセスに返します。
+
+3つのドライバが用意されています。
+
+| ドライバ | 説明 |
+| --- | --- |
+| `process` | デフォルト。子PHPプロセスを起動して実行する。Webリクエストでも動作する |
+| `fork` | `spatie/fork` パッケージが必要。プロセスをforkするためCLIのみで動作するが高速 |
+| `sync` | 並行実行せず順番に実行する。テスト用途に向いている |
+
+## 基本的な使い方
+
+### Concurrency::run()
+
+`run()` メソッドにクロージャの配列を渡すと、それらが並行実行されます。
+戻り値は各クロージャの返した値を配列で受け取ります。
+
+```php
+use Illuminate\Support\Facades\Concurrency;
+use Illuminate\Support\Facades\DB;
+
+[$userCount, $orderCount] = Concurrency::run([
+    fn () => DB::table('users')->count(),
+    fn () => DB::table('orders')->count(),
+]);
+```
+
+配列のデストラクチャリングで各結果を変数に受け取れます。
+クロージャの順番と戻り値の順番は一致します。
+
+### ドライバの指定
+
+特定のドライバを使いたい場合は `driver()` メソッドで指定します。
+
+```php
+$results = Concurrency::driver('fork')->run([
+    fn () => fetchFromApiA(),
+    fn () => fetchFromApiB(),
+]);
+```
+
+デフォルトのドライバを変更するには、設定ファイルを公開して `default` オプションを更新します。
+
+```shell
+php artisan config:publish concurrency
+```
+
+## forkドライバの使い方
+
+`fork` ドライバは `process` ドライバよりも高速ですが、PHPのCLI環境（Artisanコマンドやキューワーカー）でのみ使用できます。
+Webリクエストの中では使用できません。
+
+使用前に `spatie/fork` パッケージをインストールしてください。
+
+```shell
+composer require spatie/fork
+```
+
+<Warning>
+  `fork` ドライバはWebリクエスト中では動作しません。Artisanコマンドやキューワーカーの中で並行処理を行いたいときに使用してください。
+</Warning>
+
+## 実行結果を受け取らない: Concurrency::defer()
+
+処理の結果には関心がなく、HTTPレスポンスを返した後にバックグラウンドで実行したい場合は `defer()` メソッドを使います。
+
+```php
+use App\Services\Metrics;
+use Illuminate\Support\Facades\Concurrency;
+
+Concurrency::defer([
+    fn () => Metrics::report('users'),
+    fn () => Metrics::report('orders'),
+]);
+```
+
+`defer()` を呼んだ時点ではクロージャは実行されません。
+HTTPレスポンスがユーザーに送信された後に、並行して実行されます。
+
+<Tip>
+  分析データの記録やキャッシュのウォームアップなど、ユーザーを待たせる必要のない処理に `defer()` は最適です。
+</Tip>
+
+## 実践例: 複数の外部APIを同時に呼び出す
+
+ECサイトのダッシュボードで、在庫管理API・売上集計API・配送状況APIの3つから情報を取得する例を考えます。
+
+### 順次実行(改善前)
+
+```php
+use Illuminate\Support\Facades\Http;
+
+public function dashboard(): array
+{
+    // 各リクエストが順番に完了するまで待つ(合計約3秒)
+    $inventory = Http::get('https://api.example.com/inventory')->json();
+    $sales     = Http::get('https://api.example.com/sales')->json();
+    $shipping  = Http::get('https://api.example.com/shipping')->json();
+
+    return compact('inventory', 'sales', 'shipping');
+}
+```
+
+### 並行実行(改善後)
+
+```php
+use Illuminate\Support\Facades\Concurrency;
+use Illuminate\Support\Facades\Http;
+
+public function dashboard(): array
+{
+    // 3つのリクエストを同時に実行(最も遅いAPI1件分の時間で完了)
+    [$inventory, $sales, $shipping] = Concurrency::run([
+        fn () => Http::get('https://api.example.com/inventory')->json(),
+        fn () => Http::get('https://api.example.com/sales')->json(),
+        fn () => Http::get('https://api.example.com/shipping')->json(),
+    ]);
+
+    return compact('inventory', 'sales', 'shipping');
+}
+```
+
+各APIが1秒かかる場合、順次実行では合計3秒かかりますが、並行実行では約1秒で完了します。
+
+### 複数のデータベース集計を同時実行する
+
+```php
+use Illuminate\Support\Facades\Concurrency;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+
+public function statistics(): array
+{
+    [$totalUsers, $activeUsers, $totalOrders, $revenue] = Concurrency::run([
+        fn () => DB::table('users')->count(),
+        fn () => DB::table('users')->where('active', true)->count(),
+        fn () => DB::table('orders')->count(),
+        fn () => DB::table('orders')->sum('total_amount'),
+    ]);
+
+    return [
+        'total_users'  => $totalUsers,
+        'active_users' => $activeUsers,
+        'total_orders' => $totalOrders,
+        'revenue'      => $revenue,
+    ];
+}
+```
+
+<Tip>
+  データベース集計に `process` ドライバを使う場合、子プロセスごとに新しいデータベース接続が確立されます。
+  同時実行数が多い場合はデータベースの最大接続数に注意してください。
+</Tip>
+
+## テスト時の設定
+
+テスト環境では `sync` ドライバを使うと、クロージャを順番に実行します。
+並行実行によるプロセスの立ち上げコストがなく、テストが高速になります。
+
+```php
+// tests/Feature/DashboardTest.php
+use Illuminate\Support\Facades\Concurrency;
+
+public function test_dashboard_returns_correct_data(): void
+{
+    Concurrency::fake(); // syncドライバに切り替える
+
+    $response = $this->get('/dashboard');
+
+    $response->assertStatus(200);
+}
+```
+
+または `.env.testing` でデフォルトドライバを変更する方法もあります。
+
+```ini
+CONCURRENCY_DRIVER=sync
+```
+
+## 注意事項
+
+<AccordionGroup>
+  <Accordion title="クロージャにできる制限">
+    クロージャはシリアライズされて子プロセスに渡されます。
+    シリアライズできないオブジェクト(データベース接続、ファイルハンドル、リソースなど)をクロージャの外側からキャプチャすることはできません。
+    必要なオブジェクトはクロージャの中で新たに生成してください。
+
+    ```php
+    // NG: 外側のEloquentモデルをキャプチャ
+    $user = User::find(1);
+    Concurrency::run([
+        fn () => $user->orders()->count(), // シリアライズできない可能性がある
+    ]);
+
+    // OK: クロージャの中でデータを取得する
+    $userId = 1;
+    Concurrency::run([
+        fn () => Order::where('user_id', $userId)->count(),
+    ]);
+    ```
+  </Accordion>
+
+  <Accordion title="processドライバのオーバーヘッド">
+    `process` ドライバは子プロセスの起動コストがあるため、処理自体が非常に短い(数ミリ秒以下)場合は並行実行しても速くならないことがあります。
+    HTTPリクエストやデータベース集計など、処理に100ms以上かかるものを並行化するときに効果を発揮します。
+  </Accordion>
+
+  <Accordion title="forkドライバの制限">
+    `fork` ドライバはPHPのプロセスをforkするため、Webリクエスト中(FPMやApache)では使用できません。
+    Artisanコマンドやキューワーカーの中でのみ使用してください。
+  </Accordion>
+
+  <Accordion title="例外の扱い">
+    並行実行中に例外が発生すると、`run()` は例外を再スローします。
+    個々の処理で例外が発生しても他の処理を継続させたい場合は、クロージャの中で `try/catch` を使ってください。
+
+    ```php
+    Concurrency::run([
+        function () {
+            try {
+                return Http::get('https://api.example.com/data')->json();
+            } catch (\Exception $e) {
+                return null; // 失敗時はnullを返す
+            }
+        },
+    ]);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## 次のステップ
+
+<Card title="キューとジョブ" icon="layer-group" href="/jp/queues">
+  処理をバックグラウンドで非同期実行するキューとジョブの使い方を学ぶ
+</Card>

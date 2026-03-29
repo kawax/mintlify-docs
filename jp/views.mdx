@@ -1,0 +1,165 @@
+---
+title: "ビュー"
+description: "Laravelのビューを作成してルートやコントローラーから返す方法、データの渡し方を解説します。"
+---
+
+## はじめに
+
+ルートやコントローラーからHTMLドキュメント全体を文字列で返すことは現実的ではありません。
+ビューを使うと、すべてのHTMLを独立したファイルに記述できます。
+
+ビューはコントローラー・アプリケーションロジックをプレゼンテーションロジックから分離し、`resources/views` ディレクトリに格納されます。
+Laravelでは通常、[Bladeテンプレート言語](/jp/blade)を使ってビューを記述します。
+
+```blade
+<!-- resources/views/greeting.blade.php -->
+<html>
+    <body>
+        <h1>こんにちは、{{ $name }}</h1>
+    </body>
+</html>
+```
+
+このビューは `resources/views/greeting.blade.php` に格納されており、グローバルな `view` ヘルパーを使って返せます。
+
+```php
+Route::get('/', function () {
+    return view('greeting', ['name' => '太郎']);
+});
+```
+
+## ビューの作成
+
+ビューを作成するには、`resources/views` ディレクトリに `.blade.php` 拡張子のファイルを置くか、Artisanコマンドを使います。
+
+```shell
+php artisan make:view greeting
+```
+
+`.blade.php` 拡張子はフレームワークに、そのファイルが[Bladeテンプレート](/jp/blade)を含むことを知らせます。
+
+## ビューの返し方
+
+ビューを作成したら、ルートやコントローラーからグローバルな `view` ヘルパーを使って返せます。
+
+```php
+Route::get('/', function () {
+    return view('greeting', ['name' => '太郎']);
+});
+```
+
+`View` ファサードを使っても返せます。
+
+```php
+use Illuminate\Support\Facades\View;
+
+return View::make('greeting', ['name' => '太郎']);
+```
+
+`view` ヘルパーの第1引数は `resources/views` ディレクトリ内のビューファイル名に対応します。
+第2引数はビューで利用可能にするデータの配列です。
+
+### ネストしたビューディレクトリ
+
+ビューは `resources/views` のサブディレクトリに入れ子にできます。
+ネストしたビューを参照するには「ドット」記法を使います。
+
+例えば `resources/views/admin/profile.blade.php` に格納したビューは次のように返せます。
+
+```php
+return view('admin.profile', $data);
+```
+
+<Warning>
+  ビューのディレクトリ名には `.` 文字を含めないでください。
+</Warning>
+
+### 最初に存在するビューの返し方
+
+`View` ファサードの `first` メソッドを使うと、ビューの配列の中で最初に存在するビューを返せます。
+
+```php
+use Illuminate\Support\Facades\View;
+
+return View::first(['custom.admin', 'admin'], $data);
+```
+
+### ビューの存在確認
+
+ビューが存在するか確認するには、`View` ファサードの `exists` メソッドを使います。
+
+```php
+use Illuminate\Support\Facades\View;
+
+if (View::exists('admin.profile')) {
+    // ...
+}
+```
+
+## ビューへのデータの渡し方
+
+前の例で見たように、データの配列をビューに渡してビュー内でそのデータを利用できます。
+
+```php
+return view('greetings', ['name' => '花子']);
+```
+
+この方法では、データはキーと値のペアの配列である必要があります。
+ビュー内ではデータのキーを使って各値にアクセスできます。
+
+`with` メソッドを使って個別にデータを追加することもできます。
+`with` メソッドはビューオブジェクトのインスタンスを返すのでメソッドチェーンが使えます。
+
+```php
+return view('greeting')
+    ->with('name', '花子')
+    ->with('occupation', 'エンジニア');
+```
+
+## すべてのビューでデータを共有する
+
+すべてのビューでデータを共有したい場合は、`View` ファサードの `share` メソッドを使います。
+通常はサービスプロバイダーの `boot` メソッド内に記述します。
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\View;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * アプリケーションサービスの起動処理
+     */
+    public function boot(): void
+    {
+        View::share('appName', 'MyApp');
+    }
+}
+```
+
+## ビューの最適化
+
+デフォルトでは、Bladeテンプレートのビューはオンデマンドでコンパイルされます。
+リクエスト時にビューのコンパイル処理が実行されるため、わずかにパフォーマンスに影響することがあります。
+
+`view:cache` Artisanコマンドを使うと、アプリケーションで使われるすべてのビューをあらかじめコンパイルできます。
+デプロイプロセスの一部として実行することを推奨します。
+
+```shell
+php artisan view:cache
+```
+
+ビューキャッシュをクリアするには次のコマンドを使います。
+
+```shell
+php artisan view:clear
+```
+
+## 次のステップ
+
+<Card title="Bladeテンプレート" icon="code" href="/jp/blade">
+  Bladeの構文を使って動的なビューを構築する方法を学びます。
+</Card>

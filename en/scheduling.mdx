@@ -1,0 +1,406 @@
+---
+title: "Task scheduling"
+description: "Define recurring tasks in code with Laravel's scheduler and manage them from a single cron entry instead of managing cron jobs manually."
+---
+
+## What is task scheduling?
+
+Traditionally, you would create a cron entry on your server for every recurring task. This approach scatters your schedule definitions outside version control and requires SSH access every time you want to change them.
+
+Laravel's scheduler lets you **define all scheduled tasks in code**, using an expressive API. You only need one cron entry on your server, and your entire schedule lives alongside your application.
+
+Define your scheduled tasks in `routes/console.php`:
+
+```php
+<?php
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::call(function () {
+    DB::table('recent_users')->delete();
+})->daily();
+```
+
+<Info>
+  Run `php artisan schedule:list` to see all defined tasks and when they will next execute.
+</Info>
+
+## Defining schedules
+
+Write schedules in `routes/console.php`. You can also use the `withSchedule` method in `bootstrap/app.php`:
+
+```php
+// bootstrap/app.php
+use Illuminate\Console\Scheduling\Schedule;
+
+->withSchedule(function (Schedule $schedule) {
+    $schedule->call(new DeleteRecentUsers)->daily();
+})
+```
+
+## What you can schedule
+
+### Artisan commands
+
+```php
+use App\Console\Commands\SendEmailsCommand;
+use Illuminate\Support\Facades\Schedule;
+
+// Schedule by command name
+Schedule::command('emails:send Taylor --force')->daily();
+
+// Schedule by class name with an array of arguments
+Schedule::command(SendEmailsCommand::class, ['Taylor', '--force'])->daily();
+```
+
+You can also chain a schedule method directly onto a closure command:
+
+```php
+Artisan::command('delete:recent-users', function () {
+    DB::table('recent_users')->delete();
+})->purpose('Delete recent users')->daily();
+```
+
+### Queued jobs
+
+```php
+use App\Jobs\Heartbeat;
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::job(new Heartbeat)->everyFiveMinutes();
+
+// Specify the queue and connection
+Schedule::job(new Heartbeat, 'heartbeats', 'sqs')->everyFiveMinutes();
+```
+
+### Shell commands
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::exec('node /home/forge/script.js')->daily();
+```
+
+### Closures
+
+```php
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::call(function () {
+    DB::table('recent_users')->delete();
+})->daily();
+
+// Invokable objects work too
+Schedule::call(new DeleteRecentUsers)->daily();
+```
+
+## Frequency options
+
+### Common frequency methods
+
+| Method | Description |
+|---|---|
+| `->everySecond()` | Every second |
+| `->everyMinute()` | Every minute |
+| `->everyFiveMinutes()` | Every five minutes |
+| `->everyFifteenMinutes()` | Every fifteen minutes |
+| `->everyThirtyMinutes()` | Every thirty minutes |
+| `->hourly()` | Every hour |
+| `->hourlyAt(17)` | At 17 minutes past every hour |
+| `->daily()` | Every day at midnight |
+| `->dailyAt('13:00')` | Every day at 13:00 |
+| `->twiceDaily(1, 13)` | Every day at 01:00 and 13:00 |
+| `->weekly()` | Every Sunday at midnight |
+| `->weeklyOn(1, '8:00')` | Every Monday at 08:00 |
+| `->monthly()` | First day of every month at midnight |
+| `->monthlyOn(4, '15:00')` | Fourth day of every month at 15:00 |
+| `->quarterly()` | First day of each quarter at midnight |
+| `->yearly()` | January 1 at midnight |
+| `->timezone('America/New_York')` | Set the task timezone |
+
+### Custom cron expressions
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('emails:send')->cron('0 9 * * *'); // Every day at 09:00
+```
+
+### Combining frequency and day constraints
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+// Every Monday at 13:00
+Schedule::call(function () {
+    // ...
+})->weekly()->mondays()->at('13:00');
+
+// Weekdays, hourly, between 08:00 and 17:00
+Schedule::command('foo')
+    ->weekdays()
+    ->hourly()
+    ->between('8:00', '17:00');
+```
+
+### Day constraints
+
+| Method | Description |
+|---|---|
+| `->weekdays()` | Weekdays only |
+| `->weekends()` | Weekends only |
+| `->mondays()` – `->sundays()` | A specific day of the week |
+| `->days([0, 3])` | Multiple specific days (0 = Sunday) |
+
+## Timezones
+
+Set a per-task timezone with `timezone()`:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('report:generate')
+    ->timezone('America/Chicago')
+    ->at('9:00');
+```
+
+Set a default timezone for all tasks in `config/app.php`:
+
+```php
+'schedule_timezone' => 'America/Chicago',
+```
+
+<Warning>
+  If a timezone observes daylight saving time, a task scheduled during the transition hour may run twice (when clocks fall back) or be skipped entirely (when clocks spring forward). UTC avoids these issues and is the safest choice for scheduled tasks.
+</Warning>
+
+## Preventing overlaps
+
+By default, a task starts even if the previous run is still executing. Use `withoutOverlapping()` to ensure only one instance runs at a time:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('emails:send')->withoutOverlapping();
+
+// Expire the lock after 10 minutes instead of the default 24 hours
+Schedule::command('emails:send')->withoutOverlapping(10);
+```
+
+<Info>
+  `withoutOverlapping()` uses the application cache to manage locks. If a task gets stuck, clear the lock with `php artisan schedule:clear-cache`.
+</Info>
+
+## Conditions and constraints
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+// Run only when the closure returns true
+Schedule::command('emails:send')->daily()->when(fn () => true);
+
+// Skip when the closure returns true
+Schedule::command('emails:send')->daily()->skip(fn () => true);
+
+// Run only in specific environments
+Schedule::command('emails:send')
+    ->daily()
+    ->environments(['staging', 'production']);
+
+// Run only between 07:00 and 22:00
+Schedule::command('emails:send')
+    ->hourly()
+    ->between('7:00', '22:00');
+```
+
+## Running on one server
+
+When your scheduler runs on multiple servers, use `onOneServer()` to ensure only one server executes the task:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('report:generate')
+    ->fridays()
+    ->at('17:00')
+    ->onOneServer();
+```
+
+<Warning>
+  This feature requires your default cache driver to be `database`, `memcached`, `dynamodb`, or `redis`, and all servers must share the same cache server.
+</Warning>
+
+## Grouping tasks
+
+Apply shared configuration to multiple tasks at once:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::daily()
+    ->onOneServer()
+    ->timezone('America/Chicago')
+    ->group(function () {
+        Schedule::command('emails:send --force');
+        Schedule::command('emails:prune');
+    });
+```
+
+## Background execution
+
+Tasks scheduled at the same time run sequentially by default. Use `runInBackground()` to let a long-running task execute in parallel with others:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('analytics:report')
+    ->daily()
+    ->runInBackground();
+```
+
+<Warning>
+  `runInBackground()` works only with `command()` and `exec()` tasks.
+</Warning>
+
+## Maintenance mode
+
+Scheduled tasks are skipped when the application is in maintenance mode. To force a task to run even then:
+
+```php
+Schedule::command('emails:send')->evenInMaintenanceMode();
+```
+
+## Pausing the scheduler
+
+Pause and resume the entire scheduler without touching code:
+
+```shell
+php artisan schedule:pause
+php artisan schedule:continue
+```
+
+To keep a specific task running while the scheduler is paused:
+
+```php
+Schedule::command('health:check')->evenWhenPaused();
+```
+
+## Output handling
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+// Write output to a file
+Schedule::command('emails:send')
+    ->daily()
+    ->sendOutputTo(storage_path('logs/emails-send.log'));
+
+// Append output to an existing file
+Schedule::command('emails:send')
+    ->daily()
+    ->appendOutputTo(storage_path('logs/emails-send.log'));
+
+// Email output on completion
+Schedule::command('report:generate')
+    ->daily()
+    ->sendOutputTo($filePath)
+    ->emailOutputTo('admin@example.com');
+
+// Email output only on failure
+Schedule::command('report:generate')
+    ->daily()
+    ->emailOutputOnFailure('admin@example.com');
+```
+
+## Task hooks
+
+```php
+use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Stringable;
+
+Schedule::command('emails:send')
+    ->daily()
+    ->before(function () {
+        // Before the task runs
+    })
+    ->after(function () {
+        // After the task runs
+    })
+    ->onSuccess(function (Stringable $output) {
+        // Task succeeded
+    })
+    ->onFailure(function (Stringable $output) {
+        // Task failed
+    });
+```
+
+## Deploying to a server
+
+<Steps>
+  <Step title="Add one cron entry">
+    Add a single line to the server's crontab. Laravel's scheduler dispatches all your tasks from there.
+
+    ```shell
+    * * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
+    ```
+
+    Edit the crontab with `crontab -e`.
+  </Step>
+  <Step title="Verify your schedule">
+    List all defined tasks and their next execution times:
+
+    ```shell
+    php artisan schedule:list
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  [Laravel Cloud](https://cloud.laravel.com) manages scheduled tasks for you without any cron configuration.
+</Tip>
+
+### Local development
+
+Run the scheduler continuously in the foreground during development—no cron needed:
+
+```shell
+php artisan schedule:work
+```
+
+### Sub-minute scheduling
+
+Normal cron only goes down to one-minute intervals. Laravel supports per-second scheduling:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::call(function () {
+    DB::table('recent_users')->delete();
+})->everySecond();
+```
+
+When sub-minute tasks are defined, `schedule:run` stays alive for the entire minute and fires them at the right moments.
+
+To interrupt an in-progress `schedule:run` during a deployment:
+
+```shell
+php artisan schedule:interrupt
+```
+
+## Common commands reference
+
+```shell
+php artisan schedule:list       # List all tasks and next run times
+php artisan schedule:run        # Run due tasks (called by cron every minute)
+php artisan schedule:work       # Run the scheduler continuously (local development)
+php artisan schedule:pause      # Pause all scheduled tasks
+php artisan schedule:continue   # Resume scheduled tasks
+php artisan schedule:clear-cache # Clear overlap-prevention locks
+php artisan schedule:interrupt  # Interrupt the running schedule:run process
+```
+
+<Card title="Artisan console" icon="terminal" href="/en/artisan">
+  Build custom Artisan commands to use in your scheduled tasks.
+</Card>

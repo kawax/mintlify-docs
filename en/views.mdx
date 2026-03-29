@@ -1,0 +1,154 @@
+---
+title: "Views"
+description: "How to create views in Laravel, return them from routes and controllers, and pass data to them."
+---
+
+## Introduction
+
+Returning an entire HTML document as a string from a route or controller is not practical. Views let you keep all your HTML in separate files.
+
+Views separate your controller and application logic from your presentation logic. Laravel stores views in the `resources/views` directory. By convention, Laravel views are written using the [Blade templating language](/en/blade).
+
+```blade
+<!-- resources/views/greeting.blade.php -->
+<html>
+    <body>
+        <h1>Hello, {{ $name }}</h1>
+    </body>
+</html>
+```
+
+This view is stored at `resources/views/greeting.blade.php` and you can return it using the global `view` helper.
+
+```php
+Route::get('/', function () {
+    return view('greeting', ['name' => 'James']);
+});
+```
+
+## Creating views
+
+To create a view, place a file with a `.blade.php` extension in the `resources/views` directory, or use the Artisan command:
+
+```shell
+php artisan make:view greeting
+```
+
+The `.blade.php` extension tells the framework that the file contains a [Blade template](/en/blade).
+
+## Returning views
+
+Once you have created a view, you can return it from a route or controller using the global `view` helper:
+
+```php
+Route::get('/', function () {
+    return view('greeting', ['name' => 'James']);
+});
+```
+
+You can also use the `View` facade:
+
+```php
+use Illuminate\Support\Facades\View;
+
+return View::make('greeting', ['name' => 'James']);
+```
+
+The first argument to `view` corresponds to the name of the view file in the `resources/views` directory. The second argument is an array of data to make available to the view.
+
+### Nested view directories
+
+Views can be nested inside subdirectories of `resources/views`. Use dot notation to reference nested views.
+
+For example, a view stored at `resources/views/admin/profile.blade.php` can be returned like this:
+
+```php
+return view('admin.profile', $data);
+```
+
+<Warning>
+  Do not include a `.` character in your view directory names.
+</Warning>
+
+### Returning the first existing view
+
+Use the `first` method on the `View` facade to return the first view that exists from an array:
+
+```php
+use Illuminate\Support\Facades\View;
+
+return View::first(['custom.admin', 'admin'], $data);
+```
+
+### Checking if a view exists
+
+Use the `exists` method on the `View` facade to check whether a view exists:
+
+```php
+use Illuminate\Support\Facades\View;
+
+if (View::exists('admin.profile')) {
+    // ...
+}
+```
+
+## Passing data to views
+
+As shown in the examples above, you pass an array of data to a view to make it available inside:
+
+```php
+return view('greetings', ['name' => 'Victoria']);
+```
+
+The data must be a key/value array. Inside the view, you can access each value using its corresponding key.
+
+You can also add individual pieces of data using the `with` method. It returns the view instance, so you can chain calls:
+
+```php
+return view('greeting')
+    ->with('name', 'Victoria')
+    ->with('occupation', 'Engineer');
+```
+
+## Sharing data with all views
+
+To share data with every view in your application, use the `share` method on the `View` facade. Call it in the `boot` method of a service provider:
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\View;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        View::share('appName', 'MyApp');
+    }
+}
+```
+
+## Optimizing views
+
+By default, Blade templates are compiled on demand. When a request renders a view, Laravel checks whether a compiled version exists and whether the template has been modified. You can pre-compile all views using the `view:cache` Artisan command — this is recommended as part of your deployment process:
+
+```shell
+php artisan view:cache
+```
+
+To clear the view cache:
+
+```shell
+php artisan view:clear
+```
+
+## Next steps
+
+<Card title="Blade templates" icon="code" href="/en/blade">
+  Learn how to use Blade syntax to build dynamic views.
+</Card>

@@ -1,0 +1,234 @@
+---
+title: "ルーティング"
+description: "Laravelのルート定義方法、ルートパラメータ、名前付きルートの基本を解説します。"
+---
+
+## 基本的なルーティング
+
+Laravelの最も基本的なルートは、URIとクロージャを受け取ります。
+複雑な設定ファイルなしに、ルートと動作を簡単に定義できます。
+
+```php
+use Illuminate\Support\Facades\Route;
+
+Route::get('/greeting', function () {
+    return 'Hello World';
+});
+```
+
+### デフォルトのルートファイル
+
+すべてのLaravelルートは `routes/` ディレクトリのルートファイルに定義します。
+これらのファイルは `bootstrap/app.php` の設定に基づいてLaravelが自動的に読み込みます。
+
+`routes/web.php` にはブラウザ向けのルートを定義します。
+このファイルのルートには `web` ミドルウェアグループが適用され、セッション・CSRF保護・クッキー暗号化が提供されます。
+
+```php
+use App\Http\Controllers\UserController;
+
+Route::get('/user', [UserController::class, 'index']);
+```
+
+### 利用可能なHTTPメソッド
+
+ルーターはすべてのHTTPメソッドに対応したルートを登録できます。
+
+```php
+Route::get($uri, $callback);
+Route::post($uri, $callback);
+Route::put($uri, $callback);
+Route::patch($uri, $callback);
+Route::delete($uri, $callback);
+Route::options($uri, $callback);
+```
+
+複数のHTTPメソッドに応答するルートは `match` または `any` を使います。
+
+```php
+Route::match(['get', 'post'], '/', function () {
+    // ...
+});
+
+Route::any('/', function () {
+    // ...
+});
+```
+
+<Info>
+  `web` ルートファイルで `POST`・`PUT`・`PATCH`・`DELETE` を受け取るHTMLフォームには、必ず `@csrf` ディレクティブを含めてください。
+  含めない場合、リクエストが拒否されます。
+</Info>
+
+## ビューを返すルート
+
+ルートがビューを返すだけの場合は、`Route::view` を使うと簡潔に書けます。
+
+```php
+Route::view('/welcome', 'welcome');
+
+// ビューにデータを渡す場合
+Route::view('/welcome', 'welcome', ['name' => 'Taylor']);
+```
+
+## ルートパラメータ
+
+### 必須パラメータ
+
+URLの一部を動的に取得するには、ルートパラメータを使います。
+パラメータは `{}` で囲み、ルートコールバックの引数として受け取ります。
+
+```php
+Route::get('/user/{id}', function (string $id) {
+    return 'ユーザー ID: ' . $id;
+});
+```
+
+複数のパラメータも定義できます。
+
+```php
+Route::get('/posts/{post}/comments/{comment}', function (string $postId, string $commentId) {
+    return "投稿 {$postId} のコメント {$commentId}";
+});
+```
+
+<Warning>
+  ルートパラメータには `/` 文字を含めることはできません。
+</Warning>
+
+### 任意パラメータ
+
+パラメータを任意にするには、パラメータ名の末尾に `?` を付け、対応する引数にデフォルト値を設定します。
+
+```php
+Route::get('/user/{name?}', function (?string $name = null) {
+    return $name ?? 'ゲスト';
+});
+
+Route::get('/user/{name?}', function (?string $name = 'ゲスト') {
+    return $name;
+});
+```
+
+### 正規表現によるパラメータ制約
+
+`where` メソッドを使ってパラメータの形式を正規表現で制約できます。
+
+```php
+Route::get('/user/{id}', function (string $id) {
+    // ...
+})->where('id', '[0-9]+');
+
+Route::get('/user/{name}', function (string $name) {
+    // ...
+})->where('name', '[a-zA-Z]+');
+```
+
+よく使うパターンは便利メソッドでも書けます。
+
+```php
+Route::get('/user/{id}/{name}', function (string $id, string $name) {
+    // ...
+})->whereNumber('id')->whereAlpha('name');
+```
+
+## 名前付きルート
+
+名前付きルートを使うと、URL生成やリダイレクトを行う際にルート名を使って参照できます。
+
+```php
+Route::get('/user/profile', function () {
+    // ...
+})->name('profile');
+```
+
+### 名前付きルートへのURL生成
+
+ルート名からURLを生成するには `route` ヘルパーを使います。
+
+```php
+// URL生成
+$url = route('profile');
+
+// パラメータ付きURL生成
+$url = route('user.show', ['id' => 1]);
+```
+
+### リダイレクト
+
+```php
+return redirect()->route('profile');
+```
+
+## ルートグループ
+
+関連するルートをグループ化して、ミドルウェア・コントローラー・プレフィックスなどを共通設定できます。
+
+### ミドルウェア
+
+```php
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', function () {
+        // 認証済みユーザーのみアクセス可能
+    });
+
+    Route::get('/account', function () {
+        // 認証済みユーザーのみアクセス可能
+    });
+});
+```
+
+### コントローラー
+
+同じコントローラーを使うルートをグループ化できます。
+
+```php
+use App\Http\Controllers\OrderController;
+
+Route::controller(OrderController::class)->group(function () {
+    Route::get('/orders', 'index');
+    Route::post('/orders', 'store');
+    Route::get('/orders/{id}', 'show');
+});
+```
+
+### プレフィックス
+
+ルートのURIに共通のプレフィックスを付けられます。
+
+```php
+Route::prefix('admin')->group(function () {
+    Route::get('/users', function () {
+        // /admin/users にアクセス可能
+    });
+    Route::get('/posts', function () {
+        // /admin/posts にアクセス可能
+    });
+});
+```
+
+## ルート一覧の確認
+
+定義されたすべてのルートを一覧表示するには、Artisanコマンドを使います。
+
+```shell
+php artisan route:list
+```
+
+ミドルウェア情報も含めて表示する場合は次のようにします。
+
+```shell
+php artisan route:list -v
+```
+
+特定のURIから始まるルートのみを表示する場合は次のようにします。
+
+```shell
+php artisan route:list --path=user
+```
+
+## 次のステップ
+
+<Card title="ビュー" icon="eye" href="/jp/views">
+  ビューを作成し、コントローラーからデータを渡す方法を学びます。
+</Card>

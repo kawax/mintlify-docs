@@ -1,0 +1,225 @@
+---
+title: "データベースマイグレーション"
+description: "Laravelのマイグレーション機能を使ってデータベーススキーマをバージョン管理する方法を解説します。"
+---
+
+## マイグレーションとは
+
+マイグレーションはデータベースのバージョン管理のようなものです。
+チームがアプリケーションのデータベーススキーマ定義を共有・管理できます。
+
+ソースコードを pull した後に「ローカルのデータベースにカラムを手動で追加してください」とチームメンバーに伝えなければならない場面を経験したことがあるでしょう。
+マイグレーションはその問題を解決します。
+
+マイグレーションファイルは `database/migrations` ディレクトリに格納されます。
+各ファイル名にはタイムスタンプが含まれており、Laravelがマイグレーションの実行順序を決定するために使われます。
+
+## マイグレーションファイルの作成
+
+`make:migration` Artisanコマンドで新しいマイグレーションファイルを生成します。
+
+```shell
+php artisan make:migration create_posts_table
+```
+
+マイグレーション名から Laravelはテーブル名を推測し、適切なスタブを生成します。
+`create_posts_table` という名前であれば、`posts` テーブルを作成するコードがあらかじめ用意されます。
+
+## マイグレーションの構造
+
+マイグレーションクラスは `up` と `down` の2つのメソッドを持ちます。
+
+- `up` メソッド：テーブル・カラム・インデックスをデータベースに追加します。
+- `down` メソッド：`up` の操作を元に戻します。ロールバック時に呼ばれます。
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * マイグレーションを実行する
+     */
+    public function up(): void
+    {
+        Schema::create('posts', function (Blueprint $table) {
+            $table->id();
+            $table->string('title');
+            $table->text('body');
+            $table->boolean('published')->default(false);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * マイグレーションを元に戻す
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('posts');
+    }
+};
+```
+
+## 主なカラム定義メソッド
+
+`Blueprint` クラスには多くのカラム型が用意されています。
+
+| メソッド | 説明 |
+| --- | --- |
+| `$table->id()` | 自動増分の主キー（`bigIncrements('id')` の別名） |
+| `$table->string('name')` | VARCHAR相当のカラム（デフォルト255文字） |
+| `$table->text('body')` | TEXTカラム |
+| `$table->integer('count')` | INTEGERカラム |
+| `$table->boolean('active')` | TINYINTで真偽値を格納 |
+| `$table->timestamp('published_at')` | TIMESTAMPカラム |
+| `$table->timestamps()` | `created_at` と `updated_at` をまとめて追加 |
+| `$table->softDeletes()` | 論理削除用の `deleted_at` カラムを追加 |
+| `$table->foreignId('user_id')` | 外部キー用の `BIGINT UNSIGNEDカラム` |
+
+### カラム修飾子
+
+カラム定義にはメソッドチェーンで修飾子を追加できます。
+
+```php
+$table->string('email')->unique();
+$table->string('name')->nullable();
+$table->integer('votes')->default(0);
+$table->string('title')->after('id'); // 指定カラムの後に配置
+```
+
+## マイグレーションの実行
+
+`migrate` コマンドで未実行のマイグレーションをすべて実行します。
+
+```shell
+php artisan migrate
+```
+
+実行済みのマイグレーションと未実行のマイグレーションを確認するには `migrate:status` を使います。
+
+```shell
+php artisan migrate:status
+```
+
+<Warning>
+  本番環境でマイグレーションを実行すると確認プロンプトが表示されます。
+  確認なしで実行したい場合は `--force` フラグを使いますが、データが失われる操作もあるため慎重に行ってください。
+</Warning>
+
+## ロールバック
+
+直近のマイグレーションバッチを取り消すには `migrate:rollback` を使います。
+
+```shell
+php artisan migrate:rollback
+```
+
+特定のステップ数だけロールバックするには `--step` オプションを指定します。
+
+```shell
+# 直近5件のマイグレーションをロールバック
+php artisan migrate:rollback --step=5
+```
+
+すべてのマイグレーションをロールバックしてから再実行するには `migrate:refresh` を使います。
+
+```shell
+php artisan migrate:refresh
+```
+
+<Info>
+  `migrate:refresh` はすべてのテーブルを作り直すため、既存のデータは失われます。
+  開発中のデータベースリセットに便利です。
+</Info>
+
+## 実践例：postsテーブルの作成
+
+ブログ投稿を管理する `posts` テーブルを例に、一連の流れを確認します。
+
+### 1. マイグレーションファイルの生成
+
+```shell
+php artisan make:migration create_posts_table
+```
+
+### 2. マイグレーションの編集
+
+`database/migrations/xxxx_xx_xx_xxxxxx_create_posts_table.php` を開いて編集します。
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('posts', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->string('title');
+            $table->text('body');
+            $table->boolean('published')->default(false);
+            $table->timestamp('published_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('posts');
+    }
+};
+```
+
+### 3. マイグレーションの実行
+
+```shell
+php artisan migrate
+```
+
+実行後、データベースに `posts` テーブルが作成されます。
+
+### 4. カラムを後から追加する
+
+テーブル作成後に新しいカラムを追加したい場合は、既存のマイグレーションを編集せず、新しいマイグレーションを作成します。
+
+```shell
+php artisan make:migration add_excerpt_to_posts_table
+```
+
+```php
+public function up(): void
+{
+    Schema::table('posts', function (Blueprint $table) {
+        $table->string('excerpt')->nullable()->after('title');
+    });
+}
+
+public function down(): void
+{
+    Schema::table('posts', function (Blueprint $table) {
+        $table->dropColumn('excerpt');
+    });
+}
+```
+
+<Tip>
+  既存のマイグレーションファイルを直接編集するのは避けましょう。
+  他のメンバーや本番環境との整合性が崩れます。
+  変更は常に新しいマイグレーションとして追加します。
+</Tip>
+
+## 次のステップ
+
+<Card title="Eloquent入門" icon="database" href="/jp/eloquent">
+  マイグレーションで作成したテーブルをEloquent ORMで操作する方法を学びます。
+</Card>

@@ -17,4 +17,4 @@
 - [x] docs.json: navigation.languages内で言語別にページを定義する形式に変更。Mintlifyではドロップダウンメニューで言語を切り替えられるようになっている。
 - [x] `helpers.md` `strings.md`のヘルパーはLaravelを便利に使うためにチュートリアル段階で知った方がいい機能だけどドキュメントとしてはcollectionsと同じ場所に配置がいいので中級で作成。
 - [x] ページが増えてきたのでそろそろドメイン設定する準備。`index.mdx`はtabsの各カテゴリーに誘導する内容。日本語→英語の順で両方記載。トップの`/`を表示した時のデフォルト言語はnavigation.languagesの順番で決まる。どちらをデフォルトにするかは後で変えればいいので今は日本語で進める。
-- [ ] URLとして最適化するためファイルを移動する。tutorialとintermediateは言語別ディレクトリ直下に移動。advancedとblogは変更なし。docs.jsonや各ファイルのリンクを修正。`mint broken-links`コマンドでリンク切れを確認できるので実行しながら修正。
+- [x] URLとして最適化するためファイルを移動する。tutorialとintermediateは言語別ディレクトリ直下に移動。advancedとblogは変更なし。docs.jsonや各ファイルのリンクを修正。`mint broken-links`コマンドでリンク切れを確認できるので実行しながら修正。

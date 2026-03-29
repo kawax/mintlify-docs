@@ -1,0 +1,365 @@
+---
+title: "レスポンス"
+description: "Laravelのレスポンスの種類と、コントローラーから適切なレスポンスを返す方法を解説します。"
+---
+
+## レスポンスとは
+
+コントローラーやルートは、ユーザーのブラウザへ何らかの**レスポンス**を返す必要があります。
+Laravelは文字列・配列・ビュー・リダイレクト・JSONなど、様々な形式のレスポンスをシンプルに返せる仕組みを提供しています。
+
+## 基本的なレスポンス
+
+### 文字列を返す
+
+最もシンプルなレスポンスは文字列の返却です。
+Laravelは自動的に適切なHTTPレスポンスに変換します。
+
+```php
+Route::get('/', function () {
+    return 'Hello World';
+});
+```
+
+### 配列を返す
+
+配列を返すと、LaravelはそれをJSON形式に自動変換してレスポンスします。
+
+```php
+Route::get('/users', function () {
+    return [
+        ['id' => 1, 'name' => '田中'],
+        ['id' => 2, 'name' => '鈴木'],
+    ];
+});
+```
+
+<Info>
+  EloquentモデルやコレクションをそのままReturnするとJSON形式に自動変換されます。APIを手軽に作れるのでよく使われるパターンです。
+</Info>
+
+### Eloquentモデルを返す
+
+```php
+use App\Models\User;
+
+Route::get('/user/{user}', function (User $user) {
+    return $user;
+});
+```
+
+## Responseオブジェクト
+
+`response()` ヘルパーを使うと、HTTPステータスコードやヘッダーを指定した詳細なレスポンスを返せます。
+
+```php
+Route::get('/home', function () {
+    return response('Hello World', 200)
+        ->header('Content-Type', 'text/plain');
+});
+```
+
+`response()` の第1引数はレスポンスのボディ、第2引数はHTTPステータスコードです。
+
+### よく使うHTTPステータスコード
+
+| コード | 意味 |
+| --- | --- |
+| `200` | OK（成功） |
+| `201` | Created（リソース作成成功） |
+| `204` | No Content（コンテンツなし） |
+| `301` | Moved Permanently（恒久的リダイレクト） |
+| `302` | Found（一時的リダイレクト） |
+| `404` | Not Found（見つからない） |
+| `422` | Unprocessable Entity（バリデーションエラー） |
+| `500` | Internal Server Error（サーバーエラー） |
+
+## ビューのレスポンス
+
+コントローラーからBladeテンプレートを表示するには `view()` を使います。
+これがWebアプリケーションにおける最も一般的なレスポンスです。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\View\View;
+
+class HomeController extends Controller
+{
+    public function index(): View
+    {
+        $users = [
+            ['name' => '田中', 'email' => 'tanaka@example.com'],
+            ['name' => '鈴木', 'email' => 'suzuki@example.com'],
+        ];
+
+        return view('users.index', ['users' => $users]);
+    }
+}
+```
+
+`view()` の第1引数はビュー名、第2引数はビューへ渡すデータの配列です。
+
+<Tip>
+  戻り値の型ヒントに `Illuminate\View\View` を指定すると、コードの意図が明確になります。
+</Tip>
+
+### `response()->view()` で詳細を制御する
+
+ステータスコードやヘッダーも一緒に指定したい場合は `response()->view()` を使います。
+
+```php
+return response()
+    ->view('errors.404', ['message' => 'ページが見つかりません'], 404);
+```
+
+## リダイレクト
+
+### 基本的なリダイレクト
+
+`redirect()` ヘルパーはリダイレクトレスポンスを返します。
+フォーム送信後に別ページへ誘導する際によく使います。
+
+```php
+use Illuminate\Http\RedirectResponse;
+
+Route::get('/old-page', function (): RedirectResponse {
+    return redirect('/new-page');
+});
+```
+
+コントローラーでの使用例です。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+
+class PostController extends Controller
+{
+    public function store(Request $request): RedirectResponse
+    {
+        // 投稿を保存する処理...
+
+        return redirect('/posts');
+    }
+}
+```
+
+### 名前付きルートへのリダイレクト
+
+`route()` 関数を使うと、URLを直接書かずにルート名でリダイレクト先を指定できます。
+URLが変わっても修正不要になるため、名前付きルートを活用するのがベストプラクティスです。
+
+```php
+// ルートに名前を付ける
+Route::get('/posts', [PostController::class, 'index'])->name('posts.index');
+Route::get('/posts/{post}', [PostController::class, 'show'])->name('posts.show');
+```
+
+```php
+// 名前付きルートへリダイレクト
+return redirect()->route('posts.index');
+
+// ルートパラメーターを渡す場合
+return redirect()->route('posts.show', ['post' => $post->id]);
+```
+
+### 直前のページへ戻る
+
+`back()` でユーザーが直前にいたページへ戻れます。
+バリデーション失敗時のリダイレクトによく使われます。
+
+```php
+return back();
+
+// 入力データを保持して戻る
+return back()->withInput();
+```
+
+### フラッシュメッセージ付きのリダイレクト
+
+`with()` でセッションにメッセージを付けてリダイレクトできます。
+フォーム送信成功後のメッセージ表示に便利です。
+
+```php
+return redirect('/posts')->with('success', '投稿を作成しました。');
+```
+
+Bladeテンプレートでメッセージを表示します。
+
+```blade
+@if (session('success'))
+    <div class="alert alert-success">
+        {{ session('success') }}
+    </div>
+@endif
+```
+
+## JSONレスポンス
+
+APIを作る場合には `response()->json()` を使ってJSONレスポンスを返します。
+`Content-Type: application/json` ヘッダーが自動的に設定されます。
+
+```php
+use Illuminate\Http\JsonResponse;
+
+Route::get('/api/users', function (): JsonResponse {
+    $users = [
+        ['id' => 1, 'name' => '田中'],
+        ['id' => 2, 'name' => '鈴木'],
+    ];
+
+    return response()->json($users);
+});
+```
+
+ステータスコードも指定できます。
+
+```php
+return response()->json(['message' => '作成しました'], 201);
+```
+
+コントローラーでの使用例です。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class UserController extends Controller
+{
+    public function index(): JsonResponse
+    {
+        $users = User::all();
+
+        return response()->json($users);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        // バリデーション済みデータで作成（フォームリクエストまたは $request->validate() の後）
+        $user = User::create($request->validated());
+
+        return response()->json($user, 201);
+    }
+}
+```
+
+<Info>
+  単純に配列やEloquentモデルをReturnするだけでもJSONレスポンスになりますが、`response()->json()` を使うとステータスコードやヘッダーを細かく制御できます。
+</Info>
+
+## レスポンスヘッダー
+
+`header()` メソッドでレスポンスにHTTPヘッダーを追加できます。
+
+```php
+return response('Hello World')
+    ->header('Content-Type', 'text/plain')
+    ->header('X-Custom-Header', 'MyValue');
+```
+
+複数のヘッダーをまとめて設定する場合は `withHeaders()` を使います。
+
+```php
+return response('Hello World')
+    ->withHeaders([
+        'Content-Type' => 'text/plain',
+        'X-Custom-Header' => 'MyValue',
+        'Cache-Control' => 'no-cache',
+    ]);
+```
+
+## 実践例：コントローラーでの使い分け
+
+用途に応じたレスポンスの使い分けをまとめた例です。
+
+<Steps>
+  <Step title="ルートの定義">
+    ```php
+    use App\Http\Controllers\PostController;
+
+    Route::get('/posts', [PostController::class, 'index'])->name('posts.index');
+    Route::get('/posts/create', [PostController::class, 'create'])->name('posts.create');
+    Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+    Route::get('/posts/{post}', [PostController::class, 'show'])->name('posts.show');
+    Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('posts.destroy');
+    ```
+  </Step>
+  <Step title="コントローラーの実装">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use App\Models\Post;
+    use Illuminate\Http\RedirectResponse;
+    use Illuminate\Http\Request;
+    use Illuminate\View\View;
+
+    class PostController extends Controller
+    {
+        // 一覧表示: ビューを返す
+        public function index(): View
+        {
+            $posts = Post::latest()->get();
+
+            return view('posts.index', ['posts' => $posts]);
+        }
+
+        // 作成フォーム: ビューを返す
+        public function create(): View
+        {
+            return view('posts.create');
+        }
+
+        // 保存: リダイレクトを返す
+        public function store(Request $request): RedirectResponse
+        {
+            // バリデーション済みデータで作成（フォームリクエストを使用している場合）
+            $post = Post::create($request->validated());
+
+            return redirect()
+                ->route('posts.show', ['post' => $post->id])
+                ->with('success', '投稿を作成しました。');
+        }
+
+        // 詳細表示: ビューを返す
+        public function show(Post $post): View
+        {
+            return view('posts.show', ['post' => $post]);
+        }
+
+        // 削除: リダイレクトを返す
+        public function destroy(Post $post): RedirectResponse
+        {
+            $post->delete();
+
+            return redirect()
+                ->route('posts.index')
+                ->with('success', '投稿を削除しました。');
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  Webアプリでは `View` と `RedirectResponse` の使い分けが基本です。表示系のアクションは `View`、変更系（作成・更新・削除）のアクションは処理後に `RedirectResponse` を返すのが一般的なパターンです。
+</Tip>
+
+## 次のステップ
+
+<Card title="バリデーション" icon="check-circle" href="/jp/validation">
+  レスポンスを返す前に、入力データをバリデーションで検証する方法を確認します。
+</Card>
