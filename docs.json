@@ -81,19 +81,20 @@
             "tab": "ガイド",
             "groups": [
               {
-                "group": "データベース",
-                "pages": [
-                  "jp/query-builder",
-                  "jp/pagination"
-                ]
-              },
-              {
                 "group": "アーキテクチャ",
                 "pages": [
+                  "jp/lifecycle",
                   "jp/service-container",
                   "jp/service-providers",
                   "jp/facades",
                   "jp/contracts"
+                ]
+              },
+              {
+                "group": "データベース",
+                "pages": [
+                  "jp/query-builder",
+                  "jp/pagination"
                 ]
               },
               {
