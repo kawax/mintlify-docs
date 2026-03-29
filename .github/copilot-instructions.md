@@ -112,6 +112,14 @@ Pages use Mintlify's built-in MDX components. Common ones in this repo:
 
 Do not use raw HTML for layout when a Mintlify component exists.
 
+## Mermaid
+
+公式ドキュメントではフローチャートなどは使われていないので使うと効果的な箇所ではMermaidでの図解を入れていく。
+
+```mermaid
+// Your mermaid diagram code here
+```
+
 ## Adding a new page
 
 1. Create an MDX file with frontmatter (`title`, `description`).
