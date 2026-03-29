@@ -1,0 +1,756 @@
+---
+title: "Laravel MCP"
+description: "Add a Model Context Protocol (MCP) server to your Laravel application so AI coding agents can interact with your data, run tools, and consume reusable resources and prompts."
+---
+
+## What is MCP?
+
+**Model Context Protocol (MCP)** is a standardised protocol for communication between AI clients (Claude, Cursor, GitHub Copilot, etc.) and your application. By implementing an MCP server you let AI agents read your application's data and execute actions on your behalf.
+
+<Info>
+  Laravel MCP is an official package added in Laravel 13, available as `laravel/mcp`. It provides everything you need to build MCP servers.
+</Info>
+
+An MCP server can expose three types of capabilities:
+
+| Capability | Description |
+| --- | --- |
+| **Tools** | Functions an AI client can call — search, update, or integrate with external APIs |
+| **Resources** | Data and context an AI client can read |
+| **Prompts** | Reusable, parameterised prompt templates |
+
+## Installation
+
+```shell
+composer require laravel/mcp
+```
+
+After installation, publish the `routes/ai.php` file:
+
+```shell
+php artisan vendor:publish --tag=ai-routes
+```
+
+This creates `routes/ai.php` where you register your MCP servers.
+
+## Creating a server
+
+Generate a server class with Artisan:
+
+```shell
+php artisan make:mcp-server WeatherServer
+```
+
+The class is placed in `app/Mcp/Servers`:
+
+```php
+<?php
+
+namespace App\Mcp\Servers;
+
+use Laravel\Mcp\Server\Attributes\Instructions;
+use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Version;
+use Laravel\Mcp\Server;
+
+#[Name('Weather Server')]
+#[Version('1.0.0')]
+#[Instructions('This server provides weather information and forecasts.')]
+class WeatherServer extends Server
+{
+    protected array $tools = [
+        // GetCurrentWeatherTool::class,
+    ];
+
+    protected array $resources = [
+        // WeatherGuidelinesResource::class,
+    ];
+
+    protected array $prompts = [
+        // DescribeWeatherPrompt::class,
+    ];
+}
+```
+
+### Registering a server
+
+Register servers in `routes/ai.php`. You can register a server as a **web server** or a **local server**.
+
+#### Web server
+
+A web server listens for HTTP POST requests. Use it for remote AI clients or web-based integrations.
+
+```php
+use App\Mcp\Servers\WeatherServer;
+use Laravel\Mcp\Facades\Mcp;
+
+Mcp::web('/mcp/weather', WeatherServer::class);
+```
+
+Apply middleware just like any other route:
+
+```php
+Mcp::web('/mcp/weather', WeatherServer::class)
+    ->middleware(['throttle:mcp']);
+```
+
+#### Local server
+
+A local server runs as an Artisan command. Use it with local AI clients such as Claude Desktop.
+
+```php
+use App\Mcp\Servers\WeatherServer;
+use Laravel\Mcp\Facades\Mcp;
+
+Mcp::local('weather', WeatherServer::class);
+```
+
+<Tip>
+  The MCP client normally starts local servers automatically — you do not need to run `mcp:start` manually.
+</Tip>
+
+## Tools
+
+Tools are functions an AI client can call. They can fetch data, update records, or integrate with external services.
+
+### Creating a tool
+
+```shell
+php artisan make:mcp-tool CurrentWeatherTool
+```
+
+Register the tool in the server's `$tools` array:
+
+```php
+use App\Mcp\Tools\CurrentWeatherTool;
+use Laravel\Mcp\Server;
+
+class WeatherServer extends Server
+{
+    protected array $tools = [
+        CurrentWeatherTool::class,
+    ];
+}
+```
+
+A basic tool implementation:
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('Fetches the current weather forecast for a specified location.')]
+class CurrentWeatherTool extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $location = $request->get('location');
+
+        // Fetch weather data...
+
+        return Response::text('The weather is sunny, 22°C.');
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'location' => $schema->string()
+                ->description('The location to get the weather for.')
+                ->required(),
+        ];
+    }
+}
+```
+
+### Tool name and description
+
+The tool's name and title are automatically derived from the class name. `CurrentWeatherTool` becomes name `current-weather` and title `Current Weather Tool`. Override with `Name` and `Title` attributes:
+
+```php
+use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Title;
+
+#[Name('get-optimistic-weather')]
+#[Title('Get Optimistic Weather Forecast')]
+class CurrentWeatherTool extends Tool
+{
+    // ...
+}
+```
+
+<Warning>
+  The `Description` attribute is not generated automatically. Always provide a meaningful description — it is how the AI model understands what the tool does and when to use it.
+</Warning>
+
+### Input schema
+
+Define input parameters in the `schema` method using Laravel's JSON schema builder:
+
+```php
+public function schema(JsonSchema $schema): array
+{
+    return [
+        'location' => $schema->string()
+            ->description('The location to get the weather for.')
+            ->required(),
+
+        'units' => $schema->string()
+            ->enum(['celsius', 'fahrenheit'])
+            ->description('The temperature units to use.')
+            ->default('celsius'),
+    ];
+}
+```
+
+### Output schema
+
+Define the shape of the response in `outputSchema` so AI clients can parse it reliably:
+
+```php
+public function outputSchema(JsonSchema $schema): array
+{
+    return [
+        'temperature' => $schema->number()
+            ->description('Temperature in Celsius')
+            ->required(),
+
+        'conditions' => $schema->string()
+            ->description('Weather conditions')
+            ->required(),
+
+        'humidity' => $schema->integer()
+            ->description('Humidity percentage')
+            ->required(),
+    ];
+}
+```
+
+### Validation
+
+Use Laravel's standard validation inside `handle`:
+
+```php
+public function handle(Request $request): Response
+{
+    $validated = $request->validate([
+        'location' => 'required|string|max:100',
+        'units'    => 'in:celsius,fahrenheit',
+    ], [
+        'location.required' => 'You must specify a location, e.g. "New York City" or "Tokyo".',
+        'units.in'          => 'Units must be "celsius" or "fahrenheit".',
+    ]);
+
+    // Use $validated...
+}
+```
+
+<Tip>
+  When validation fails the AI client receives the error message and can retry. Write clear, actionable error messages to help the agent self-correct.
+</Tip>
+
+### Dependency injection
+
+Tools are resolved through the service container, so you can type-hint dependencies in the constructor or `handle` method:
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use App\Repositories\WeatherRepository;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Tool;
+
+class CurrentWeatherTool extends Tool
+{
+    public function __construct(
+        protected WeatherRepository $weather,
+    ) {}
+
+    public function handle(Request $request, WeatherRepository $weather): Response
+    {
+        $location = $request->get('location');
+        $forecast = $weather->getForecastFor($location);
+
+        return Response::text("Forecast: {$forecast}");
+    }
+}
+```
+
+### Annotations
+
+Add annotations to give AI clients additional hints about a tool's behaviour:
+
+```php
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Laravel\Mcp\Server\Tool;
+
+#[IsIdempotent]
+#[IsReadOnly]
+class CurrentWeatherTool extends Tool
+{
+    // ...
+}
+```
+
+| Annotation | Description |
+| --- | --- |
+| `#[IsReadOnly]` | Tool does not modify any state |
+| `#[IsDestructive]` | Tool may perform destructive updates |
+| `#[IsIdempotent]` | Repeating the call with the same arguments has no additional side effects |
+| `#[IsOpenWorld]` | Tool may interact with external entities |
+
+### Conditional registration
+
+Implement `shouldRegister` to expose a tool only when certain conditions are met:
+
+```php
+public function shouldRegister(Request $request): bool
+{
+    return $request?->user()?->subscribed() ?? false;
+}
+```
+
+When this returns `false`, the tool is invisible to the AI client.
+
+### Responses
+
+Tools must return a `Laravel\Mcp\Response` instance.
+
+<AccordionGroup>
+  <Accordion title="Text response">
+    ```php
+    return Response::text('Weather Summary: Sunny, 22°C');
+    ```
+  </Accordion>
+
+  <Accordion title="Error response">
+    ```php
+    return Response::error('Unable to fetch weather data. Please try again.');
+    ```
+  </Accordion>
+
+  <Accordion title="Image and audio responses">
+    ```php
+    return Response::image(file_get_contents(storage_path('weather/radar.png')), 'image/png');
+
+    return Response::audio(file_get_contents(storage_path('weather/alert.mp3')), 'audio/mp3');
+
+    // Load directly from storage (MIME type is auto-detected)
+    return Response::fromStorage('weather/radar.png');
+    ```
+  </Accordion>
+
+  <Accordion title="Multiple content items">
+    ```php
+    public function handle(Request $request): array
+    {
+        return [
+            Response::text('Weather Summary: Sunny, 22°C'),
+            Response::text("**Detailed Forecast**\n- Morning: 18°C\n- Afternoon: 25°C"),
+        ];
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Structured response">
+    ```php
+    return Response::structured([
+        'temperature' => 22.5,
+        'conditions'  => 'Partly cloudy',
+        'humidity'    => 65,
+    ]);
+    ```
+  </Accordion>
+
+  <Accordion title="Streaming response">
+    Stream progress updates for long-running operations:
+
+    ```php
+    public function handle(Request $request): Generator
+    {
+        $locations = $request->array('locations');
+
+        foreach ($locations as $index => $location) {
+            yield Response::notification('processing/progress', [
+                'current'  => $index + 1,
+                'total'    => count($locations),
+                'location' => $location,
+            ]);
+
+            yield Response::text($this->forecastFor($location));
+        }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Prompts
+
+Prompts are reusable, parameterised prompt templates that standardise common queries an AI client sends to a language model.
+
+### Creating a prompt
+
+```shell
+php artisan make:mcp-prompt DescribeWeatherPrompt
+```
+
+Register it in the server's `$prompts` array:
+
+```php
+use App\Mcp\Prompts\DescribeWeatherPrompt;
+
+class WeatherServer extends Server
+{
+    protected array $prompts = [
+        DescribeWeatherPrompt::class,
+    ];
+}
+```
+
+### Prompt arguments
+
+Define prompt parameters in the `arguments` method:
+
+```php
+<?php
+
+namespace App\Mcp\Prompts;
+
+use Laravel\Mcp\Server\Prompt;
+use Laravel\Mcp\Server\Prompts\Argument;
+
+class DescribeWeatherPrompt extends Prompt
+{
+    public function arguments(): array
+    {
+        return [
+            new Argument(
+                name: 'tone',
+                description: 'The tone for the weather description (e.g., formal, casual, humorous).',
+                required: true,
+            ),
+        ];
+    }
+}
+```
+
+### Prompt responses
+
+Return user and assistant messages from the `handle` method. Use `asAssistant()` to mark a message as coming from the assistant:
+
+```php
+<?php
+
+namespace App\Mcp\Prompts;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Prompt;
+
+class DescribeWeatherPrompt extends Prompt
+{
+    public function handle(Request $request): array
+    {
+        $tone = $request->string('tone');
+
+        return [
+            Response::text("You are a helpful weather assistant. Describe the weather in a {$tone} tone.")->asAssistant(),
+            Response::text('What is the current weather like in Tokyo?'),
+        ];
+    }
+}
+```
+
+## Resources
+
+Resources are data or information an AI client can load as context — documentation, configuration, or dynamic application data that improves the quality of AI responses.
+
+### Creating a resource
+
+```shell
+php artisan make:mcp-resource WeatherGuidelinesResource
+```
+
+Register it in the server's `$resources` array:
+
+```php
+use App\Mcp\Resources\WeatherGuidelinesResource;
+
+class WeatherServer extends Server
+{
+    protected array $resources = [
+        WeatherGuidelinesResource::class,
+    ];
+}
+```
+
+```php
+<?php
+
+namespace App\Mcp\Resources;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Resource;
+
+#[Description('Comprehensive guidelines for using the Weather API.')]
+class WeatherGuidelinesResource extends Resource
+{
+    public function handle(Request $request): Response
+    {
+        $guidelines = "# Weather API Guidelines\n\n- Always specify a location...";
+
+        return Response::text($guidelines);
+    }
+}
+```
+
+### URI and MIME type
+
+The URI is derived automatically from the class name (e.g. `weather://resources/weather-guidelines`). Customise with `Uri` and `MimeType` attributes:
+
+```php
+use Laravel\Mcp\Server\Attributes\MimeType;
+use Laravel\Mcp\Server\Attributes\Uri;
+use Laravel\Mcp\Server\Resource;
+
+#[Uri('weather://resources/guidelines')]
+#[MimeType('application/pdf')]
+class WeatherGuidelinesResource extends Resource
+{
+    // ...
+}
+```
+
+### Resource templates
+
+Implement `HasUriTemplate` to define dynamic resources with URI variables:
+
+```php
+<?php
+
+namespace App\Mcp\Resources;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\MimeType;
+use Laravel\Mcp\Server\Contracts\HasUriTemplate;
+use Laravel\Mcp\Server\Resource;
+use Laravel\Mcp\Support\UriTemplate;
+
+#[Description('Access user files by ID')]
+#[MimeType('text/plain')]
+class UserFileResource extends Resource implements HasUriTemplate
+{
+    public function uriTemplate(): UriTemplate
+    {
+        return new UriTemplate('file://users/{userId}/files/{fileId}');
+    }
+
+    public function handle(Request $request): Response
+    {
+        $userId = $request->get('userId');
+        $fileId = $request->get('fileId');
+
+        return Response::text("File {$fileId} for user {$userId}");
+    }
+}
+```
+
+URI variables are automatically injected into the request and accessible via `get()`.
+
+### Resource annotations
+
+Annotate resources with audience, priority, and last-modified date:
+
+```php
+use Laravel\Mcp\Enums\Role;
+use Laravel\Mcp\Server\Annotations\Audience;
+use Laravel\Mcp\Server\Annotations\LastModified;
+use Laravel\Mcp\Server\Annotations\Priority;
+use Laravel\Mcp\Server\Resource;
+
+#[Audience(Role::User)]
+#[LastModified('2025-01-12T15:00:58Z')]
+#[Priority(0.9)]
+class UserDashboardResource extends Resource
+{
+    // ...
+}
+```
+
+| Annotation | Type | Description |
+| --- | --- | --- |
+| `#[Audience]` | Role or array | Intended audience (`Role::User`, `Role::Assistant`, or both) |
+| `#[Priority]` | float | Importance score from 0.0 to 1.0 |
+| `#[LastModified]` | string | ISO 8601 timestamp of the last modification |
+
+## Metadata
+
+Attach MCP spec `_meta` fields to tool, resource, and prompt responses:
+
+```php
+return Response::text('The weather is sunny.')
+    ->withMeta(['source' => 'weather-api', 'cached' => true]);
+```
+
+To attach metadata to the response envelope, use `Response::make`:
+
+```php
+return Response::make(
+    Response::text('The weather is sunny.')
+)->withMeta(['request_id' => '12345']);
+```
+
+To attach metadata to the tool, resource, or prompt class itself, define a `$meta` property:
+
+```php
+class CurrentWeatherTool extends Tool
+{
+    protected ?array $meta = [
+        'version' => '2.0',
+        'author'  => 'Weather Team',
+    ];
+}
+```
+
+## Authentication
+
+Web servers support Laravel's standard middleware for authentication.
+
+### Sanctum
+
+Use token-based authentication with [Laravel Sanctum](https://laravel.com/docs/sanctum). The MCP client sends an `Authorization: Bearer <token>` header.
+
+```php
+use App\Mcp\Servers\WeatherServer;
+use Laravel\Mcp\Facades\Mcp;
+
+Mcp::web('/mcp/weather', WeatherServer::class)
+    ->middleware('auth:sanctum');
+```
+
+### OAuth 2.1
+
+Use [Laravel Passport](https://laravel.com/docs/passport) for robust OAuth-based authentication:
+
+```php
+use App\Mcp\Servers\WeatherServer;
+use Laravel\Mcp\Facades\Mcp;
+
+Mcp::oauthRoutes();
+
+Mcp::web('/mcp/weather', WeatherServer::class)
+    ->middleware('auth:api');
+```
+
+When using OAuth, publish the MCP authorization views and register them with Passport:
+
+```shell
+php artisan vendor:publish --tag=mcp-views
+```
+
+```php
+// AppServiceProvider::boot()
+use Laravel\Passport\Passport;
+
+Passport::authorizationView(function ($parameters) {
+    return view('mcp.authorize', $parameters);
+});
+```
+
+## Authorization
+
+Access the authenticated user inside a tool or resource via `$request->user()`:
+
+```php
+public function handle(Request $request): Response
+{
+    if (! $request->user()->can('read-weather')) {
+        return Response::error('Permission denied.');
+    }
+
+    // Continue...
+}
+```
+
+## Testing
+
+### MCP Inspector
+
+Use the interactive `mcp:inspector` command to debug your server:
+
+```shell
+# Web server
+php artisan mcp:inspector mcp/weather
+
+# Local server (named 'weather')
+php artisan mcp:inspector weather
+```
+
+The command launches the MCP Inspector and displays a client configuration you can copy. If your server uses authentication middleware, include the `Authorization` header when connecting.
+
+### Unit tests
+
+Write unit tests directly against your tools, resources, and prompts:
+
+<CodeGroup>
+```php Pest
+test('tool', function () {
+    $response = WeatherServer::tool(CurrentWeatherTool::class, [
+        'location' => 'Tokyo',
+        'units'    => 'celsius',
+    ]);
+
+    $response
+        ->assertOk()
+        ->assertSee('The current weather in Tokyo is 22°C and sunny.');
+});
+```
+
+```php PHPUnit
+public function test_tool(): void
+{
+    $response = WeatherServer::tool(CurrentWeatherTool::class, [
+        'location' => 'Tokyo',
+        'units'    => 'celsius',
+    ]);
+
+    $response
+        ->assertOk()
+        ->assertSee('The current weather in Tokyo is 22°C and sunny.');
+}
+```
+</CodeGroup>
+
+Prompts and resources follow the same pattern:
+
+```php
+$response = WeatherServer::prompt(DescribeWeatherPrompt::class, ['tone' => 'casual']);
+$response = WeatherServer::resource(WeatherGuidelinesResource::class);
+```
+
+Authenticate as a specific user with `actingAs`:
+
+```php
+$response = WeatherServer::actingAs($user)->tool(CurrentWeatherTool::class, [...]);
+```
+
+Key assertion methods:
+
+```php
+$response->assertOk();        // No error in the response
+$response->assertSee('...');  // Response contains the given text
+```

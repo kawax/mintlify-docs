@@ -1,0 +1,520 @@
+---
+title: "Helper Functions"
+description: "Laravel's global PHP helper functions and the Arr, Number, and other utility classes — with practical examples for everyday use."
+---
+
+## What are helpers?
+
+Laravel ships with a large collection of global PHP helper functions. Most are used internally by the framework, but you can freely use them in your application code.
+
+Helpers fall into several categories:
+
+- **Arrays & objects** — the `Arr::` class and functions like `data_get()`
+- **Numbers** — the `Number::` class
+- **Paths** — `app_path()`, `storage_path()`, and friends
+- **URLs** — `route()`, `url()`, `asset()`
+- **Miscellaneous** — `config()`, `collect()`, `auth()`, and other utilities
+
+<Info>
+  Global helper functions need no `use` declaration. The `Arr` and `Number` classes do require an import, e.g. `use Illuminate\Support\Arr;`.
+</Info>
+
+## Array helpers — the `Arr` class
+
+### `Arr::get()` — read nested values with dot notation
+
+Safely retrieves a value from a deeply nested array using dot notation. Returns a default when the key is absent.
+
+```php
+use Illuminate\Support\Arr;
+
+$config = [
+    'database' => [
+        'connections' => [
+            'mysql' => ['host' => '127.0.0.1', 'port' => 3306],
+        ],
+    ],
+];
+
+$host = Arr::get($config, 'database.connections.mysql.host');
+// '127.0.0.1'
+
+$charset = Arr::get($config, 'database.connections.mysql.charset', 'utf8mb4');
+// 'utf8mb4'
+```
+
+<Tip>
+  The `data_get()` global function is equivalent and also works on objects and Eloquent models, making it the more versatile choice.
+</Tip>
+
+### `Arr::set()` — write a nested value
+
+```php
+use Illuminate\Support\Arr;
+
+$array = ['products' => ['desk' => ['price' => 100]]];
+
+Arr::set($array, 'products.desk.price', 200);
+// ['products' => ['desk' => ['price' => 200]]]
+```
+
+### `Arr::has()` — check key existence
+
+```php
+use Illuminate\Support\Arr;
+
+$array = ['product' => ['name' => 'Desk', 'price' => 100]];
+
+Arr::has($array, 'product.name');
+// true
+
+// All keys must exist
+Arr::has($array, ['product.name', 'product.price']);
+// true
+```
+
+### `Arr::only()` / `Arr::except()` — filter keys
+
+Pick the keys you want or strip the ones you don't. Both are handy when sanitising request data.
+
+```php
+use Illuminate\Support\Arr;
+
+$user = [
+    'id'       => 1,
+    'name'     => 'Alice',
+    'email'    => 'alice@example.com',
+    'password' => 'secret',
+    'role'     => 'admin',
+];
+
+// Keep specific keys
+$safe = Arr::only($user, ['id', 'name', 'email']);
+
+// Remove specific keys
+$public = Arr::except($user, ['password']);
+```
+
+### `Arr::pluck()` — extract a column
+
+```php
+use Illuminate\Support\Arr;
+
+$records = [
+    ['user' => ['id' => 1, 'name' => 'Alice']],
+    ['user' => ['id' => 2, 'name' => 'Bob']],
+];
+
+$names = Arr::pluck($records, 'user.name');
+// ['Alice', 'Bob']
+
+// Key the results by another column
+$nameById = Arr::pluck($records, 'user.name', 'user.id');
+// [1 => 'Alice', 2 => 'Bob']
+```
+
+### `Arr::first()` / `Arr::last()` — find by condition
+
+```php
+use Illuminate\Support\Arr;
+
+$prices = [150, 80, 200, 50, 120];
+
+$first = Arr::first($prices, fn ($price) => $price >= 100);
+// 150
+
+// Default when no match
+$first = Arr::first($prices, fn ($price) => $price >= 500, 0);
+// 0
+
+$last = Arr::last($prices);
+// 120
+```
+
+### `Arr::flatten()` — collapse nested arrays
+
+```php
+use Illuminate\Support\Arr;
+
+$tags = [
+    'frontend' => ['html', 'css', 'javascript'],
+    'backend'  => ['php', 'laravel', 'mysql'],
+];
+
+$allTags = Arr::flatten($tags);
+// ['html', 'css', 'javascript', 'php', 'laravel', 'mysql']
+```
+
+### `Arr::wrap()` — guarantee an array
+
+Wraps a scalar in an array, leaves an existing array alone, and converts `null` to `[]`.
+
+```php
+use Illuminate\Support\Arr;
+
+Arr::wrap('Laravel');       // ['Laravel']
+Arr::wrap(['Laravel']);     // ['Laravel']
+Arr::wrap(null);            // []
+```
+
+### `Arr::sort()` — sort by value or key
+
+```php
+use Illuminate\Support\Arr;
+
+$fruits = ['banana', 'apple', 'cherry'];
+$sorted = Arr::sort($fruits);
+// ['apple', 'banana', 'cherry']
+
+// Sort by a derived key
+$products = [
+    ['name' => 'Laptop',   'price' => 1200],
+    ['name' => 'Mouse',    'price' => 35],
+    ['name' => 'Keyboard', 'price' => 80],
+];
+
+$byPrice = Arr::sort($products, fn ($product) => $product['price']);
+// Mouse, Keyboard, Laptop
+```
+
+### `Arr::dot()` / `Arr::undot()` — convert to and from dot notation
+
+```php
+use Illuminate\Support\Arr;
+
+$nested = [
+    'user' => [
+        'profile' => ['name' => 'Alice', 'age' => 28],
+    ],
+];
+
+$dotted = Arr::dot($nested);
+// ['user.profile.name' => 'Alice', 'user.profile.age' => 28]
+
+$restored = Arr::undot($dotted);
+// ['user' => ['profile' => ['name' => 'Alice', 'age' => 28]]]
+```
+
+### `Arr::join()` — join an array into a string
+
+```php
+use Illuminate\Support\Arr;
+
+$items = ['PHP', 'Laravel', 'MySQL'];
+
+Arr::join($items, ', ');
+// 'PHP, Laravel, MySQL'
+
+// Different glue for the last item
+Arr::join($items, ', ', ' and ');
+// 'PHP, Laravel and MySQL'
+```
+
+## `data_get()` — access nested data anywhere
+
+A more general version of `Arr::get()` that works on arrays, objects, Eloquent models, and collections.
+
+```php
+$users = [
+    ['name' => 'Alice', 'address' => ['city' => 'New York']],
+    ['name' => 'Bob',   'address' => ['city' => 'London']],
+];
+
+$city = data_get($users, '0.address.city');
+// 'New York'
+
+// Wildcard — collect a column across all items
+$cities = data_get($users, '*.address.city');
+// ['New York', 'London']
+```
+
+## Number helpers — the `Number` class
+
+### `Number::format()` — readable number formatting
+
+```php
+use Illuminate\Support\Number;
+
+Number::format(1234567.89);
+// '1,234,567.89'
+
+Number::format(1234567.89, precision: 0, locale: 'en');
+// '1,234,568'
+```
+
+### `Number::currency()` — currency formatting
+
+```php
+use Illuminate\Support\Number;
+
+Number::currency(29.99, 'USD');
+// '$29.99'
+
+Number::currency(10000, 'EUR', locale: 'de');
+// '10.000,00 €'
+```
+
+### `Number::fileSize()` — human-readable file sizes
+
+```php
+use Illuminate\Support\Number;
+
+Number::fileSize(1024);
+// '1 KB'
+
+Number::fileSize(1024 * 1024 * 2.5);
+// '2.5 MB'
+```
+
+### `Number::abbreviate()` — compact large numbers
+
+```php
+use Illuminate\Support\Number;
+
+Number::abbreviate(1000);      // '1K'
+Number::abbreviate(1500000);   // '1.5M'
+```
+
+### `Number::percentage()` — percentage display
+
+```php
+use Illuminate\Support\Number;
+
+Number::percentage(75.5, precision: 1);
+// '75.5%'
+```
+
+## Path helpers
+
+Return absolute paths to key directories. These always resolve correctly regardless of where you deploy.
+
+```php
+app_path();                                       // /var/www/app
+app_path('Http/Controllers/UserController.php');
+
+base_path('composer.json');
+
+config_path('database.php');
+
+database_path('migrations');
+
+storage_path('app/uploads');
+
+public_path('css/app.css');
+
+resource_path('views/welcome.blade.php');
+```
+
+## URL helpers
+
+### `route()` — generate a named route URL
+
+```php
+// Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
+
+$url = route('users.show', ['user' => 1]);
+// 'https://example.com/users/1'
+
+// Relative URL
+$url = route('users.show', ['user' => 1], false);
+// '/users/1'
+```
+
+### `url()` — absolute URL for any path
+
+```php
+$url = url('user/profile');
+// 'https://example.com/user/profile'
+
+$current  = url()->current();   // current URL without the query string
+$full     = url()->full();      // current URL with the query string
+$previous = url()->previous();  // the previous URL
+```
+
+### `asset()` — public asset URL
+
+```php
+$url = asset('img/logo.png');
+// 'https://example.com/img/logo.png'
+```
+
+### `to_route()` — redirect to a named route
+
+```php
+return to_route('users.show', ['user' => 1]);
+
+// With HTTP status and headers
+return to_route('users.show', ['user' => 1], 302, ['X-Custom' => 'value']);
+```
+
+## Commonly used helpers
+
+### `config()` — read and write config values
+
+```php
+$timezone = config('app.timezone');
+// 'UTC'
+
+// With a default
+$debug = config('app.debug', false);
+
+// Override at runtime (this request only)
+config(['app.locale' => 'en']);
+```
+
+### `collect()` — create a collection
+
+```php
+$collection = collect([1, 2, 3, 4, 5]);
+
+$sum = collect([1, 2, 3])->sum(); // 6
+```
+
+<Tip>
+  `collect()` is the entry point to Laravel's powerful Collection API. See the [Collections](/en/collections) guide for a full overview.
+</Tip>
+
+### `auth()` — access the authenticated user
+
+```php
+$user = auth()->user();
+
+if (auth()->check()) {
+    // user is authenticated
+}
+
+// Use a specific guard
+$admin = auth('admin')->user();
+```
+
+### `blank()` / `filled()` — empty checks
+
+`blank()` returns `true` for `null`, empty strings, whitespace-only strings, and empty arrays/collections. `filled()` is the inverse.
+
+```php
+blank('');          // true
+blank('   ');       // true
+blank(null);        // true
+blank(collect());   // true
+
+blank(0);           // false — zero is not blank
+blank(false);       // false
+
+filled('hello');    // true
+filled(0);          // true
+```
+
+### `abort()` / `abort_if()` / `abort_unless()` — HTTP exceptions
+
+```php
+abort(404);
+abort(403, 'You do not have permission to access this page.');
+
+// Throw when condition is true
+abort_if(! auth()->user()->isAdmin(), 403);
+
+// Throw when condition is false
+abort_unless(auth()->check(), 401);
+```
+
+### `dd()` / `dump()` — debugging
+
+```php
+// Dump and die
+dd($user);
+dd($user, $orders, $config);
+
+// Dump without stopping
+dump($query);
+```
+
+### `dispatch()` — push a job onto the queue
+
+```php
+dispatch(new App\Jobs\SendWelcomeEmail($user));
+
+// Run synchronously
+dispatch_sync(new App\Jobs\GenerateReport($data));
+```
+
+### `encrypt()` / `decrypt()` — encryption
+
+```php
+$encrypted = encrypt('sensitive-value');
+$decrypted = decrypt($encrypted);
+```
+
+### `env()` — read environment variables
+
+```php
+$debug  = env('APP_DEBUG', false);
+$dbHost = env('DB_HOST', '127.0.0.1');
+```
+
+<Warning>
+  Avoid calling `env()` directly in controllers or service classes. Read it inside `config/` files and access the value through `config()` instead. When config caching is active (`php artisan config:cache`), `env()` returns `null` for everything not in the cache.
+</Warning>
+
+## `Arr::` vs `collect()`
+
+Use `Arr::` for quick, one-off operations on a plain PHP array. Switch to `collect()` when you want to chain multiple transformations.
+
+```php
+use Illuminate\Support\Arr;
+
+// Plain array stays a plain array
+$filtered = Arr::where($items, fn ($v) => $v > 0);
+
+// Chain with collect()
+$result = collect($items)
+    ->filter(fn ($v) => $v > 0)
+    ->map(fn ($v) => $v * 2)
+    ->values()
+    ->all();
+```
+
+<Info>
+  Eloquent query results already return a Collection, so there is no need to wrap them in `collect()`. Use `Arr::` when you only need a simple array operation without the overhead of a Collection object.
+</Info>
+
+## Quick reference
+
+<AccordionGroup>
+  <Accordion title="Common helpers at a glance">
+    | Helper | Purpose |
+    | --- | --- |
+    | `Arr::get($array, 'a.b.c', $default)` | Read a nested key safely |
+    | `Arr::only($array, $keys)` | Keep specific keys |
+    | `Arr::except($array, $keys)` | Remove specific keys |
+    | `Arr::pluck($array, 'key')` | Extract a column |
+    | `Arr::flatten($array)` | Collapse to a flat array |
+    | `Arr::wrap($value)` | Ensure a value is an array |
+    | `data_get($target, 'a.*.b')` | Wildcard nested access |
+    | `Number::format($n)` | Human-readable number |
+    | `Number::currency($n, 'USD')` | Currency formatting |
+    | `Number::fileSize($bytes)` | File size display |
+    | `route('name', $params)` | Named route URL |
+    | `url('path')` | Absolute URL |
+    | `asset('path')` | Public asset URL |
+    | `config('key', $default)` | Read a config value |
+    | `collect($array)` | Create a Collection |
+    | `auth()->user()` | Current authenticated user |
+    | `blank($value)` | Check for emptiness |
+    | `filled($value)` | Check for non-emptiness |
+    | `abort(403)` | Throw an HTTP exception |
+    | `dispatch($job)` | Push a job to the queue |
+    | `env('KEY', $default)` | Read an env variable |
+  </Accordion>
+
+  <Accordion title="Arr:: vs collect()">
+    **Use `Arr::` when:**
+    - You need a single, simple operation on a plain array
+    - You want the result to stay as a plain PHP array
+    - You do not need method chaining
+
+    **Use `collect()` when:**
+    - You want to chain multiple transformations
+    - You are already working with Eloquent results (they are already collections)
+    - You need collection-specific methods like `groupBy`, `mapWithKeys`, or `zip`
+  </Accordion>
+</AccordionGroup>
