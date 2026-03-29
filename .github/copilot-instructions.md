@@ -2,8 +2,6 @@
 
 Mintlifyを使ったLaravelのチュートリアルから高度な情報まで提供するドキュメントサイト。GitHub Agentic Workflowsを使って自動で更新し続ける。
 
-Mintlifyで稼働はしてるけど独自ドメイン設定して一般公開はまだしてないのでゆっくり準備していい。
-
 This is a Mintlify documentation site. Pages are MDX files with YAML frontmatter. Site configuration lives in `docs.json`.
 
 ## 大事な制限
