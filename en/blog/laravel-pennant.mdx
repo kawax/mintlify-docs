@@ -1,0 +1,481 @@
+---
+title: "Feature flags in Laravel with Pennant"
+description: "Laravel Pennant is the official first-party feature flag package for Laravel. Learn how to define flags, run gradual rollouts, build A/B tests, and manage beta features — all with a clean, Laravel-native API."
+---
+
+## Introduction
+
+Releasing a new feature to all users at once is a risk. If something breaks, you either roll back the entire deployment or leave broken code in production while you fix it. **Feature flags** — also called feature toggles — solve this by decoupling deployment from release.
+
+With feature flags, you deploy code continuously but control who sees which features through configuration. You can release to 5% of users, roll back with a single API call, run A/B experiments, and give beta access to specific user segments — all without touching your deployment pipeline.
+
+**Laravel Pennant** is the official first-party feature flag package, available since Laravel 10. It provides a clean, Laravel-native API for defining and evaluating flags, with built-in support for database persistence, Blade directives, scoped checks, and testing.
+
+<Info>
+  Pennant was released with Laravel 10 in 2023 and is fully compatible with Laravel 13.
+</Info>
+
+---
+
+## Installation
+
+```shell
+composer require laravel/pennant
+```
+
+Publish the config file and migration:
+
+```shell
+php artisan vendor:publish --provider="Laravel\Pennant\PennantServiceProvider"
+```
+
+Run the migration to create the `features` table:
+
+```shell
+php artisan migrate
+```
+
+### Configuration
+
+The published `config/pennant.php` defaults to the `database` driver:
+
+```php
+// config/pennant.php
+return [
+    'default' => env('PENNANT_STORE', 'database'),
+
+    'stores' => [
+        'array' => [
+            'driver' => 'array',
+        ],
+        'database' => [
+            'driver'     => 'database',
+            'connection' => null,
+            'table'      => 'features',
+        ],
+    ],
+];
+```
+
+---
+
+## Defining features
+
+### Closure-based features
+
+Define features with `Feature::define()`. The closure receives a scope (by default, the authenticated user) and returns the flag value. Register definitions in `AppServiceProvider::boot()`.
+
+```php
+<?php
+
+namespace App\Providers;
+
+use App\Models\User;
+use Illuminate\Support\ServiceProvider;
+use Laravel\Pennant\Feature;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        Feature::define('new-dashboard', fn (User $user) => $user->isInternalTeamMember());
+    }
+}
+```
+
+When the closure returns `true`, the feature is active. When it returns `false`, it is inactive. The result is stored in the configured driver the first time it is resolved. Subsequent checks for the same scope read from storage — the closure does not re-execute.
+
+### Class-based features
+
+For features with more complex logic, use a dedicated class:
+
+```shell
+php artisan pennant:feature NewDashboard
+```
+
+This generates `app/Features/NewDashboard.php`:
+
+```php
+<?php
+
+namespace App\Features;
+
+use App\Models\User;
+
+class NewDashboard
+{
+    public function resolve(User $user): mixed
+    {
+        return $user->isInternalTeamMember();
+    }
+}
+```
+
+Class-based features do not need to be registered in the service provider. They are resolved through the container, so constructor injection works.
+
+---
+
+## Checking features
+
+```php
+use Laravel\Pennant\Feature;
+
+// Check against the current authenticated user
+if (Feature::active('new-dashboard')) {
+    // Show the new dashboard
+}
+
+// Check for a specific user
+if (Feature::for($user)->active('new-dashboard')) {
+    // ...
+}
+
+// Check multiple features
+Feature::allAreActive(['new-dashboard', 'beta-reporting']); // all active?
+Feature::someAreActive(['new-dashboard', 'beta-reporting']); // any active?
+Feature::inactive('new-dashboard');                          // inactive?
+```
+
+For class-based features, pass the class name:
+
+```php
+use App\Features\NewDashboard;
+
+Feature::active(NewDashboard::class);
+```
+
+### Conditional execution with `when` and `unless`
+
+```php
+return Feature::when('new-dashboard',
+    fn () => $this->renderNewDashboard(),
+    fn () => $this->renderLegacyDashboard(),
+);
+```
+
+### Blade directives
+
+```blade
+@feature('new-dashboard')
+    {{-- New dashboard content --}}
+@else
+    {{-- Legacy dashboard content --}}
+@endfeature
+
+@featureany(['new-dashboard', 'beta'])
+    {{-- Shown when either feature is active --}}
+@endfeatureany
+```
+
+### Middleware
+
+Guard routes with a feature flag. If the feature is inactive, the request returns `400 Bad Request`.
+
+```php
+use Illuminate\Support\Facades\Route;
+use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
+
+Route::get('/api/v2/servers', function () {
+    // ...
+})->middleware(EnsureFeaturesAreActive::using('new-api', 'servers-v2'));
+```
+
+### `HasFeatures` trait
+
+Add the `HasFeatures` trait to your `User` model to check flags directly from the model:
+
+```php
+use Laravel\Pennant\Concerns\HasFeatures;
+
+class User extends Authenticatable
+{
+    use HasFeatures;
+}
+```
+
+```php
+if ($user->features()->active('new-dashboard')) {
+    // ...
+}
+```
+
+---
+
+## Real-world use cases
+
+### Gradual rollout — release to 20% of users
+
+Combine `Feature::define()` with `Illuminate\Support\Lottery` for percentage-based rollouts:
+
+```php
+use App\Models\User;
+use Illuminate\Support\Lottery;
+use Laravel\Pennant\Feature;
+
+Feature::define('new-checkout', fn (User $user) => match (true) {
+    $user->isInternalTeamMember() => true,   // Always on for internal team
+    $user->isPremium()            => true,   // Always on for premium users
+    default                       => Lottery::odds(1 / 5), // 20% of everyone else
+});
+```
+
+<Tip>
+  `Lottery::odds(1 / 5)` returns `true` roughly one in five times. The result is persisted on first evaluation, so the same user always sees the same experience. Consistency is guaranteed automatically.
+</Tip>
+
+For a pure lottery with no per-scope logic, pass the `Lottery` directly:
+
+```php
+Feature::define('site-redesign', Lottery::odds(1, 10)); // 10%
+```
+
+### User segmentation — beta members and admins
+
+```php
+use App\Models\User;
+use Laravel\Pennant\Feature;
+
+Feature::define('analytics-v2', fn (User $user) => match (true) {
+    $user->hasRole('admin')      => true,
+    $user->isBetaMember()        => true,
+    $user->plan === 'enterprise' => true,
+    default                      => false,
+});
+```
+
+Use it in a controller:
+
+```php
+use Laravel\Pennant\Feature;
+use Illuminate\Http\Request;
+
+class AnalyticsController
+{
+    public function index(Request $request)
+    {
+        return Feature::when('analytics-v2',
+            fn () => view('analytics.v2.index'),
+            fn () => view('analytics.legacy.index'),
+        );
+    }
+}
+```
+
+### A/B testing — rich values
+
+Flags can return values other than `true`/`false`. Use this to assign users to experiment variants:
+
+```php
+use App\Models\User;
+use Illuminate\Support\Arr;
+use Laravel\Pennant\Feature;
+
+Feature::define('purchase-button', fn (User $user) => Arr::random([
+    'blue-sapphire',
+    'seafoam-green',
+    'tart-orange',
+]));
+```
+
+Read the value in a Blade template:
+
+```blade
+@php
+    $buttonColor = Feature::value('purchase-button');
+@endphp
+
+<button class="btn btn-{{ $buttonColor }}">
+    Buy now
+</button>
+```
+
+Track experiment results by listening to the `FeatureRetrieved` event:
+
+```php
+use Laravel\Pennant\Events\FeatureRetrieved;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(function (FeatureRetrieved $event) {
+    if ($event->feature === 'purchase-button') {
+        analytics()->track('feature_checked', [
+            'feature' => $event->feature,
+            'value'   => $event->value,
+            'scope'   => $event->scope?->id,
+        ]);
+    }
+});
+```
+
+### Manual activation and deactivation
+
+Override computed flag values from an admin panel or Artisan command:
+
+```php
+use Laravel\Pennant\Feature;
+
+// Activate for a specific user
+Feature::for($user)->activate('new-checkout');
+
+// Deactivate for a specific user
+Feature::for($user)->deactivate('new-checkout');
+
+// Activate for all users at once
+Feature::activateForEveryone('new-checkout');
+
+// Deactivate for all users at once
+Feature::deactivateForEveryone('new-checkout');
+```
+
+When a feature is fully retired, purge it from storage:
+
+```shell
+php artisan pennant:purge new-checkout
+```
+
+### Eager loading — avoiding N+1 queries
+
+When checking flags inside a loop, load them in bulk first:
+
+```php
+// Generates a query per user in the loop
+foreach ($users as $user) {
+    if (Feature::for($user)->active('new-checkout')) {
+        // ...
+    }
+}
+
+// Load all at once, then iterate
+Feature::for($users)->load(['new-checkout']);
+
+foreach ($users as $user) {
+    if (Feature::for($user)->active('new-checkout')) {
+        // ...
+    }
+}
+```
+
+---
+
+## Storage drivers
+
+### `array` driver
+
+Stores flag values in memory for the duration of the request. Use it in tests and local development.
+
+```ini
+# .env.testing
+PENNANT_STORE=array
+```
+
+### `database` driver
+
+Persists flag values in the `features` table. The default for production. Once a value is resolved for a scope, it is stored and returned from the database on subsequent checks — the closure does not re-run.
+
+### Custom drivers
+
+Implement `Laravel\Pennant\Contracts\Driver` and register with `Feature::extend()`:
+
+```php
+use App\Extensions\RedisFeatureDriver;
+use Illuminate\Contracts\Foundation\Application;
+use Laravel\Pennant\Feature;
+
+public function boot(): void
+{
+    Feature::extend('redis', function (Application $app) {
+        return new RedisFeatureDriver(
+            $app->make('redis'),
+            $app->make('events'),
+            []
+        );
+    });
+}
+```
+
+Then set `PENNANT_STORE=redis` in your environment.
+
+---
+
+## Testing
+
+The simplest way to control feature flags in tests is to redefine them inline:
+
+```php tab=Pest
+use Laravel\Pennant\Feature;
+
+test('new dashboard is shown when feature is active', function () {
+    Feature::define('new-dashboard', true);
+
+    $response = $this->actingAs($this->user)->get('/dashboard');
+
+    $response->assertViewIs('dashboard.new');
+});
+
+test('legacy dashboard is shown when feature is inactive', function () {
+    Feature::define('new-dashboard', false);
+
+    $response = $this->actingAs($this->user)->get('/dashboard');
+
+    $response->assertViewIs('dashboard.legacy');
+});
+```
+
+```php tab=PHPUnit
+use Laravel\Pennant\Feature;
+
+public function test_shows_new_dashboard()
+{
+    Feature::define('new-dashboard', true);
+
+    $response = $this->actingAs($this->user)->get('/dashboard');
+
+    $response->assertViewIs('dashboard.new');
+}
+
+public function test_shows_legacy_dashboard()
+{
+    Feature::define('new-dashboard', false);
+
+    $response = $this->actingAs($this->user)->get('/dashboard');
+
+    $response->assertViewIs('dashboard.legacy');
+}
+```
+
+For lottery-based features, use Laravel's `Lottery::fix()` helper:
+
+```php
+use Illuminate\Support\Lottery;
+
+Lottery::fix([true]); // Always return true
+
+// ... your test ...
+
+Lottery::determineResultsNormally(); // Reset
+```
+
+Set the `array` driver in `phpunit.xml` so test flag state does not persist between runs:
+
+```xml
+<php>
+    <env name="PENNANT_STORE" value="array"/>
+</php>
+```
+
+---
+
+## Summary
+
+| Scenario | Pennant's role |
+|----------|---------------|
+| Gradual rollout | `Lottery::odds()` for percentage-based release |
+| Beta features | Segment by role, plan, or any model attribute |
+| A/B testing | Rich values assign users to variants |
+| Kill switch | `Feature::deactivateForEveryone()` disables instantly |
+| Trunk-based development | Ship unfinished features hidden behind a flag |
+
+Feature flags change how you think about deployment. When you can turn a feature off instantly without rolling back code, the fear of deploying shrinks. Pennant makes adding that safety net a low-effort decision for any Laravel project.
+
+<Card title="Laravel Pennant documentation" icon="book-open" href="https://laravel.com/docs/pennant">
+  Complete API reference for Pennant, including scopes, events, and custom drivers.
+</Card>

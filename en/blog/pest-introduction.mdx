@@ -1,0 +1,278 @@
+---
+title: "Testing Laravel applications with Pest"
+description: "Pest is the default test framework for new Laravel projects. This guide covers why it exists, how it compares to PHPUnit, and how to use its most valuable features — from the expect() API to architecture testing."
+---
+
+## Why Pest became the Laravel default
+
+Since Laravel 11, `laravel new` defaults to **Pest** as the test framework. PHPUnit has been the PHP testing standard for years, and Pest is built on top of it. So why the change?
+
+The answer is friction. Writing a PHPUnit test requires defining a class, extending `TestCase`, and naming a method with a specific prefix. Pest removes all of that. You write what you want to test, and the framework stays out of the way.
+
+<Info>
+  Pest runs on top of PHPUnit, so all existing PHPUnit tests continue to work. You can migrate gradually — or not at all.
+</Info>
+
+The goal is to lower the barrier to writing tests. When tests are fast to write, developers write more of them. Pest reduces the ceremony so you can focus on describing behavior rather than structuring classes.
+
+---
+
+## Pest vs. PHPUnit — the key differences
+
+### Test syntax
+
+The most visible difference is how you write tests.
+
+```php tab=Pest
+test('user can log in', function () {
+    $user = User::factory()->create();
+
+    $response = $this->post('/login', [
+        'email'    => $user->email,
+        'password' => 'password',
+    ]);
+
+    $response->assertRedirect('/dashboard');
+});
+```
+
+```php tab=PHPUnit
+class AuthTest extends TestCase
+{
+    public function test_user_can_log_in(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->post('/login', [
+            'email'    => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect('/dashboard');
+    }
+}
+```
+
+The Pest `test()` function takes a description and a closure. No class, no method naming convention. You can also use `it()`, which reads as a natural sentence: `it('redirects to dashboard after login', ...)`.
+
+### The `expect()` API
+
+Pest's most distinctive feature is its chainable `expect()` API for assertions.
+
+```php
+test('posts API returns JSON', function () {
+    $posts = Post::factory(3)->create();
+
+    $response = $this->getJson('/api/posts');
+
+    expect($response->status())->toBe(200);
+    expect($response->json('data'))->toHaveCount(3);
+    expect($response->json('data.0.title'))->not->toBeEmpty();
+});
+```
+
+Assertions read like natural English: `toBe()`, `toBeNull()`, `toContain()`, `toHaveCount()`. You can chain multiple assertions on a single value:
+
+```php
+expect($user)
+    ->name->toBe('Jane Smith')
+    ->email->toBe('jane@example.com')
+    ->is_admin->toBeFalse();
+```
+
+### Setup and teardown
+
+`beforeEach()` replaces PHPUnit's `setUp()`. `afterEach()` replaces `tearDown()`.
+
+```php
+beforeEach(function () {
+    $this->user = User::factory()->create();
+    $this->actingAs($this->user);
+});
+
+test('authenticated user can view profile', function () {
+    $response = $this->get('/profile');
+    $response->assertOk();
+});
+
+test('authenticated user can update profile', function () {
+    $response = $this->patch('/profile', ['name' => 'Updated Name']);
+    $response->assertRedirect('/profile');
+});
+```
+
+### Datasets — table-driven tests
+
+When you want to run the same test logic with multiple inputs, use `with()`.
+
+```php
+test('invalid email addresses fail validation', function (string $email) {
+    $response = $this->postJson('/api/users', [
+        'name'  => 'Jane Smith',
+        'email' => $email,
+    ]);
+
+    $response->assertUnprocessable();
+})->with([
+    'empty'          => [''],
+    'malformed'      => ['notanemail'],
+    'double at sign' => ['a@@example.com'],
+]);
+```
+
+Each dataset label (`'empty'`, `'malformed'`, etc.) is appended to the test name in the output, so you can see exactly which case failed.
+
+---
+
+## Architecture testing with `arch()`
+
+`arch()` is one of Pest's most unique features. It lets you write tests that verify the structure of your codebase — not just behavior.
+
+```php
+test('models extend Eloquent', function () {
+    arch()->expect('App\Models')
+        ->toExtend(Illuminate\Database\Eloquent\Model::class);
+});
+
+test('controllers are declared final', function () {
+    arch()->expect('App\Http\Controllers')
+        ->toBeFinal();
+});
+
+test('service classes do not depend on controllers', function () {
+    arch()->expect('App\Services')
+        ->not->toUse('App\Http\Controllers');
+});
+```
+
+<Tip>
+  Architecture tests analyze source code statically — no HTTP requests, no database queries. They run very fast and can catch structural regressions early.
+</Tip>
+
+Pest also ships with preset rule sets for common frameworks:
+
+```php
+test('codebase follows Laravel conventions', function () {
+    arch()->preset()->laravel();
+});
+```
+
+The `laravel()` preset validates model naming, controller inheritance, middleware structure, and other common Laravel conventions in a single call.
+
+---
+
+## Practical examples in a Laravel project
+
+### Creating tests
+
+```shell
+php artisan make:test UserTest
+```
+
+With the default Laravel 11+ setup, this generates a Pest-style file:
+
+```php
+<?php
+
+test('example', function () {
+    expect(true)->toBeTrue();
+});
+```
+
+### Using Laravel test helpers
+
+Pest inherits from Laravel's `TestCase`, so every Laravel testing helper works without modification: `actingAs()`, `assertDatabaseHas()`, HTTP testing methods, and more.
+
+```php
+use App\Models\Post;
+use App\Models\User;
+
+test('user can delete their own post', function () {
+    $user = User::factory()->create();
+    $post = Post::factory()->for($user)->create();
+
+    $response = $this
+        ->actingAs($user)
+        ->delete("/posts/{$post->id}");
+
+    $response->assertRedirect('/posts');
+    $this->assertModelMissing($post);
+});
+
+test('user cannot delete another user\'s post', function () {
+    $user      = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $post      = Post::factory()->for($otherUser)->create();
+
+    $this
+        ->actingAs($user)
+        ->delete("/posts/{$post->id}")
+        ->assertForbidden();
+
+    $this->assertModelExists($post);
+});
+```
+
+### Database traits
+
+Apply `RefreshDatabase` or `DatabaseTransactions` with `uses()`. A single line at the top of the file covers every test in it.
+
+```php
+uses(Tests\TestCase::class, Illuminate\Foundation\Testing\RefreshDatabase::class)->in('Feature');
+```
+
+Put this in `tests/Pest.php` to apply it to all Feature tests automatically. Individual test files can override it.
+
+---
+
+## Running tests
+
+```shell
+./vendor/bin/pest                        # Run all tests
+./vendor/bin/pest --filter="user"        # Filter by name
+./vendor/bin/pest --parallel             # Run in parallel
+php artisan test                         # Artisan command (uses Pest automatically in Laravel 11+)
+```
+
+<Info>
+  `php artisan test` automatically detects Pest when it is installed and runs tests through it. You do not need to call `./vendor/bin/pest` separately unless you need Pest-specific flags.
+</Info>
+
+---
+
+## Coexisting with PHPUnit tests
+
+Pest runs PHPUnit test classes alongside Pest-style tests without any changes. Migrate at your own pace:
+
+<Steps>
+  <Step title="Configure Pest.php">
+    Add `uses()` configuration to `tests/Pest.php` to apply traits globally.
+  </Step>
+  <Step title="Write new tests in Pest">
+    Start all new tests in Pest syntax. Do not touch existing PHPUnit tests yet.
+  </Step>
+  <Step title="Migrate incrementally">
+    Convert existing PHPUnit tests to Pest one file at a time, verifying behavior as you go.
+  </Step>
+</Steps>
+
+There is no deadline. Both styles run together indefinitely.
+
+---
+
+## Summary
+
+| Feature | PHPUnit | Pest |
+|---------|---------|------|
+| Test definition | Class + method | `test()` / `it()` function |
+| Assertions | `$this->assert*()` | `expect()->to*()` |
+| Setup | `setUp()` | `beforeEach()` |
+| Data-driven | `@dataProvider` | `->with()` |
+| Architecture checks | Not available | `arch()` |
+| Execution speed | Standard | Equivalent (runs on PHPUnit) |
+
+Pest is a higher-level layer on top of PHPUnit, not a replacement. Its deep Laravel integration and low migration cost make it worth adopting even in existing projects. The `arch()` feature alone can catch structural regressions that traditional unit tests miss.
+
+<Card title="Pest documentation" icon="book-open" href="https://pestphp.com/docs">
+  Datasets, code coverage, parallel execution, and the full API reference.
+</Card>

@@ -1,0 +1,395 @@
+---
+title: "Building SPAs with Inertia.js 3"
+description: "Inertia.js connects a Laravel backend to a React, Vue, or Svelte frontend — no API required. This guide covers the core concepts of Inertia v3, from page components and shared data to form handling and the new v3 features."
+---
+
+## What is Inertia.js?
+
+You want a React or Vue frontend. You don't want to design, build, and maintain a separate REST API. **Inertia.js** solves exactly that problem.
+
+Inertia is not a framework. It's an adapter layer that connects your existing Laravel backend to a JavaScript frontend. You keep Laravel's routing, controllers, and middleware. Your views become React, Vue, or Svelte components. Page navigation happens over XHR instead of full reloads, giving you SPA-like fluidity without the API overhead.
+
+<Info>
+  Inertia v3 was released on March 26, 2026. Laravel 13 starter kits for React, Vue, and Svelte all use Inertia.
+</Info>
+
+### Inertia vs. traditional approaches
+
+| Architecture | Strengths | Trade-offs |
+|-------------|-----------|------------|
+| Blade (MPA) | Simple, tight Laravel integration | Full page reload on every navigation |
+| Separate SPA + API | High interactivity | API design, authentication, and type definitions duplicated |
+| **Inertia (modern monolith)** | SPA UX + server-side simplicity | Some learning curve |
+
+With Inertia, a Laravel controller passes data directly to a React or Vue component. You define no REST endpoints, and page transitions feel instant because only the component is swapped — the shell of the page persists.
+
+---
+
+## Getting started with a starter kit
+
+The fastest way to use Inertia is through a Laravel starter kit. When you run `laravel new`, choose React, Vue, or Svelte:
+
+```shell
+laravel new my-app
+# Select React, Vue, or Svelte in the interactive prompt to get an Inertia setup
+```
+
+The starter kit wires up:
+
+- `inertiajs/inertia-laravel` (server-side adapter)
+- `@inertiajs/react`, `@inertiajs/vue3`, or `@inertiajs/svelte` (client adapter)
+- The `HandleInertiaRequests` middleware
+- Authentication screens (login, register, password reset) already implemented as Inertia page components
+
+For adding Inertia to an existing project, install the server and client packages separately. See the [official installation guide](https://inertiajs.com/docs/v3/getting-started/installation) for step-by-step instructions.
+
+---
+
+## `Inertia::render()` — the core API
+
+Return an Inertia response from any controller using `Inertia::render()`. The first argument is the JavaScript component name; the second is the data passed as props.
+
+```php
+use Inertia\Inertia;
+
+class PostController extends Controller
+{
+    public function index()
+    {
+        return Inertia::render('Posts/Index', [
+            'posts' => Post::latest()->paginate(10),
+        ]);
+    }
+
+    public function show(Post $post)
+    {
+        return Inertia::render('Posts/Show', [
+            'post' => $post->only('id', 'title', 'content', 'created_at'),
+            'author' => $post->user->only('id', 'name'),
+        ]);
+    }
+}
+```
+
+<Tip>
+  The `inertia()` helper function is equivalent to `Inertia::render()`. Use whichever your team prefers, but be consistent.
+</Tip>
+
+The component name `'Posts/Index'` maps to a file path. For React that's `resources/js/Pages/Posts/Index.jsx`; for Vue it's `resources/js/Pages/Posts/Index.vue`.
+
+---
+
+## Page components
+
+An Inertia page component is a standard React or Vue component. Props from the controller arrive automatically.
+
+```jsx React
+// resources/js/Pages/Posts/Index.jsx
+import { Link } from '@inertiajs/react'
+
+export default function PostsIndex({ posts }) {
+    return (
+        <div>
+            <h1>Posts</h1>
+            {posts.data.map(post => (
+                <article key={post.id}>
+                    <h2>
+                        <Link href={`/posts/${post.id}`}>{post.title}</Link>
+                    </h2>
+                </article>
+            ))}
+        </div>
+    )
+}
+```
+
+```vue Vue
+<!-- resources/js/Pages/Posts/Index.vue -->
+<script setup>
+import { Link } from '@inertiajs/vue3'
+
+defineProps({
+    posts: Object,
+})
+</script>
+
+<template>
+    <div>
+        <h1>Posts</h1>
+        <article v-for="post in posts.data" :key="post.id">
+            <h2>
+                <Link :href="`/posts/${post.id}`">{{ post.title }}</Link>
+            </h2>
+        </article>
+    </div>
+</template>
+```
+
+Use the `<Link>` component instead of `<a>` tags. Inertia intercepts the click, fetches only the new component over XHR, and swaps it in — no full page reload.
+
+---
+
+## Shared data — `HandleInertiaRequests`
+
+Data needed on every page (the authenticated user, flash messages, app config) belongs in the `share()` method of the `HandleInertiaRequests` middleware.
+
+```php
+// app/Http/Middleware/HandleInertiaRequests.php
+use Illuminate\Http\Request;
+use Inertia\Middleware;
+
+class HandleInertiaRequests extends Middleware
+{
+    public function share(Request $request): array
+    {
+        return array_merge(parent::share($request), [
+            'appName' => config('app.name'),
+
+            'auth' => [
+                'user' => $request->user()
+                    ? $request->user()->only('id', 'name', 'email')
+                    : null,
+            ],
+
+            'flash' => [
+                'success' => $request->session()->get('success'),
+                'error'   => $request->session()->get('error'),
+            ],
+        ]);
+    }
+}
+```
+
+Shared data is automatically merged into every page's props.
+
+```jsx React
+// Accessing shared data from a layout component
+import { usePage } from '@inertiajs/react'
+
+export default function Layout({ children }) {
+    const { auth, flash } = usePage().props
+
+    return (
+        <main>
+            <header>
+                {auth.user ? `Logged in as ${auth.user.name}` : 'Guest'}
+            </header>
+            {flash.success && <div className="alert-success">{flash.success}</div>}
+            <article>{children}</article>
+        </main>
+    )
+}
+```
+
+<Info>
+  Shared data is included in every request, so keep it minimal. Wrap expensive data in a closure for lazy evaluation — it will only run when the response is actually sent.
+</Info>
+
+---
+
+## Form handling and validation errors
+
+Inertia's `useForm()` helper manages form state, submission, and error display in one place. Laravel's built-in validation integrates automatically.
+
+### Controller
+
+```php
+class PostController extends Controller
+{
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title'   => ['required', 'string', 'max:255'],
+            'content' => ['required', 'string'],
+        ]);
+
+        Post::create($validated + ['user_id' => auth()->id()]);
+
+        return redirect()->route('posts.index')
+            ->with('success', 'Post created.');
+    }
+}
+```
+
+When validation fails, Laravel redirects back and stores the errors in the session. Inertia detects this automatically and delivers the errors as an `errors` prop to the page component.
+
+### Frontend
+
+```jsx React
+// resources/js/Pages/Posts/Create.jsx
+import { useForm } from '@inertiajs/react'
+
+export default function PostsCreate() {
+    const { data, setData, post, processing, errors } = useForm({
+        title: '',
+        content: '',
+    })
+
+    function handleSubmit(e) {
+        e.preventDefault()
+        post('/posts')
+    }
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <div>
+                <label>Title</label>
+                <input
+                    value={data.title}
+                    onChange={e => setData('title', e.target.value)}
+                />
+                {errors.title && <p className="error">{errors.title}</p>}
+            </div>
+
+            <div>
+                <label>Content</label>
+                <textarea
+                    value={data.content}
+                    onChange={e => setData('content', e.target.value)}
+                />
+                {errors.content && <p className="error">{errors.content}</p>}
+            </div>
+
+            <button type="submit" disabled={processing}>
+                {processing ? 'Saving...' : 'Publish'}
+            </button>
+        </form>
+    )
+}
+```
+
+```vue Vue
+<!-- resources/js/Pages/Posts/Create.vue -->
+<script setup>
+import { useForm } from '@inertiajs/vue3'
+
+const form = useForm({
+    title: '',
+    content: '',
+})
+
+function submit() {
+    form.post('/posts')
+}
+</script>
+
+<template>
+    <form @submit.prevent="submit">
+        <div>
+            <label>Title</label>
+            <input v-model="form.title" />
+            <p v-if="form.errors.title" class="error">{{ form.errors.title }}</p>
+        </div>
+
+        <div>
+            <label>Content</label>
+            <textarea v-model="form.content"></textarea>
+            <p v-if="form.errors.content" class="error">{{ form.errors.content }}</p>
+        </div>
+
+        <button type="submit" :disabled="form.processing">
+            {{ form.processing ? 'Saving...' : 'Publish' }}
+        </button>
+    </form>
+</template>
+```
+
+When validation errors are returned, `useForm()` preserves the user's input and displays the error messages — no re-entering data, better user experience.
+
+---
+
+## What's new in Inertia v3
+
+Inertia v3 shipped on March 26, 2026. Here are the key changes from v2.
+
+### Axios removed — lighter built-in XHR client
+
+v3 removes the Axios dependency and replaces it with a lighter built-in XHR client. Most applications require no code changes. Axios interceptors migrate directly to the built-in interceptor API. If you need Axios specifically, an Axios adapter is available.
+
+### SSR simplified with `@inertiajs/vite`
+
+The new Vite plugin handles automatic page component resolution and SSR configuration. Running SSR in development now requires only `npm run dev` — no separate Node server to start.
+
+```shell
+npm install @inertiajs/vite@^3.0
+```
+
+### `useHttp` — HTTP requests without page navigation
+
+The new `useHttp` hook sends HTTP requests to the server without triggering an Inertia visit (page transition). Use it for modal saves, background updates, or any case where you want to communicate with the server while staying on the current page.
+
+### Optimistic UI updates
+
+`useForm` and the router now support optimistic updates. The UI updates immediately on user action; if the server returns an error, Inertia rolls back the change automatically.
+
+### Layout props
+
+The new `useLayoutProps` hook lets a page component pass data to its persistent layout. Previously, sharing page-specific state with a layout required shared data or extra props threading.
+
+### Minimum version requirements
+
+| Dependency | v2 | v3 |
+|-----------|----|----|
+| PHP | 8.1+ | 8.2+ |
+| Laravel | 10+ | 11+ |
+| React | 18+ | 19+ |
+| Svelte | 4+ | 5+ |
+
+### `Inertia::lazy()` removed
+
+`Inertia::lazy()`, deprecated in v2, is removed in v3. Use `Inertia::optional()` instead.
+
+```php
+// v2 (deprecated)
+'users' => Inertia::lazy(fn () => User::all()),
+
+// v3
+'users' => Inertia::optional(fn () => User::all()),
+```
+
+### Event name changes
+
+| v2 | v3 |
+|----|----|
+| `invalid` | `httpException` |
+| `exception` | `networkError` |
+
+<Info>
+  For the full v2 → v3 upgrade steps, see the [official upgrade guide](https://inertiajs.com/docs/v3/getting-started/upgrade-guide). v2 receives bug fixes until September 26, 2026, and security fixes until March 26, 2027.
+</Info>
+
+---
+
+## When to use Inertia
+
+### Good fits
+
+- Teams already familiar with Laravel who want a React or Vue frontend
+- Applications that centralize authentication, authorization, and validation in Laravel
+- Admin panels and internal tools where SEO is not a priority
+- Projects where maintaining a separate API would add significant overhead
+
+### Less suited for
+
+- Applications where multiple clients (mobile apps, third-party integrations) share the same API
+- Content sites where SEO is critical (SSR is supported but adds complexity)
+- Projects where the frontend team operates completely independently of the backend
+
+<Tip>
+  Inertia supports server-side rendering (SSR). If you need SEO for specific pages, SSR is a viable option. The Laravel starter kits include SSR configuration out of the box.
+</Tip>
+
+---
+
+## Inertia vs. Livewire
+
+Both Inertia and Livewire address the same underlying problem — dynamic UIs in Laravel — but from opposite directions.
+
+- **Livewire** keeps everything in PHP and Blade. No JavaScript framework is involved; your team writes PHP.
+- **Inertia** lets your team write React, Vue, or Svelte on the frontend while keeping Laravel on the backend. It assumes comfort with a JavaScript framework.
+
+Choose Livewire when your team is PHP-first and the UI interactions are primarily form-driven. Choose Inertia when you want the full power of a modern JavaScript framework and your team is comfortable with it.
+
+<Card title="Inertia.js documentation" icon="book-open" href="https://inertiajs.com">
+  Full reference for Inertia v3, including SSR, the Vite plugin, and the upgrade guide.
+</Card>
