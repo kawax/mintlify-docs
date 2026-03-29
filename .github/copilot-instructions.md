@@ -107,6 +107,7 @@ Pages use Mintlify's built-in MDX components. Common ones in this repo:
 - `<Info>`, `<Warning>`, `<Tip>` — callout boxes
 - `<Frame>` — image wrapper with styling
 - `<Accordion>`, `<AccordionGroup>` — collapsible sections
+- `<Tree>` — file tree display
 - `<Snippet>` — include reusable content from `snippets/`
 
 Do not use raw HTML for layout when a Mintlify component exists.
