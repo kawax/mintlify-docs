@@ -104,6 +104,12 @@
                 ]
               },
               {
+                "group": "イベント",
+                "pages": [
+                  "jp/events"
+                ]
+              },
+              {
                 "group": "メールと通知",
                 "pages": [
                   "jp/mail",
@@ -118,15 +124,15 @@
                 ]
               },
               {
-                "group": "スケジューリング",
+                "group": "リアルタイム通信",
                 "pages": [
-                  "jp/scheduling"
+                  "jp/broadcasting"
                 ]
               },
               {
-                "group": "イベント",
+                "group": "スケジューリング",
                 "pages": [
-                  "jp/events"
+                  "jp/scheduling"
                 ]
               },
               {
@@ -187,18 +193,20 @@
                   "jp/mcp",
                   "jp/ai-sdk"
                 ]
-              },
-              {
-                "group": "リアルタイム通信",
-                "pages": [
-                  "jp/broadcasting"
-                ]
               }
             ]
           },
           {
             "tab": "応用トピック",
             "groups": [
+              {
+                "group": "AI開発",
+                "pages": [
+                  "jp/advanced/mcp-server",
+                  "jp/advanced/boost-custom-agent",
+                  "jp/advanced/ai-sdk-custom-provider"
+                ]
+              },
               {
                 "group": "デザインパターン",
                 "pages": [
@@ -235,6 +243,12 @@
                 ]
               },
               {
+                "group": "セキュリティ",
+                "pages": [
+                  "jp/advanced/rate-limiting"
+                ]
+              },
+              {
                 "group": "パッケージ開発",
                 "pages": [
                   "jp/advanced/package-development"
@@ -244,20 +258,6 @@
                 "group": "テスト",
                 "pages": [
                   "jp/advanced/testing-pest"
-                ]
-              },
-              {
-                "group": "セキュリティ",
-                "pages": [
-                  "jp/advanced/rate-limiting"
-                ]
-              },
-              {
-                "group": "AI上級",
-                "pages": [
-                  "jp/advanced/boost-custom-agent",
-                  "jp/advanced/mcp-server",
-                  "jp/advanced/ai-sdk-custom-provider"
                 ]
               }
             ]
