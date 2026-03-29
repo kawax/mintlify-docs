@@ -1,0 +1,530 @@
+---
+title: "Custom Authentication Guards"
+description: "Understand Laravel's authentication internals and implement custom guards using the Guard and StatefulGuard interfaces, from API token authentication to multi-guard applications."
+---
+
+## How Laravel's authentication system works
+
+### The Auth facade and AuthManager
+
+The `Auth` facade proxies `Illuminate\Auth\AuthManager`. The manager uses a driver pattern to manage multiple guards and creates the appropriate guard instance based on `config/auth.php`.
+
+```php
+// Auth::guard('web') — AuthManager::guard() simplified
+public function guard($name = null)
+{
+    $name = $name ?: $this->getDefaultDriver();
+
+    return $this->guards[$name] ?? ($this->guards[$name] = $this->resolve($name));
+}
+```
+
+`resolve()` reads the `driver` key from the `guards` array in `config/auth.php` and invokes the matching factory closure. The built-in `session` and `token` drivers use the same mechanism.
+
+### Guard vs StatefulGuard
+
+Any authentication guard must implement at minimum `Illuminate\Contracts\Auth\Guard`. If the guard needs to maintain session state, implement `StatefulGuard` instead.
+
+<Accordion title="Guard interface (Illuminate\Contracts\Auth\Guard)">
+```php
+interface Guard
+{
+    // Check whether an authenticated user exists
+    public function check();
+
+    // Check whether the current user is a guest (unauthenticated)
+    public function guest();
+
+    // Return the currently authenticated user, or null
+    public function user();
+
+    // Return the ID of the currently authenticated user
+    public function id();
+
+    // Validate credentials without logging in
+    public function validate(array $credentials = []);
+
+    // Check whether a user has been set on the guard
+    public function hasUser();
+
+    // Manually set the authenticated user
+    public function setUser(Authenticatable $user);
+}
+```
+</Accordion>
+
+<Accordion title="StatefulGuard interface (Illuminate\Contracts\Auth\StatefulGuard)">
+`StatefulGuard` extends `Guard` and adds methods for session and cookie-based login state.
+
+```php
+interface StatefulGuard extends Guard
+{
+    // Validate credentials and log the user in
+    public function attempt(array $credentials = [], $remember = false);
+
+    // Authenticate for a single request without storing state
+    public function once(array $credentials = []);
+
+    // Log in a user instance directly
+    public function login(Authenticatable $user, $remember = false);
+
+    // Log in using a user ID
+    public function loginUsingId($id, $remember = false);
+
+    // Authenticate using a user ID for a single request
+    public function onceUsingId($id);
+
+    // Determine whether the user logged in via the "remember me" cookie
+    public function viaRemember();
+
+    // Log the user out
+    public function logout();
+}
+```
+</Accordion>
+
+<Info>
+  Guards for API or token-based authentication typically only need to implement `Guard` because there is no session state to maintain. Guards that need session-based login (e.g. an admin panel) should implement `StatefulGuard`.
+</Info>
+
+## Implementing a custom guard
+
+### The GuardHelpers trait
+
+The implementations of `check()`, `guest()`, `id()`, and `hasUser()` are nearly identical across all guards. Laravel provides `Illuminate\Auth\GuardHelpers` to handle them automatically, so you only need to implement `user()` and `validate()`.
+
+```php
+// Default implementations provided by GuardHelpers (excerpt)
+trait GuardHelpers
+{
+    protected $user;
+
+    public function check(): bool
+    {
+        return ! is_null($this->user());
+    }
+
+    public function guest(): bool
+    {
+        return ! $this->check();
+    }
+
+    public function id(): mixed
+    {
+        return $this->user()?->getAuthIdentifier();
+    }
+
+    public function hasUser(): bool
+    {
+        return ! is_null($this->user);
+    }
+
+    public function setUser(Authenticatable $user): static
+    {
+        $this->user = $user;
+        return $this;
+    }
+}
+```
+
+### Building an API token guard
+
+The example below follows the design of Laravel's built-in `TokenGuard`. It reads a token from the `Authorization` header or a query parameter and resolves the user through the configured `UserProvider`.
+
+<Steps>
+  <Step title="Create the guard class">
+    Place the guard class in `app/Auth`.
+
+    ```php
+    <?php
+
+    namespace App\Auth;
+
+    use Illuminate\Auth\GuardHelpers;
+    use Illuminate\Contracts\Auth\Guard;
+    use Illuminate\Contracts\Auth\UserProvider;
+    use Illuminate\Http\Request;
+
+    class ApiTokenGuard implements Guard
+    {
+        use GuardHelpers;
+
+        protected Request $request;
+
+        public function __construct(UserProvider $provider, Request $request)
+        {
+            $this->provider = $provider;
+            $this->request = $request;
+        }
+
+        /**
+         * Return the currently authenticated user.
+         */
+        public function user(): ?\Illuminate\Contracts\Auth\Authenticatable
+        {
+            // Return the cached user if already resolved
+            if (! is_null($this->user)) {
+                return $this->user;
+            }
+
+            $token = $this->getTokenForRequest();
+
+            if (empty($token)) {
+                return null;
+            }
+
+            // Resolve the user via the UserProvider
+            $this->user = $this->provider->retrieveByCredentials([
+                'api_token' => $token,
+            ]);
+
+            return $this->user;
+        }
+
+        /**
+         * Validate credentials without logging in.
+         */
+        public function validate(array $credentials = []): bool
+        {
+            if (empty($credentials['api_token'])) {
+                return false;
+            }
+
+            return (bool) $this->provider->retrieveByCredentials($credentials);
+        }
+
+        /**
+         * Extract the token from the request.
+         *
+         * Priority: Bearer header → query parameter → request body
+         */
+        protected function getTokenForRequest(): ?string
+        {
+            $token = $this->request->bearerToken();
+
+            if (empty($token)) {
+                $token = $this->request->query('api_token');
+            }
+
+            if (empty($token)) {
+                $token = $this->request->input('api_token');
+            }
+
+            return $token ?: null;
+        }
+
+        /**
+         * Replace the current request instance.
+         */
+        public function setRequest(Request $request): static
+        {
+            $this->request = $request;
+            return $this;
+        }
+    }
+    ```
+  </Step>
+  <Step title="Register the guard in a service provider">
+    Register the guard in the `boot()` method of `AppServiceProvider` using `Auth::extend()`.
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Auth\ApiTokenGuard;
+    use Illuminate\Contracts\Foundation\Application;
+    use Illuminate\Support\Facades\Auth;
+    use Illuminate\Support\ServiceProvider;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            Auth::extend('api-token', function (Application $app, string $name, array $config) {
+                $provider = Auth::createUserProvider($config['provider'] ?? 'users');
+
+                return new ApiTokenGuard($provider, $app->make('request'));
+            });
+        }
+    }
+    ```
+
+    <Info>
+      `Auth::createUserProvider()` reads the `providers` section of `config/auth.php` and returns the matching `UserProvider` instance. Unless you need a custom provider, this returns the standard `EloquentUserProvider`.
+    </Info>
+  </Step>
+  <Step title="Configure the guard in config/auth.php">
+    Add the new guard to the `guards` array.
+
+    ```php
+    'guards' => [
+        'web' => [
+            'driver'   => 'session',
+            'provider' => 'users',
+        ],
+
+        // Your custom guard
+        'api' => [
+            'driver'   => 'api-token', // must match the name passed to Auth::extend()
+            'provider' => 'users',
+        ],
+    ],
+    ```
+  </Step>
+  <Step title="Apply the guard to routes">
+    Pass the guard name to the `auth` middleware.
+
+    ```php
+    // routes/api.php
+    use Illuminate\Support\Facades\Route;
+
+    Route::middleware('auth:api')->group(function () {
+        Route::get('/user', function () {
+            return auth()->user();
+        });
+
+        Route::get('/posts', [\App\Http\Controllers\PostController::class, 'index']);
+    });
+    ```
+
+    To access a specific guard in controller code, use `Auth::guard('api')` or `auth('api')`.
+
+    ```php
+    $user = Auth::guard('api')->user();
+    ```
+  </Step>
+</Steps>
+
+## Closure-based request guards
+
+`Auth::viaRequest()` lets you define a simple guard using only a closure — no class required. This is suitable for prototypes or very straightforward authentication needs.
+
+```php
+use Illuminate\Http\Request;
+use App\Models\User;
+
+// Inside AppServiceProvider::boot()
+Auth::viaRequest('custom-token', function (Request $request): ?User {
+    $token = $request->bearerToken();
+
+    if (empty($token)) {
+        return null;
+    }
+
+    return User::where('api_token', $token)->first();
+});
+```
+
+Add the driver to `config/auth.php`:
+
+```php
+'guards' => [
+    'api' => [
+        'driver' => 'custom-token',
+    ],
+],
+```
+
+<Warning>
+  Guards created with `Auth::viaRequest()` bypass the `UserProvider` entirely. Methods like `retrieveById()` will not be called. For production use, prefer a class-based guard registered with `Auth::extend()`.
+</Warning>
+
+## Custom UserProvider
+
+When user data comes from a source other than the database — an external API, LDAP, etc. — implement `Illuminate\Contracts\Auth\UserProvider`.
+
+```php
+<?php
+
+namespace App\Auth;
+
+use App\Models\User;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\UserProvider;
+
+class ApiUserProvider implements UserProvider
+{
+    public function __construct(
+        protected string $apiBaseUrl,
+        protected string $model = User::class,
+    ) {}
+
+    /**
+     * Retrieve a user by their ID.
+     */
+    public function retrieveById(mixed $identifier): ?Authenticatable
+    {
+        return ($this->model)::find($identifier);
+    }
+
+    /**
+     * Retrieve a user by their "remember me" token.
+     * Return null for stateless/token guards.
+     */
+    public function retrieveByToken(mixed $identifier, string $token): ?Authenticatable
+    {
+        return null;
+    }
+
+    /**
+     * Update the "remember me" token.
+     * No-op for stateless guards.
+     */
+    public function updateRememberToken(Authenticatable $user, string $token): void {}
+
+    /**
+     * Retrieve a user by the given credentials.
+     * Called by the guard's user() and validate() methods.
+     */
+    public function retrieveByCredentials(array $credentials): ?Authenticatable
+    {
+        if (empty($credentials['api_token'])) {
+            return null;
+        }
+
+        // Validate the token against an external API
+        $response = \Illuminate\Support\Facades\Http::withToken($credentials['api_token'])
+            ->get("{$this->apiBaseUrl}/auth/me");
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $data = $response->json();
+
+        // Sync with the local database or create a stub model
+        return User::firstOrCreate(
+            ['external_id' => $data['id']],
+            ['name' => $data['name'], 'email' => $data['email']],
+        );
+    }
+
+    /**
+     * Validate the user's credentials.
+     * For token guards, returning true is sufficient after retrieveByCredentials succeeds.
+     */
+    public function validateCredentials(Authenticatable $user, array $credentials): bool
+    {
+        return true;
+    }
+
+    /**
+     * Rehash the user's password if required.
+     * No-op for token guards.
+     */
+    public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false): void {}
+}
+```
+
+### Registering the custom UserProvider
+
+```php
+// AppServiceProvider::boot()
+Auth::provider('api-user', function (Application $app, array $config) {
+    return new \App\Auth\ApiUserProvider(
+        config('services.auth_api.base_url'),
+        $config['model'] ?? \App\Models\User::class,
+    );
+});
+```
+
+Add the provider to the `providers` section of `config/auth.php`:
+
+```php
+'providers' => [
+    'users' => [
+        'driver' => 'eloquent',
+        'model'  => App\Models\User::class,
+    ],
+
+    // Custom provider
+    'api-users' => [
+        'driver' => 'api-user',
+        'model'  => App\Models\User::class,
+    ],
+],
+```
+
+Wire the guard and provider together:
+
+```php
+'guards' => [
+    'api' => [
+        'driver'   => 'api-token',
+        'provider' => 'api-users',
+    ],
+],
+```
+
+## Practical example — separate guards for admins and users
+
+<Steps>
+  <Step title="Create the Admin model">
+    The model must extend `Authenticatable` to integrate with the auth system.
+
+    ```bash
+    php artisan make:model Admin -m
+    ```
+
+    ```php
+    <?php
+
+    namespace App\Models;
+
+    use Illuminate\Foundation\Auth\User as Authenticatable;
+
+    class Admin extends Authenticatable
+    {
+        protected $fillable = ['name', 'email', 'password'];
+
+        protected $hidden = ['password', 'remember_token'];
+    }
+    ```
+  </Step>
+  <Step title="Configure config/auth.php">
+    ```php
+    'guards' => [
+        'web' => [
+            'driver'   => 'session',
+            'provider' => 'users',
+        ],
+        'admin' => [
+            'driver'   => 'session',
+            'provider' => 'admins',
+        ],
+    ],
+
+    'providers' => [
+        'users' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\User::class,
+        ],
+        'admins' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\Admin::class,
+        ],
+    ],
+    ```
+  </Step>
+  <Step title="Protect admin routes">
+    ```php
+    // routes/web.php
+    Route::middleware('auth:admin')->prefix('admin')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index']);
+    });
+    ```
+
+    Access the admin guard in a controller:
+
+    ```php
+    $admin = Auth::guard('admin')->user();
+    ```
+  </Step>
+</Steps>
+
+## Related page
+
+<Card title="Authentication (basics)" icon="lock" href="/en/authentication">
+  Standard session-based authentication, starter kits, and route protection.
+</Card>

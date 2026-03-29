@@ -1,0 +1,378 @@
+---
+title: "Rate Limiting"
+description: "Configure custom rate limiters with the RateLimiter facade, apply them to API routes with the throttle middleware, and handle high-traffic scenarios with Redis-backed limiting."
+---
+
+## How Laravel rate limiting works
+
+Laravel's rate limiting is built on `Illuminate\Cache\RateLimiting\Limit` and the `RateLimiter` facade. Internally, a counter is stored in the cache driver (file or Redis by default) and incremented on each matching request. When a request arrives, the `throttle` middleware executes the closure you defined with `RateLimiter::for()`. If the limit has been reached, Laravel returns `429 Too Many Requests` automatically.
+
+## Defining rate limiters in AppServiceProvider
+
+Define your rate limiters in the `boot()` method of `App\Providers\AppServiceProvider`.
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+    }
+}
+```
+
+The first argument to `RateLimiter::for()` is the limiter name — you reference this name in the `throttle` middleware. The closure must return a `Limit` instance (or an array of `Limit` instances).
+
+## Defining limits per user, plan, or IP
+
+### Authenticated users vs guests
+
+```php
+RateLimiter::for('uploads', function (Request $request) {
+    return $request->user()
+        ? Limit::perHour(100)->by($request->user()->id)
+        : Limit::perHour(10)->by($request->ip());
+});
+```
+
+### Per-plan limits
+
+```php
+RateLimiter::for('api', function (Request $request) {
+    $user = $request->user();
+
+    if (! $user) {
+        return Limit::perMinute(30)->by($request->ip());
+    }
+
+    return match ($user->plan) {
+        'enterprise' => Limit::none(),
+        'pro'        => Limit::perMinute(500)->by($user->id),
+        default      => Limit::perMinute(60)->by($user->id),
+    };
+});
+```
+
+### Global IP-based limit
+
+Throttle all requests from a single IP address regardless of the route.
+
+```php
+RateLimiter::for('global', function (Request $request) {
+    return Limit::perMinute(1000)->by($request->ip());
+});
+```
+
+### Combining multiple limits
+
+Return an array of `Limit` instances to enforce all limits simultaneously. Laravel returns `429` as soon as any one of them is exceeded.
+
+```php
+RateLimiter::for('login', function (Request $request) {
+    return [
+        Limit::perMinute(10)->by($request->ip()),
+        Limit::perMinute(3)->by($request->input('email')),
+    ];
+});
+```
+
+<Info>
+  When multiple limits share the same `by` key, they will overwrite each other in the cache. Add a prefix to keep them separate.
+</Info>
+
+```php
+RateLimiter::for('uploads', function (Request $request) {
+    return [
+        Limit::perMinute(10)->by('minute:' . $request->user()->id),
+        Limit::perDay(1000)->by('day:' . $request->user()->id),
+    ];
+});
+```
+
+## Attaching limiters to routes with the throttle middleware
+
+Pass the limiter name to the `throttle` middleware.
+
+```php
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['throttle:api'])->group(function () {
+    Route::get('/user', function () { /* ... */ });
+    Route::post('/posts', function () { /* ... */ });
+});
+```
+
+### Registering in bootstrap/app.php
+
+In Laravel 11+, middleware is managed in `bootstrap/app.php`.
+
+```php
+use Illuminate\Foundation\Application;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        apiPrefix: 'api',
+    )
+    ->withMiddleware(function (\Illuminate\Foundation\Configuration\Middleware $middleware): void {
+        $middleware->throttleApi('api');
+    })
+    ->create();
+```
+
+## Full API example
+
+<Steps>
+  <Step title="Define the limiters">
+    Add multiple limiters to `AppServiceProvider`.
+
+    ```php
+    public function boot(): void
+    {
+        // General API access
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // File uploads
+        RateLimiter::for('uploads', function (Request $request) {
+            return $request->user()?->isPro()
+                ? Limit::perHour(500)->by($request->user()->id)
+                : Limit::perHour(50)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Login attempts
+        RateLimiter::for('login', function (Request $request) {
+            return [
+                Limit::perMinute(10)->by($request->ip()),
+                Limit::perMinute(5)->by($request->input('email')),
+            ];
+        });
+    }
+    ```
+  </Step>
+  <Step title="Apply middleware to routes">
+    ```php
+    // routes/api.php
+    use Illuminate\Support\Facades\Route;
+
+    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+        Route::get('/user', [\App\Http\Controllers\UserController::class, 'show']);
+        Route::get('/posts', [\App\Http\Controllers\PostController::class, 'index']);
+    });
+
+    Route::middleware(['auth:sanctum', 'throttle:uploads'])->group(function () {
+        Route::post('/uploads', [\App\Http\Controllers\UploadController::class, 'store']);
+    });
+
+    Route::middleware(['throttle:login'])->group(function () {
+        Route::post('/login', [\App\Http\Controllers\AuthController::class, 'login']);
+    });
+    ```
+  </Step>
+</Steps>
+
+## Response headers
+
+The `throttle` middleware automatically adds rate limit headers to every response.
+
+| Header | Description |
+|---|---|
+| `X-RateLimit-Limit` | Total requests allowed in the window |
+| `X-RateLimit-Remaining` | Requests remaining in the current window |
+| `Retry-After` | Seconds until the next request is allowed (429 responses only) |
+| `X-RateLimit-Reset` | Unix timestamp when the limit resets |
+
+```http
+HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 0
+Retry-After: 45
+X-RateLimit-Reset: 1717000000
+Content-Type: application/json
+
+{
+    "message": "Too Many Requests."
+}
+```
+
+### Returning a custom response
+
+```php
+RateLimiter::for('api', function (Request $request) {
+    return Limit::perMinute(60)
+        ->by($request->user()?->id ?: $request->ip())
+        ->response(function (Request $request, array $headers) {
+            return response()->json([
+                'message' => 'Rate limit exceeded. Please try again later.',
+                'retry_after' => $headers['Retry-After'],
+            ], 429, $headers);
+        });
+});
+```
+
+## Response-based rate limiting
+
+Use `after()` when you only want to count certain responses toward the limit. The callback receives the response and should return `true` if the response should be counted.
+
+```php
+use Symfony\Component\HttpFoundation\Response;
+
+RateLimiter::for('resource-lookup', function (Request $request) {
+    return Limit::perMinute(10)
+        ->by($request->user()?->id ?: $request->ip())
+        ->after(function (Response $response) {
+            return $response->getStatusCode() === 404;
+        });
+});
+```
+
+This pattern prevents enumeration attacks by limiting consecutive 404 responses without penalising requests that return valid resources.
+
+## Manual rate limiting with RateLimiter::attempt()
+
+When you need to apply rate limiting outside of the `throttle` middleware — for example, inside a controller action — use `RateLimiter::attempt()`.
+
+```php
+use Illuminate\Support\Facades\RateLimiter;
+
+class SmsController extends Controller
+{
+    public function send(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $key = 'sms:' . $request->user()->id;
+
+        $executed = RateLimiter::attempt(
+            key: $key,
+            maxAttempts: 5,
+            callback: function () use ($request) {
+                app(SmsService::class)->send(
+                    $request->user()->phone,
+                    $request->input('message')
+                );
+            },
+            decaySeconds: 3600, // 1 hour window
+        );
+
+        if (! $executed) {
+            $seconds = RateLimiter::availableIn($key);
+
+            return response()->json([
+                'message' => "SMS limit exceeded. Try again in {$seconds} seconds.",
+            ], 429);
+        }
+
+        return response()->json(['message' => 'SMS sent.']);
+    }
+}
+```
+
+### Inspecting and resetting counters
+
+```php
+// Current hit count
+$hits = RateLimiter::attempts($key);
+
+// Seconds until the window resets
+$seconds = RateLimiter::availableIn($key);
+
+// Check whether the limit has been exceeded
+$tooMany = RateLimiter::tooManyAttempts($key, $maxAttempts = 5);
+
+// Manually reset the counter (e.g. after logout)
+RateLimiter::clear($key);
+```
+
+### Login throttling example
+
+```php
+public function login(Request $request): mixed
+{
+    $key = 'login:' . $request->input('email');
+
+    if (RateLimiter::tooManyAttempts($key, 5)) {
+        $seconds = RateLimiter::availableIn($key);
+
+        throw ValidationException::withMessages([
+            'email' => "Too many login attempts. Try again in {$seconds} seconds.",
+        ]);
+    }
+
+    if (! Auth::attempt($request->only('email', 'password'))) {
+        RateLimiter::hit($key, 300); // 5-minute window
+
+        throw ValidationException::withMessages([
+            'email' => 'The provided credentials are incorrect.',
+        ]);
+    }
+
+    RateLimiter::clear($key);
+
+    return redirect()->intended('/dashboard');
+}
+```
+
+## Redis-backed rate limiting
+
+Switching the cache driver to Redis automatically makes the `throttle` middleware use Redis as its backing store.
+
+### Configuring Redis as the cache driver
+
+```php
+// config/cache.php
+'default' => env('CACHE_DRIVER', 'redis'),
+```
+
+```ini
+# .env
+CACHE_DRIVER=redis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+```
+
+### Using throttleWithRedis
+
+For Redis-optimised throttling with atomic increment operations, call `throttleWithRedis()` in `bootstrap/app.php`. This maps the `throttle` middleware to `ThrottleRequestsWithRedis`.
+
+```php
+use Illuminate\Foundation\Application;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        apiPrefix: 'api',
+    )
+    ->withMiddleware(function (\Illuminate\Foundation\Configuration\Middleware $middleware): void {
+        $middleware->throttleWithRedis();
+    })
+    ->create();
+```
+
+<Warning>
+  `throttleWithRedis()` requires Redis to be reachable. If the Redis connection fails, requests may be rejected. Monitor your Redis instance and configure appropriate timeouts.
+</Warning>
+
+Redis-backed rate limiting provides:
+
+- **Horizontal scaling** — counters are shared across multiple server instances
+- **Precision** — atomic operations prevent race conditions
+- **Automatic cleanup** — Redis TTLs expire counters without additional maintenance
+
+## Related page
+
+<Card title="Caching" icon="database" href="/en/cache">
+  Configure Redis and other cache drivers used by the rate limiter.
+</Card>

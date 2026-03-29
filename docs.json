@@ -469,6 +469,30 @@
                   "en/advanced/eloquent-scopes",
                   "en/advanced/eloquent-casts"
                 ]
+              },
+              {
+                "group": "Validation Extensions",
+                "pages": [
+                  "en/advanced/custom-validation-rules"
+                ]
+              },
+              {
+                "group": "Authentication Extensions",
+                "pages": [
+                  "en/advanced/custom-auth-guard"
+                ]
+              },
+              {
+                "group": "Security",
+                "pages": [
+                  "en/advanced/rate-limiting"
+                ]
+              },
+              {
+                "group": "Testing",
+                "pages": [
+                  "en/advanced/testing-pest"
+                ]
               }
             ]
           },

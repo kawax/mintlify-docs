@@ -1,0 +1,515 @@
+---
+title: "Custom Validation Rules"
+description: "Extend Laravel's validation system with rule objects and closures, from basic implementations to advanced data-aware and validator-aware rules."
+---
+
+## What are custom validation rules?
+
+Laravel ships with a rich set of built-in validation rules, but you will sometimes need validation logic specific to your application. Custom validation rules let you define reusable validation logic as a class or closure and use it exactly like a standard rule.
+
+There are two main ways to define a custom rule:
+
+- **Rule objects** — highly reusable and easy to test in isolation
+- **Closures** — concise, suitable for one-off rules
+
+## Rule objects
+
+### Generating a rule class
+
+Use the `make:rule` Artisan command to generate a new rule class. The generated class is placed in the `app/Rules` directory.
+
+```bash
+php artisan make:rule Uppercase
+```
+
+### Implementing the ValidationRule interface
+
+Implement the `validate` method in the generated class. This method calls the `$fail` closure when validation fails.
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
+
+class Uppercase implements ValidationRule
+{
+    /**
+     * Run the validation rule.
+     */
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (strtoupper($value) !== $value) {
+            $fail('The :attribute must be uppercase.');
+        }
+    }
+}
+```
+
+The string passed to `$fail` may use the `:attribute` placeholder, which Laravel replaces with the field name.
+
+### Applying a rule object
+
+Pass an instance of the rule object in the validation array.
+
+```php
+use App\Rules\Uppercase;
+
+$request->validate([
+    'name' => ['required', 'string', new Uppercase],
+]);
+```
+
+The same approach works inside a `FormRequest`'s `rules()` method.
+
+```php
+public function rules(): array
+{
+    return [
+        'name' => ['required', 'string', new Uppercase],
+    ];
+}
+```
+
+### Using translation keys for error messages
+
+Instead of hard-coding error messages, you can use translation keys.
+
+```php
+public function validate(string $attribute, mixed $value, Closure $fail): void
+{
+    if (strtoupper($value) !== $value) {
+        $fail('validation.uppercase')->translate();
+    }
+}
+```
+
+Add the message to `lang/en/validation.php`:
+
+```php
+return [
+    'uppercase' => 'The :attribute must be uppercase.',
+    // ...
+];
+```
+
+### Reporting multiple errors
+
+Call `$fail` more than once to report multiple errors for a single field.
+
+```php
+public function validate(string $attribute, mixed $value, Closure $fail): void
+{
+    if (! is_string($value)) {
+        $fail('The :attribute must be a string.');
+        return;
+    }
+
+    if (strlen($value) < 8) {
+        $fail('The :attribute must be at least 8 characters.');
+    }
+
+    if (! preg_match('/[A-Z]/', $value)) {
+        $fail('The :attribute must contain at least one uppercase letter.');
+    }
+}
+```
+
+## Closure-based rules
+
+For simple rules you only need once, define the logic inline as a closure instead of creating a class.
+
+```php
+use Illuminate\Support\Facades\Validator;
+use Closure;
+
+$validator = Validator::make($request->all(), [
+    'title' => [
+        'required',
+        'max:255',
+        function (string $attribute, mixed $value, Closure $fail) {
+            if ($value === 'foo') {
+                $fail("The {$attribute} is invalid.");
+            }
+        },
+    ],
+]);
+```
+
+<Tip>
+  Closure rules are convenient for one-off logic, but they are harder to reuse and test independently. If the same rule appears in more than one place, extract it into a rule object.
+</Tip>
+
+## Implicit rules (run even when the value is empty)
+
+By default, custom rules are skipped when the field is missing or empty. To run the rule regardless, add the `--implicit` flag when generating the class.
+
+```bash
+php artisan make:rule RequiredIfPresent --implicit
+```
+
+The generated class implements `ImplicitRule`. This interface has no additional methods — it is a marker interface that signals Laravel to run the rule on empty values too.
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ImplicitRule;
+use Illuminate\Contracts\Validation\ValidationRule;
+
+class RequiredWhenSubscribed implements ValidationRule, ImplicitRule
+{
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (empty($value)) {
+            $fail('The :attribute is required for subscribers.');
+            return;
+        }
+
+        // Additional checks...
+    }
+}
+```
+
+<Warning>
+  `ImplicitRule` only tells Laravel to run the rule on empty values. Whether empty values actually fail is still determined by your `validate` method implementation.
+</Warning>
+
+## Accessing other data during validation
+
+### DataAwareRule — accessing the full form data
+
+When your rule logic depends on another field's value, implement `DataAwareRule`. Laravel automatically calls `setData` before validation begins.
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\DataAwareRule;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Support\Facades\DB;
+
+class UniqueForTenant implements DataAwareRule, ValidationRule
+{
+    /**
+     * All data under validation.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $data = [];
+
+    public function __construct(
+        protected string $table,
+        protected string $column = 'value',
+    ) {}
+
+    /**
+     * Set the data under validation.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function setData(array $data): static
+    {
+        $this->data = $data;
+
+        return $this;
+    }
+
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        $tenantId = $this->data['tenant_id'] ?? null;
+
+        $exists = DB::table($this->table)
+            ->where('tenant_id', $tenantId)
+            ->where($this->column, $value)
+            ->exists();
+
+        if ($exists) {
+            $fail('The :attribute has already been taken for this tenant.');
+        }
+    }
+}
+```
+
+Usage:
+
+```php
+$request->validate([
+    'tenant_id' => 'required|integer',
+    'email' => ['required', 'email', new UniqueForTenant('users', 'email')],
+]);
+```
+
+### ValidatorAwareRule — accessing the validator instance
+
+To access the full validator (including errors from other fields or custom messages), implement `ValidatorAwareRule`.
+
+```php
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\ValidatorAwareRule;
+use Illuminate\Validation\Validator;
+
+class ConditionalFormat implements ValidationRule, ValidatorAwareRule
+{
+    protected Validator $validator;
+
+    public function setValidator(Validator $validator): static
+    {
+        $this->validator = $validator;
+
+        return $this;
+    }
+
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        // Skip if a related field has already failed
+        if ($this->validator->errors()->has('type')) {
+            return;
+        }
+
+        $type = $this->validator->getData()['type'] ?? null;
+
+        if ($type === 'phone' && ! preg_match('/^\+?[0-9\-\s]+$/', $value)) {
+            $fail('The :attribute must be a valid phone number.');
+        }
+
+        if ($type === 'email' && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            $fail('The :attribute must be a valid email address.');
+        }
+    }
+}
+```
+
+<Tip>
+  `DataAwareRule` and `ValidatorAwareRule` can be implemented together on the same class. Laravel will inject both the data and the validator instance.
+</Tip>
+
+## Practical example — tenant-scoped unique constraint
+
+A common multi-tenant requirement: a value must be unique within a tenant's scope.
+
+<Steps>
+  <Step title="Create the rule class">
+    ```bash
+    php artisan make:rule TenantUnique
+    ```
+
+    ```php
+    <?php
+
+    namespace App\Rules;
+
+    use Closure;
+    use Illuminate\Contracts\Validation\DataAwareRule;
+    use Illuminate\Contracts\Validation\ValidationRule;
+    use Illuminate\Support\Facades\DB;
+
+    class TenantUnique implements DataAwareRule, ValidationRule
+    {
+        protected array $data = [];
+
+        public function __construct(
+            protected string $table,
+            protected string $column,
+            protected ?int $ignoreId = null,
+        ) {}
+
+        public function setData(array $data): static
+        {
+            $this->data = $data;
+
+            return $this;
+        }
+
+        public function validate(string $attribute, mixed $value, Closure $fail): void
+        {
+            $tenantId = $this->data['tenant_id'] ?? null;
+
+            $query = DB::table($this->table)
+                ->where('tenant_id', $tenantId)
+                ->where($this->column, $value);
+
+            if ($this->ignoreId !== null) {
+                $query->where('id', '!=', $this->ignoreId);
+            }
+
+            if ($query->exists()) {
+                $fail('The :attribute is already in use.');
+            }
+        }
+    }
+    ```
+  </Step>
+  <Step title="Use the rule in a FormRequest">
+    ```php
+    <?php
+
+    namespace App\Http\Requests;
+
+    use App\Rules\TenantUnique;
+    use Illuminate\Foundation\Http\FormRequest;
+
+    class CreateProjectRequest extends FormRequest
+    {
+        public function rules(): array
+        {
+            return [
+                'tenant_id' => 'required|integer|exists:tenants,id',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    new TenantUnique('projects', 'name'),
+                ],
+            ];
+        }
+
+        public function authorize(): bool
+        {
+            return true;
+        }
+    }
+    ```
+  </Step>
+  <Step title="Exclude the current record on update">
+    When updating an existing record, exclude its own ID from the uniqueness check.
+
+    ```php
+    class UpdateProjectRequest extends FormRequest
+    {
+        public function rules(): array
+        {
+            $projectId = $this->route('project');
+
+            return [
+                'tenant_id' => 'required|integer|exists:tenants,id',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    new TenantUnique('projects', 'name', ignoreId: $projectId),
+                ],
+            ];
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Registering rules via the service provider
+
+### Validator::extend() — adding a string-based rule
+
+`Validator::extend()` lets you register a rule that can be referenced as a plain string (e.g. `'rule_name'`). Register it in the `boot()` method of `AppServiceProvider`.
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        Validator::extend('strong_password', function (string $attribute, mixed $value, array $parameters): bool {
+            return strlen($value) >= 8
+                && preg_match('/[A-Z]/', $value)
+                && preg_match('/[0-9]/', $value);
+        });
+
+        Validator::replacer('strong_password', function (string $message, string $attribute): string {
+            return "The {$attribute} must be at least 8 characters and contain an uppercase letter and a number.";
+        });
+    }
+}
+```
+
+Use the rule as a string:
+
+```php
+$request->validate([
+    'password' => 'required|strong_password',
+]);
+```
+
+<Warning>
+  `Validator::extend()` is an older registration style. For new code, prefer rule objects that implement `ValidationRule`.
+</Warning>
+
+### Adding a fluent API via Rule macros
+
+Add a macro to the `Rule` class so the rule can be called as `Rule::myRule()`.
+
+```php
+use Illuminate\Validation\Rule;
+
+Rule::macro('tenantUnique', function (string $table, string $column, ?int $ignoreId = null) {
+    return new \App\Rules\TenantUnique($table, $column, $ignoreId);
+});
+```
+
+```php
+$request->validate([
+    'name' => ['required', Rule::tenantUnique('projects', 'name')],
+]);
+```
+
+## How Laravel invokes custom rules internally
+
+When the validator processes an attribute, `validateUsingCustomRule()` is called for any rule implementing `ValidationRule`. Here is a simplified version:
+
+```php
+// Illuminate\Validation\Validator::validateUsingCustomRule() — simplified
+protected function validateUsingCustomRule($attribute, $value, $rule)
+{
+    // Inject data for DataAwareRule
+    if ($rule instanceof DataAwareRule) {
+        $rule->setData($this->getData());
+    }
+
+    // Inject the validator for ValidatorAwareRule
+    if ($rule instanceof ValidatorAwareRule) {
+        $rule->setValidator($this);
+    }
+
+    // Call validate() and handle the $fail closure
+    $rule->validate($attribute, $value, function ($message) use ($attribute, $rule) {
+        $this->errors()->add($attribute, $this->makeReplacements(
+            $message,
+            $attribute,
+            get_class($rule),
+            [],
+        ));
+    });
+}
+```
+
+The `ImplicitRule` check determines whether the rule runs on empty values:
+
+```php
+protected function isImplicit($rule): bool
+{
+    return $rule instanceof ImplicitRule
+        || in_array($rule, $this->implicitRules);
+}
+```
+
+## Related page
+
+<Card title="Validation (basics)" icon="shield-check" href="/en/validation">
+  Standard validation in controllers and form requests.
+</Card>
