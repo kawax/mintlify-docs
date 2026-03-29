@@ -43,8 +43,6 @@ The project structure:
 - `docs.json` — central Mintlify configuration with navigation
 - `jp/` — Japanese language pages
 - `en/` — English language pages
-- `essentials/` — Mintlify customization guides (template defaults)
-- `ai-tools/` — AI tools integration guides (template defaults)
 - `snippets/` — reusable MDX fragments
 - `.github/STEERING.md` — human-curated task list and priorities
 
