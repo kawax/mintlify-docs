@@ -63,7 +63,7 @@ Every day, follow these steps:
 Based on your review, choose **one** task to work on. Candidates include:
 
 - **New page creation**: Create new tutorial or guide pages in `jp/` or `en/`. This is the highest priority since the site needs content.
-- **Existing page improvement**: Improve content, fix errors, or add missing information to existing pages.
+- **Existing page improvement**: Improve content, adding inter-page links, fix errors, or add missing information to existing pages.
 - **Mintlify configuration changes**: Update `docs.json` navigation, add new sections, improve site structure.
 - **Translation**: Add missing translations between Japanese and English.
 - **Any project improvement**: Since this is a new project, any reasonable improvement is welcome.
