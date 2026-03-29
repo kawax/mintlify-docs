@@ -1,0 +1,580 @@
+---
+title: "Laravel AI SDK"
+description: "Interact with OpenAI, Anthropic, Gemini, and other AI providers through a unified Laravel API — covering agents, image generation, streaming, structured output, and testing."
+---
+
+## Introduction
+
+[Laravel AI SDK](https://github.com/laravel/ai) provides a unified, expressive API for interacting with AI providers such as OpenAI, Anthropic, and Gemini. Build agents, generate images, synthesise speech, transcribe audio, and create vector embeddings — all with a consistent, Laravel-native interface.
+
+<Info>
+  Laravel AI SDK is an official package added in Laravel 13, available as `laravel/ai`. It supports multiple AI providers through a single API.
+</Info>
+
+| Capability | Supported providers |
+| --- | --- |
+| Text generation | OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama |
+| Image generation | OpenAI, Gemini, xAI |
+| Text-to-speech | OpenAI, ElevenLabs |
+| Speech-to-text | OpenAI, ElevenLabs, Mistral |
+| Embeddings | OpenAI, Gemini, Azure, Cohere, Mistral, Jina, VoyageAI |
+| Reranking | Cohere, Jina |
+| Files | OpenAI, Anthropic, Gemini |
+
+## Installation
+
+<Steps>
+  <Step title="Install the package">
+    ```shell
+    composer require laravel/ai
+    ```
+  </Step>
+  <Step title="Publish config and migrations">
+    ```shell
+    php artisan vendor:publish --provider="Laravel\Ai\AiServiceProvider"
+    ```
+  </Step>
+  <Step title="Run migrations">
+    ```shell
+    php artisan migrate
+    ```
+
+    This creates the `agent_conversations` and `agent_conversation_messages` tables used to persist conversation history.
+  </Step>
+</Steps>
+
+## Provider configuration
+
+Set your API keys in `config/ai.php` or `.env`:
+
+```ini
+ANTHROPIC_API_KEY=
+COHERE_API_KEY=
+ELEVENLABS_API_KEY=
+GEMINI_API_KEY=
+MISTRAL_API_KEY=
+OLLAMA_API_KEY=
+OPENAI_API_KEY=
+JINA_API_KEY=
+VOYAGEAI_API_KEY=
+XAI_API_KEY=
+```
+
+### Custom base URLs
+
+If you route requests through a proxy such as LiteLLM or Azure OpenAI Gateway, configure a custom URL per provider:
+
+```php
+'providers' => [
+    'openai' => [
+        'driver' => 'openai',
+        'key'    => env('OPENAI_API_KEY'),
+        'url'    => env('OPENAI_BASE_URL'),
+    ],
+
+    'anthropic' => [
+        'driver' => 'anthropic',
+        'key'    => env('ANTHROPIC_API_KEY'),
+        'url'    => env('ANTHROPIC_BASE_URL'),
+    ],
+],
+```
+
+Custom base URLs are supported for OpenAI, Anthropic, Gemini, Groq, Cohere, DeepSeek, xAI, and OpenRouter.
+
+### Referencing providers in code
+
+Use the `Lab` enum to reference providers without hardcoding strings:
+
+```php
+use Laravel\Ai\Enums\Lab;
+
+Lab::Anthropic;
+Lab::OpenAI;
+Lab::Gemini;
+```
+
+## Agents
+
+Agents are the core abstraction of the Laravel AI SDK. Each agent is a dedicated PHP class that encapsulates a system prompt, conversation context, tools, and an optional output schema.
+
+### Creating an agent
+
+```shell
+php artisan make:agent SalesCoach
+```
+
+Add `--structured` for agents that return structured JSON output:
+
+```shell
+php artisan make:agent SalesCoach --structured
+```
+
+A generated agent class:
+
+```php
+<?php
+
+namespace App\Ai\Agents;
+
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Promptable;
+use Stringable;
+
+class SalesCoach implements Agent
+{
+    use Promptable;
+
+    public function instructions(): Stringable|string
+    {
+        return 'You are a sales coach. Analyse sales call transcripts and provide feedback with an overall score.';
+    }
+}
+```
+
+### Running a prompt
+
+Instantiate the agent and call `prompt`:
+
+```php
+$response = (new SalesCoach)
+    ->prompt('Please analyse this sales call transcript...');
+
+return (string) $response;
+```
+
+Use `make` to resolve the agent from the service container (enables dependency injection):
+
+```php
+$agent = SalesCoach::make(user: $user);
+```
+
+Override the provider or model per request:
+
+```php
+use Laravel\Ai\Enums\Lab;
+
+$response = (new SalesCoach)->prompt(
+    'Please analyse this sales call transcript...',
+    provider: Lab::Anthropic,
+    model:    'claude-haiku-4-5-20251001',
+    timeout:  120,
+);
+```
+
+## Conversation context
+
+To maintain a chat history across messages, implement the `Conversational` interface.
+
+### Managing history manually
+
+Return previous messages from the `messages` method:
+
+```php
+use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Messages\Message;
+
+class SalesCoach implements Agent, Conversational
+{
+    use Promptable;
+
+    public function messages(): iterable
+    {
+        return History::where('user_id', $this->user->id)
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->reverse()
+            ->map(fn ($message) => new Message($message->role, $message->content))
+            ->all();
+    }
+}
+```
+
+### Persisting history automatically
+
+The `RemembersConversations` trait stores and retrieves conversation history in the database automatically:
+
+```php
+use Laravel\Ai\Concerns\RemembersConversations;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Promptable;
+
+class SalesCoach implements Agent, Conversational
+{
+    use Promptable, RemembersConversations;
+
+    public function instructions(): string
+    {
+        return 'You are a sales coach...';
+    }
+}
+```
+
+Start a new conversation with `forUser`:
+
+```php
+$response = (new SalesCoach)->forUser($user)->prompt('Hello!');
+
+$conversationId = $response->conversationId;
+```
+
+Continue an existing conversation with `continue`:
+
+```php
+$response = (new SalesCoach)
+    ->continue($conversationId, as: $user)
+    ->prompt('Could you elaborate on that?');
+```
+
+## Streaming
+
+Use `stream` to deliver the AI response in real time. Returning a `StreamableAgentResponse` from a route automatically sends it as Server-Sent Events (SSE):
+
+```php
+use App\Ai\Agents\SalesCoach;
+
+Route::get('/coach', function () {
+    return (new SalesCoach)->stream('Please analyse this sales call transcript...');
+});
+```
+
+Register a callback to run after streaming completes with `then`:
+
+```php
+use Laravel\Ai\Responses\StreamedAgentResponse;
+
+Route::get('/coach', function () {
+    return (new SalesCoach)
+        ->stream('Please analyse this sales call transcript...')
+        ->then(function (StreamedAgentResponse $response) {
+            // $response->text, $response->events, $response->usage
+        });
+});
+```
+
+### Vercel AI SDK protocol
+
+To integrate with the [Vercel AI SDK](https://ai-sdk.dev/) stream protocol, call `usingVercelDataProtocol`:
+
+```php
+Route::post('/api/chat', function () {
+    return (new SalesCoach)
+        ->stream(request()->input('message'))
+        ->usingVercelDataProtocol();
+});
+```
+
+## Advanced agent features
+
+### Structured output
+
+Implement `HasStructuredOutput` to return a JSON object that matches a defined schema:
+
+```php
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasStructuredOutput;
+use Laravel\Ai\Promptable;
+
+class SalesCoach implements Agent, HasStructuredOutput
+{
+    use Promptable;
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'feedback' => $schema->string()->required(),
+            'score'    => $schema->integer()->min(1)->max(10)->required(),
+        ];
+    }
+}
+```
+
+Access the response as an array:
+
+```php
+$response = (new SalesCoach)->prompt('Please analyse this transcript...');
+
+return $response['score'];
+```
+
+### Tools
+
+Tools extend what an agent can do — call external APIs, run searches, or perform calculations.
+
+```shell
+php artisan make:tool RandomNumberGenerator
+```
+
+The generated class lives in `app/Ai/Tools`:
+
+```php
+<?php
+
+namespace App\Ai\Tools;
+
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
+use Stringable;
+
+class RandomNumberGenerator implements Tool
+{
+    public function description(): Stringable|string
+    {
+        return 'Generates a cryptographically secure random number.';
+    }
+
+    public function handle(Request $request): Stringable|string
+    {
+        return (string) random_int($request['min'], $request['max']);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'min' => $schema->integer()->min(0)->required(),
+            'max' => $schema->integer()->required(),
+        ];
+    }
+}
+```
+
+Register tools in the agent's `tools` method:
+
+```php
+use Laravel\Ai\Contracts\HasTools;
+
+class SalesCoach implements Agent, HasTools
+{
+    use Promptable;
+
+    public function tools(): iterable
+    {
+        return [
+            new RandomNumberGenerator,
+        ];
+    }
+}
+```
+
+### Queuing
+
+Run the agent in the background with `queue`:
+
+```php
+use Laravel\Ai\Responses\AgentResponse;
+
+Route::post('/coach', function (Request $request) {
+    (new SalesCoach)
+        ->queue($request->input('transcript'))
+        ->then(function (AgentResponse $response) {
+            // handle completion
+        })
+        ->catch(function (Throwable $e) {
+            // handle failure
+        });
+
+    return back();
+});
+```
+
+### Attachments
+
+Attach documents or images to a prompt:
+
+```php
+use Laravel\Ai\Files;
+
+$response = (new SalesCoach)->prompt(
+    'Please analyse the attached transcript...',
+    attachments: [
+        Files\Document::fromStorage('transcript.pdf'),
+        Files\Document::fromPath('/home/laravel/transcript.md'),
+        $request->file('transcript'),
+    ]
+);
+```
+
+For images, use `Files\Image`:
+
+```php
+use Laravel\Ai\Files;
+
+$response = (new ImageAnalyser)->prompt(
+    'What is in this image?',
+    attachments: [
+        Files\Image::fromStorage('photo.jpg'),
+        Files\Image::fromPath('/home/laravel/photo.jpg'),
+        $request->file('photo'),
+    ]
+);
+```
+
+## Image generation
+
+Generate images with the `Image` class. Supported providers: `openai`, `gemini`, and `xai`.
+
+```php
+use Laravel\Ai\Image;
+
+$image = Image::of('A donut sitting on a kitchen counter')->generate();
+
+$rawContent = (string) $image;
+```
+
+Specify aspect ratio and quality:
+
+```php
+$image = Image::of('A donut sitting on a kitchen counter')
+    ->quality('high')   // 'high', 'medium', 'low'
+    ->landscape()       // square(), portrait(), landscape()
+    ->timeout(120)
+    ->generate();
+```
+
+### Storing generated images
+
+```php
+$image = Image::of('A donut sitting on a kitchen counter');
+
+$path = $image->store();
+$path = $image->storeAs('image.jpg');
+$path = $image->storePublicly();
+$path = $image->storePubliclyAs('image.jpg');
+```
+
+### Queuing image generation
+
+```php
+use Laravel\Ai\Image;
+use Laravel\Ai\Responses\ImageResponse;
+
+Image::of('A donut sitting on a kitchen counter')
+    ->portrait()
+    ->queue()
+    ->then(function (ImageResponse $image) {
+        $path = $image->store();
+    });
+```
+
+## Practical use cases
+
+### Chatbot
+
+A simple chatbot using `RemembersConversations`:
+
+```php
+// app/Ai/Agents/SupportBot.php
+class SupportBot implements Agent, Conversational
+{
+    use Promptable, RemembersConversations;
+
+    public function instructions(): string
+    {
+        return 'You are a friendly customer support agent. Answer user questions politely and concisely.';
+    }
+}
+
+// routes/web.php
+Route::post('/chat', function (Request $request) {
+    $conversationId = $request->input('conversation_id');
+
+    $agent = new SupportBot;
+
+    if ($conversationId) {
+        $agent = $agent->continue($conversationId, as: $request->user());
+    } else {
+        $agent = $agent->forUser($request->user());
+    }
+
+    $response = $agent->prompt($request->input('message'));
+
+    return response()->json([
+        'message'         => (string) $response,
+        'conversation_id' => $response->conversationId,
+    ]);
+});
+```
+
+### Streaming chat with the Vercel AI SDK
+
+Backend implementation for a frontend powered by the Vercel AI SDK:
+
+```php
+use App\Ai\Agents\SupportBot;
+
+Route::post('/api/chat', function (Request $request) {
+    return (new SupportBot)
+        ->forUser($request->user())
+        ->stream($request->input('message'))
+        ->usingVercelDataProtocol();
+});
+```
+
+### Document analysis with structured output
+
+Attach a PDF and return structured data:
+
+```php
+use Laravel\Ai\Contracts\HasStructuredOutput;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Files;
+
+class DocumentAnalyser implements Agent, HasStructuredOutput
+{
+    use Promptable;
+
+    public function instructions(): string
+    {
+        return 'Analyse the attached document and return a summary, key points, and a sentiment score.';
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'summary'    => $schema->string()->required(),
+            'key_points' => $schema->array()->items($schema->string())->required(),
+            'sentiment'  => $schema->string()->enum(['positive', 'neutral', 'negative'])->required(),
+        ];
+    }
+}
+
+$response = (new DocumentAnalyser)->prompt(
+    'Please analyse this document.',
+    attachments: [
+        Files\Document::fromStorage('report.pdf'),
+    ]
+);
+
+$summary   = $response['summary'];
+$sentiment = $response['sentiment'];
+```
+
+<Tip>
+  Agents can be returned directly from routes or injected into service classes. In larger applications, use `SalesCoach::make()` to resolve agents from the container, which makes them easier to test.
+</Tip>
+
+## Testing
+
+The SDK provides a fake implementation so you can test agent behaviour without calling real APIs:
+
+```php
+use Laravel\Ai\Facades\Ai;
+use Laravel\Ai\Testing\AgentFake;
+
+Ai::fake([
+    SalesCoach::class => AgentFake::make()
+        ->withTextResponse('Your score is 8 out of 10.'),
+]);
+
+$response = (new SalesCoach)->prompt('Please analyse this transcript.');
+
+expect((string) $response)->toBe('Your score is 8 out of 10.');
+```
+
+<Warning>
+  Always use `Ai::fake()` in tests to avoid making real API calls. This prevents unexpected costs and rate-limit errors.
+</Warning>

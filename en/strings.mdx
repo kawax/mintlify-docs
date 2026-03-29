@@ -1,0 +1,531 @@
+---
+title: "String Manipulation"
+description: "Work with strings in Laravel using the Str class and Fluent Strings (Str::of()) — with practical examples for slugs, masking, case conversion, and more."
+---
+
+## The `Str` class
+
+`Illuminate\Support\Str` provides a consistent API for string operations. Instead of memorising the inconsistent argument order of PHP's built-in string functions, you get a single, uniform interface that also handles multibyte characters correctly.
+
+Laravel offers two styles:
+
+- **Static methods** — `Str::slug($title, '-')` — clear for single operations
+- **Fluent strings** — `Str::of($title)->slug('-')->limit(50)` — chain multiple transformations left to right
+
+```php
+use Illuminate\Support\Str;
+
+// Static method
+$slug = Str::slug('My New Blog Post', '-');
+// 'my-new-blog-post'
+
+// Fluent (Str::of)
+$result = Str::of('  My New Blog Post: Part 1  ')
+    ->trim()
+    ->slug('-')
+    ->limit(30);
+// 'my-new-blog-post-part-1'
+```
+
+<Info>
+  The `str()` global helper is equivalent to `Str::of()`. You can write `str('hello')->upper()` instead of `Str::of('hello')->upper()`.
+</Info>
+
+## Case conversion
+
+Use these when normalising database column names, API keys, or user-facing labels.
+
+### `Str::camel()` / `Str::snake()` / `Str::kebab()` / `Str::studly()`
+
+```php
+use Illuminate\Support\Str;
+
+Str::camel('foo_bar');         // 'fooBar'
+Str::camel('user_profile_id'); // 'userProfileId'
+
+Str::snake('fooBar');          // 'foo_bar'
+Str::snake('UserProfile');     // 'user_profile'
+
+Str::kebab('fooBar');          // 'foo-bar'
+
+Str::studly('foo_bar');        // 'FooBar'
+Str::studly('user-profile');   // 'UserProfile'
+```
+
+### `Str::lower()` / `Str::upper()` / `Str::title()`
+
+```php
+use Illuminate\Support\Str;
+
+Str::lower('LARAVEL');      // 'laravel'
+Str::upper('laravel');      // 'LARAVEL'
+Str::title('hello world');  // 'Hello World'
+```
+
+## Slugs and URLs
+
+### `Str::slug()` — URL-friendly slugs
+
+Converts spaces and special characters into a safe URL segment.
+
+```php
+use Illuminate\Support\Str;
+
+Str::slug('My New Blog Post', '-');
+// 'my-new-blog-post'
+
+Str::slug('Hello World!', '_');
+// 'hello_world'
+```
+
+### Combine slug generation with fluent strings
+
+```php
+use Illuminate\Support\Str;
+
+$slug = Str::of('  My New Blog Post: Part 1!  ')
+    ->trim()
+    ->slug('-')
+    ->limit(50);
+// 'my-new-blog-post-part-1'
+```
+
+## Trimming and truncating
+
+### `Str::limit()` — truncate by character count
+
+Truncate article previews or comment snippets to a fixed length.
+
+```php
+use Illuminate\Support\Str;
+
+$text = 'The quick brown fox jumps over the lazy dog.';
+
+Str::limit($text, 20);
+// 'The quick brown fox ...'
+
+// Custom end string
+Str::limit($text, 20, ' → read more');
+// 'The quick brown fox  → read more'
+
+// Do not break in the middle of a word
+Str::limit($text, 20, preserveWords: true);
+// 'The quick brown fox...'
+```
+
+### `Str::words()` — truncate by word count
+
+```php
+use Illuminate\Support\Str;
+
+Str::words('Perfectly balanced, as all things should be.', 3, ' >>>');
+// 'Perfectly balanced, as >>>'
+```
+
+## Searching and checking
+
+### `Str::contains()` — check for a substring
+
+```php
+use Illuminate\Support\Str;
+
+Str::contains('This is my name', 'my');
+// true
+
+// Match any of several needles
+Str::contains('This is my name', ['my', 'your']);
+// true
+
+// Case-insensitive
+Str::contains('This is my name', 'MY', ignoreCase: true);
+// true
+```
+
+### `Str::startsWith()` / `Str::endsWith()`
+
+```php
+use Illuminate\Support\Str;
+
+Str::startsWith('https://laravel.com', 'https://');
+// true
+
+Str::startsWith('https://laravel.com', ['https://', 'http://']);
+// true
+
+Str::endsWith('photo.jpg', '.jpg');
+// true
+
+Str::endsWith('photo.jpg', ['.jpg', '.png', '.gif']);
+// true
+```
+
+### `Str::is()` — wildcard pattern matching
+
+```php
+use Illuminate\Support\Str;
+
+Str::is('foo*', 'foobar');
+// true
+
+Str::is('*/user/*', '/admin/user/profile');
+// true
+
+// Case-insensitive
+Str::is('F*', 'foo', ignoreCase: true);
+// true
+```
+
+## Replacing and transforming
+
+### `Str::replace()` — simple replacement
+
+```php
+use Illuminate\Support\Str;
+
+Str::replace('8.x', '13.x', 'Laravel 8.x');
+// 'Laravel 13.x'
+
+// Case-insensitive replacement
+Str::replace('laravel', 'Symfony', 'I love Laravel', caseSensitive: false);
+// 'I love Symfony'
+```
+
+### `Str::replaceArray()` — sequential placeholder replacement
+
+```php
+use Illuminate\Support\Str;
+
+$string = 'The event runs from ? to ?';
+
+Str::replaceArray('?', ['9am', '5pm'], $string);
+// 'The event runs from 9am to 5pm'
+```
+
+### `Str::replaceMatches()` — regex replacement
+
+```php
+use Illuminate\Support\Str;
+
+// Strip non-digits from a phone number
+Str::replaceMatches('/[^0-9]/', '', '(555) 123-4567');
+// '5551234567'
+
+// Dynamic replacement via a closure
+Str::replaceMatches('/\d+/', fn ($matches) => '[' . $matches[0] . ']', '1 item, 2 boxes');
+// '[1] item, [2] boxes'
+```
+
+### `Str::remove()` — delete substrings
+
+```php
+use Illuminate\Support\Str;
+
+Str::remove('e', 'Peter Piper picked a peck of pickled peppers.');
+// 'Ptr Pipr pickd a pck of pickld ppprs.'
+
+// Multiple substrings
+Str::remove(['foo', 'bar'], 'foo and bar and baz');
+// ' and  and baz'
+```
+
+### `Str::squish()` — collapse whitespace
+
+```php
+use Illuminate\Support\Str;
+
+Str::squish('  Laravel   Framework  ');
+// 'Laravel Framework'
+```
+
+## Extracting substrings
+
+### `Str::before()` / `Str::after()`
+
+```php
+use Illuminate\Support\Str;
+
+Str::before('test@example.com', '@');
+// 'test'
+
+Str::after('test@example.com', '@');
+// 'example.com'
+
+// Last occurrence
+Str::afterLast('App\Http\Controllers\UserController', '\\');
+// 'UserController'
+
+Str::beforeLast('App\Http\Controllers\UserController', '\\');
+// 'App\Http\Controllers'
+```
+
+### `Str::between()` — text between two markers
+
+```php
+use Illuminate\Support\Str;
+
+Str::between('[debug] Error occurred', '[', ']');
+// 'debug'
+```
+
+### `Str::start()` / `Str::finish()` — ensure a prefix or suffix
+
+Adds the character only when it is not already there — never duplicates.
+
+```php
+use Illuminate\Support\Str;
+
+Str::start('users/profile', '/');
+// '/users/profile'
+
+Str::start('/users/profile', '/');
+// '/users/profile' — not doubled
+
+Str::finish('https://example.com', '/');
+// 'https://example.com/'
+```
+
+### `Str::chopStart()` / `Str::chopEnd()` — remove a prefix or suffix
+
+```php
+use Illuminate\Support\Str;
+
+Str::chopStart('https://laravel.com', 'https://');
+// 'laravel.com'
+
+// Multiple possible prefixes
+Str::chopStart('http://laravel.com', ['https://', 'http://']);
+// 'laravel.com'
+
+Str::chopEnd('UserController.php', '.php');
+// 'UserController'
+```
+
+## Masking and security
+
+### `Str::mask()` — redact part of a string
+
+Useful for displaying partially obscured email addresses, phone numbers, or card numbers.
+
+```php
+use Illuminate\Support\Str;
+
+// Mask from position 4 onward
+Str::mask('alice@example.com', '*', 4);
+// 'alic*************'
+
+// Show only the last 4 characters (negative offset)
+Str::mask('1234-5678-9012-3456', '*', -4);
+// '***************3456'
+
+// Mask a specific range
+Str::mask('alice@example.com', '*', 3, 5);
+// 'ali*****xample.com'
+```
+
+### `Str::excerpt()` — contextual snippet
+
+Extract a passage of text centred around a keyword — handy for search result snippets.
+
+```php
+use Illuminate\Support\Str;
+
+$text = 'Laravel is a PHP framework for building beautiful web applications.';
+
+Str::excerpt($text, 'PHP', ['radius' => 12]);
+// '...is a PHP framework...'
+```
+
+## Random strings and identifiers
+
+### `Str::random()` — random alphanumeric string
+
+```php
+use Illuminate\Support\Str;
+
+Str::random(32);
+// 32-character random string — suitable for tokens and reset keys
+```
+
+### `Str::uuid()` / `Str::ulid()` — unique identifiers
+
+```php
+use Illuminate\Support\Str;
+
+(string) Str::uuid();
+// '550e8400-e29b-41d4-a716-446655440000'
+
+// Time-ordered UUID (UUIDv7)
+(string) Str::uuid7();
+
+// Sortable ULID
+(string) Str::ulid();
+// '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+```
+
+### `Str::password()` — secure password generation
+
+```php
+use Illuminate\Support\Str;
+
+Str::password(12);
+// 12-character string with uppercase, lowercase, digits, and symbols
+```
+
+## Fluent strings — `Str::of()`
+
+`Str::of()` returns a `Stringable` instance so you can chain methods. Cast the result to `string` or call `toString()` when you need a plain string.
+
+```php
+use Illuminate\Support\Str;
+
+$result = Str::of('  hello world  ')
+    ->trim()
+    ->title()
+    ->append('!')
+    ->toString();
+// 'Hello World!'
+```
+
+### Practical chaining examples
+
+**Slug from a blog title**
+
+```php
+$slug = Str::of('  My New Blog Post: Part 1  ')
+    ->trim()
+    ->lower()
+    ->slug('-')
+    ->limit(50);
+// 'my-new-blog-post-part-1'
+```
+
+**Extract a domain from a URL**
+
+```php
+$domain = Str::of('https://www.example.com/path/to/page')
+    ->after('//')
+    ->before('/')
+    ->chopStart('www.');
+// 'example.com'
+```
+
+**Sanitise user input**
+
+```php
+$clean = Str::of($userInput)
+    ->squish()      // collapse extra whitespace
+    ->limit(255)    // enforce max length
+    ->toString();
+```
+
+**Class name to file path**
+
+```php
+$path = Str::of('App\Http\Controllers\UserController')
+    ->replace('\\', '/')
+    ->append('.php')
+    ->toString();
+// 'App/Http/Controllers/UserController.php'
+```
+
+### Conditional chaining — `when()`
+
+```php
+use Illuminate\Support\Str;
+
+$result = Str::of('Laravel')
+    ->when($isUppercase, fn ($str) => $str->upper())
+    ->append(' Framework');
+// 'LARAVEL Framework' when $isUppercase is true
+// 'Laravel Framework' otherwise
+```
+
+### `pipe()` — insert an arbitrary callback
+
+```php
+use Illuminate\Support\Str;
+
+$result = Str::of('my-slug')
+    ->pipe(fn ($str) => $str->replace('-', '_'))
+    ->upper()
+    ->toString();
+// 'MY_SLUG'
+```
+
+## Key fluent methods at a glance
+
+```php
+use Illuminate\Support\Str;
+
+$str = Str::of('Hello, World!');
+
+$str->length();            // 13
+$str->upper();             // 'HELLO, WORLD!'
+$str->lower();             // 'hello, world!'
+$str->trim();              // 'Hello, World!'
+$str->slug();              // 'hello-world'
+$str->contains('World');   // true
+$str->startsWith('Hello'); // true
+$str->endsWith('!');       // true
+$str->replace(',', '');    // 'Hello World!'
+$str->prepend('>>> ');     // '>>> Hello, World!'
+$str->append(' <<<');      // 'Hello, World! <<<'
+$str->reverse();           // '!dlroW ,olleH'
+$str->wordCount();         // 2
+```
+
+## Summary
+
+<AccordionGroup>
+  <Accordion title="Common Str methods at a glance">
+    | Method | Purpose |
+    | --- | --- |
+    | `Str::slug($str)` | URL-friendly slug |
+    | `Str::limit($str, $n)` | Truncate by character count |
+    | `Str::contains($str, $needle)` | Substring check |
+    | `Str::startsWith($str, $needle)` | Prefix check |
+    | `Str::endsWith($str, $needle)` | Suffix check |
+    | `Str::replace($search, $replace, $str)` | Simple replacement |
+    | `Str::camel($str)` | Convert to camelCase |
+    | `Str::snake($str)` | Convert to snake_case |
+    | `Str::kebab($str)` | Convert to kebab-case |
+    | `Str::studly($str)` | Convert to StudlyCase |
+    | `Str::upper($str)` | Uppercase |
+    | `Str::lower($str)` | Lowercase |
+    | `Str::squish($str)` | Collapse extra whitespace |
+    | `Str::after($str, $search)` | Substring after a marker |
+    | `Str::before($str, $search)` | Substring before a marker |
+    | `Str::between($str, $from, $to)` | Text between two markers |
+    | `Str::mask($str, '*', $index)` | Redact part of a string |
+    | `Str::random($length)` | Random alphanumeric string |
+    | `Str::uuid()` | Generate a UUID |
+    | `Str::of($str)` | Start a fluent chain |
+  </Accordion>
+
+  <Accordion title="Static methods vs fluent strings">
+    **Use static methods when** you only need one or two transformations:
+
+    ```php
+    $slug = Str::slug($title);
+    ```
+
+    **Use fluent strings (`Str::of()`) when** you want to chain three or more operations, use conditional logic, or prefer reading the transformations top to bottom:
+
+    ```php
+    $slug = Str::of($title)
+        ->trim()
+        ->lower()
+        ->slug()
+        ->limit(50);
+    ```
+  </Accordion>
+
+  <Accordion title="Str class vs PHP built-ins">
+    Prefer `Str` over raw PHP functions (`strtolower()`, `substr()`, `str_replace()`) because:
+
+    - It handles multibyte characters correctly by using `mb_*` functions internally
+    - You can chain operations without nesting function calls
+    - The argument order is consistent across all methods
+    - It keeps your code style consistent with the rest of Laravel
+  </Accordion>
+</AccordionGroup>

@@ -421,8 +421,10 @@
                 ]
               },
               {
-                "group": "Collections",
+                "group": "Helpers & Collections",
                 "pages": [
+                  "en/helpers",
+                  "en/strings",
                   "en/collections"
                 ]
               },
@@ -430,6 +432,14 @@
                 "group": "Internationalization",
                 "pages": [
                   "en/localization"
+                ]
+              },
+              {
+                "group": "AI Development",
+                "pages": [
+                  "en/boost",
+                  "en/mcp",
+                  "en/ai-sdk"
                 ]
               },
               {

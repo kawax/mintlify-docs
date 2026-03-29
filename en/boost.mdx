@@ -1,0 +1,351 @@
+---
+title: "Laravel Boost"
+description: "Laravel Boost accelerates AI-assisted development by providing MCP servers, coding guidelines, and Agent Skills that help AI coding agents write high-quality Laravel code."
+---
+
+## Introduction
+
+Laravel Boost is a package that accelerates AI-assisted development by supplying the guidelines and Agent Skills that AI agents need to write high-quality Laravel code following the framework's best practices.
+
+Boost also provides a powerful Laravel ecosystem documentation API — a knowledge base containing over 17,000 Laravel-specific facts combined with semantic search via embeddings. Boost instructs AI agents such as Claude Code and Cursor to query this API to learn about the latest Laravel features and best practices.
+
+## Installation
+
+Install Laravel Boost via Composer as a development dependency:
+
+```shell
+composer require laravel/boost --dev
+```
+
+Then install the MCP server and coding guidelines:
+
+```shell
+php artisan boost:install
+```
+
+The `boost:install` command generates relevant guidelines and skill files for the AI coding agent you select during installation.
+
+After installation, you can start coding with Cursor, Claude Code, or your preferred AI agent.
+
+<Note>
+  The generated MCP configuration file (`.mcp.json`), guideline files (`CLAUDE.md`, `AGENTS.md`, `junie/`, etc.), and the `boost.json` configuration file may be added to your application's `.gitignore`. These files are automatically regenerated when you run `boost:install` or `boost:update`.
+</Note>
+
+### Configuring your agent
+
+<Tabs>
+  <Tab title="Cursor">
+    1. Open the Command Palette (`Cmd+Shift+P` or `Ctrl+Shift+P`)
+    2. Select **Open MCP Settings** and press `Enter`
+    3. Toggle **laravel-boost** on
+  </Tab>
+  <Tab title="Claude Code">
+    Support for Claude Code is usually enabled automatically. If not, open a shell in your project directory and run:
+
+    ```shell
+    claude mcp add -s local -t stdio laravel-boost php artisan boost:mcp
+    ```
+  </Tab>
+  <Tab title="Codex">
+    Support for Codex is usually enabled automatically. If not, open a shell in your project directory and run:
+
+    ```shell
+    codex mcp add laravel-boost -- php "artisan" "boost:mcp"
+    ```
+  </Tab>
+  <Tab title="Gemini CLI">
+    Support for Gemini CLI is usually enabled automatically. If not, open a shell in your project directory and run:
+
+    ```shell
+    gemini mcp add -s project -t stdio laravel-boost php artisan boost:mcp
+    ```
+  </Tab>
+  <Tab title="GitHub Copilot (VS Code)">
+    1. Open the Command Palette (`Cmd+Shift+P` or `Ctrl+Shift+P`)
+    2. Select **MCP: List Servers** and press `Enter`
+    3. Select `laravel-boost` and press `Enter`
+    4. Choose **Start server**
+  </Tab>
+  <Tab title="Junie">
+    1. Press `Shift` twice to open the command palette
+    2. Search for **MCP Settings** and press `Enter`
+    3. Check the checkbox next to `laravel-boost`
+    4. Click **Apply** in the bottom right
+  </Tab>
+</Tabs>
+
+### Updating Boost resources
+
+Keep your local Boost resources (AI guidelines and skills) up to date to reflect the latest versions of your installed Laravel ecosystem packages:
+
+```shell
+php artisan boost:update
+```
+
+You can automate this by adding it to the `post-update-cmd` script in `composer.json`:
+
+```json
+{
+  "scripts": {
+    "post-update-cmd": [
+      "@php artisan boost:update --ansi"
+    ]
+  }
+}
+```
+
+By default, `boost:update` only refreshes Boost resources that have already been published. Use `--discover` to detect newly installed packages and offer to publish their guidelines and skills:
+
+```shell
+php artisan boost:update --discover
+```
+
+## MCP server
+
+Laravel Boost ships an MCP (Model Context Protocol) server that exposes tools allowing AI agents to interact with your Laravel application — inspecting its structure, querying the database, and running code.
+
+### Available MCP tools
+
+| Tool | Description |
+| --- | --- |
+| Application Info | Reads PHP and Laravel versions, database engine, versioned ecosystem packages, and Eloquent models |
+| Browser Logs | Reads logs and errors from the browser |
+| Database Connections | Lists available database connections, including the default |
+| Database Query | Executes a query against the database |
+| Database Schema | Reads the database schema |
+| Get Absolute URL | Converts a relative URI to an absolute URL so the agent can generate valid links |
+| Last Error | Reads the last error from the application log file |
+| Read Log Entries | Reads the last N log entries |
+| Search Docs | Queries the Laravel hosted documentation API based on installed packages |
+
+### Registering the MCP server manually
+
+Some editors require you to register the MCP server manually. Use the following details:
+
+| Field | Value |
+| --- | --- |
+| **Command** | `php` |
+| **Args** | `artisan boost:mcp` |
+
+JSON example:
+
+```json
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "php",
+            "args": ["artisan", "boost:mcp"]
+        }
+    }
+}
+```
+
+## AI guidelines
+
+AI guidelines are instruction files that are preloaded to give AI agents important context about your Laravel ecosystem packages. They cover core conventions, best practices, and framework-specific patterns so agents consistently generate high-quality code.
+
+### Available guidelines
+
+Boost includes AI guidelines for the following packages and frameworks. The `core` guideline provides general advice that applies regardless of version.
+
+| Package | Supported versions |
+| --- | --- |
+| Core & Boost | core |
+| Laravel Framework | core, 10.x, 11.x, 12.x |
+| Livewire | core, 2.x, 3.x, 4.x |
+| Flux UI | core, free, pro |
+| Folio | core |
+| Herd | core |
+| Inertia Laravel | core, 1.x, 2.x, 3.x |
+| Inertia React | core, 1.x, 2.x, 3.x |
+| Inertia Vue | core, 1.x, 2.x, 3.x |
+| Inertia Svelte | core, 1.x, 2.x, 3.x |
+| MCP | core |
+| Pennant | core |
+| Pest | core, 3.x, 4.x |
+| PHPUnit | core |
+| Pint | core |
+| Sail | core |
+| Tailwind CSS | core, 3.x, 4.x |
+| Livewire Volt | core |
+| Wayfinder | core |
+| Enforce Tests | conditional |
+
+<Tip>
+  To keep AI guidelines current, see [Updating Boost resources](#updating-boost-resources).
+</Tip>
+
+### Adding custom guidelines
+
+Add your own AI guidelines to Boost by placing `.blade.php` or `.md` files in the `.ai/guidelines/*` directory of your application. These files are merged with Boost's built-in guidelines when you run `boost:install`.
+
+### Overriding Boost guidelines
+
+Create a custom guideline at a path matching an existing Boost guideline to override it. When `boost:install` finds a matching path, it uses your custom version instead of the built-in one.
+
+For example, to override the "Inertia React v2 Form Guidance" guideline, create a file at `.ai/guidelines/inertia-react/2/forms.blade.php`.
+
+### Guidelines for third-party packages
+
+If you maintain a third-party package and want Boost to include AI guidelines for it, add a `resources/boost/guidelines/core.blade.php` file to your package. Boost will automatically discover and load the guideline when users run `php artisan boost:install`.
+
+Guidelines should include a brief overview of the package, required file structures and conventions, and how to create or use the main features — with commands and code snippets. Keep them concise and action-oriented:
+
+```php
+## Package Name
+
+This package provides [brief description of functionality].
+
+### Features
+
+- Feature 1: [clear & short description].
+- Feature 2: [clear & short description]. Example usage:
+
+@verbatim
+<code-snippet name="How to use Feature 2" lang="php">
+$result = PackageName::featureTwo($param1, $param2);
+</code-snippet>
+@endverbatim
+```
+
+## Agent Skills
+
+[Agent Skills](https://agentskills.io/home) are lightweight, focused knowledge modules that an agent can activate on demand when working in a specific domain. Unlike guidelines (which are always preloaded), skills are loaded only when relevant — keeping context lean and code quality high.
+
+When you run `boost:install` and select Skills as a feature, Boost automatically installs the appropriate skills based on the packages detected in `composer.json`. For example, if your project includes `livewire/livewire`, the `livewire-development` skill is installed automatically.
+
+### Available skills
+
+| Skill | Package |
+| --- | --- |
+| fluxui-development | Flux UI |
+| folio-routing | Folio |
+| inertia-react-development | Inertia React |
+| inertia-svelte-development | Inertia Svelte |
+| inertia-vue-development | Inertia Vue |
+| livewire-development | Livewire |
+| mcp-development | MCP |
+| pennant-development | Pennant |
+| pest-testing | Pest |
+| tailwindcss-development | Tailwind CSS |
+| volt-development | Volt |
+| wayfinder-development | Wayfinder |
+
+<Tip>
+  To keep skills current, see [Updating Boost resources](#updating-boost-resources).
+</Tip>
+
+### Creating custom skills
+
+Add a `SKILL.md` file to `.ai/skills/{skill-name}/` in your application. Running `boost:update` will install your custom skill alongside Boost's built-in skills.
+
+For example, to create a skill for application-specific invoice logic:
+
+```
+.ai/skills/creating-invoices/SKILL.md
+```
+
+### Overriding built-in skills
+
+Create a custom skill with the same name as a built-in Boost skill to override it. Boost will use your version instead of the default.
+
+For example, to override the `livewire-development` skill, create `.ai/skills/livewire-development/SKILL.md`.
+
+### Skills for third-party packages
+
+If you maintain a third-party package, add `resources/boost/skills/{skill-name}/SKILL.md` to your package. Boost will offer to install the skill when users run `php artisan boost:install`.
+
+Skills follow the Agent Skills format — a folder containing a `SKILL.md` file with required YAML frontmatter (`name` and `description`) and Markdown instructions:
+
+```markdown
+---
+name: package-name-development
+description: Build and work with PackageName features, including components and workflows.
+---
+
+# Package Name Development
+
+## When to use this skill
+Use this skill when working with PackageName features...
+
+## Features
+
+- Feature 1: [clear & short description].
+- Feature 2: example usage:
+
+$result = PackageName::featureTwo($param1, $param2);
+```
+
+## Guidelines vs Skills
+
+Boost gives you two ways to provide context to AI agents:
+
+| | Guidelines | Skills |
+| --- | --- | --- |
+| **Loaded** | Always, at startup | On demand, when relevant |
+| **Scope** | Broad, foundational | Focused, task-specific |
+| **Purpose** | Core conventions and best practices | Detailed implementation patterns |
+
+## Documentation API
+
+Boost's documentation API gives AI agents access to a knowledge base of over 17,000 Laravel-specific facts. It uses semantic search with embeddings to return accurate, context-aware results.
+
+The `Search Docs` MCP tool lets agents query the Laravel hosted documentation API based on your installed packages. Boost's AI guidelines and skills automatically instruct agents to use this API.
+
+| Package | Supported versions |
+| --- | --- |
+| Laravel Framework | 10.x, 11.x, 12.x |
+| Filament | 2.x, 3.x, 4.x, 5.x |
+| Flux UI | 2.x Free, 2.x Pro |
+| Inertia | 1.x, 2.x |
+| Livewire | 1.x, 2.x, 3.x, 4.x |
+| Nova | 4.x, 5.x |
+| Pest | 3.x, 4.x |
+| Tailwind CSS | 3.x, 4.x |
+
+## Extending Boost
+
+Boost works out of the box with many popular IDEs and AI agents. If your coding tool is not yet supported, you can create a custom agent integration.
+
+### Adding support for another IDE or agent
+
+Create a class that extends `Laravel\Boost\Install\Agents\Agent` and implement one or more of the following contracts:
+
+- `Laravel\Boost\Contracts\SupportsGuidelines` — add AI guideline support
+- `Laravel\Boost\Contracts\SupportsMcp` — add MCP support
+- `Laravel\Boost\Contracts\SupportsSkills` — add Agent Skills support
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App;
+
+use Laravel\Boost\Contracts\SupportsGuidelines;
+use Laravel\Boost\Contracts\SupportsMcp;
+use Laravel\Boost\Contracts\SupportsSkills;
+use Laravel\Boost\Install\Agents\Agent;
+
+class CustomAgent extends Agent implements SupportsGuidelines, SupportsMcp, SupportsSkills
+{
+    // Your implementation...
+}
+```
+
+See [ClaudeCode.php](https://github.com/laravel/boost/blob/main/src/Install/Agents/ClaudeCode.php) for a reference implementation.
+
+### Registering your agent
+
+Register the custom agent in the `boot` method of `App\Providers\AppServiceProvider`:
+
+```php
+use Laravel\Boost\Boost;
+
+public function boot(): void
+{
+    Boost::registerAgent('customagent', CustomAgent::class);
+}
+```
+
+Once registered, the agent appears as an option when running `php artisan boost:install`.
