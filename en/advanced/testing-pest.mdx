@@ -1,0 +1,482 @@
+---
+title: "Advanced Testing with Pest"
+description: "Master Pest in Laravel projects: the Expectation API, datasets, mocking, HTTP fakes, and architecture tests for well-structured codebases."
+---
+
+## What is Pest?
+
+[Pest](https://pestphp.com) is a testing framework built on top of PHPUnit and is the default test runner for new Laravel 11+ projects. It lets you write tests as closures with concise, expressive syntax while still having full access to PHPUnit's assertion library.
+
+| Aspect | Pest | PHPUnit |
+|---|---|---|
+| Test definition | `test()` / `it()` closures | Methods on a class |
+| Assertions | Expectation API (`expect()->toBe()`) | `$this->assert*()` |
+| Datasets | `dataset()` / `with()` | `@dataProvider` |
+| Hooks | `beforeEach()` / `afterEach()` | `setUp()` / `tearDown()` |
+| Grouping | `describe()` | Test classes |
+
+<Info>
+  Pest tests run on PHPUnit under the hood, so they can coexist with existing PHPUnit test classes. Run them with `php artisan test` or `vendor/bin/pest`.
+</Info>
+
+## describe / it / test
+
+### test()
+
+The simplest form. The first argument becomes the test description.
+
+```php
+test('a user can log in with their email address', function () {
+    $user = User::factory()->create();
+
+    $response = $this->post('/login', [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $response->assertRedirect('/dashboard');
+});
+```
+
+### it()
+
+Reads naturally in English as "it should …".
+
+```php
+it('redirects unauthenticated users to the login page', function () {
+    $response = $this->get('/dashboard');
+
+    $response->assertRedirect('/login');
+});
+```
+
+### describe()
+
+Groups related tests and allows sharing `beforeEach()` state within the group.
+
+```php
+describe('order management', function () {
+    beforeEach(function () {
+        $this->user = User::factory()->create();
+        $this->actingAs($this->user);
+    });
+
+    it('returns the list of orders for the current user', function () {
+        Order::factory(3)->for($this->user)->create();
+
+        $response = $this->get('/orders');
+
+        $response->assertOk()->assertJsonCount(3, 'data');
+    });
+
+    it('does not return orders belonging to another user', function () {
+        $other = User::factory()->create();
+        Order::factory()->for($other)->create();
+
+        $response = $this->get('/orders');
+
+        $response->assertOk()->assertJsonCount(0, 'data');
+    });
+});
+```
+
+<Tip>
+  `describe()` blocks can be nested, but keep the depth to two levels to keep tests readable.
+</Tip>
+
+## The Expectation API
+
+`expect()` is Pest's fluent assertion syntax. Chain matchers to build readable assertions.
+
+### Basic assertions
+
+```php
+expect($value)->toBe(42);               // strict equality (===)
+expect($value)->toEqual(['a' => 1]);    // loose equality (==)
+expect($value)->toBeTrue();
+expect($value)->toBeFalse();
+expect($value)->toBeNull();
+expect($value)->not->toBeNull();
+
+expect($string)->toContain('Laravel');
+expect($array)->toHaveCount(3);
+expect($array)->toHaveKey('email');
+expect($array)->toContain('admin');
+
+expect($number)->toBeGreaterThan(0);
+expect($number)->toBeLessThanOrEqual(100);
+```
+
+### Assertions on models
+
+```php
+expect($user)->toBeInstanceOf(User::class);
+expect($user->email)->toMatchRegex('/^.+@.+\..+$/');
+
+// Confirm a record was persisted
+expect(User::where('email', 'test@example.com')->exists())->toBeTrue();
+```
+
+### Chaining with and()
+
+```php
+expect($response->status())->toBe(200)
+    ->and($response->json('name'))->toBe('Laravel')
+    ->and($response->json('version'))->toBeGreaterThan(12);
+```
+
+### Asserting over every element with each()
+
+```php
+$users = User::factory(3)->create();
+
+expect($users)->each(function ($user) {
+    $user->toBeInstanceOf(User::class)
+        ->email->not->toBeNull();
+});
+```
+
+## Datasets — parameterised tests
+
+### Inline datasets
+
+```php
+it('rejects invalid email addresses', function (string $email) {
+    $response = $this->post('/register', ['email' => $email]);
+
+    $response->assertInvalid('email');
+})->with([
+    'plain text'   => ['not-an-email'],
+    'missing TLD'  => ['user@'],
+    'empty string' => [''],
+]);
+```
+
+### Named datasets
+
+Define reusable datasets in the `tests/Datasets` directory.
+
+```php
+// tests/Datasets/InvalidEmails.php
+dataset('invalid_emails', [
+    'plain'  => ['not-an-email'],
+    'no TLD' => ['user@'],
+    'empty'  => [''],
+    'spaces' => ['user @example.com'],
+]);
+```
+
+```php
+it('rejects invalid email addresses', function (string $email) {
+    $response = $this->post('/register', ['email' => $email]);
+
+    $response->assertInvalid('email');
+})->with('invalid_emails');
+```
+
+### Testing with multiple values per row
+
+```php
+it('enforces per-plan request limits', function (string $plan, int $limit) {
+    $user = User::factory()->create(['plan' => $plan]);
+
+    expect($user->requestLimit())->toBe($limit);
+})->with([
+    ['free',       100],
+    ['pro',        1000],
+    ['enterprise', 10000],
+]);
+```
+
+## Mocking with Mockery
+
+### Mocking a service
+
+```php
+use App\Services\PaymentGateway;
+use Mockery\MockInterface;
+
+test('the payment gateway is called with the correct amount', function () {
+    $this->mock(PaymentGateway::class, function (MockInterface $mock) {
+        $mock->expects('charge')
+            ->with(1000, 'usd')
+            ->andReturn(['status' => 'succeeded']);
+    });
+
+    $result = app(PaymentGateway::class)->charge(1000, 'usd');
+
+    expect($result['status'])->toBe('succeeded');
+});
+```
+
+### Spies
+
+Spies call the real implementation and record what was called.
+
+```php
+use App\Services\NotificationService;
+
+test('the notification service is called after an order is placed', function () {
+    $spy = $this->spy(NotificationService::class);
+
+    $this->post('/orders', ['amount' => 1000]);
+
+    $spy->shouldHaveReceived('send')->once()->with('order.created');
+});
+```
+
+### Partial mocks
+
+Stub specific methods while calling through to the real implementation for everything else.
+
+```php
+use App\Services\ReportService;
+use Mockery\MockInterface;
+
+test('report generation skips file writes in tests', function () {
+    $mock = $this->partialMock(ReportService::class, function (MockInterface $mock) {
+        $mock->expects('writeFile')->andReturnNull();
+    });
+
+    $result = $mock->generate();
+
+    expect($result)->not->toBeNull();
+});
+```
+
+## Faking HTTP requests
+
+`Http::fake()` stubs HTTP responses without making real network calls.
+
+### Basic fake
+
+```php
+use Illuminate\Support\Facades\Http;
+
+test('it fetches user data from the external API', function () {
+    Http::fake([
+        'https://api.example.com/users/*' => Http::response([
+            'id'   => 1,
+            'name' => 'Taylor Otwell',
+        ], 200),
+    ]);
+
+    $result = app(UserApiClient::class)->find(1);
+
+    expect($result['name'])->toBe('Taylor Otwell');
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.example.com/users/1');
+});
+```
+
+### Error responses
+
+```php
+test('it throws an exception when the API returns 503', function () {
+    Http::fake([
+        'api.example.com/*' => Http::response([], 503),
+    ]);
+
+    expect(fn () => app(UserApiClient::class)->find(1))
+        ->toThrow(\App\Exceptions\ApiUnavailableException::class);
+});
+```
+
+### Simulating connection failures
+
+```php
+use Illuminate\Http\Client\ConnectionException;
+
+test('it returns null when the connection fails', function () {
+    Http::fake(fn () => throw new ConnectionException('Connection refused'));
+
+    $result = app(UserApiClient::class)->findWithFallback(1);
+
+    expect($result)->toBeNull();
+});
+```
+
+## Faking events, mail, and notifications
+
+### Event::fake()
+
+```php
+use Illuminate\Support\Facades\Event;
+use App\Events\OrderCreated;
+
+test('placing an order dispatches the OrderCreated event', function () {
+    Event::fake();
+
+    $this->post('/orders', ['product_id' => 1, 'amount' => 1000]);
+
+    Event::assertDispatched(OrderCreated::class, function ($event) {
+        return $event->order->amount === 1000;
+    });
+});
+```
+
+Fake only specific events and let others propagate normally:
+
+```php
+Event::fake([OrderCreated::class]);
+```
+
+### Mail::fake()
+
+```php
+use Illuminate\Support\Facades\Mail;
+use App\Mail\WelcomeEmail;
+
+test('registering sends a welcome email', function () {
+    Mail::fake();
+
+    $this->post('/register', [
+        'name'                  => 'Test User',
+        'email'                 => 'test@example.com',
+        'password'              => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    Mail::assertSent(WelcomeEmail::class, function ($mail) {
+        return $mail->hasTo('test@example.com');
+    });
+});
+```
+
+### Notification::fake()
+
+```php
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\OrderShipped;
+
+test('shipping an order notifies the customer', function () {
+    Notification::fake();
+
+    $user  = User::factory()->create();
+    $order = Order::factory()->for($user)->create();
+
+    $this->post("/orders/{$order->id}/ship");
+
+    Notification::assertSentTo($user, OrderShipped::class, function ($notification) use ($order) {
+        return $notification->order->id === $order->id;
+    });
+});
+```
+
+## Testing Artisan commands
+
+```php
+test('the cleanup command removes expired orders', function () {
+    $expired = Order::factory()->create(['expires_at' => now()->subDay()]);
+    $valid   = Order::factory()->create(['expires_at' => now()->addDay()]);
+
+    $this->artisan('orders:cleanup')
+        ->assertSuccessful()
+        ->expectsOutput('Cleaned up 1 expired order(s).');
+
+    expect(Order::find($expired->id))->toBeNull();
+    expect(Order::find($valid->id))->not->toBeNull();
+});
+```
+
+### Interactive commands
+
+```php
+test('the report command prompts for confirmation before running', function () {
+    $this->artisan('reports:generate')
+        ->expectsQuestion('Are you sure?', 'yes')
+        ->expectsOutput('Report generated.')
+        ->assertExitCode(0);
+});
+```
+
+## Database helpers
+
+### RefreshDatabase
+
+Runs all migrations before the test suite and wraps each test in a database transaction that is rolled back afterward.
+
+```php
+// tests/Pest.php
+uses(RefreshDatabase::class)->in('Feature');
+```
+
+```php
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+test('it creates a user', function () {
+    $user = User::factory()->create(['name' => 'Laravel']);
+
+    expect(User::count())->toBe(1);
+    expect($user->name)->toBe('Laravel');
+});
+```
+
+### LazilyRefreshDatabase
+
+Defers migration until the first test that actually writes to the database. Faster when many tests in your suite do not touch the database.
+
+```php
+// tests/Pest.php
+uses(LazilyRefreshDatabase::class)->in('Feature');
+```
+
+<Tip>
+  For most projects, `RefreshDatabase` is the safer choice. Consider `LazilyRefreshDatabase` when you have a large number of tests that do not interact with the database.
+</Tip>
+
+| | `RefreshDatabase` | `LazilyRefreshDatabase` |
+|---|---|---|
+| Migration timing | At test suite start | Before first DB write |
+| Overhead for non-DB tests | Yes | No |
+| Recommended for | Most projects | Large suites with many non-DB tests |
+
+## Architecture tests
+
+Pest's architecture testing API lets you enforce structural rules across your codebase. These run as part of your normal test suite.
+
+```php
+// tests/Architecture/AppTest.php
+
+// Controllers must not depend on repositories directly
+arch('controllers do not use repositories directly')
+    ->expect('App\Http\Controllers')
+    ->not->toUse('App\Repositories');
+
+// All commands must be in the Console namespace
+arch('commands are in the Console namespace')
+    ->expect('App\Console\Commands')
+    ->toExtend('Illuminate\Console\Command');
+
+// Models must not call external HTTP services
+arch('models do not make HTTP calls')
+    ->expect('App\Models')
+    ->not->toUse('Illuminate\Support\Facades\Http');
+```
+
+## Code coverage
+
+Xdebug or PCOV must be installed.
+
+```bash
+# Print coverage summary to the terminal
+php artisan test --coverage
+
+# Fail CI if coverage drops below 80%
+php artisan test --coverage --min=80
+
+# Generate an HTML report
+vendor/bin/pest --coverage-html=coverage/
+
+# Profile slow tests
+php artisan test --profile
+```
+
+<Warning>
+  Coverage measurement significantly increases test run time. In CI, run coverage in a dedicated job or only on pull requests to avoid slowing down your main pipeline.
+</Warning>
+
+## Related page
+
+<Card title="Testing (basics)" icon="flask" href="/en/testing">
+  Getting started with testing in Laravel and the `php artisan test` command.
+</Card>
