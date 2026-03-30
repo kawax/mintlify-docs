@@ -223,6 +223,12 @@
                 ]
               },
               {
+                "group": "アプリケーション構造",
+                "pages": [
+                  "jp/advanced/app-structure"
+                ]
+              },
+              {
                 "group": "Laravel 13 新機能",
                 "pages": [
                   "jp/advanced/php-attributes"
