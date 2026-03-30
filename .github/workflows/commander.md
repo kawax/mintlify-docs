@@ -17,6 +17,7 @@ network:
     - defaults
     - laravel.com
     - "*.laravel.com"
+    - inertiajs.com
 safe-outputs:
   create-issue:
     max: 3
