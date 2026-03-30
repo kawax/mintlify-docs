@@ -287,6 +287,13 @@
                   "jp/blog/upgrade-11-to-12",
                   "jp/blog/upgrade-10-to-11"
                 ]
+              },
+              {
+                "group": "環境構築",
+                "pages": [
+                  "jp/blog/mac-setup",
+                  "jp/blog/windows-setup"
+                ]
               }
             ]
           }
