@@ -1,0 +1,223 @@
+---
+title: "HomebrewでPHPとComposerとNode.jsをインストールする(macOS)"
+description: "macOSでHomebrewを使いPHP・Composer・Node.jsをインストールし、Laravel開発環境を整えるステップバイステップガイドです。"
+---
+
+## はじめに
+
+Laravel チームは初心者向けに [Herd](https://herd.laravel.com/) や `php.new` を用意していますが、シニアエンジニアはパッケージマネージャーで各ツールを個別に管理することを好みます。自分でバージョンを制御でき、複数プロジェクトで異なる PHP バージョンを切り替えるのも簡単です。
+
+このガイドでは **Homebrew** を使って PHP・Composer・Node.js(nvm 経由)をインストールし、`laravel new` が動く状態にするまでを解説します。
+
+<Info>
+  対象環境: macOS 13 Ventura 以降。Apple Silicon(M1/M2/M3)・Intel どちらにも対応しています。
+</Info>
+
+---
+
+## Homebrew のインストール
+
+Homebrew は macOS 向けのパッケージマネージャーです。まだインストールしていない場合は、ターミナルで以下を実行します。
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+インストール後、Apple Silicon の場合はシェル設定ファイル(`~/.zprofile` など)に以下の行が自動追加されます。手動で追加した場合は、設定を再読み込みしてください。
+
+```bash
+eval "$(/opt/homebrew/bin/brew shellenv)"
+```
+
+インストールを確認します。
+
+```bash
+brew --version
+```
+
+---
+
+## PHP のインストール
+
+<Steps>
+  <Step title="最新の PHP をインストールする">
+    Homebrew の `php` フォーミュラは常に最新の安定バージョンを指しています。Laravel 13 は PHP 8.3 以上が必要です。
+
+    ```bash
+    brew install php
+    ```
+  </Step>
+
+  <Step title="バージョンを確認する">
+    ```bash
+    php --version
+    ```
+
+    `PHP 8.3.x` 以上が表示されれば成功です。
+  </Step>
+
+  <Step title="(任意)特定バージョンを使う">
+    複数の PHP バージョンを管理したい場合は、バージョン付きフォーミュラをインストールします。
+
+    ```bash
+    brew install php@8.3
+    ```
+
+    バージョンを切り替えるには `brew link` を使います。
+
+    ```bash
+    brew unlink php
+    brew link php@8.3 --force --overwrite
+    ```
+
+    現在リンクされているバージョンを確認します。
+
+    ```bash
+    php --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Composer のインストール
+
+<Steps>
+  <Step title="Composer をインストールする">
+    Homebrew から直接インストールできます。
+
+    ```bash
+    brew install composer
+    ```
+  </Step>
+
+  <Step title="バージョンを確認する">
+    ```bash
+    composer --version
+    ```
+  </Step>
+
+  <Step title="グローバルインストールのパスを設定する">
+    `composer global require` でインストールしたパッケージ(Laravel インストーラーなど)を使えるように、`~/.composer/vendor/bin` を `PATH` に追加します。
+
+    `~/.zshrc`(または `~/.bashrc`)に以下を追記します。
+
+    ```bash
+    export PATH="$HOME/.composer/vendor/bin:$PATH"
+    ```
+
+    設定を反映します。
+
+    ```bash
+    source ~/.zshrc
+    ```
+  </Step>
+</Steps>
+
+---
+
+## nvm のインストール
+
+Node.js は nvm(Node Version Manager)を使ってユーザー単位でインストールします。`root` 権限なしで管理できるため、グローバルな npm パッケージを使う AI ツールや CLI との相性が良いです。
+
+<Steps>
+  <Step title="nvm をインストールする">
+    最新のインストールスクリプトは [nvm の GitHub リポジトリ](https://github.com/nvm-sh/nvm) で確認できます。
+
+    ```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="シェル設定ファイルに追記する">
+    インストールスクリプトは自動的に `~/.zshrc`(または `~/.bashrc`)に以下を追記します。追記されていない場合は手動で追加してください。
+
+    ```bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    ```
+
+    設定を反映します。
+
+    ```bash
+    source ~/.zshrc
+    ```
+  </Step>
+
+  <Step title="インストールを確認する">
+    ```bash
+    nvm --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Node.js のインストール
+
+<Steps>
+  <Step title="LTS バージョンをインストールする">
+    ```bash
+    nvm install --lts
+    ```
+  </Step>
+
+  <Step title="デフォルトに設定する">
+    新しいターミナルセッションでも自動的に使われるよう、デフォルトバージョンを設定します。
+
+    ```bash
+    nvm alias default node
+    ```
+  </Step>
+
+  <Step title="バージョンを確認する">
+    ```bash
+    node --version
+    npm --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Laravel のインストール確認
+
+<Steps>
+  <Step title="Laravel インストーラーを導入する">
+    ```bash
+    composer global require laravel/installer
+    ```
+  </Step>
+
+  <Step title="新しいプロジェクトを作成する">
+    ```bash
+    laravel new my-app
+    ```
+
+    対話的なセットアップが始まります。スターターキットや認証の有無などを選択できます。
+  </Step>
+
+  <Step title="開発サーバーを起動する">
+    ```bash
+    cd my-app
+    php artisan serve
+    ```
+
+    ブラウザで `http://localhost:8000` にアクセスし、Laravel のウェルカムページが表示されれば完了です。
+  </Step>
+</Steps>
+
+---
+
+## Herd との使い分け
+
+| | Homebrew 手動構築 | Herd |
+|---|---|---|
+| **対象者** | バージョン管理や設定を細かく制御したい開発者 | 手早く始めたい初心者・個人開発者 |
+| **PHP バージョン切り替え** | `brew link` で手動 | GUI で簡単に切り替え |
+| **ローカルドメイン** | `/etc/hosts` を手動編集 | 自動で `.test` ドメインを設定 |
+| **サービス管理** | `brew services` | GUI から起動・停止 |
+| **カスタマイズ性** | 高い | 限定的 |
+
+チーム開発や CI 環境と設定を合わせたい場合や、複数バージョンの PHP を頻繁に切り替える場合は Homebrew による手動構築が適しています。

@@ -1,0 +1,261 @@
+---
+title: "WSLでPHPとComposerとNode.jsをインストールする(Windows)"
+description: "Windows 10/11でWSL 2を使いPHP・Composer・Node.jsをインストールし、Laravel開発環境を整えるステップバイステップガイドです。"
+---
+
+## はじめに
+
+Windows で Laravel を開発するには **WSL(Windows Subsystem for Linux)** を使うのがベストプラクティスです。Linux のツールチェーンをそのまま使えるため、macOS や本番サーバーと同じコマンドが通ります。
+
+このガイドでは WSL 2 上の Ubuntu で PHP・Composer・Node.js(nvm 経由)をインストールし、`laravel new` が動く状態にするまでを解説します。
+
+<Info>
+  対象環境: Windows 10(バージョン 2004 以降)または Windows 11。WSL 2 を使います。
+</Info>
+
+---
+
+## WSL のインストール
+
+<Steps>
+  <Step title="PowerShell を管理者として開く">
+    スタートメニューで「PowerShell」を検索し、「管理者として実行」を選択します。
+  </Step>
+
+  <Step title="WSL と Ubuntu をインストールする">
+    ```powershell
+    wsl --install
+    ```
+
+    このコマンドで WSL 2 と Ubuntu(デフォルトディストリビューション)がインストールされます。完了後、PC を再起動します。
+  </Step>
+
+  <Step title="Ubuntu をセットアップする">
+    再起動後、Ubuntu が自動的に起動します。ユーザー名とパスワードを設定してください。このパスワードは `sudo` コマンドで使います。
+
+    <Warning>
+      パスワードは入力中に画面に表示されません。正確に入力してください。
+    </Warning>
+  </Step>
+
+  <Step title="パッケージリストを更新する">
+    Ubuntu のターミナルで以下を実行します。
+
+    ```bash
+    sudo apt update && sudo apt upgrade -y
+    ```
+  </Step>
+</Steps>
+
+---
+
+## PHP のインストール
+
+Ubuntu の標準リポジトリの PHP は古いバージョンが含まれていることがあります。`ondrej/php` PPA を使って最新バージョンをインストールします。
+
+<Steps>
+  <Step title="必要なパッケージをインストールする">
+    ```bash
+    sudo apt install -y software-properties-common
+    ```
+  </Step>
+
+  <Step title="ondrej/php PPA を追加する">
+    ```bash
+    sudo add-apt-repository ppa:ondrej/php
+    sudo apt update
+    ```
+  </Step>
+
+  <Step title="PHP 8.3 と必要な拡張をインストールする">
+    Laravel 13 は PHP 8.3 以上が必要です。
+
+    ```bash
+    sudo apt install -y php8.3 php8.3-cli php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-sqlite3 php8.3-mysql
+    ```
+  </Step>
+
+  <Step title="バージョンを確認する">
+    ```bash
+    php --version
+    ```
+
+    `PHP 8.3.x` 以上が表示されれば成功です。
+  </Step>
+
+  <Step title="(任意)複数バージョンを切り替える">
+    複数の PHP バージョンが必要な場合は `update-alternatives` で切り替えられます。
+
+    ```bash
+    sudo update-alternatives --config php
+    ```
+
+    インストール済みのバージョン一覧が表示されるので、使用するバージョンの番号を入力します。
+  </Step>
+</Steps>
+
+---
+
+## Composer のインストール
+
+Composer は公式インストーラーを使ってインストールします。
+
+<Steps>
+  <Step title="必要なパッケージを確認する">
+    ```bash
+    sudo apt install -y curl php8.3-cli unzip
+    ```
+  </Step>
+
+  <Step title="公式インストーラーをダウンロードして実行する">
+    ```bash
+    curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
+    sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    ```
+  </Step>
+
+  <Step title="バージョンを確認する">
+    ```bash
+    composer --version
+    ```
+  </Step>
+
+  <Step title="グローバルインストールのパスを設定する">
+    `composer global require` でインストールしたパッケージ(Laravel インストーラーなど)を使えるように、`~/.composer/vendor/bin` を `PATH` に追加します。
+
+    `~/.bashrc`(または `~/.zshrc`)に以下を追記します。
+
+    ```bash
+    export PATH="$HOME/.composer/vendor/bin:$PATH"
+    ```
+
+    設定を反映します。
+
+    ```bash
+    source ~/.bashrc
+    ```
+  </Step>
+</Steps>
+
+---
+
+## nvm のインストール
+
+Node.js は nvm(Node Version Manager)を使ってユーザー単位でインストールします。`sudo` 不要で管理できるため、グローバルな npm パッケージを使う AI ツールや CLI との相性が良いです。
+
+<Steps>
+  <Step title="nvm をインストールする">
+    最新のインストールスクリプトは [nvm の GitHub リポジトリ](https://github.com/nvm-sh/nvm) で確認できます。
+
+    ```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="シェル設定ファイルに追記する">
+    インストールスクリプトは自動的に `~/.bashrc` に以下を追記します。追記されていない場合は手動で追加してください。
+
+    ```bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    ```
+
+    設定を反映します。
+
+    ```bash
+    source ~/.bashrc
+    ```
+
+    zsh を使っている場合は `~/.zshrc` に同様に追記し、`source ~/.zshrc` で反映します。
+  </Step>
+
+  <Step title="インストールを確認する">
+    ```bash
+    nvm --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Node.js のインストール
+
+<Steps>
+  <Step title="LTS バージョンをインストールする">
+    ```bash
+    nvm install --lts
+    ```
+  </Step>
+
+  <Step title="デフォルトに設定する">
+    新しいターミナルセッションでも自動的に使われるよう、デフォルトバージョンを設定します。
+
+    ```bash
+    nvm alias default node
+    ```
+  </Step>
+
+  <Step title="バージョンを確認する">
+    ```bash
+    node --version
+    npm --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Laravel のインストール確認
+
+<Steps>
+  <Step title="Laravel インストーラーを導入する">
+    ```bash
+    composer global require laravel/installer
+    ```
+  </Step>
+
+  <Step title="新しいプロジェクトを作成する">
+    ```bash
+    laravel new my-app
+    ```
+
+    対話的なセットアップが始まります。スターターキットや認証の有無などを選択できます。
+  </Step>
+
+  <Step title="開発サーバーを起動する">
+    ```bash
+    cd my-app
+    php artisan serve
+    ```
+
+    ブラウザで `http://localhost:8000` にアクセスし、Laravel のウェルカムページが表示されれば完了です。
+
+    <Tip>
+      WSL から Windows のブラウザで `localhost` にアクセスできない場合は、`php artisan serve --host=0.0.0.0` で起動してみてください。
+    </Tip>
+  </Step>
+</Steps>
+
+---
+
+## 補足: 開発効率を上げるツール
+
+### Windows Terminal
+
+Windows Terminal を使うと、複数のタブで WSL・PowerShell・コマンドプロンプトを一元管理できます。Microsoft Store から無料でインストールできます。
+
+- タブで複数のシェルを並行操作
+- Ubuntu のシェルをデフォルトに設定可能
+- フォントや配色を自由にカスタマイズ
+
+### VS Code Remote - WSL 拡張
+
+VS Code の [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) 拡張を使うと、WSL 内のファイルを Windows の VS Code から直接編集できます。
+
+```bash
+# WSL ターミナルからプロジェクトを VS Code で開く
+code .
+```
+
+初回実行時に VS Code サーバーが WSL 内に自動インストールされます。以降はネイティブと同等の操作感で開発できます。
