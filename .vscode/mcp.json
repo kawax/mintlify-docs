@@ -8,6 +8,11 @@
         "mcp-server"
       ],
       "tools": ["*"]
+    },
+    "Mintlify": {
+      "type": "http",
+      "url": "https://mintlify.com/docs/mcp",
+      "tools": ["*"]
     }
   }
 }
