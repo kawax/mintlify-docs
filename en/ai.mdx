@@ -1,0 +1,115 @@
+---
+title: "Laravel and AI Development"
+description: "Laravel is an ideal framework for AI-assisted development. Use Laravel Boost's MCP server integration, AI guidelines, and documentation search API to get the most out of your AI coding agents."
+---
+
+## Why Laravel works well with AI development
+
+AI coding agents like [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor](https://cursor.com), and [GitHub Copilot](https://github.com/features/copilot) can dramatically speed up code generation, debugging, and refactoring. But to get the most out of an agent, the codebase needs to be something the agent can understand accurately.
+
+Laravel has an advantage here. Its convention-based design means that when you ask an agent to "add a controller," it already knows where to put it. When you ask it to "create a migration," it can predict the naming conventions and file locations. That consistency removes the ambiguity that trips up AI tools.
+
+Features like Eloquent relationships, form requests, and middleware follow patterns that agents can reliably understand and reproduce. The result is idiomatic code that looks like it was written by an experienced Laravel developer — not a patchwork of generic PHP snippets.
+
+## Laravel Boost
+
+[Laravel Boost](https://github.com/laravel/boost) is a package that bridges AI coding agents and your Laravel application. Boost runs as an **MCP (Model Context Protocol) server**, giving agents deep insight into your application's structure, database, routes, and more through 15+ dedicated tools.
+
+Boost provides three main capabilities:
+
+<Columns>
+  <Card title="MCP tools" icon="wrench">
+    15+ tools for inspecting and interacting with your application — from checking the database schema to running Artisan commands.
+  </Card>
+  <Card title="AI guidelines" icon="book-open">
+    AI guidelines designed for the Laravel ecosystem. Communicates best practices to agents so they write idiomatic code.
+  </Card>
+  <Card title="Documentation search API" icon="magnifying-glass">
+    Search over 17,000 Laravel-specific documentation entries. Returns accurate information matched to the versions of packages you have installed.
+  </Card>
+</Columns>
+
+### Installation
+
+Boost works with Laravel 10, 11, 12, and 13, on PHP 8.1 and above. Add it as a development dependency first.
+
+<Steps>
+  <Step title="Install the package">
+    ```shell
+    composer require laravel/boost --dev
+    ```
+  </Step>
+  <Step title="Run the interactive installer">
+    ```shell
+    php artisan boost:install
+    ```
+
+    The installer auto-detects your IDE and AI agent. Select the integrations you want, and it generates the necessary configuration files — including `.mcp.json` for the MCP server and a guidelines file.
+  </Step>
+</Steps>
+
+<Info>
+  Generated files such as `.mcp.json`, `CLAUDE.md`, and `boost.json` can be added to `.gitignore` if you prefer each developer to configure their own environment.
+</Info>
+
+### Available MCP tools
+
+The tools Boost exposes to agents include:
+
+| Tool | Description |
+| --- | --- |
+| Application inspection | Check PHP and Laravel versions, installed packages, configuration, and environment variables |
+| Database tools | Inspect the schema, run read-only queries, and understand your data structure |
+| Route inspection | List all registered routes including middleware, controllers, and parameters |
+| Artisan commands | Explore available Artisan commands and their arguments so agents can propose and run the right command |
+| Log analysis | Read and analyze application log files to assist with debugging |
+| Browser logs | Access browser console logs and errors when using Laravel's frontend tooling |
+| Tinker integration | Execute PHP code within your application context via Laravel Tinker to verify behavior |
+| Documentation search | Search Laravel ecosystem documentation matched to your installed package versions |
+
+### AI guidelines
+
+Boost's AI guidelines are a curated set of coding conventions designed for the Laravel ecosystem. They tell agents how to write idiomatic Laravel code, follow framework conventions, and avoid common pitfalls. Guidelines are automatically composed based on the versions of packages you have installed.
+
+Supported packages include:
+
+- Livewire (2.x, 3.x, 4.x)
+- Inertia.js (React, Svelte, and Vue variants)
+- Tailwind CSS (3.x, 4.x)
+- Filament (3.x, 4.x)
+- PHPUnit, Pest PHP, Laravel Pint, and more
+
+When you run `boost:install`, it auto-detects the packages in your `composer.json` and incorporates the relevant guidelines into your AI context file.
+
+### Agent Skills
+
+[Agent Skills](https://agentskills.io/home) are lightweight knowledge modules that agents load on demand. Unlike guidelines — which are loaded upfront — skills are activated only when you work in a specific domain. This prevents context bloat and improves the accuracy of generated code.
+
+Skills are available for popular packages such as Livewire, Inertia, Tailwind CSS, and Pest. When you select the skills feature during `boost:install`, they are automatically installed based on the contents of your `composer.json`.
+
+### Documentation search API
+
+Boost's documentation API lets agents search over 17,000 entries from the Laravel ecosystem. Unlike a general web search, the index is scoped and vectorized to match the versions of packages you have installed.
+
+When an agent needs to look up how a feature works, it uses this API to retrieve version-specific, accurate information. This eliminates the problem of agents suggesting deprecated methods or outdated syntax from older framework versions.
+
+### Supported agents
+
+Boost works with the major IDEs and AI tools that support the Model Context Protocol.
+
+<Columns>
+  <Card title="Cursor" icon="arrow-pointer" href="https://cursor.com" />
+  <Card title="Claude Code" icon="terminal" href="https://docs.anthropic.com/en/docs/claude-code" />
+  <Card title="GitHub Copilot" icon="github" href="https://github.com/features/copilot" />
+  <Card title="Gemini CLI" icon="arrow-right" href="https://github.com/google-gemini/gemini-cli" />
+  <Card title="Codex" icon="arrow-right" href="https://openai.com/codex" />
+  <Card title="Junie" icon="arrow-right" href="https://www.jetbrains.com/junie/" />
+</Columns>
+
+For detailed setup instructions for each agent, see the [Set Up Your Agents section of the Boost documentation](https://laravel.com/docs/boost#set-up-your-agents).
+
+## Next steps
+
+<Card title="Laravel Boost official documentation" icon="book-open-cover" href="https://laravel.com/docs/boost">
+  See the official documentation for detailed integration instructions for each agent, the MCP tool reference, and guideline customization.
+</Card>
