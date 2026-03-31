@@ -354,6 +354,12 @@
                 "pages": [
                   "en/testing"
                 ]
+              },
+              {
+                "group": "AI Development",
+                "pages": [
+                  "en/ai"
+                ]
               }
             ]
           },
@@ -363,6 +369,7 @@
               {
                 "group": "Architecture",
                 "pages": [
+                  "en/lifecycle",
                   "en/service-container",
                   "en/service-providers",
                   "en/facades",
