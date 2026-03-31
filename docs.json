@@ -171,6 +171,7 @@
               {
                 "group": "デバッグと監視",
                 "pages": [
+                  "jp/context",
                   "jp/error-handling",
                   "jp/logging"
                 ]
@@ -431,6 +432,7 @@
               {
                 "group": "Debug & Monitoring",
                 "pages": [
+                  "en/context",
                   "en/error-handling",
                   "en/logging"
                 ]
