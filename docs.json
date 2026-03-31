@@ -12,6 +12,7 @@
     "languages": [
       {
         "language": "jp",
+        "default": true,
         "tabs": [
           {
             "tab": "チュートリアル",
@@ -583,5 +584,10 @@
   },
   "metadata": {
     "timestamp": true
+  },
+  "seo": {
+    "metatags": {
+      "canonical": "https://kawax.biz"
+    }
   }
 }
