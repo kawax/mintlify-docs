@@ -1,0 +1,560 @@
+---
+title: "Creating a Custom Agent for Boost"
+description: "A deep dive into Laravel Boost's extension architecture, explaining how to create custom agents that implement the SupportsGuidelines, SupportsMcp, and SupportsSkills contracts."
+---
+
+## Why you might need a custom agent
+
+Laravel Boost supports the major AI coding tools out of the box — Claude Code, Cursor, Codex, and GitHub Copilot. However, to integrate with in-house tools, emerging AI agents, or proprietary workflows, you need to implement a custom agent using Boost's extension system.
+
+Scenarios where a custom agent is useful:
+
+- You are using an IDE or AI tool that Boost does not yet support
+- You want to integrate Boost into an internal development workflow or a custom CI/CD pipeline
+- Your agent requires a specific configuration file format or installation procedure
+
+## Boost extension architecture
+
+### The Agent base class
+
+All agents extend `Laravel\Boost\Install\Agents\Agent`. This abstract class provides:
+
+- Agent detection (system-wide and per-project)
+- MCP server installation (file-based or shell command-based)
+- A guidelines transformation hook (`transformGuidelines`)
+
+Two abstract methods must be implemented:
+
+| Method | Description |
+| --- | --- |
+| `name()` | Internal identifier for the agent (e.g. `claude_code`) |
+| `displayName()` | Name shown during installation (e.g. `Claude Code`) |
+| `systemDetectionConfig(Platform $platform)` | Detection config for system-wide installation |
+| `projectDetectionConfig()` | Detection config for per-project installation |
+
+### The three contracts
+
+Implement only the contracts you need to selectively enable Boost features.
+
+| Contract | Role |
+| --- | --- |
+| `SupportsGuidelines` | Output path and transformation for AI guideline files |
+| `SupportsMcp` | Install MCP server configuration |
+| `SupportsSkills` | Installation path for Agent Skills |
+
+<Info>
+  All three contracts are optional. You can implement guidelines support only, without MCP support.
+</Info>
+
+### The SupportsGuidelines contract
+
+```php
+interface SupportsGuidelines
+{
+    // File path where AI guidelines are written
+    public function guidelinesPath(): string;
+
+    // Whether the guidelines file requires frontmatter
+    public function frontmatter(): bool;
+
+    // Post-process the generated guidelines Markdown
+    public function transformGuidelines(string $markdown): string;
+}
+```
+
+`guidelinesPath()` returns the path where generated guidelines are written — matching the format the agent reads, such as `CLAUDE.md` for Claude Code or `.cursor/rules/laravel-boost.mdc` for Cursor.
+
+`transformGuidelines()` is a hook for post-processing the generated Markdown. You can add agent-specific headers or convert to a special format. The default in the `Agent` base class returns the string unchanged.
+
+### The SupportsMcp contract
+
+```php
+interface SupportsMcp
+{
+    // Whether to use an absolute path for the MCP command
+    public function useAbsolutePathForMcp(): bool;
+
+    // Returns the path to the PHP executable
+    public function getPhpPath(bool $forceAbsolutePath = false): string;
+
+    // Returns the path to artisan
+    public function getArtisanPath(bool $forceAbsolutePath = false): string;
+
+    // Install the MCP server configuration
+    public function installMcp(string $key, string $command, array $args = [], array $env = []): bool;
+
+    // Install an HTTP-based MCP server configuration
+    public function installHttpMcp(string $key, string $url): bool;
+}
+```
+
+The `Agent` base class provides default implementations of `installMcp()` and `installHttpMcp()`, so in most cases you only need to override `mcpInstallationStrategy()` and `mcpConfigPath()`.
+
+There are two installation strategies:
+
+| `McpInstallationStrategy` | Behavior |
+| --- | --- |
+| `FILE` | Writes configuration to a JSON/TOML file (default) |
+| `SHELL` | Registers the MCP by running a shell command |
+| `NONE` | Skips MCP installation |
+
+### The SupportsSkills contract
+
+```php
+interface SupportsSkills
+{
+    // Directory path where Agent Skills are written
+    public function skillsPath(): string;
+}
+```
+
+Returns the path to the skills directory the agent reads — for example `.claude/skills` for Claude Code or `.cursor/skills` for Cursor.
+
+## Creating a custom agent
+
+Here we implement a real custom agent class. The example is a fictional agent called "MyAgent" embedded in a proprietary CI/CD workflow.
+
+<Steps>
+  <Step title="Create the agent class">
+    Create `app/Boost/MyAgent.php`.
+
+    ```php
+    <?php
+
+    declare(strict_types=1);
+
+    namespace App\Boost;
+
+    use Laravel\Boost\Contracts\SupportsGuidelines;
+    use Laravel\Boost\Contracts\SupportsMcp;
+    use Laravel\Boost\Contracts\SupportsSkills;
+    use Laravel\Boost\Install\Agents\Agent;
+    use Laravel\Boost\Install\Enums\McpInstallationStrategy;
+    use Laravel\Boost\Install\Enums\Platform;
+
+    class MyAgent extends Agent implements SupportsGuidelines, SupportsMcp, SupportsSkills
+    {
+        public function name(): string
+        {
+            return 'my_agent';
+        }
+
+        public function displayName(): string
+        {
+            return 'MyAgent';
+        }
+
+        public function systemDetectionConfig(Platform $platform): array
+        {
+            return match ($platform) {
+                Platform::Darwin, Platform::Linux => [
+                    'command' => 'command -v myagent',
+                ],
+                Platform::Windows => [
+                    'command' => 'cmd /c where myagent 2>nul',
+                ],
+            };
+        }
+
+        public function projectDetectionConfig(): array
+        {
+            return [
+                'files' => ['.myagent.json'],
+            ];
+        }
+
+        // --- SupportsGuidelines ---
+
+        public function guidelinesPath(): string
+        {
+            return 'MYAGENT.md';
+        }
+
+        // frontmatter() uses the Agent base class default (false)
+        // transformGuidelines() also uses the base class default (returns string as-is)
+
+        // --- SupportsMcp ---
+
+        // useAbsolutePathForMcp(), getPhpPath(), getArtisanPath(),
+        // installMcp(), and installHttpMcp() are all implemented by the Agent base class
+
+        public function mcpInstallationStrategy(): McpInstallationStrategy
+        {
+            return McpInstallationStrategy::FILE;
+        }
+
+        public function mcpConfigPath(): string
+        {
+            return '.myagent.json';
+        }
+
+        // --- SupportsSkills ---
+
+        public function skillsPath(): string
+        {
+            return '.myagent/skills';
+        }
+    }
+    ```
+
+    <Info>
+      `systemDetectionConfig()` and `projectDetectionConfig()` are used by Boost to auto-detect the agent system-wide and per-project. When `boost:install` is run, the agent is automatically listed as a candidate.
+    </Info>
+  </Step>
+
+  <Step title="Register the agent">
+    Register the custom agent in the `boot` method of `App\Providers\AppServiceProvider`.
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Boost\MyAgent;
+    use Illuminate\Support\ServiceProvider;
+    use Laravel\Boost\Boost;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            Boost::registerAgent('my_agent', MyAgent::class);
+        }
+    }
+    ```
+
+    After registration, running `php artisan boost:install` will display MyAgent as an option.
+  </Step>
+
+  <Step title="Verify the installation">
+    ```shell
+    php artisan boost:install
+    ```
+
+    MyAgent will appear in the agent selection prompt. Selecting it generates `MYAGENT.md`, `.myagent.json`, and `.myagent/skills/`.
+  </Step>
+</Steps>
+
+## Customizing guidelines
+
+### Configuring guidelinesPath
+
+The location of the guidelines file differs per agent.
+
+```php
+// Output as a single file
+public function guidelinesPath(): string
+{
+    return 'MYAGENT.md';
+}
+```
+
+Making it overridable via config adds flexibility.
+
+```php
+public function guidelinesPath(): string
+{
+    return config('boost.agents.my_agent.guidelines_path', 'MYAGENT.md');
+}
+```
+
+### Agents that require frontmatter
+
+For formats that require frontmatter — such as Cursor's `.cursor/rules/*.mdc` — return `true` from `frontmatter()`.
+
+```php
+public function frontmatter(): bool
+{
+    return true;
+}
+```
+
+### Post-processing guidelines
+
+Use `transformGuidelines()` to modify the generated Markdown.
+
+```php
+public function transformGuidelines(string $markdown): string
+{
+    // Add an agent-specific header
+    $header = "<!-- Generated by Laravel Boost for MyAgent -->\n\n";
+
+    return $header . $markdown;
+}
+```
+
+## Adding custom AI guidelines
+
+To add project-specific rules to Boost's guidelines, place Blade files in the `.ai/guidelines/` directory.
+
+```
+.ai/
+└── guidelines/
+    ├── my-domain-rules.blade.php
+    └── coding-standards.blade.php
+```
+
+Example file:
+
+```php
+## Project-specific rules
+
+Follow these conventions in this project:
+
+- Place all models in the `App\Models\` namespace
+- Create all API endpoints under `App\Http\Controllers\Api\`
+- Wrap DB transactions in `DB::transaction()` and keep them inside service classes
+
+@verbatim
+<code-snippet name="Service class transaction example" lang="php">
+DB::transaction(function () use ($data) {
+    $order = Order::create($data);
+    $order->items()->createMany($data['items']);
+    event(new OrderCreated($order));
+});
+</code-snippet>
+@endverbatim
+```
+
+When `boost:install` is run, these guidelines are automatically merged with Boost's built-in guidelines and written to the output file.
+
+### Overriding built-in guidelines
+
+Place a custom file at the same path as a Boost built-in guideline to have it take precedence.
+
+```
+# Override the built-in "Inertia React v2 Form Guidance"
+.ai/guidelines/inertia-react/2/forms.blade.php
+```
+
+## Adding custom skills
+
+### Creating SKILL.md
+
+Define a skill in `.ai/skills/{skill-name}/SKILL.md`.
+
+```
+.ai/
+└── skills/
+    └── creating-invoices/
+        └── SKILL.md
+```
+
+`SKILL.md` consists of YAML frontmatter and Markdown instructions.
+
+```markdown
+---
+name: creating-invoices
+description: A skill for implementing invoice creation, updates, and sending.
+---
+
+# Invoice creation skill
+
+## When to use this skill
+
+Use this skill when implementing invoice model creation, PDF generation, or email sending.
+
+## File structure
+
+- `app/Models/Invoice.php` — Invoice model
+- `app/Services/InvoiceService.php` — Business logic
+- `app/Jobs/SendInvoiceEmail.php` — Email sending job
+
+## Implementation patterns
+
+### Creating an invoice
+
+```php
+// $items is an array passed from a controller or another service
+$invoice = InvoiceService::create([
+    'user_id' => $user->id,
+    'items' => $items,
+    'due_date' => now()->addDays(30),
+]);
+```
+
+### Generating an invoice PDF
+
+Generate PDFs using `barryvdh/laravel-dompdf`:
+
+```php
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Storage;
+
+$pdf = Pdf::loadView('invoices.pdf', ['invoice' => $invoice]);
+Storage::put("invoices/{$invoice->id}.pdf", $pdf->output());
+```
+
+<Tip>
+  Skills are designed to be loaded only when needed. Keep always-needed information in guidelines and task-specific details in skills to optimize the AI's context usage.
+</Tip>
+
+### Overriding built-in skills
+
+Creating a custom skill with the same name as a Boost built-in skill will override it.
+
+```
+# Customize the livewire-development skill
+.ai/skills/livewire-development/SKILL.md
+```
+
+## Adding Boost support to a third-party package
+
+To add Boost support to your own package, place configuration files in the package's `resources/boost/` directory.
+
+### Adding guidelines
+
+```
+resources/
+└── boost/
+    └── guidelines/
+        └── core.blade.php
+```
+
+```php
+## MyPackage
+
+This package provides [overview of features].
+
+### Basic usage
+
+@verbatim
+<code-snippet name="Initializing MyPackage" lang="php">
+$result = MyPackage::create([
+    'option' => 'value',
+]);
+</code-snippet>
+@endverbatim
+```
+
+### Adding skills
+
+```
+resources/
+└── boost/
+    └── skills/
+        └── mypackage-development/
+            └── SKILL.md
+```
+
+```markdown
+---
+name: mypackage-development
+description: A skill for implementing features using MyPackage.
+---
+
+# MyPackage Development
+
+## When to use this skill
+Use this skill when implementing features with MyPackage.
+
+## Main features
+
+- Feature 1: ...
+- Feature 2: ...
+```
+
+When a package user runs `php artisan boost:install`, these guidelines and skills are automatically detected and presented as installation options.
+
+## Real-world example: custom agent for an in-house CI/CD agent
+
+A complete implementation of a fictional agent called "PipelineAgent" that is embedded in an internal CI/CD pipeline. This agent supports guidelines only; MCP and skills are not supported.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Boost;
+
+use Laravel\Boost\Contracts\SupportsGuidelines;
+use Laravel\Boost\Install\Agents\Agent;
+use Laravel\Boost\Install\Enums\Platform;
+
+class PipelineAgent extends Agent implements SupportsGuidelines
+{
+    public function name(): string
+    {
+        return 'pipeline_agent';
+    }
+
+    public function displayName(): string
+    {
+        return 'Pipeline Agent (CI/CD)';
+    }
+
+    public function systemDetectionConfig(Platform $platform): array
+    {
+        // Detect via CI environment variable
+        return [
+            'command' => match ($platform) {
+                Platform::Windows => 'cmd /c echo %CI_AGENT_VERSION% 2>nul',
+                default => 'echo $CI_AGENT_VERSION',
+            },
+        ];
+    }
+
+    public function projectDetectionConfig(): array
+    {
+        // Detect via config file in the project root
+        return [
+            'files' => ['.pipeline-agent.yml'],
+        ];
+    }
+
+    public function guidelinesPath(): string
+    {
+        // Path where the CI/CD agent reads the coding guidelines
+        return '.pipeline/CODING_GUIDELINES.md';
+    }
+
+    public function frontmatter(): bool
+    {
+        return false;
+    }
+
+    public function transformGuidelines(string $markdown): string
+    {
+        // Add a pipeline metadata header
+        $timestamp = now()->toIso8601String();
+
+        return "<!-- Generated by Laravel Boost at {$timestamp} -->\n\n{$markdown}";
+    }
+}
+```
+
+Register it in `AppServiceProvider`:
+
+```php
+use App\Boost\PipelineAgent;
+use Laravel\Boost\Boost;
+
+public function boot(): void
+{
+    Boost::registerAgent('pipeline_agent', PipelineAgent::class);
+}
+```
+
+In a CI environment, generate guidelines only with the following command:
+
+```shell
+php artisan boost:install --agent=pipeline_agent
+```
+
+## Reference links
+
+<Card
+  title="ClaudeCode.php — official implementation example"
+  icon="github"
+  href="https://github.com/laravel/boost/blob/main/src/Install/Agents/ClaudeCode.php"
+>
+  View the complete implementation of the ClaudeCode agent that ships with Boost.
+</Card>
+
+<Card
+  title="Agent Skills"
+  icon="book"
+  href="https://agentskills.io/what-are-skills"
+>
+  SKILL.md format specification and best practices.
+</Card>
