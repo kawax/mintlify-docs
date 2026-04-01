@@ -479,6 +479,18 @@
             "tab": "Advanced Topics",
             "groups": [
               {
+                "group": "Application Structure",
+                "pages": [
+                  "en/advanced/app-structure"
+                ]
+              },
+              {
+                "group": "Laravel 13 New Features",
+                "pages": [
+                  "en/advanced/php-attributes"
+                ]
+              },
+              {
                 "group": "AI Development",
                 "pages": [
                   "en/advanced/mcp-server",
@@ -519,6 +531,12 @@
                 "group": "Security",
                 "pages": [
                   "en/advanced/rate-limiting"
+                ]
+              },
+              {
+                "group": "Package Development",
+                "pages": [
+                  "en/advanced/package-development"
                 ]
               },
               {
