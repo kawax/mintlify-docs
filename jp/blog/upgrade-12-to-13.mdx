@@ -15,6 +15,24 @@ Laravel 13 は 2026年3月にリリースされました。このガイドでは
 
 [Laravel Boost](https://github.com/laravel/boost) を使ってアップグレードを自動化することもできます。Boost はファーストパーティの MCP サーバーで、AI アシスタントに段階的なアップグレードプロンプトを提供します。Laravel 12 アプリケーションにインストール後、Claude Code、Cursor、OpenCode、Gemini、VS Code で `/upgrade-laravel-v13` スラッシュコマンドを使用して Laravel 13 へのアップグレードを開始できます。このコマンドには `laravel/boost ^2.0` が必要です。
 
+スラッシュコマンドが使えない AI ツールでも、プロンプトファイルを直接参照することで同じアップグレード手順を実行できます。以下のプロンプトをそのまま AI に貼り付けてください。
+
+```text
+Laravel Boostが提供しているプロンプトを読み込んでLaravel 12から13へのアップグレード作業を行なってください。
+https://raw.githubusercontent.com/laravel/boost/refs/heads/main/src/Mcp/Prompts/UpgradeLaravelv13/upgrade-laravel-v13.blade.php
+
+- `laravel/laravel`スケルトンの変更点を反映させる。masterではなく13.xブランチを確認する。
+- `database/migrations/*_create_cache_table.php`はそのまま変更ではなく新しいマイグレーションを作成。
+- Laravel13で一番アプリにエラーを発生させる変更はキャッシュの動作変更なのでプロジェクト内のキャッシュの使用箇所を検索して許可しても問題なさそうならconfig/cache.phpの`serializable_classes`で許可するように更新。
+
+'serializable_classes' => [
+    App\Data\CachedDashboardStats::class,
+    App\Support\CachedPricingSnapshot::class,
+    Illuminate\Support\Collection::class,
+    Illuminate\Database\Eloquent\Collection::class,
+],
+```
+
 ---
 
 ## 影響度別の変更点
