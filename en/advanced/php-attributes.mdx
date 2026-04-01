@@ -1,0 +1,642 @@
+---
+title: "PHP Attributes"
+description: "Learn how to use the PHP attributes introduced and enhanced in Laravel 13 to declare job and model configuration in a more expressive way."
+---
+
+## What are PHP attributes?
+
+PHP attributes (PHP Attributes) are a native metadata syntax introduced in PHP 8.0. They let you attach meta-information to classes, methods, properties, and functions using the `#[AttributeName]` syntax.
+
+Laravel actively adopts PHP attributes throughout the framework, allowing you to declare job and Eloquent model configuration in a declarative style. In Laravel 13 (v13.2.0), queue attributes gained the ability to accept enums. Instead of class properties or method overrides, attributes let you write cleaner, more readable code.
+
+```php
+// Traditional approach
+class ProcessOrder implements ShouldQueue
+{
+    public string $queue = 'orders';
+    public string $connection = 'redis';
+    public int $tries = 3;
+    public array $backoff = [30, 60, 120];
+}
+
+// Using attributes
+#[Queue('orders')]
+#[Connection('redis')]
+#[Tries(3)]
+#[Backoff(30, 60, 120)]
+class ProcessOrder implements ShouldQueue
+{
+}
+```
+
+<Tip>
+  Attributes require PHP 8.0 or later. Since Laravel 13 requires PHP 8.2 or higher, attributes are available in every supported environment.
+</Tip>
+
+## Queue attributes
+
+All queue job attributes live in the `Illuminate\Queue\Attributes` namespace.
+
+### `#[Queue]` — specify the queue name
+
+Specifies the default queue name the job is dispatched to.
+
+```php
+use Illuminate\Queue\Attributes\Queue;
+
+#[Queue('emails')]
+class SendWelcomeEmail implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function handle(): void
+    {
+        // ...
+    }
+}
+```
+
+Since v13.2.0, you can pass an enum instead of a string.
+
+```php
+enum QueueName: string
+{
+    case Emails = 'emails';
+    case Orders = 'orders';
+    case Notifications = 'notifications';
+}
+
+#[Queue(QueueName::Emails)]
+class SendWelcomeEmail implements ShouldQueue
+{
+    // ...
+}
+```
+
+<Info>
+  The `#[Queue]` attribute targets `Attribute::TARGET_CLASS`, so it can only be applied to classes.
+</Info>
+
+### `#[Connection]` — specify the connection
+
+Specifies the default queue connection the job uses.
+
+```php
+use Illuminate\Queue\Attributes\Connection;
+
+#[Connection('sqs')]
+class ProcessPayment implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function handle(): void
+    {
+        // ...
+    }
+}
+```
+
+Enums work here as well.
+
+```php
+enum QueueConnection: string
+{
+    case Redis = 'redis';
+    case Sqs = 'sqs';
+    case Database = 'database';
+}
+
+#[Connection(QueueConnection::Sqs)]
+class ProcessPayment implements ShouldQueue
+{
+    // ...
+}
+```
+
+### `#[Backoff]` — specify retry backoff time
+
+Specifies the wait time in seconds before retrying a failed job. Pass multiple values to use a different wait time for each retry (variadic argument support).
+
+```php
+use Illuminate\Queue\Attributes\Backoff;
+
+// Fixed wait time (60 seconds for every retry)
+#[Backoff(60)]
+class SendEmail implements ShouldQueue
+{
+    // ...
+}
+
+// Different wait time per retry (exponential backoff)
+#[Backoff(30, 60, 120)]
+class ProcessOrder implements ShouldQueue
+{
+    // ...
+}
+```
+
+Looking at the `Backoff` class implementation, it accepts variadic arguments.
+
+```php
+// Implementation of Illuminate\Queue\Attributes\Backoff
+#[Attribute(Attribute::TARGET_CLASS)]
+class Backoff
+{
+    public array|int $backoff;
+
+    public function __construct(array|int ...$backoff)
+    {
+        $this->backoff = count($backoff) === 1 ? $backoff[0] : $backoff;
+    }
+}
+```
+
+A single value is stored as `int`; multiple values are stored as `array`.
+
+### `#[Tries]` — specify the retry count
+
+Specifies the maximum number of times a failed job should be retried.
+
+```php
+use Illuminate\Queue\Attributes\Tries;
+
+#[Tries(5)]
+class ProcessPayment implements ShouldQueue
+{
+    // ...
+}
+```
+
+### `#[Timeout]` — specify the timeout
+
+Specifies the maximum execution time in seconds. The job is forcefully terminated if it exceeds this limit.
+
+```php
+use Illuminate\Queue\Attributes\Timeout;
+
+#[Timeout(120)]
+class GenerateReport implements ShouldQueue
+{
+    // ...
+}
+```
+
+### `#[MaxExceptions]` — specify the maximum exception count
+
+Marks a job as failed after the specified number of exceptions have been thrown. Use together with `#[Tries]`.
+
+```php
+use Illuminate\Queue\Attributes\MaxExceptions;
+use Illuminate\Queue\Attributes\Tries;
+
+#[Tries(10)]
+#[MaxExceptions(3)]
+class ProcessWebhook implements ShouldQueue
+{
+    // ...
+}
+```
+
+### `#[UniqueFor]` — specify the uniqueness period
+
+Specifies the lock duration in seconds to prevent duplicate job execution. Use together with `ShouldBeUnique`.
+
+```php
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Queue\Attributes\UniqueFor;
+
+#[UniqueFor(3600)]
+class SyncUserData implements ShouldQueue, ShouldBeUnique
+{
+    // ...
+}
+```
+
+### `#[DeleteWhenMissingModels]` — delete when the model is missing
+
+When the Eloquent model a job depends on cannot be found, the job is deleted (skipped) instead of marked as failed.
+
+```php
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+
+#[DeleteWhenMissingModels]
+class SendOrderConfirmation implements ShouldQueue
+{
+    public function __construct(
+        protected Order $order,
+    ) {}
+
+    public function handle(): void
+    {
+        // This job is deleted if $order does not exist
+    }
+}
+```
+
+### `#[WithoutRelations]` — exclude relations from serialization
+
+Prevents model relations from being included when serializing the job. This reduces the payload sent to the queue.
+
+```php
+use Illuminate\Queue\Attributes\WithoutRelations;
+
+#[WithoutRelations]
+class ExportUser implements ShouldQueue
+{
+    public function __construct(
+        protected User $user,
+    ) {}
+}
+```
+
+### `#[FailOnTimeout]` — mark as failed on timeout
+
+Records the job as failed when a timeout occurs (by default, timeouts are not recorded as failures).
+
+```php
+use Illuminate\Queue\Attributes\FailOnTimeout;
+use Illuminate\Queue\Attributes\Timeout;
+
+#[Timeout(30)]
+#[FailOnTimeout]
+class ProcessLongTask implements ShouldQueue
+{
+    // ...
+}
+```
+
+## Combining multiple queue attributes
+
+You can combine these attributes to declare a job's behavior entirely through attributes.
+
+```php
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Connection;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Queue\Attributes\FailOnTimeout;
+use Illuminate\Queue\Attributes\MaxExceptions;
+use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\Tries;
+
+#[Queue('payments')]
+#[Connection('redis')]
+#[Tries(3)]
+#[Backoff(30, 60, 120)]
+#[Timeout(60)]
+#[MaxExceptions(2)]
+#[DeleteWhenMissingModels]
+class ProcessPayment implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function __construct(
+        protected Order $order,
+    ) {}
+
+    public function handle(PaymentService $payment): void
+    {
+        $payment->charge($this->order);
+    }
+}
+```
+
+## Eloquent attributes
+
+Eloquent model attributes live in the `Illuminate\Database\Eloquent\Attributes` namespace. Laravel 13 added a large number of new attributes.
+
+### `#[ScopedBy]` — specify global scopes
+
+Specifies the global scope classes to apply to a model automatically via an attribute. Supports inheritance and allows multiple scopes using the `IS_REPEATABLE` flag.
+
+```php
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+
+#[ScopedBy(ActiveScope::class)]
+class User extends Model
+{
+    // No need to register the scope in booted()
+}
+```
+
+To apply multiple scopes, repeat the attribute or pass an array.
+
+```php
+// Repeat the attribute (IS_REPEATABLE support)
+#[ScopedBy(ActiveScope::class)]
+#[ScopedBy(VerifiedScope::class)]
+class User extends Model
+{
+}
+
+// Pass an array
+#[ScopedBy([ActiveScope::class, VerifiedScope::class])]
+class User extends Model
+{
+}
+```
+
+Comparison with the traditional `booted()` method:
+
+```php
+// Traditional approach
+class User extends Model
+{
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ActiveScope);
+        static::addGlobalScope(new VerifiedScope);
+    }
+}
+```
+
+### `#[ObservedBy]` — specify observers
+
+Specifies the observer classes to associate with a model via an attribute. Like `ScopedBy`, it is `IS_REPEATABLE`.
+
+```php
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+
+#[ObservedBy(UserObserver::class)]
+class User extends Model
+{
+}
+```
+
+You can specify multiple observers too.
+
+```php
+#[ObservedBy(UserObserver::class)]
+#[ObservedBy(AuditObserver::class)]
+class User extends Model
+{
+}
+```
+
+This eliminates the need to register observers in `AppServiceProvider`.
+
+```php
+// Traditional approach (AppServiceProvider)
+public function boot(): void
+{
+    User::observe(UserObserver::class);
+}
+```
+
+### `#[UseEloquentBuilder]` — specify a custom query builder
+
+Specifies the custom Eloquent builder the model should use via an attribute.
+
+```php
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
+
+#[UseEloquentBuilder(UserQueryBuilder::class)]
+class User extends Model
+{
+}
+```
+
+```php
+namespace App\Builders;
+
+use Illuminate\Database\Eloquent\Builder;
+
+class UserQueryBuilder extends Builder
+{
+    public function active(): static
+    {
+        return $this->where('active', true);
+    }
+
+    public function verified(): static
+    {
+        return $this->whereNotNull('email_verified_at');
+    }
+}
+```
+
+```php
+// Usage (custom methods are available with full type safety)
+$users = User::query()->active()->verified()->get();
+```
+
+### `#[CollectedBy]` — specify a custom collection
+
+Specifies the custom collection class to use for the model's collection via an attribute.
+
+```php
+use Illuminate\Database\Eloquent\Attributes\CollectedBy;
+
+#[CollectedBy(UserCollection::class)]
+class User extends Model
+{
+}
+```
+
+```php
+namespace App\Collections;
+
+use Illuminate\Database\Eloquent\Collection;
+
+class UserCollection extends Collection
+{
+    public function admins(): static
+    {
+        return $this->filter(fn (User $user) => $user->is_admin);
+    }
+
+    public function active(): static
+    {
+        return $this->filter(fn (User $user) => $user->active);
+    }
+}
+```
+
+### `#[Table]` — configure table settings in one place
+
+Lets you specify multiple table-related settings — table name, primary key, timestamps, and more — with a single attribute.
+
+```php
+use Illuminate\Database\Eloquent\Attributes\Table;
+
+#[Table(name: 'system_users', key: 'user_id', timestamps: false)]
+class SystemUser extends Model
+{
+}
+```
+
+Options available through the `Table` attribute:
+
+| Parameter | Corresponding property | Description |
+|---|---|---|
+| `name` | `$table` | Table name |
+| `key` | `$primaryKey` | Primary key column name |
+| `keyType` | `$keyType` | Primary key type (`'int'`, `'string'`, etc.) |
+| `incrementing` | `$incrementing` | Auto-incrementing primary key |
+| `timestamps` | `$timestamps` | Enable/disable timestamps |
+| `dateFormat` | `$dateFormat` | Date format |
+
+### `#[Scope]` — define a method as a local scope
+
+Lets you define a method as an Eloquent local scope without the `scope` prefix.
+
+```php
+use Illuminate\Database\Eloquent\Attributes\Scope;
+
+class User extends Model
+{
+    #[Scope]
+    public function active(Builder $query): void
+    {
+        $query->where('active', true);
+    }
+
+    #[Scope]
+    public function verified(Builder $query): void
+    {
+        $query->whereNotNull('email_verified_at');
+    }
+}
+```
+
+```php
+// Traditionally the method name had to have a "scope" prefix:
+// public function scopeActive(Builder $query): void
+
+// With the attribute, the method name becomes the scope name directly
+User::query()->active()->verified()->get();
+```
+
+### `#[UseFactory]` — specify a factory class
+
+Specifies the custom factory class the model should use via an attribute.
+
+```php
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+
+#[UseFactory(UserFactory::class)]
+class User extends Model
+{
+}
+```
+
+### Other Eloquent attributes
+
+| Attribute | Description |
+|---|---|
+| `#[Fillable(...$attributes)]` | Specifies columns allowed for mass assignment |
+| `#[Guarded(...$attributes)]` | Specifies columns protected from mass assignment |
+| `#[Unguarded]` | Disables mass assignment protection |
+| `#[Hidden(...$attributes)]` | Specifies columns to exclude during serialization |
+| `#[Visible(...$attributes)]` | Specifies columns to include during serialization |
+| `#[Appends(...$attributes)]` | Specifies accessors to append during serialization |
+| `#[Touches(...$relations)]` | Specifies relations whose `updated_at` should be updated on save |
+| `#[WithoutTimestamps]` | Disables timestamps |
+| `#[WithoutIncrementing]` | Disables auto-incrementing primary key |
+| `#[DateFormat(format: '...')]` | Specifies the date format |
+| `#[UsePolicy(policyClass: '...')]` | Specifies the associated policy class |
+| `#[UseResource(resourceClass: '...')]` | Specifies the associated API resource class |
+| `#[UseResourceCollection(resourceCollectionClass: '...')]` | Specifies the associated resource collection class |
+
+## Enum support (added in v13.2.0)
+
+In v13.2.0, `#[Queue]` and `#[Connection]` gained the ability to accept enums. This lets you specify queues and connections in a type-safe manner using PHP enums instead of string literals.
+
+```php
+// Enum for queue names
+enum Queue: string
+{
+    case Default = 'default';
+    case High = 'high';
+    case Low = 'low';
+    case Emails = 'emails';
+    case Orders = 'orders';
+}
+
+// Enum for connections
+enum Connection: string
+{
+    case Redis = 'redis';
+    case Sqs = 'sqs';
+    case Database = 'database';
+    case Sync = 'sync';
+}
+```
+
+```php
+use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Queue\Attributes\Connection;
+
+// Type-safe specification using enums
+#[Queue(Queue::Orders)]
+#[Connection(Connection::Redis)]
+class ProcessOrder implements ShouldQueue
+{
+    // ...
+}
+```
+
+<Tip>
+  Using enums prevents typos in queue and connection names and enables IDE auto-completion. It is convenient for centrally managing all queue names and connection names across your application.
+</Tip>
+
+## Comparison with traditional class properties
+
+### Benefits of attributes
+
+- **Declarative** — A glance at the top of the class reveals the job's behavior
+- **Type-safe** — Enums enable IDE completion and type checking
+- **Compatible with inheritance** — Child classes can override parent class attributes
+- **Less code** — No need for property declarations or method overrides
+
+### Drawbacks of attributes
+
+- **Cannot use dynamic values** — Attribute arguments are compile-time constants only; variables and config values are not supported
+- **Learning curve** — Teams may need time to get comfortable with PHP 8 attribute syntax
+
+### When dynamic values are required
+
+Use the traditional method override approach when you need to determine a value at runtime.
+
+```php
+class ProcessOrder implements ShouldQueue
+{
+    // Dynamic backoff is defined via a method
+    public function backoff(): array
+    {
+        return [
+            config('queue.backoff.first'),
+            config('queue.backoff.second'),
+        ];
+    }
+}
+```
+
+<Warning>
+  Attributes are parsed at PHP compile time. You cannot use runtime values such as `config()` or `env()`. When dynamic configuration is needed, continue using class properties or methods.
+</Warning>
+
+## How it works internally
+
+Laravel uses the Reflection API internally to read attributes. When the queue worker dispatches a job, the `ReadsQueueAttributes` trait (included in `InteractsWithQueue`) uses reflection to detect attributes and sets the corresponding properties.
+
+```php
+// Simplified internal reading process
+$reflection = new ReflectionClass($job);
+$attributes = $reflection->getAttributes(Queue::class);
+
+foreach ($attributes as $attribute) {
+    $instance = $attribute->newInstance();
+    $job->queue = $instance->queue instanceof UnitEnum
+        ? $instance->queue->value
+        : $instance->queue;
+}
+```
+
+Eloquent model attributes are similarly read via reflection at the equivalent of `Model::booted()`.
+
+## Next steps
+
+<Card title="Intermediate: Queues and jobs" icon="layer-group" href="/en/queues">
+  Learn the basics of Laravel's queue system.
+</Card>

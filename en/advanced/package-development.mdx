@@ -1,0 +1,645 @@
+---
+title: "Laravel Package Development"
+description: "A comprehensive guide to developing Laravel packages centered on service providers, covering everything from publishing config, views, and migrations to facades, auto-discovery, and deferred loading."
+---
+
+## What is a package?
+
+In Laravel, a package is a Composer package that adds functionality to an application. There are two broad categories:
+
+- **Standalone packages** — General-purpose PHP libraries with no Laravel dependency (e.g., Carbon, Pest)
+- **Laravel packages** — Packages with routes, controllers, views, config, and other features tightly integrated with Laravel
+
+This guide covers the latter: packages built specifically for Laravel. Package development requires a deep understanding of Laravel internals, including service providers, facades, and config publishing.
+
+<Info>
+  When writing tests for a package, use [Orchestra Testbench](https://github.com/orchestral/testbench). It lets you write package tests just as you would tests inside a normal Laravel application.
+</Info>
+
+## Package auto-discovery
+
+When a package is installed, Laravel reads the `extra.laravel` section of `composer.json` and automatically registers service providers and facades.
+
+```json
+"extra": {
+    "laravel": {
+        "providers": [
+            "Acme\\Courier\\CourierServiceProvider"
+        ],
+        "aliases": {
+            "Courier": "Acme\\Courier\\Facades\\Courier"
+        }
+    }
+}
+```
+
+With this configuration in place, users do not need to manually edit `bootstrap/providers.php` — the package is loaded automatically.
+
+### Disabling auto-discovery
+
+Users who want to disable auto-discovery for a specific package can do so in their application's `composer.json`.
+
+```json
+"extra": {
+    "laravel": {
+        "dont-discover": [
+            "acme/courier"
+        ]
+    }
+}
+```
+
+## The role of service providers
+
+A service provider is the entry point for a package. It is where you centralize the registration of views, config, migrations, routes, and other resources with Laravel.
+
+Service providers extend `Illuminate\Support\ServiceProvider` and have two methods: `register` and `boot`.
+
+```php
+<?php
+
+namespace Acme\Courier;
+
+use Illuminate\Support\ServiceProvider;
+
+class CourierServiceProvider extends ServiceProvider
+{
+    /**
+     * Register package services.
+     */
+    public function register(): void
+    {
+        // Container bindings go here
+        $this->mergeConfigFrom(
+            __DIR__.'/../config/courier.php', 'courier'
+        );
+
+        $this->app->singleton(CourierManager::class, function ($app) {
+            return new CourierManager($app['config']['courier']);
+        });
+    }
+
+    /**
+     * Bootstrap package services.
+     */
+    public function boot(): void
+    {
+        // Resource registration goes here
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'courier');
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'courier');
+
+        $this->publishesMigrations([
+            __DIR__.'/../database/migrations' => database_path('migrations'),
+        ]);
+
+        $this->publishes([
+            __DIR__.'/../config/courier.php' => config_path('courier.php'),
+        ], 'courier-config');
+
+        $this->publishes([
+            __DIR__.'/../resources/views' => resource_path('views/vendor/courier'),
+        ], 'courier-views');
+    }
+}
+```
+
+<Warning>
+  Do not register event listeners, routes, or views inside the `register` method. You might accidentally use a service from another service provider that has not yet been loaded. Always perform any work beyond bindings in the `boot` method.
+</Warning>
+
+## Publishing config files
+
+### publishes() — publish files
+
+Calling `publishes()` in the `boot` method allows users to copy config files into their application with the `vendor:publish` command.
+
+```php
+public function boot(): void
+{
+    $this->publishes([
+        __DIR__.'/../config/courier.php' => config_path('courier.php'),
+    ]);
+}
+```
+
+Once published, config values are accessible the usual way.
+
+```php
+$value = config('courier.option');
+```
+
+### mergeConfigFrom() — merge with defaults
+
+Using `mergeConfigFrom()` in the `register` method ensures that the package's default values are used even when users have not published the config file.
+
+```php
+public function register(): void
+{
+    $this->mergeConfigFrom(
+        __DIR__.'/../config/courier.php', 'courier'
+    );
+}
+```
+
+<Warning>
+  `mergeConfigFrom()` does not perform a deep merge for nested arrays. When a config has multi-dimensional arrays, options not defined by the user will not be merged from deeper levels.
+</Warning>
+
+### Organizing with publish tags
+
+Pass a tag as the second argument to `publishes()` so users can choose which resources to publish.
+
+```php
+public function boot(): void
+{
+    $this->publishes([
+        __DIR__.'/../config/courier.php' => config_path('courier.php'),
+    ], 'courier-config');
+
+    $this->publishesMigrations([
+        __DIR__.'/../database/migrations/' => database_path('migrations'),
+    ], 'courier-migrations');
+}
+```
+
+```shell
+# Publish only the config file
+php artisan vendor:publish --tag=courier-config
+
+# Publish everything provided by the service provider
+php artisan vendor:publish --provider="Acme\Courier\CourierServiceProvider"
+```
+
+## Registering routes
+
+Use `loadRoutesFrom()` to load a routes file. It is automatically skipped when the application's route cache is active.
+
+```php
+public function boot(): void
+{
+    $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+}
+```
+
+Reference your package's controllers inside the routes file.
+
+```php
+// routes/web.php
+use Acme\Courier\Http\Controllers\TrackingController;
+use Illuminate\Support\Facades\Route;
+
+Route::prefix('courier')->group(function () {
+    Route::get('/track/{id}', [TrackingController::class, 'show'])
+        ->name('courier.track');
+});
+```
+
+## Publishing migrations
+
+Use `publishesMigrations()` to publish migration files. Laravel automatically updates the timestamps when the files are published.
+
+```php
+public function boot(): void
+{
+    $this->publishesMigrations([
+        __DIR__.'/../database/migrations' => database_path('migrations'),
+    ]);
+}
+```
+
+## Publishing views
+
+### loadViewsFrom() — register views
+
+Register a view directory with `loadViewsFrom()`. Use the namespace passed as the second argument to reference views with the `package::view` syntax.
+
+```php
+public function boot(): void
+{
+    $this->loadViewsFrom(__DIR__.'/../resources/views', 'courier');
+}
+```
+
+After registration, reference views using the package namespace.
+
+```php
+Route::get('/dashboard', function () {
+    return view('courier::dashboard');
+});
+```
+
+Laravel looks for views in two locations. It first checks `resources/views/vendor/courier` in the application; if nothing is found there, it falls back to the package's view directory. This lets users customize views.
+
+### Publishing views
+
+```php
+public function boot(): void
+{
+    $this->loadViewsFrom(__DIR__.'/../resources/views', 'courier');
+
+    $this->publishes([
+        __DIR__.'/../resources/views' => resource_path('views/vendor/courier'),
+    ], 'courier-views');
+}
+```
+
+### Registering Blade components
+
+To include components in your package, register them in the `boot` method.
+
+```php
+use Illuminate\Support\Facades\Blade;
+use Acme\Courier\View\Components\AlertComponent;
+
+public function boot(): void
+{
+    Blade::component('courier-alert', AlertComponent::class);
+}
+```
+
+You can also register components in bulk using a component namespace.
+
+```php
+use Illuminate\Support\Facades\Blade;
+
+public function boot(): void
+{
+    Blade::componentNamespace('Acme\\Courier\\View\\Components', 'courier');
+}
+```
+
+```blade
+{{-- Individual registration --}}
+<x-courier-alert />
+
+{{-- Namespace registration --}}
+<x-courier::alert />
+```
+
+## Publishing translation files
+
+Register translation files with `loadTranslationsFrom()`. Reference translations using the `package::file.key` syntax.
+
+```php
+public function boot(): void
+{
+    $this->loadTranslationsFrom(__DIR__.'/../lang', 'courier');
+
+    $this->publishes([
+        __DIR__.'/../lang' => $this->app->langPath('vendor/courier'),
+    ]);
+}
+```
+
+```php
+// Using translations
+echo trans('courier::messages.welcome');
+```
+
+For JSON translation files, use `loadJsonTranslationsFrom()`.
+
+```php
+public function boot(): void
+{
+    $this->loadJsonTranslationsFrom(__DIR__.'/../lang');
+}
+```
+
+## Registering commands
+
+Register Artisan commands for your package using the `commands()` method. It is common practice to register them only in a console environment.
+
+```php
+use Acme\Courier\Console\Commands\InstallCommand;
+use Acme\Courier\Console\Commands\SyncCommand;
+
+public function boot(): void
+{
+    if ($this->app->runningInConsole()) {
+        $this->commands([
+            InstallCommand::class,
+            SyncCommand::class,
+        ]);
+    }
+}
+```
+
+### Integrating with the optimize command
+
+If your package has its own cache, use the `optimizes()` method to integrate with `php artisan optimize` and `php artisan optimize:clear`.
+
+```php
+public function boot(): void
+{
+    if ($this->app->runningInConsole()) {
+        $this->optimizes(
+            optimize: 'courier:cache',
+            clear: 'courier:clear-cache',
+        );
+    }
+}
+```
+
+### Adding information to the `about` command
+
+Use `AboutCommand::add()` to include package information in the output of `php artisan about`.
+
+```php
+use Illuminate\Foundation\Console\AboutCommand;
+
+public function boot(): void
+{
+    AboutCommand::add('Courier Package', fn () => ['Version' => '1.0.0']);
+}
+```
+
+## Creating a facade
+
+A facade lets you call service container bindings as if they were static methods.
+
+<Steps>
+  <Step title="Create the service class">
+    ```php
+    <?php
+
+    namespace Acme\Courier;
+
+    class CourierManager
+    {
+        public function __construct(
+            protected array $config,
+        ) {}
+
+        public function send(string $to, string $message): bool
+        {
+            // Message sending logic
+            return true;
+        }
+
+        public function track(string $id): array
+        {
+            // Tracking information retrieval logic
+            return ['status' => 'delivered'];
+        }
+    }
+    ```
+  </Step>
+  <Step title="Create the facade class">
+    Extend `Illuminate\Support\Facades\Facade` and return the service container binding key from `getFacadeAccessor()`.
+
+    ```php
+    <?php
+
+    namespace Acme\Courier\Facades;
+
+    use Illuminate\Support\Facades\Facade;
+
+    /**
+     * @method static bool send(string $to, string $message)
+     * @method static array track(string $id)
+     *
+     * @see \Acme\Courier\CourierManager
+     */
+    class Courier extends Facade
+    {
+        protected static function getFacadeAccessor(): string
+        {
+            return \Acme\Courier\CourierManager::class;
+        }
+    }
+    ```
+  </Step>
+  <Step title="Bind it in the service provider">
+    ```php
+    public function register(): void
+    {
+        $this->app->singleton(\Acme\Courier\CourierManager::class, function ($app) {
+            return new \Acme\Courier\CourierManager($app['config']['courier']);
+        });
+    }
+    ```
+  </Step>
+  <Step title="Register it in composer.json">
+    ```json
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Acme\\Courier\\CourierServiceProvider"
+            ],
+            "aliases": {
+                "Courier": "Acme\\Courier\\Facades\\Courier"
+            }
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+Adding `@method` PHPDoc annotations to the facade enables IDE auto-completion.
+
+```php
+// Calling the service through the facade
+use Acme\Courier\Facades\Courier;
+
+Courier::send('user@example.com', 'Your package has arrived');
+$status = Courier::track('ABC-123');
+```
+
+## DeferrableProvider — implementing deferred loading
+
+Providers that only perform service container bindings can implement the `DeferrableProvider` interface to achieve deferred loading. The provider is not loaded until the service is actually needed, improving application performance.
+
+```php
+<?php
+
+namespace Acme\Courier;
+
+use Illuminate\Contracts\Support\DeferrableProvider;
+use Illuminate\Support\ServiceProvider;
+
+class CourierServiceProvider extends ServiceProvider implements DeferrableProvider
+{
+    public function register(): void
+    {
+        $this->app->singleton(CourierManager::class, function ($app) {
+            return new CourierManager($app['config']['courier']);
+        });
+    }
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array<int, string>
+     */
+    public function provides(): array
+    {
+        return [CourierManager::class];
+    }
+}
+```
+
+Laravel compiles and stores the list of services provided by deferred providers. The provider is loaded only when one of the services listed in `provides()` is resolved.
+
+<Warning>
+  Do not use `DeferrableProvider` for providers that need to register resources (views, routes, event listeners, etc.). If the provider is deferred, those resources will never be registered.
+</Warning>
+
+## Testing a package
+
+Use [Orchestra Testbench](https://github.com/orchestral/testbench) to test your package in isolation. It lets you write tests as if you were inside a normal Laravel application.
+
+```shell
+composer require --dev orchestra/testbench
+```
+
+Override `getPackageProviders()` in your test case to register the package's service provider.
+
+```php
+<?php
+
+namespace Acme\Courier\Tests;
+
+use Acme\Courier\CourierServiceProvider;
+use Orchestra\Testbench\TestCase as BaseTestCase;
+
+class TestCase extends BaseTestCase
+{
+    /**
+     * Register the package's service providers.
+     */
+    protected function getPackageProviders($app): array
+    {
+        return [
+            CourierServiceProvider::class,
+        ];
+    }
+
+    /**
+     * Register the package's facade aliases.
+     */
+    protected function getPackageAliases($app): array
+    {
+        return [
+            'Courier' => \Acme\Courier\Facades\Courier::class,
+        ];
+    }
+
+    /**
+     * Define the test environment configuration.
+     */
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('courier.api_key', 'test-key');
+    }
+}
+```
+
+```php
+<?php
+
+namespace Acme\Courier\Tests\Feature;
+
+use Acme\Courier\Facades\Courier;
+use Acme\Courier\Tests\TestCase;
+
+class CourierTest extends TestCase
+{
+    public function test_can_send_message(): void
+    {
+        $result = Courier::send('user@example.com', 'Test message');
+
+        $this->assertTrue($result);
+    }
+}
+```
+
+## Publishing to Composer
+
+Best practices for publishing your package to [Packagist](https://packagist.org/).
+
+**Basic `composer.json` configuration**
+
+```json
+{
+    "name": "acme/courier",
+    "description": "A Laravel courier package",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0||^12.0||^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0||^10.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Acme\\Courier\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Acme\\Courier\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Acme\\Courier\\CourierServiceProvider"
+            ],
+            "aliases": {
+                "Courier": "Acme\\Courier\\Facades\\Courier"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
+```
+
+<Tip>
+  Depending on `illuminate/support` rather than `illuminate/framework` keeps the dependency tree smaller by pulling in only the Laravel components you actually need.
+</Tip>
+
+**Example directory structure**
+
+```
+acme/courier/
+├── config/
+│   └── courier.php
+├── database/
+│   └── migrations/
+│       └── 2024_01_01_000000_create_courier_logs_table.php
+├── lang/
+│   └── en/
+│       └── messages.php
+├── resources/
+│   └── views/
+│       └── dashboard.blade.php
+├── routes/
+│   └── web.php
+├── src/
+│   ├── Console/
+│   │   └── Commands/
+│   │       └── InstallCommand.php
+│   ├── Facades/
+│   │   └── Courier.php
+│   ├── Http/
+│   │   └── Controllers/
+│   │       └── TrackingController.php
+│   ├── CourierManager.php
+│   └── CourierServiceProvider.php
+├── tests/
+│   ├── Feature/
+│   └── TestCase.php
+├── composer.json
+└── README.md
+```
+
+## Related pages
+
+<Card title="Service providers" icon="plug" href="/en/service-providers">
+  Learn about the `register` and `boot` methods of service providers and the details of deferred providers.
+</Card>
