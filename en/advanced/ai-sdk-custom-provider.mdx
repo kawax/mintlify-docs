@@ -1,0 +1,444 @@
+---
+title: "Creating a Custom Provider for AI SDK"
+description: "Understand the Laravel AI SDK source code and implement custom providers for AI services not supported out of the box."
+---
+
+## When you need a custom provider
+
+Laravel AI SDK supports the major AI services out of the box — OpenAI, Anthropic, Gemini, and Mistral. However, the standard providers cannot handle cases like:
+
+- An on-premises inference server you built internally (including those with an OpenAI-compatible API)
+- An emerging AI service that is not yet officially supported
+- An internal model gateway or billing management layer you want to route requests through
+
+In these cases, implement a custom provider and register it with the SDK's `AiManager` to use it through the same API as the standard providers.
+
+## Architecture overview
+
+### Two-layer structure
+
+The Laravel AI SDK consists of two layers: providers and gateways.
+
+| Layer | Role | Examples |
+| --- | --- | --- |
+| **Provider** | Application-side interface. Resolves model names and holds configuration. | `OpenAiProvider`, `AnthropicProvider` |
+| **Gateway** | Sends the actual API requests. | `PrismGateway`, `OpenAiGateway` |
+
+All providers extend the abstract class `Laravel\Ai\Providers\Provider` and implement feature-specific contracts (interfaces).
+
+### Available contracts
+
+Implement only the contracts for the features you want to provide.
+
+| Contract | Namespace | Feature |
+| --- | --- | --- |
+| `TextProvider` | `Laravel\Ai\Contracts\Providers\TextProvider` | Text generation and agents |
+| `EmbeddingProvider` | `Laravel\Ai\Contracts\Providers\EmbeddingProvider` | Vector embedding generation |
+| `ImageProvider` | `Laravel\Ai\Contracts\Providers\ImageProvider` | Image generation |
+| `AudioProvider` | `Laravel\Ai\Contracts\Providers\AudioProvider` | Text-to-speech (TTS) |
+| `TranscriptionProvider` | `Laravel\Ai\Contracts\Providers\TranscriptionProvider` | Speech-to-text (STT) |
+
+<Info>
+  In most cases, implementing `TextProvider` alone is sufficient.
+</Info>
+
+## The TextProvider contract
+
+The interface that text generation providers implement (`src/Contracts/Providers/TextProvider.php`).
+
+```php
+interface TextProvider
+{
+    public function prompt(AgentPrompt $prompt): AgentResponse;
+    public function stream(AgentPrompt $prompt): StreamableAgentResponse;
+    public function textGateway(): TextGateway;
+    public function useTextGateway(TextGateway $gateway): self;
+    public function defaultTextModel(): string;
+    public function cheapestTextModel(): string;
+    public function smartestTextModel(): string;
+}
+```
+
+The `prompt()` and `stream()` implementations can be delegated to existing traits (`GeneratesText`, `StreamsText`), so the only methods you actually need to implement are the three model name methods.
+
+## Implementation example: custom provider for an OpenAI-compatible API
+
+This example registers an internally built OpenAI-compatible inference server as a provider named `my-inference`.
+
+<Steps>
+  <Step title="Create the provider class">
+    Create `app/Ai/Providers/MyInferenceProvider.php`.
+
+    ```php
+    <?php
+
+    declare(strict_types=1);
+
+    namespace App\Ai\Providers;
+
+    use Illuminate\Contracts\Events\Dispatcher;
+    use Laravel\Ai\Contracts\Providers\EmbeddingProvider;
+    use Laravel\Ai\Contracts\Providers\TextProvider;
+    use Laravel\Ai\Gateway\Prism\PrismGateway;
+    use Laravel\Ai\Providers\Concerns\GeneratesEmbeddings;
+    use Laravel\Ai\Providers\Concerns\GeneratesText;
+    use Laravel\Ai\Providers\Concerns\HasEmbeddingGateway;
+    use Laravel\Ai\Providers\Concerns\HasTextGateway;
+    use Laravel\Ai\Providers\Concerns\StreamsText;
+    use Laravel\Ai\Providers\Provider;
+
+    class MyInferenceProvider extends Provider implements EmbeddingProvider, TextProvider
+    {
+        use GeneratesEmbeddings;
+        use GeneratesText;
+        use HasEmbeddingGateway;
+        use HasTextGateway;
+        use StreamsText;
+
+        public function __construct(array $config, Dispatcher $events)
+        {
+            parent::__construct(new PrismGateway($events), $config, $events);
+        }
+
+        public function defaultTextModel(): string
+        {
+            return $this->config['models']['text']['default'] ?? 'llama3.3-70b';
+        }
+
+        public function cheapestTextModel(): string
+        {
+            return $this->config['models']['text']['cheapest'] ?? 'llama3.2-3b';
+        }
+
+        public function smartestTextModel(): string
+        {
+            return $this->config['models']['text']['smartest'] ?? 'llama3.3-70b';
+        }
+
+        public function defaultEmbeddingsModel(): string
+        {
+            return $this->config['models']['embeddings']['default'] ?? 'nomic-embed-text';
+        }
+
+        public function defaultEmbeddingsDimensions(): int
+        {
+            return $this->config['models']['embeddings']['dimensions'] ?? 768;
+        }
+    }
+    ```
+
+    <Info>
+      `PrismGateway` uses [Prism](https://github.com/prism-php/prism) and supports OpenAI-compatible APIs. For services with a proprietary non-compatible API, use a custom gateway as described below.
+    </Info>
+  </Step>
+
+  <Step title="Register in AppServiceProvider">
+    Register the provider in the `boot` method of `App\Providers\AppServiceProvider` using `extend()`.
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use App\Ai\Providers\MyInferenceProvider;
+    use Illuminate\Contracts\Events\Dispatcher;
+    use Illuminate\Support\ServiceProvider;
+    use Laravel\Ai\AiManager;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            $this->app->make(AiManager::class)->extend(
+                'my-inference',
+                fn (array $config) => new MyInferenceProvider(
+                    $config,
+                    $this->app->make(Dispatcher::class)
+                )
+            );
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Add the provider to config/ai.php">
+    ```php
+    'providers' => [
+        // ...existing providers...
+
+        'my-inference' => [
+            'driver' => 'my-inference',
+            'key'    => env('MY_INFERENCE_API_KEY'),
+            'url'    => env('MY_INFERENCE_URL', 'http://localhost:8080/v1'),
+        ],
+    ],
+    ```
+
+    Add the values to your `.env` file as well.
+
+    ```ini
+    MY_INFERENCE_API_KEY=your-api-key
+    MY_INFERENCE_URL=https://inference.example.internal/v1
+    ```
+  </Step>
+
+  <Step title="Use it from an agent">
+    After registration, specify the provider name with `provider()` and use it just like a standard provider.
+
+    ```php
+    use App\Ai\Agents\SummaryAgent;
+    use Laravel\Ai\Ai;
+
+    $response = Ai::agent(SummaryAgent::class)
+        ->provider('my-inference')
+        ->prompt('Summarize this article.');
+
+    echo $response->text;
+    ```
+
+    To use it as the default provider, change the `default` key in `config/ai.php`.
+
+    ```php
+    'default' => 'my-inference',
+    ```
+  </Step>
+</Steps>
+
+## Implementing a custom gateway
+
+Services with a proprietary non-OpenAI-compatible API require a custom gateway that implements the `TextGateway` contract.
+
+### The TextGateway contract
+
+The interface defined in `src/Contracts/Gateway/TextGateway.php`.
+
+```php
+interface TextGateway
+{
+    public function generateText(
+        Provider $provider,
+        ?string $model,
+        string $systemPrompt,
+        array $messages,
+        array $tools,
+        ?ObjectSchema $schema,
+        TextGenerationOptions $options,
+        ?int $timeout,
+    ): GatewayResponse;
+
+    public function stream(
+        Provider $provider,
+        ?string $model,
+        string $systemPrompt,
+        array $messages,
+        array $tools,
+        ?ObjectSchema $schema,
+        TextGenerationOptions $options,
+        ?int $timeout,
+    ): Generator;
+
+    public function onToolInvocation(
+        Closure $invoking,
+        Closure $invoked,
+    ): void;
+}
+```
+
+### Custom gateway implementation example
+
+A skeleton of a simple gateway that sends HTTP requests to a proprietary inference API.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Ai\Gateway;
+
+use Closure;
+use Generator;
+use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Support\Facades\Http;
+use Laravel\Ai\Contracts\Gateway\TextGateway;
+use Laravel\Ai\Gateway\TextGenerationOptions;
+use Laravel\Ai\ObjectSchema;
+use Laravel\Ai\Providers\Provider;
+use Laravel\Ai\Responses\GatewayResponse;
+use Laravel\Ai\Responses\Usage;
+
+class MyInferenceGateway implements TextGateway
+{
+    protected ?Closure $onInvoking = null;
+    protected ?Closure $onInvoked = null;
+
+    public function generateText(
+        Provider $provider,
+        ?string $model,
+        string $systemPrompt,
+        array $messages,
+        array $tools,
+        ?ObjectSchema $schema,
+        TextGenerationOptions $options,
+        ?int $timeout,
+    ): GatewayResponse {
+        $credentials = $provider->providerCredentials();
+        $config      = $provider->additionalConfiguration();
+
+        $response = Http::withToken($credentials['key'])
+            ->baseUrl($config['url'])
+            ->post('/chat/completions', [
+                'model'    => $model ?? $provider->defaultTextModel(),
+                'messages' => $this->formatMessages($systemPrompt, $messages),
+            ]);
+
+        $data = $response->json();
+
+        return new GatewayResponse(
+            text: $data['choices'][0]['message']['content'] ?? '',
+            usage: new Usage(
+                inputTokens: $data['usage']['prompt_tokens'] ?? 0,
+                outputTokens: $data['usage']['completion_tokens'] ?? 0,
+            ),
+        );
+    }
+
+    public function stream(
+        Provider $provider,
+        ?string $model,
+        string $systemPrompt,
+        array $messages,
+        array $tools,
+        ?ObjectSchema $schema,
+        TextGenerationOptions $options,
+        ?int $timeout,
+    ): Generator {
+        // Streaming implementation (omitted)
+        yield '';
+    }
+
+    public function onToolInvocation(Closure $invoking, Closure $invoked): void
+    {
+        $this->onInvoking = $invoking;
+        $this->onInvoked  = $invoked;
+    }
+
+    protected function formatMessages(string $systemPrompt, array $messages): array
+    {
+        $formatted = [['role' => 'system', 'content' => $systemPrompt]];
+
+        foreach ($messages as $message) {
+            $formatted[] = [
+                'role'    => $message->role->value,
+                'content' => $message->content,
+            ];
+        }
+
+        return $formatted;
+    }
+}
+```
+
+Update the provider to use the custom gateway.
+
+```php
+public function __construct(
+    protected array $config,
+    protected Dispatcher $events,
+) {}
+
+/**
+ * Get the provider's text gateway.
+ */
+public function textGateway(): TextGateway
+{
+    return $this->textGateway ??= new MyInferenceGateway;
+}
+```
+
+<Warning>
+  If you need to support tool calls (function calling), you must also implement tool execution and recursive message sending inside `generateText()`. Refer to the `PrismGateway` implementation at `src/Gateway/Prism/PrismGateway.php`.
+</Warning>
+
+## Testing
+
+### Using Ai::fake()
+
+You can use the SDK's built-in `Ai::fake()` directly to test agents that use your custom provider. Regardless of whether a custom provider is in use, the fake gateway is set on the provider.
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Ai\Agents\SummaryAgent;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Ai\Ai;
+use Tests\TestCase;
+
+class SummaryAgentTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_summary_agent_returns_text(): void
+    {
+        Ai::fake([
+            SummaryAgent::class => 'This is a summary.',
+        ]);
+
+        $response = Ai::agent(SummaryAgent::class)
+            ->provider('my-inference')
+            ->prompt('Long article text...');
+
+        $this->assertEquals('This is a summary.', $response->text);
+
+        Ai::assertPrompted(SummaryAgent::class);
+    }
+}
+```
+
+### Mock provider using extend()
+
+You can also use `extend()` to register a test provider from the container.
+
+```php
+public function test_with_mock_provider(): void
+{
+    $this->app->make(AiManager::class)->extend(
+        'my-inference',
+        function (array $config) {
+            $gateway = $this->app->make(\Laravel\Ai\Gateway\Prism\PrismGateway::class);
+            $events  = $this->app->make(\Illuminate\Contracts\Events\Dispatcher::class);
+
+            return new MyInferenceProvider($config, $events);
+        }
+    );
+
+    // Test code
+}
+```
+
+## Reference links
+
+<Card
+  title="OllamaProvider.php — simple implementation example"
+  icon="github"
+  href="https://github.com/laravel/ai/blob/0.x/src/Providers/OllamaProvider.php"
+>
+  A minimal provider that connects to a local model server. A good starting point for custom provider implementations.
+</Card>
+
+<Card
+  title="PrismGateway.php — gateway implementation example"
+  icon="github"
+  href="https://github.com/laravel/ai/blob/0.x/src/Gateway/Prism/PrismGateway.php"
+>
+  A full gateway implementation including tool calls and streaming.
+</Card>
+
+<Card
+  title="TextProvider Contract"
+  icon="github"
+  href="https://github.com/laravel/ai/blob/0.x/src/Contracts/Providers/TextProvider.php"
+>
+  The interface definition that text generation providers must implement.
+</Card>

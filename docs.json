@@ -479,6 +479,14 @@
             "tab": "Advanced Topics",
             "groups": [
               {
+                "group": "AI Development",
+                "pages": [
+                  "en/advanced/mcp-server",
+                  "en/advanced/boost-custom-agent",
+                  "en/advanced/ai-sdk-custom-provider"
+                ]
+              },
+              {
                 "group": "Design Patterns",
                 "pages": [
                   "en/advanced/pipeline",
