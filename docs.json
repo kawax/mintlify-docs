@@ -101,7 +101,8 @@
               {
                 "group": "セキュリティ",
                 "pages": [
-                  "jp/authorization"
+                  "jp/authorization",
+                  "jp/sanctum"
                 ]
               },
               {
@@ -487,6 +488,14 @@
                 "group": "Laravel 13 New Features",
                 "pages": [
                   "en/advanced/php-attributes"
+                ]
+              },
+              {
+                "group": "AI Development",
+                "pages": [
+                  "en/advanced/mcp-server",
+                  "en/advanced/boost-custom-agent",
+                  "en/advanced/ai-sdk-custom-provider"
                 ]
               },
               {

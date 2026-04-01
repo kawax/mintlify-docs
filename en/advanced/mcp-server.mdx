@@ -1,0 +1,933 @@
+---
+title: "Building an MCP Server with Laravel"
+description: "Build a production-ready MCP server using the laravel/mcp package. A practical guide covering tools, resources, prompts, authentication, testing, and deployment."
+---
+
+## What is an MCP server (advanced overview)
+
+**Model Context Protocol (MCP)** is a specification that allows AI clients (Claude, Cursor, GitHub Copilot, etc.) to communicate with your application using a standardized protocol. MCP has three primary primitives:
+
+| Primitive | Role | Common use cases |
+| --- | --- | --- |
+| **Tools** | Functions the AI can invoke | Data manipulation, external API calls, computation |
+| **Resources** | Context the AI can read | Documentation, configuration, dynamic data |
+| **Prompts** | Reusable templates | Standardized queries, workflow guidance |
+
+Building an MCP server with Laravel lets you use the entire Laravel ecosystem — Eloquent, caching, authentication, validation — as-is.
+
+<Info>
+  This advanced guide focuses on practical implementation. For a conceptual introduction to MCP, see [Intermediate: Laravel MCP](/en/mcp).
+</Info>
+
+## Installation and setup
+
+<Steps>
+  <Step title="Install the package">
+    Install the package via Composer.
+
+    ```shell
+    composer require laravel/mcp
+    ```
+  </Step>
+  <Step title="Publish the route file">
+    Use `vendor:publish` to generate `routes/ai.php`, where you register your MCP servers.
+
+    ```shell
+    php artisan vendor:publish --tag=ai-routes
+    ```
+  </Step>
+  <Step title="Generate a server class">
+    Create a server class with the Artisan command.
+
+    ```shell
+    php artisan make:mcp-server DatabaseServer
+    ```
+
+    Register your tools, resources, and prompts in the generated `app/Mcp/Servers/DatabaseServer.php`.
+  </Step>
+  <Step title="Register the server">
+    Register the server to a route in `routes/ai.php`.
+
+    <CodeGroup>
+      ```php Web server
+      use App\Mcp\Servers\DatabaseServer;
+      use Laravel\Mcp\Facades\Mcp;
+
+      Mcp::web('/mcp/database', DatabaseServer::class);
+      ```
+
+      ```php Local server
+      use App\Mcp\Servers\DatabaseServer;
+      use Laravel\Mcp\Facades\Mcp;
+
+      Mcp::local('database', DatabaseServer::class);
+      ```
+    </CodeGroup>
+
+    The web server is accessed via HTTP POST. The local server runs as an Artisan command and is used with CLI-based AI clients.
+  </Step>
+</Steps>
+
+## Implementing tools
+
+Tools are functions that AI clients can invoke. You can use Laravel's service container, validation, and Eloquent directly.
+
+### Creating a tool
+
+```shell
+php artisan make:mcp-tool SearchUsersTool
+```
+
+Implement the `handle` and `schema` methods in the generated class.
+
+### Defining parameters (schema)
+
+Use the `Illuminate\Contracts\JsonSchema\JsonSchema` builder in the `schema` method to define accepted parameters.
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('Search users by name or email address.')]
+class SearchUsersTool extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $validated = $request->validate([
+            'query'   => 'required|string|max:100',
+            'limit'   => 'integer|min:1|max:50',
+            'role'    => 'nullable|string|in:admin,editor,viewer',
+        ], [
+            'query.required' => 'Please provide a search keyword, e.g. "John" or "john@example.com".',
+            'limit.max'      => 'The limit may not be greater than 50.',
+            'role.in'        => 'Role must be one of: admin, editor, viewer.',
+        ]);
+
+        $users = \App\Models\User::query()
+            ->where(function ($q) use ($validated) {
+                $q->where('name', 'like', "%{$validated['query']}%")
+                  ->orWhere('email', 'like', "%{$validated['query']}%");
+            })
+            ->when(isset($validated['role']), fn ($q) => $q->where('role', $validated['role']))
+            ->limit($validated['limit'] ?? 10)
+            ->get(['id', 'name', 'email', 'role']);
+
+        if ($users->isEmpty()) {
+            return Response::text('No users found matching the given criteria.');
+        }
+
+        $result = $users->map(fn ($u) => "ID:{$u->id} {$u->name} <{$u->email}> [{$u->role}]")
+                        ->implode("\n");
+
+        return Response::text($result);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'query' => $schema->string()
+                ->description('Search keyword. Searches by name or email address.')
+                ->required(),
+
+            'limit' => $schema->integer()
+                ->description('Maximum number of results (default: 10, max: 50).')
+                ->minimum(1)
+                ->maximum(50)
+                ->default(10),
+
+            'role' => $schema->string()
+                ->description('Filter by role: admin, editor, or viewer.')
+                ->enum(['admin', 'editor', 'viewer']),
+        ];
+    }
+}
+```
+
+### Tool annotations
+
+MCP protocol annotations let AI clients assess the safety of a tool.
+
+```php
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+
+#[IsReadOnly]      // Does not modify state
+#[IsIdempotent]    // Safe to call multiple times with the same arguments
+class SearchUsersTool extends Tool
+{
+    // ...
+}
+```
+
+| Annotation | Description |
+| --- | --- |
+| `#[IsReadOnly]` | Does not modify data |
+| `#[IsDestructive]` | Performs a destructive operation such as deletion |
+| `#[IsIdempotent]` | Re-running with the same arguments is safe |
+| `#[IsOpenWorld]` | Communicates with external entities |
+
+### Structured responses
+
+Use `Response::structured` to return JSON responses that are easy for AI clients to parse.
+
+```php
+return Response::structured([
+    'total' => $users->count(),
+    'users' => $users->map(fn ($u) => [
+        'id'    => $u->id,
+        'name'  => $u->name,
+        'email' => $u->email,
+    ])->toArray(),
+]);
+```
+
+### Streaming responses
+
+For long-running operations, return a Generator to stream progress updates.
+
+```php
+use Generator;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+
+public function handle(Request $request): Generator
+{
+    $items = \App\Models\Product::all();
+    $total = $items->count();
+
+    foreach ($items as $index => $item) {
+        yield Response::notification('processing/progress', [
+            'current' => $index + 1,
+            'total'   => $total,
+            'name'    => $item->name,
+        ]);
+
+        // Heavy processing...
+        yield Response::text("Processed: {$item->name}");
+    }
+}
+```
+
+On a web server, streaming responses are automatically sent as SSE (Server-Sent Events) streams.
+
+### Conditional registration
+
+You can expose a tool only to users who meet certain conditions.
+
+```php
+public function shouldRegister(Request $request): bool
+{
+    return $request?->user()?->hasRole('admin') ?? false;
+}
+```
+
+## Implementing resources
+
+Resources are data that AI clients load as context — documents, configuration, or dynamic data.
+
+### Static resources
+
+```shell
+php artisan make:mcp-resource AppDocumentationResource
+```
+
+```php
+<?php
+
+namespace App\Mcp\Resources;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\MimeType;
+use Laravel\Mcp\Server\Attributes\Uri;
+use Laravel\Mcp\Server\Resource;
+
+#[Uri('app://resources/documentation')]
+#[MimeType('text/markdown')]
+#[Description('Overview of the application API documentation and business rules.')]
+class AppDocumentationResource extends Resource
+{
+    public function handle(Request $request): Response
+    {
+        $content = \Illuminate\Support\Facades\Storage::get('docs/api-overview.md')
+            ?? 'Documentation not found.';
+
+        return Response::text($content);
+    }
+}
+```
+
+### Dynamic resources (URI templates)
+
+URI templates let you serve dynamic resources based on URL parameters.
+
+```php
+<?php
+
+namespace App\Mcp\Resources;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\MimeType;
+use Laravel\Mcp\Server\Contracts\HasUriTemplate;
+use Laravel\Mcp\Server\Resource;
+use Laravel\Mcp\Support\UriTemplate;
+
+#[MimeType('application/json')]
+#[Description('Retrieve user information by user ID.')]
+class UserProfileResource extends Resource implements HasUriTemplate
+{
+    public function uriTemplate(): UriTemplate
+    {
+        return new UriTemplate('app://users/{userId}/profile');
+    }
+
+    public function handle(Request $request): Response
+    {
+        $userId = $request->get('userId');
+
+        $user = \App\Models\User::find($userId);
+
+        if (! $user) {
+            return Response::error("User ID {$userId} not found.");
+        }
+
+        return Response::text(json_encode([
+            'id'         => $user->id,
+            'name'       => $user->name,
+            'email'      => $user->email,
+            'created_at' => $user->created_at->toIso8601String(),
+        ], JSON_PRETTY_PRINT));
+    }
+}
+```
+
+An AI client requests `app://users/42/profile`, and the `{userId}` value is available via `$request->get('userId')`.
+
+### Resource annotations
+
+You can explicitly set the priority and audience of a resource.
+
+```php
+use Laravel\Mcp\Enums\Role;
+use Laravel\Mcp\Server\Annotations\Audience;
+use Laravel\Mcp\Server\Annotations\Priority;
+
+#[Audience(Role::Assistant)]   // Intended for the AI assistant
+#[Priority(0.8)]               // Importance (0.0–1.0)
+class AppDocumentationResource extends Resource
+{
+    // ...
+}
+```
+
+## Implementing prompts
+
+Prompts are reusable templates that AI clients can use to standardize common queries or complex workflows.
+
+### Creating a prompt
+
+```shell
+php artisan make:mcp-prompt DataAnalysisPrompt
+```
+
+```php
+<?php
+
+namespace App\Mcp\Prompts;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Prompt;
+use Laravel\Mcp\Server\Prompts\Argument;
+
+#[Description('Prompt template for generating data analysis reports.')]
+class DataAnalysisPrompt extends Prompt
+{
+    public function arguments(): array
+    {
+        return [
+            new Argument(
+                name: 'target',
+                description: 'The subject to analyze, e.g. "last month\'s sales" or "user registration trends".',
+                required: true,
+            ),
+            new Argument(
+                name: 'format',
+                description: 'Output format: "summary" or "detail".',
+                required: false,
+            ),
+        ];
+    }
+
+    public function handle(Request $request): array
+    {
+        $validated = $request->validate([
+            'target' => 'required|string|max:200',
+            'format' => 'nullable|in:summary,detail',
+        ]);
+
+        $target = $validated['target'];
+        $format = $validated['format'] ?? 'summary';
+        $instruction = $format === 'detail'
+            ? 'Create a detailed report including metrics, trends, anomalies, and recommended actions.'
+            : 'Create a concise summary with key metrics and three important insights.';
+
+        return [
+            Response::text(
+                "You are a data analyst. {$instruction}"
+            )->asAssistant(),
+            Response::text(
+                "Analyze the following data: {$target}"
+            ),
+        ];
+    }
+}
+```
+
+<Tip>
+  Using `asAssistant()` treats the message as a statement from the AI assistant. Combine system prompts and user messages to fine-tune AI behavior.
+</Tip>
+
+## Authentication and authorization
+
+### Token authentication with Sanctum
+
+The simplest approach. MCP clients attach an `Authorization: Bearer <token>` header.
+
+```php
+// routes/ai.php
+Mcp::web('/mcp/database', DatabaseServer::class)
+    ->middleware('auth:sanctum');
+```
+
+### OAuth 2.1 authentication
+
+Use Laravel Passport for more robust authentication.
+
+```php
+// routes/ai.php
+use Laravel\Mcp\Facades\Mcp;
+
+Mcp::oauthRoutes();
+
+Mcp::web('/mcp/database', DatabaseServer::class)
+    ->middleware('auth:api');
+```
+
+When using OAuth, publish the MCP authorization views and configure them in `AppServiceProvider`.
+
+```shell
+php artisan vendor:publish --tag=mcp-views
+```
+
+```php
+// app/Providers/AppServiceProvider.php
+use Laravel\Passport\Passport;
+
+public function boot(): void
+{
+    Passport::authorizationView(function ($parameters) {
+        return view('mcp.authorize', $parameters);
+    });
+}
+```
+
+### Custom middleware authentication
+
+If you use your own API tokens, validate the `Authorization` header in custom middleware.
+
+```php
+// app/Http/Middleware/McpTokenMiddleware.php
+public function handle($request, Closure $next)
+{
+    $token = $request->bearerToken();
+
+    if (! $token || ! \App\Models\ApiToken::where('token', hash('sha256', $token))->exists()) {
+        return response()->json(['error' => 'Unauthorized'], 401);
+    }
+
+    return $next($request);
+}
+```
+
+### Authorization inside tools
+
+Use `$request->user()` inside a tool or resource's `handle` method for fine-grained authorization.
+
+```php
+public function handle(Request $request): Response
+{
+    $user = $request->user();
+
+    if (! $user?->can('manage-users')) {
+        return Response::error('You do not have permission to use this tool. Please contact an administrator.');
+    }
+
+    // Continue with authorized logic...
+}
+```
+
+<Warning>
+  `shouldRegister` only hides the tool from the list. Always perform authorization checks inside the `handle` method when the tool is actually invoked.
+</Warning>
+
+## Practical example: database operation tools
+
+A complete implementation of tools that search and create data using Eloquent.
+
+### Server class
+
+```php
+<?php
+
+namespace App\Mcp\Servers;
+
+use App\Mcp\Tools\CreatePostTool;
+use App\Mcp\Tools\SearchPostsTool;
+use Laravel\Mcp\Server\Attributes\Instructions;
+use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Version;
+use Laravel\Mcp\Server;
+
+#[Name('Blog Management Server')]
+#[Version('1.0.0')]
+#[Instructions('An MCP server for searching and creating blog posts.')]
+class BlogServer extends Server
+{
+    protected array $tools = [
+        SearchPostsTool::class,
+        CreatePostTool::class,
+    ];
+}
+```
+
+### Search tool (read-only)
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use App\Models\Post;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('Search blog posts by keyword or status.')]
+#[IsReadOnly]
+#[IsIdempotent]
+class SearchPostsTool extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $validated = $request->validate([
+            'keyword' => 'nullable|string|max:100',
+            'status'  => 'nullable|in:draft,published,archived',
+            'limit'   => 'integer|min:1|max:20',
+        ]);
+
+        $posts = Post::query()
+            ->when($validated['keyword'] ?? null, fn ($q, $kw) =>
+                $q->where('title', 'like', "%{$kw}%")
+                  ->orWhere('body', 'like', "%{$kw}%")
+            )
+            ->when($validated['status'] ?? null, fn ($q, $s) => $q->where('status', $s))
+            ->latest()
+            ->limit($validated['limit'] ?? 5)
+            ->get(['id', 'title', 'status', 'published_at']);
+
+        if ($posts->isEmpty()) {
+            return Response::text('No posts found matching the given criteria.');
+        }
+
+        return Response::structured([
+            'total' => $posts->count(),
+            'posts' => $posts->map(fn ($p) => [
+                'id'           => $p->id,
+                'title'        => $p->title,
+                'status'       => $p->status,
+                'published_at' => $p->published_at?->toIso8601String(),
+            ])->toArray(),
+        ]);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'keyword' => $schema->string()
+                ->description('Keyword to search in post title or body.'),
+
+            'status' => $schema->string()
+                ->description('Post status filter.')
+                ->enum(['draft', 'published', 'archived']),
+
+            'limit' => $schema->integer()
+                ->description('Maximum number of results (default: 5, max: 20).')
+                ->default(5),
+        ];
+    }
+}
+```
+
+### Create tool (write)
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use App\Models\Post;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('Create a new blog post as a draft.')]
+class CreatePostTool extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $user = $request->user();
+
+        if (! $user?->can('create-posts')) {
+            return Response::error('You do not have permission to create posts.');
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'body'  => 'required|string',
+            'tags'  => 'nullable|array',
+            'tags.*' => 'string|max:50',
+        ], [
+            'title.required' => 'Please provide a post title.',
+            'body.required'  => 'Please provide post body content.',
+        ]);
+
+        $post = Post::create([
+            'title'   => $validated['title'],
+            'body'    => $validated['body'],
+            'status'  => 'draft',
+            'user_id' => $user->id,
+        ]);
+
+        if (! empty($validated['tags'])) {
+            $post->syncTags($validated['tags']);
+        }
+
+        return Response::structured([
+            'id'         => $post->id,
+            'title'      => $post->title,
+            'status'     => $post->status,
+            'created_at' => $post->created_at->toIso8601String(),
+            'message'    => 'Post created as draft.',
+        ]);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'title' => $schema->string()
+                ->description('Post title (max 255 characters).')
+                ->required(),
+
+            'body' => $schema->string()
+                ->description('Post body content. Markdown is supported.')
+                ->required(),
+
+            'tags' => $schema->array()
+                ->description('Array of tags to attach to the post, e.g. ["Laravel", "PHP"].'),
+        ];
+    }
+}
+```
+
+## Practical example: file system tool
+
+A tool that reads files using the Storage facade.
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Storage;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('List files in storage and read the contents of text files.')]
+#[IsReadOnly]
+class ReadFileTool extends Tool
+{
+    public function handle(Request $request): Response
+    {
+        $validated = $request->validate([
+            'path'    => 'required|string|max:500',
+            'disk'    => 'nullable|string|in:local,public,s3',
+        ]);
+
+        $disk = $validated['disk'] ?? 'local';
+        $path = $validated['path'];
+
+        // Prevent directory traversal attacks
+        if (str_contains($path, '..')) {
+            return Response::error('Invalid path specified.');
+        }
+
+        if (! Storage::disk($disk)->exists($path)) {
+            return Response::error("File not found: {$path}");
+        }
+
+        $mimeType = Storage::disk($disk)->mimeType($path);
+
+        // Return contents for text files
+        if (str_starts_with($mimeType, 'text/') || $mimeType === 'application/json') {
+            $content = Storage::disk($disk)->get($path);
+            return Response::text($content);
+        }
+
+        // Return binary for image files
+        if (str_starts_with($mimeType, 'image/')) {
+            return Response::fromStorage($path, disk: $disk);
+        }
+
+        return Response::error("Unsupported file type: {$mimeType}");
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'path' => $schema->string()
+                ->description('Path to the file to read, e.g. "reports/2025-01.csv".')
+                ->required(),
+
+            'disk' => $schema->string()
+                ->description('Storage disk to use.')
+                ->enum(['local', 'public', 's3'])
+                ->default('local'),
+        ];
+    }
+}
+```
+
+<Warning>
+  Always sanitize paths in file operation tools to prevent access outside allowed directories. Reject any path containing `..`.
+</Warning>
+
+## Testing
+
+MCP servers, tools, resources, and prompts can be unit tested with Laravel's standard testing features.
+
+### Testing tools
+
+Call a tool directly using `Server::tool()`.
+
+<CodeGroup>
+  ```php Pest
+  use App\Mcp\Servers\BlogServer;
+  use App\Mcp\Tools\SearchPostsTool;
+  use App\Models\Post;
+  use App\Models\User;
+
+  test('can search posts', function () {
+      Post::factory()->create(['title' => 'Getting Started with Laravel', 'status' => 'published']);
+      Post::factory()->create(['title' => 'Advanced PHP', 'status' => 'draft']);
+
+      $response = BlogServer::tool(SearchPostsTool::class, [
+          'keyword' => 'Laravel',
+          'status'  => 'published',
+      ]);
+
+      $response
+          ->assertOk()
+          ->assertSee('Getting Started with Laravel');
+  });
+
+  test('unauthorized user cannot create a post', function () {
+      $user = User::factory()->create();
+
+      $response = BlogServer::actingAs($user)
+          ->tool(\App\Mcp\Tools\CreatePostTool::class, [
+              'title' => 'Test Post',
+              'body'  => 'Body content.',
+          ]);
+
+      $response->assertSee('You do not have permission to create posts');
+  });
+  ```
+
+  ```php PHPUnit
+  use App\Mcp\Servers\BlogServer;
+  use App\Mcp\Tools\SearchPostsTool;
+  use App\Models\Post;
+  use App\Models\User;
+
+  public function test_can_search_posts(): void
+  {
+      Post::factory()->create(['title' => 'Getting Started with Laravel', 'status' => 'published']);
+      Post::factory()->create(['title' => 'Advanced PHP', 'status' => 'draft']);
+
+      $response = BlogServer::tool(SearchPostsTool::class, [
+          'keyword' => 'Laravel',
+          'status'  => 'published',
+      ]);
+
+      $response
+          ->assertOk()
+          ->assertSee('Getting Started with Laravel');
+  }
+
+  public function test_unauthorized_user_cannot_create_post(): void
+  {
+      $user = User::factory()->create();
+
+      $response = BlogServer::actingAs($user)
+          ->tool(\App\Mcp\Tools\CreatePostTool::class, [
+              'title' => 'Test Post',
+              'body'  => 'Body content.',
+          ]);
+
+      $response->assertSee('You do not have permission to create posts');
+  }
+  ```
+</CodeGroup>
+
+### Testing resources and prompts
+
+```php
+// Testing a resource
+$response = BlogServer::resource(\App\Mcp\Resources\AppDocumentationResource::class);
+$response->assertOk()->assertSee('API');
+
+// Testing a prompt
+$response = BlogServer::prompt(\App\Mcp\Prompts\DataAnalysisPrompt::class, [
+    'target' => 'last month\'s sales',
+    'format' => 'summary',
+]);
+$response->assertOk()->assertSee('data analyst');
+```
+
+### Key assertion methods
+
+| Method | Description |
+| --- | --- |
+| `assertOk()` | Confirms the response has no errors |
+| `assertSee($text)` | Confirms the response contains the given text |
+| `assertHasErrors()` | Confirms the response has errors |
+| `assertHasNoErrors()` | Confirms the response has no errors |
+| `assertName($name)` | Confirms the tool name |
+| `assertSentNotification($method, $data)` | Confirms a notification was sent |
+| `assertNotificationCount($count)` | Confirms the number of notifications sent |
+
+### Debugging with MCP Inspector
+
+Use MCP Inspector for interactive debugging.
+
+```shell
+# Inspect a web server
+php artisan mcp:inspector mcp/database
+
+# Inspect a local server
+php artisan mcp:inspector database
+```
+
+## Deployment considerations
+
+### HTTP streaming and SSE
+
+If you use streaming responses (Generator) on a web server, verify your server configuration.
+
+<CodeGroup>
+  ```nginx Nginx
+  location /mcp {
+      proxy_pass http://127.0.0.1:8000;
+      proxy_buffering off;          # Disable buffering for SSE
+      proxy_cache off;
+      proxy_read_timeout 3600s;     # Support long-lived connections
+      proxy_set_header Connection '';
+      chunked_transfer_encoding on;
+  }
+  ```
+
+  ```apache Apache
+  # When using mod_proxy_http
+  ProxyPass /mcp http://127.0.0.1:8000/mcp
+  ProxyPassReverse /mcp http://127.0.0.1:8000/mcp
+  SetEnv proxy-sendchunks 1
+  ```
+</CodeGroup>
+
+### Using Laravel Octane
+
+For high-traffic MCP servers, consider Laravel Octane (FrankenPHP or Swoole) to significantly reduce per-request overhead.
+
+<Warning>
+  With Octane, state is shared between requests. Avoid using static properties or global state inside tools.
+</Warning>
+
+### Rate limiting
+
+Use the `throttle` middleware to limit requests to your MCP server.
+
+```php
+// routes/ai.php
+Mcp::web('/mcp/database', DatabaseServer::class)
+    ->middleware(['auth:sanctum', 'throttle:60,1']);
+```
+
+### Caching
+
+Apply caching to frequently called read-only tools.
+
+```php
+public function handle(Request $request): Response
+{
+    $data = \Illuminate\Support\Facades\Cache::remember(
+        "mcp:search:{$request->get('keyword')}",
+        now()->addMinutes(5),
+        fn () => $this->fetchFromDatabase($request)
+    );
+
+    return Response::structured($data);
+}
+```
+
+### Logging and monitoring
+
+Log MCP tool calls to track how AI clients are using your server.
+
+```php
+public function handle(Request $request): Response
+{
+    \Illuminate\Support\Facades\Log::info('MCP tool called', [
+        'tool'   => static::class,
+        'user'   => $request->user()?->id,
+        'params' => $request->all(),
+    ]);
+
+    // ...
+}
+```
+
+<Tip>
+  In production, use Laravel Telescope or Sentry to monitor MCP server performance and exceptions.
+</Tip>
