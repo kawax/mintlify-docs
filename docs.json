@@ -101,7 +101,8 @@
               {
                 "group": "セキュリティ",
                 "pages": [
-                  "jp/authorization"
+                  "jp/authorization",
+                  "jp/sanctum"
                 ]
               },
               {
