@@ -24,3 +24,11 @@
 - [x] advancedにLaravel11以降のアプリケーション構造のページを追加。11.xブランチのreleases.mdにしか情報がないので現在は参照しにくくなっている。基本的な解説＋`Application::configure()`の先の`Illuminate\Foundation\Configuration\ApplicationBuilder`クラスまで深掘り。
 - [x] blogにMac用の「HomebrewでPHPとcomposerとnode.jsをインストールする方法」とWindows用の「WSLでPHPとcomposerとnode.jsをインストールする方法」のページを追加。node.jsは今のCLIでのAIエージェント環境を想定してnvmを使う（rootでのインストールはたまに困ることがある）。
   - `installation.md`のインストール方法に書かれてる `https://php.new/` はPHP公式みたいなドメインだけど実はLaravelチームによる提供。`php`のバイナリをLaravelのサーバーからダウンロードしてインストールする結構強引な方法。HerdもLaravelチーム製なのでここで書かれてるのは「環境構築も何もしてない初心者向けにLaravelが全部用意している方法」。
+
+## advanced ページ案
+
+優先度は低い
+
+- パッケージ開発者向けのページを増やす。管理者は大量のパッケージを作ってきて知見があるのでいくらでもネタはある。パッケージを一度作って終わりではなくLaravel・PHPのバージョンアップに合わせてメンテナンスを年単位で継続できるようになるまでのガイドを提供する。
+
+## blog ページ案
