@@ -172,7 +172,7 @@ if (Hash::needsRehash($user->password)) {
 ```mermaid
 flowchart TD
     A[ログイン成功] --> B{needsRehash?}
-    B -->|true| C[新しいワークファクターで\n再ハッシュして保存]
+    B -->|true| C[新しいワークファクターで<br>再ハッシュして保存]
     B -->|false| D[そのまま続行]
     C --> D
 ```
