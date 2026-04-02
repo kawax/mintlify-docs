@@ -102,7 +102,8 @@
                 "group": "セキュリティ",
                 "pages": [
                   "jp/authorization",
-                  "jp/sanctum"
+                  "jp/sanctum",
+                  "jp/hashing"
                 ]
               },
               {
@@ -383,6 +384,7 @@
                 "group": "Security",
                 "pages": [
                   "en/authorization",
+                  "en/hashing",
                   "en/sanctum"
                 ]
               },
