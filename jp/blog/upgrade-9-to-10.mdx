@@ -1,0 +1,389 @@
+---
+title: "Laravel 9 から 10 へのアップグレード"
+description: "Laravel 9.x から 10.x へのアップグレード手順と主要な変更点の解説"
+---
+
+## はじめに
+
+Laravel 10 は 2023年2月14日にリリースされました。このガイドでは Laravel 9.x から 10.x へのアップグレード手順を説明します。
+
+<Info>
+  アップグレードに必要な推定時間は **約10分** です。ただし、破壊的変更がアプリケーションに与える影響は規模や使用している機能によって異なります。
+</Info>
+
+### Laravel Shift を使った自動アップグレード
+
+[Laravel Shift](https://laravelshift.com/) を使ってアップグレードを自動化することもできます。Shift はアプリケーションの依存関係や設定ファイルを自動的に更新してくれます。
+
+---
+
+## 影響度別の変更点
+
+### 影響度: 高
+
+- 依存関係の更新
+- minimum-stability の更新
+
+### 影響度: 中
+
+- データベース式の変更
+- モデルの `$dates` プロパティの削除
+- Monolog 3
+- Redis キャッシュタグ
+- サービスモッキングの変更
+- 言語ディレクトリ
+
+### 影響度: 低
+
+- クロージャバリデーションルールのメッセージ
+- フォームリクエストの `after` メソッド
+- パブリックパスバインディング
+- `QueryException` コンストラクタ
+- レートリミッターの戻り値
+- `Redirect::home` メソッドの削除
+- `Bus::dispatchNow` メソッドの削除
+- `registerPolicies` メソッド
+- ULID カラム
+
+---
+
+## アップグレード手順
+
+### 依存関係の更新
+
+**影響度: 高**
+
+`composer.json` の以下の依存関係を更新してください。
+
+```json
+{
+  "require": {
+    "laravel/framework": "^10.0",
+    "laravel/sanctum": "^3.2",
+    "doctrine/dbal": "^3.0",
+    "spatie/laravel-ignition": "^2.0"
+  }
+}
+```
+
+パッケージを使用している場合はあわせて更新してください。
+
+```json
+{
+  "require": {
+    "laravel/passport": "^11.0",
+    "laravel/ui": "^4.0"
+  }
+}
+```
+
+PHPUnit 10 を使用する場合は、以下も更新してください。
+
+```json
+{
+  "require-dev": {
+    "nunomaduro/collision": "^7.0",
+    "phpunit/phpunit": "^10.0"
+  }
+}
+```
+
+<Warning>
+  PHPUnit 10 を使用する場合は、`phpunit.xml` の `<coverage>` セクションから `processUncoveredFiles` 属性を削除してください。
+</Warning>
+
+更新後、以下のコマンドで依存関係をインストールします。
+
+```shell
+composer update
+```
+
+Sanctum 2.x から 3.x へのアップグレードには、[Sanctum 3.x アップグレードガイド](https://github.com/laravel/sanctum/blob/3.x/UPGRADE.md)も参照してください。
+
+---
+
+### minimum-stability の更新
+
+**影響度: 高**
+
+`composer.json` の `minimum-stability` を `stable` に更新してください。デフォルト値が `stable` であるため、この設定を削除しても構いません。
+
+```json
+"minimum-stability": "stable"
+```
+
+---
+
+## PHPバージョン要件
+
+**影響度: 高**
+
+Laravel 10 では **PHP 8.1.0 以上** および **Composer 2.2.0 以上** が必要です。
+
+---
+
+## 破壊的変更 (Breaking Changes)
+
+### アプリケーション
+
+#### パブリックパスバインディング
+
+**影響度: 低**
+
+`path.public` をコンテナにバインドしてパブリックパスをカスタマイズしている場合は、`Illuminate\Foundation\Application` の `usePublicPath` メソッドを使用するよう変更してください。
+
+```php
+app()->usePublicPath(__DIR__.'/public');
+```
+
+---
+
+### 認可
+
+#### `registerPolicies` メソッド
+
+**影響度: 低**
+
+`AuthServiceProvider` の `registerPolicies` メソッドはフレームワークが自動で呼び出すようになりました。`boot` メソッドからこのメソッドの呼び出しを削除できます。
+
+---
+
+### キャッシュ
+
+#### Redis キャッシュタグ
+
+**影響度: 中**
+
+`Cache::tags()` は Memcached を使用するアプリケーションにのみ推奨されます。Redis をキャッシュドライバーとして使用している場合は、Memcached への移行を検討してください。
+
+---
+
+### データベース
+
+#### データベース式の変更
+
+**影響度: 中**
+
+`DB::raw` で生成されるデータベース式が書き直されました。式の生の文字列値を取得するには `getValue(Grammar $grammar)` メソッドを使用する必要があります。`(string)` へのキャストは使用できなくなりました。
+
+```php
+use Illuminate\Support\Facades\DB;
+
+$expression = DB::raw('select 1');
+
+// 変更前
+$string = (string) $expression;
+
+// 変更後
+$string = $expression->getValue(DB::connection()->getQueryGrammar());
+```
+
+エンドユーザーのアプリケーションには通常影響しませんが、データベース式を文字列にキャストしている場合は更新が必要です。
+
+#### `QueryException` コンストラクタ
+
+**影響度: 非常に低**
+
+`Illuminate\Database\QueryException` のコンストラクタの第一引数に文字列の接続名が追加されました。この例外を手動でスローしている場合はコードを修正してください。
+
+#### ULID カラム
+
+**影響度: 低**
+
+マイグレーションで引数なしに `ulid` メソッドを呼び出した場合、カラム名は `ulid` になります。以前のリリースでは引数なしで呼び出した場合、誤って `uuid` という名前のカラムが作成されていました。
+
+```php
+// カラム名が "ulid" になる
+$table->ulid();
+
+// カラム名を明示的に指定する場合
+$table->ulid('ulid');
+```
+
+---
+
+### Eloquent
+
+#### モデルの `$dates` プロパティ
+
+**影響度: 中**
+
+Eloquent モデルの非推奨プロパティ `$dates` が削除されました。`$casts` プロパティを使用してください。
+
+```php
+// 変更前
+protected $dates = ['deployed_at'];
+
+// 変更後
+protected $casts = [
+    'deployed_at' => 'datetime',
+];
+```
+
+---
+
+### ローカライゼーション
+
+#### 言語ディレクトリ
+
+**影響度: なし**
+
+既存のアプリケーションには影響しませんが、新規の Laravel アプリケーションのスケルトンにはデフォルトで `lang` ディレクトリが含まれなくなりました。必要な場合は Artisan コマンドで公開できます。
+
+```shell
+php artisan lang:publish
+```
+
+---
+
+### ログ
+
+#### Monolog 3
+
+**影響度: 中**
+
+Laravel の Monolog 依存関係が Monolog 3.x に更新されました。アプリケーション内で Monolog を直接使用している場合は、[Monolog のアップグレードガイド](https://github.com/Seldaek/monolog/blob/main/UPGRADE.md)を確認してください。
+
+BugSnag や Rollbar などのサードパーティロギングサービスを使用している場合は、Monolog 3.x と Laravel 10.x をサポートするバージョンへのアップグレードが必要な場合があります。
+
+<Tip>
+  Monolog 3.x の変更点は [Monolog 3.x アップグレードガイド](https://github.com/Seldaek/monolog/blob/3.x/UPGRADE.md)で確認できます。
+</Tip>
+
+---
+
+### キュー
+
+#### `Bus::dispatchNow` メソッドの削除
+
+**影響度: 低**
+
+非推奨の `Bus::dispatchNow` と `dispatch_now` メソッドが削除されました。`Bus::dispatchSync` と `dispatch_sync` メソッドを使用してください。
+
+```php
+// 変更前
+Bus::dispatchNow(new MyJob());
+dispatch_now(new MyJob());
+
+// 変更後
+Bus::dispatchSync(new MyJob());
+dispatch_sync(new MyJob());
+```
+
+---
+
+### ルーティング
+
+#### ミドルウェアエイリアス
+
+**影響度: 任意**
+
+新規の Laravel アプリケーションでは、`App\Http\Kernel` クラスの `$routeMiddleware` プロパティが `$middlewareAliases` に改名されました。既存のアプリケーションへの適用は任意です。
+
+#### レートリミッターの戻り値
+
+**影響度: 低**
+
+`RateLimiter::attempt` メソッドを呼び出した場合、提供したクロージャの戻り値がそのまま返されるようになりました。何も返さないか `null` を返した場合は `true` が返されます。
+
+```php
+$value = RateLimiter::attempt('key', 10, fn () => ['example'], 1);
+
+$value; // ['example']
+```
+
+#### `Redirect::home` メソッドの削除
+
+**影響度: 非常に低**
+
+非推奨の `Redirect::home` メソッドが削除されました。明示的に名前付きルートへリダイレクトするよう変更してください。
+
+```php
+// 変更前
+return Redirect::home();
+
+// 変更後
+return Redirect::route('home');
+```
+
+---
+
+### テスト
+
+#### サービスモッキング
+
+**影響度: 中**
+
+非推奨の `MocksApplicationServices` トレイトがフレームワークから削除されました。このトレイトは `expectsEvents`、`expectsJobs`、`expectsNotifications` などのテストメソッドを提供していました。
+
+これらのメソッドを使用している場合は、それぞれ `Event::fake`、`Bus::fake`、`Notification::fake` に移行してください。
+
+```php
+// 変更前
+$this->expectsEvents(OrderShipped::class);
+
+// 変更後
+Event::fake();
+// ... テストコード ...
+Event::assertDispatched(OrderShipped::class);
+```
+
+---
+
+### バリデーション
+
+#### クロージャバリデーションルールのメッセージ
+
+**影響度: 非常に低**
+
+クロージャベースのカスタムバリデーションルールで `$fail` コールバックを複数回呼び出した場合、メッセージが上書きされるのではなく配列に追加されるようになりました。
+
+また、`$fail` コールバックがオブジェクトを返すようになりました。バリデーションクロージャの戻り値をタイプヒントしている場合は更新が必要です。
+
+```php
+public function rules()
+{
+    return [
+        'name' => [
+            function ($attribute, $value, $fail) {
+                $fail('validation.translation.key')->translate();
+            },
+        ],
+    ];
+}
+```
+
+#### フォームリクエストの `after` メソッド
+
+**影響度: 非常に低**
+
+フォームリクエスト内の `after` メソッドが Laravel によって予約されました。フォームリクエストで `after` メソッドを定義している場合は、新しい「バリデーション後」機能を活用するようリネームまたは変更してください。
+
+---
+
+## まとめ
+
+Laravel 10 は比較的小さな変更で構成されており、アップグレードは短時間で完了できます。
+
+| 変更点 | 影響度 | 対応 |
+|--------|--------|------|
+| `composer.json` の依存関係更新 | 高 | `laravel/framework ^10.0` に変更 |
+| PHP 8.1 / Composer 2.2 必須 | 高 | バージョンを確認・更新 |
+| データベース式の変更 | 中 | `(string)` キャストを `getValue()` に変更 |
+| モデルの `$dates` プロパティ削除 | 中 | `$casts` に移行 |
+| Monolog 3 | 中 | 直接使用している場合はアップグレードガイドを確認 |
+| Redis キャッシュタグ | 中 | Memcached への移行を検討 |
+| `MocksApplicationServices` 削除 | 中 | `Event::fake` 等に移行 |
+| `Bus::dispatchNow` 削除 | 低 | `Bus::dispatchSync` に変更 |
+| ULID カラム名 | 低 | マイグレーションの `ulid()` 呼び出しを確認 |
+| `Redirect::home` 削除 | 非常に低 | `Redirect::route('home')` に変更 |
+
+---
+
+## 参考資料
+
+- [公式アップグレードガイド (英語)](https://laravel.com/docs/10.x/upgrade)
+- [laravel/laravel リポジトリの差分 (9.x → 10.x)](https://github.com/laravel/laravel/compare/9.x...10.x)
+- [Laravel Shift](https://laravelshift.com) — アップグレードを自動化するコミュニティサービス
+- [Sanctum アップグレードガイド (2.x → 3.x)](https://github.com/laravel/sanctum/blob/3.x/UPGRADE.md)
+- [Monolog 3.x アップグレードガイド](https://github.com/Seldaek/monolog/blob/3.x/UPGRADE.md)
