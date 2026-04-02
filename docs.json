@@ -381,7 +381,8 @@
               {
                 "group": "Security",
                 "pages": [
-                  "en/authorization"
+                  "en/authorization",
+                  "en/sanctum"
                 ]
               },
               {
