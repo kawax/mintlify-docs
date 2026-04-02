@@ -83,7 +83,7 @@ sequenceDiagram
 
     Note over Client: Store the token
 
-    Client->>API: GET /api/user<br/>Authorization: Bearer <token>
+    Client->>API: GET /api/user<br>Authorization: Bearer <token>
     API->>DB: Verify token (SHA-256)
     DB-->>API: Authenticated user
     API-->>Client: Response
@@ -272,11 +272,11 @@ sequenceDiagram
     SPA->>API: GET /sanctum/csrf-cookie
     API-->>SPA: Set XSRF-TOKEN cookie
 
-    SPA->>API: POST /login<br/>X-XSRF-TOKEN header
+    SPA->>API: POST /login<br>X-XSRF-TOKEN header
     API->>Session: Create session
     API-->>SPA: Set-Cookie: laravel_session
 
-    SPA->>API: GET /api/user<br/>Cookie: laravel_session
+    SPA->>API: GET /api/user<br>Cookie: laravel_session
     API->>Session: Verify session
     Session-->>API: Authenticated user
     API-->>SPA: User data

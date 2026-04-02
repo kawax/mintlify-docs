@@ -251,17 +251,17 @@ Calling `create()` extracts the `Application` instance from the `ApplicationBuil
 
 ```mermaid
 flowchart TD
-    A["public/index.php\nEntry point"] --> B["Requires bootstrap/app.php\nto obtain the Application"]
-    B --> C["Application::configure()\nCreates ApplicationBuilder"]
-    C --> D["withKernels()\nRegisters HTTP/Console kernels"]
-    D --> E["withEvents()\nConfigures event discovery"]
-    E --> F["withCommands()\nSets paths for Artisan commands"]
-    F --> G["withProviders()\nLoads bootstrap/providers.php"]
-    G --> H["withRouting()\nConfigures routing"]
-    H --> I["withMiddleware()\nConfigures middleware"]
-    I --> J["withExceptions()\nConfigures exception handling"]
-    J --> K["create()\nReturns the Application instance"]
-    K --> L["HTTP Kernel processes the request\nMiddleware → Router → Controller"]
+    A["public/index.php<br>Entry point"] --> B["Requires bootstrap/app.php<br>to obtain the Application"]
+    B --> C["Application::configure()<br>Creates ApplicationBuilder"]
+    C --> D["withKernels()<br>Registers HTTP/Console kernels"]
+    D --> E["withEvents()<br>Configures event discovery"]
+    E --> F["withCommands()<br>Sets paths for Artisan commands"]
+    F --> G["withProviders()<br>Loads bootstrap/providers.php"]
+    G --> H["withRouting()<br>Configures routing"]
+    H --> I["withMiddleware()<br>Configures middleware"]
+    I --> J["withExceptions()<br>Configures exception handling"]
+    J --> K["create()<br>Returns the Application instance"]
+    K --> L["HTTP Kernel processes the request<br>Middleware → Router → Controller"]
     L --> M["Returns response"]
 ```
 

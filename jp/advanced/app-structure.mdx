@@ -251,17 +251,17 @@ Application::configure(basePath: dirname(__DIR__))  // ApplicationBuilder を返
 
 ```mermaid
 flowchart TD
-    A["public/index.php\nエントリーポイント"] --> B["bootstrap/app.php\nを require して Application を取得"]
-    B --> C["Application::configure()\nApplicationBuilder を生成"]
-    C --> D["withKernels()\nHTTP/Consoleカーネルを登録"]
-    D --> E["withEvents()\nイベントディスカバリを設定"]
-    E --> F["withCommands()\nArtisanコマンドのパスを設定"]
-    F --> G["withProviders()\nbootstrap/providers.php を読み込む"]
-    G --> H["withRouting()\nルーティングを設定"]
-    H --> I["withMiddleware()\nミドルウェアを設定"]
-    I --> J["withExceptions()\n例外ハンドリングを設定"]
-    J --> K["create()\nApplication インスタンスを返す"]
-    K --> L["HTTP Kernel がリクエストを処理\nミドルウェア → ルーター → コントローラー"]
+    A["public/index.php<br>エントリーポイント"] --> B["bootstrap/app.php<br>を require して Application を取得"]
+    B --> C["Application::configure()<br>ApplicationBuilder を生成"]
+    C --> D["withKernels()<br>HTTP/Consoleカーネルを登録"]
+    D --> E["withEvents()<br>イベントディスカバリを設定"]
+    E --> F["withCommands()<br>Artisanコマンドのパスを設定"]
+    F --> G["withProviders()<br>bootstrap/providers.php を読み込む"]
+    G --> H["withRouting()<br>ルーティングを設定"]
+    H --> I["withMiddleware()<br>ミドルウェアを設定"]
+    I --> J["withExceptions()<br>例外ハンドリングを設定"]
+    J --> K["create()<br>Application インスタンスを返す"]
+    K --> L["HTTP Kernel がリクエストを処理<br>ミドルウェア → ルーター → コントローラー"]
     L --> M["レスポンスを返す"]
 ```
 

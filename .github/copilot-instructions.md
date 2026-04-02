@@ -116,6 +116,8 @@ Do not use raw HTML for layout when a Mintlify component exists.
 
 公式ドキュメントではフローチャートなどは使われていないので公式よりも理解しやすくなる要素として使うと効果的な箇所ではMermaidでの図解を積極的に入れていく。
 
+Mermaid内での改行は`<br>`で行う。日本語の場合はダブルクォーテーションで囲むとより確実。`"ここで<br>改行"`
+
 ## Adding a new page
 
 1. Create an MDX file with frontmatter (`title`, `description`).

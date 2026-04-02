@@ -83,7 +83,7 @@ sequenceDiagram
 
     Note over Client: トークンを保存
 
-    Client->>API: GET /api/user<br/>Authorization: Bearer <token>
+    Client->>API: GET /api/user<br>Authorization: Bearer <token>
     API->>DB: トークン照合(SHA-256)
     DB-->>API: 認証済みユーザー
     API-->>Client: レスポンス
@@ -272,11 +272,11 @@ sequenceDiagram
     SPA->>API: GET /sanctum/csrf-cookie
     API-->>SPA: XSRF-TOKEN Cookie をセット
 
-    SPA->>API: POST /login<br/>X-XSRF-TOKEN ヘッダー
+    SPA->>API: POST /login<br>X-XSRF-TOKEN ヘッダー
     API->>Session: セッション作成
     API-->>SPA: Set-Cookie: laravel_session
 
-    SPA->>API: GET /api/user<br/>Cookie: laravel_session
+    SPA->>API: GET /api/user<br>Cookie: laravel_session
     API->>Session: セッション確認
     Session-->>API: 認証済みユーザー
     API-->>SPA: ユーザー情報
