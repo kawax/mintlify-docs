@@ -53,6 +53,7 @@
                 "group": "データベース",
                 "pages": [
                   "jp/migrations",
+                  "jp/seeding",
                   "jp/eloquent",
                   "jp/eloquent-relationships"
                 ]
@@ -342,6 +343,7 @@
                 "group": "Database",
                 "pages": [
                   "en/migrations",
+                  "en/seeding",
                   "en/eloquent",
                   "en/eloquent-relationships"
                 ]
