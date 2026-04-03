@@ -23,7 +23,7 @@
 - [x] `lifecycle.md`のページを中級/ガイドに作成。docs.jsonではアーキテクチャグループをガイドの一番上に移動、lifecycleをアーキテクチャの一番上に配置。つまりlifecycleが中級のデフォルトページ。Laravelへの入門時はいきなりルーティングやコントローラーを触ってリクエストのライフサイクルを理解しなくても使えるけど、本格的に学ぶならライフサイクルの理解が一番重要。Laravelの入口は2つあって、`public/index.php`からのHttpと`artisan`からのConsole。MintlifyのMermaidも使って図解。
 - [x] advancedにLaravel11以降のアプリケーション構造のページを追加。11.xブランチのreleases.mdにしか情報がないので現在は参照しにくくなっている。基本的な解説＋`Application::configure()`の先の`Illuminate\Foundation\Configuration\ApplicationBuilder`クラスまで深掘り。
 - [x] blogにMac用の「HomebrewでPHPとcomposerとnode.jsをインストールする方法」とWindows用の「WSLでPHPとcomposerとnode.jsをインストールする方法」のページを追加。node.jsは今のCLIでのAIエージェント環境を想定してnvmを使う（rootでのインストールはたまに困ることがある）。
-  - `installation.md`のインストール方法に書かれてる `https://php.new/` はPHP公式みたいなドメインだけど実はLaravelチームによる提供。`php`のバイナリをLaravelのサーバーからダウンロードしてインストールする結構強引な方法。HerdもLaravelチーム製なのでここで書かれてるのは「環境構築も何もしてない初心者向けにLaravelが全部用意している方法」。
+- [ ] 既存ページにMermaidによる図解を追加。
 
 ## advanced ページ案
 
