@@ -46,6 +46,7 @@ https://raw.githubusercontent.com/laravel/boost/refs/heads/main/src/Mcp/Prompts/
 ### 影響度: 中
 
 - キャッシュ `serializable_classes` 設定
+- セッション `serialization` 設定
 
 ### 影響度: 低
 
@@ -192,6 +193,27 @@ SESSION_COOKIE=myapp_session
 ```
 
 任意のキャッシュオブジェクトをデシリアライズしていた場合は、明示的なクラス許可リストまたは非オブジェクトのキャッシュペイロード（配列など）に移行する必要があります。
+
+#### セッション `serialization` 設定
+
+**影響度: 中**
+
+Laravel 13 のスケルトン (`laravel/laravel`) の `config/session.php` に `'serialization' => 'json'` が追加されています。ただし、フレームワーク内部のデフォルトは `php` のままです。
+
+<Warning>
+  AI ツールを使ってスケルトンの変更をそのまま適用した場合、`config/session.php` に `'serialization' => 'json'` が追加されることがあります。この変更はセッションのシリアライゼーション方式を切り替えるため、セッションに PHP オブジェクトを保存しているアプリケーションでエラーが発生する可能性があります。
+</Warning>
+
+公式のアップグレードガイドにはこの設定の変更が記載されていません。これは **変更しなくてよい** という意図だと考えられます。
+
+Laravel 12 までと同じ動作を維持するには、`'serialization' => 'php'` を明示的に設定してください。
+
+```php
+// config/session.php
+'serialization' => 'php',
+```
+
+JSON シリアライゼーションを有効にする場合は、セッションに PHP オブジェクトを保存していないことを事前に確認してください。
 
 ---
 

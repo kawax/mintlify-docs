@@ -46,6 +46,7 @@ https://raw.githubusercontent.com/laravel/boost/refs/heads/main/src/Mcp/Prompts/
 ### Medium impact
 
 - Cache `serializable_classes` configuration
+- Session `serialization` configuration
 
 ### Low impact
 
@@ -192,6 +193,27 @@ If your application intentionally stores PHP objects in the cache, you must expl
 ```
 
 If you were caching arbitrary objects, migrate to an explicit allowlist or switch to non-object cache payloads (such as arrays).
+
+#### Session `serialization` configuration
+
+**Medium impact**
+
+The Laravel 13 skeleton (`laravel/laravel`) adds `'serialization' => 'json'` to `config/session.php`. However, the framework's internal default remains `php`.
+
+<Warning>
+  If you use an AI tool to apply skeleton changes automatically, it may add `'serialization' => 'json'` to your `config/session.php`. This switches the session serialization strategy, and applications that store PHP objects in the session may start throwing errors.
+</Warning>
+
+The official upgrade guide does not mention changing this setting — the intent is that **you do not need to change it**.
+
+To keep the same behavior as Laravel 12, set the value explicitly to `php`:
+
+```php
+// config/session.php
+'serialization' => 'php',
+```
+
+If you do want to enable JSON serialization, first verify that your application does not store any PHP objects in the session.
 
 ---
 
