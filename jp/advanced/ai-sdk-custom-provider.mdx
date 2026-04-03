@@ -183,15 +183,12 @@ interface TextProvider
   </Step>
 
   <Step title="エージェントから使う">
-    登録後は `provider()` でプロバイダー名を指定するだけで標準プロバイダーと同じように使えます。
+    登録後は `prompt()` の `provider` 引数にプロバイダー名を指定するだけで標準プロバイダーと同じように使えます。
 
     ```php
     use App\Ai\Agents\SummaryAgent;
-    use Laravel\Ai\Ai;
 
-    $response = Ai::agent(SummaryAgent::class)
-        ->provider('my-inference')
-        ->prompt('この記事を要約してください。');
+    $response = SummaryAgent::make()->prompt('この記事を要約してください。', provider: 'my-inference');
 
     echo $response->text;
     ```
@@ -363,7 +360,7 @@ public function textGateway(): TextGateway
 
 ### Ai::fake() を使う
 
-カスタムプロバイダーを使うエージェントのテストには、SDKが提供する `Ai::fake()` をそのまま使えます。カスタムプロバイダーかどうかに関係なく、フェイクゲートウェイがプロバイダーにセットされます。
+カスタムプロバイダーを使うエージェントのテストには、SDKが提供する `Ai::fakeAgent()` をそのまま使えます。カスタムプロバイダーかどうかに関係なく、フェイクゲートウェイがプロバイダーにセットされます。
 
 ```php
 <?php
@@ -381,17 +378,13 @@ class SummaryAgentTest extends TestCase
 
     public function test_summary_agent_returns_text(): void
     {
-        Ai::fake([
-            SummaryAgent::class => 'これは要約です。',
-        ]);
+        Ai::fakeAgent(SummaryAgent::class, ['これは要約です。']);
 
-        $response = Ai::agent(SummaryAgent::class)
-            ->provider('my-inference')
-            ->prompt('長い記事のテキスト...');
+        $response = SummaryAgent::make()->prompt('長い記事のテキスト...', provider: 'my-inference');
 
         $this->assertEquals('これは要約です。', $response->text);
 
-        Ai::assertPrompted(SummaryAgent::class);
+        Ai::assertAgentWasPrompted(SummaryAgent::class, '長い記事のテキスト...');
     }
 }
 ```

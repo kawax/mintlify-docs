@@ -183,15 +183,12 @@ This example registers an internally built OpenAI-compatible inference server as
   </Step>
 
   <Step title="Use it from an agent">
-    After registration, specify the provider name with `provider()` and use it just like a standard provider.
+    After registration, specify the provider name in the `provider` argument of `prompt()` to use it just like a standard provider.
 
     ```php
     use App\Ai\Agents\SummaryAgent;
-    use Laravel\Ai\Ai;
 
-    $response = Ai::agent(SummaryAgent::class)
-        ->provider('my-inference')
-        ->prompt('Summarize this article.');
+    $response = SummaryAgent::make()->prompt('Summarize this article.', provider: 'my-inference');
 
     echo $response->text;
     ```
@@ -361,9 +358,9 @@ public function textGateway(): TextGateway
 
 ## Testing
 
-### Using Ai::fake()
+### Using Ai::fakeAgent()
 
-You can use the SDK's built-in `Ai::fake()` directly to test agents that use your custom provider. Regardless of whether a custom provider is in use, the fake gateway is set on the provider.
+You can use the SDK's built-in `Ai::fakeAgent()` directly to test agents that use your custom provider. Regardless of whether a custom provider is in use, the fake gateway is set on the provider.
 
 ```php
 <?php
@@ -381,17 +378,13 @@ class SummaryAgentTest extends TestCase
 
     public function test_summary_agent_returns_text(): void
     {
-        Ai::fake([
-            SummaryAgent::class => 'This is a summary.',
-        ]);
+        Ai::fakeAgent(SummaryAgent::class, ['This is a summary.']);
 
-        $response = Ai::agent(SummaryAgent::class)
-            ->provider('my-inference')
-            ->prompt('Long article text...');
+        $response = SummaryAgent::make()->prompt('Long article text...', provider: 'my-inference');
 
         $this->assertEquals('This is a summary.', $response->text);
 
-        Ai::assertPrompted(SummaryAgent::class);
+        Ai::assertAgentWasPrompted(SummaryAgent::class, 'Long article text...');
     }
 }
 ```
