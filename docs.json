@@ -100,6 +100,12 @@
                 ]
               },
               {
+                "group": "Eloquent",
+                "pages": [
+                  "jp/eloquent-resources"
+                ]
+              },
+              {
                 "group": "セキュリティ",
                 "pages": [
                   "jp/authorization",
@@ -417,7 +423,8 @@
                 "group": "Database",
                 "pages": [
                   "en/query-builder",
-                  "en/pagination"
+                  "en/pagination",
+                  "en/eloquent-resources"
                 ]
               },
               {
