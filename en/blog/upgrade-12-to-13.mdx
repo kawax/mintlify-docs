@@ -23,6 +23,7 @@ https://raw.githubusercontent.com/laravel/boost/refs/heads/main/src/Mcp/Prompts/
 
 - Apply changes from the `laravel/laravel` skeleton. Check the 13.x branch, not master.
 - For `database/migrations/*_create_cache_table.php`, create a new migration instead of modifying the existing one.
+- Set `serialization` in `config/session.php` to `php`. `'serialization' => 'php'`
 - The cache behavior change is the most likely source of errors in Laravel 13. Search the project for cache usage and, where it is safe to do so, allow the necessary classes in the `serializable_classes` key of config/cache.php.
 
 'serializable_classes' => [
