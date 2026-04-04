@@ -13,6 +13,17 @@ Laravel's queue system lets you push these tasks to a **background queue** and r
   Laravel supports multiple queue backends—database, Redis, Amazon SQS, and more. During development, the `sync` driver executes jobs immediately without a real queue, so no worker is required.
 </Info>
 
+```mermaid
+flowchart LR
+    A["Job created<br>dispatch()"] --> B["Queue driver<br>(Redis / DB / etc.)"]
+    B --> C["Worker<br>queue:work"]
+    C --> D{"Success?"}
+    D -->|"Yes"| E["Done"]
+    D -->|"No"| F{"Retry?"}
+    F -->|"Yes"| B
+    F -->|"No"| G["Recorded as failed<br>failed_jobs"]
+```
+
 ## Queue setup and configuration
 
 ### config/queue.php
