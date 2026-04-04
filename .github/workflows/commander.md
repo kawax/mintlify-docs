@@ -57,7 +57,8 @@ Every day, follow these steps:
 2. Review the repository file structure to understand what pages exist and what is missing.
 3. Read `docs.json` to understand the current navigation structure.
 4. Check existing open issues to avoid creating duplicate work.
-5. Fetch the latest Laravel documentation from `https://github.com/laravel/docs` to understand what topics are available.
+5. Read the latest discussion in the `copilot` category to review the previous work report. Use this to understand what was done recently, avoid repeating work, and maintain continuity.
+6. Fetch the latest Laravel documentation from `https://github.com/laravel/docs` to understand what topics are available.
 
 ### Step 2: Decide what to work on
 
