@@ -23,13 +23,13 @@
 - [x] `lifecycle.md`のページを中級/ガイドに作成。docs.jsonではアーキテクチャグループをガイドの一番上に移動、lifecycleをアーキテクチャの一番上に配置。つまりlifecycleが中級のデフォルトページ。Laravelへの入門時はいきなりルーティングやコントローラーを触ってリクエストのライフサイクルを理解しなくても使えるけど、本格的に学ぶならライフサイクルの理解が一番重要。Laravelの入口は2つあって、`public/index.php`からのHttpと`artisan`からのConsole。MintlifyのMermaidも使って図解。
 - [x] advancedにLaravel11以降のアプリケーション構造のページを追加。11.xブランチのreleases.mdにしか情報がないので現在は参照しにくくなっている。基本的な解説＋`Application::configure()`の先の`Illuminate\Foundation\Configuration\ApplicationBuilder`クラスまで深掘り。
 - [x] blogにMac用の「HomebrewでPHPとcomposerとnode.jsをインストールする方法」とWindows用の「WSLでPHPとcomposerとnode.jsをインストールする方法」のページを追加。node.jsは今のCLIでのAIエージェント環境を想定してnvmを使う（rootでのインストールはたまに困ることがある）。
-- [ ] 既存ページにMermaidによる図解を追加。
-- [ ] 中級・ガイドにPintのページ追加。ドキュメントに書いてないことだと、composer.jsonにpint実行のscriptsを追加すると便利、管理者が普段使ってるpint.jsonは以下
+- [x] 既存ページにMermaidによる図解を追加。
+- [x] 中級・ガイドにPintのページ追加。ドキュメントに書いてないことだと、composer.jsonにpint実行のscriptsを追加すると便利、管理者が普段使ってるpint.jsonは以下
 ```json
 {
     "preset": "laravel",
     "rules": {
-        "no_unused_imports": true,
+        "no_unused_imports": false,
         "strict_comparison": true,
         "declare_strict_types": true
     }
