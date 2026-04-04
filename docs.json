@@ -188,7 +188,8 @@
               {
                 "group": "コンソールとCLI",
                 "pages": [
-                  "jp/artisan"
+                  "jp/artisan",
+                  "jp/pint"
                 ]
               },
               {
@@ -436,7 +437,8 @@
               {
                 "group": "Console & CLI",
                 "pages": [
-                  "en/artisan"
+                  "en/artisan",
+                  "en/pint"
                 ]
               },
               {
