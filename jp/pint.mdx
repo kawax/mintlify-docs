@@ -160,7 +160,7 @@ composer require laravel/pint --dev
 {
     "preset": "laravel",
     "rules": {
-        "no_unused_imports": true,
+        "no_unused_imports": false,
         "strict_comparison": true,
         "declare_strict_types": true
     }
@@ -171,7 +171,7 @@ composer require laravel/pint --dev
 
 | ルール | 効果 |
 | --- | --- |
-| `no_unused_imports` | 使われていない `use` 文を自動削除してコードをすっきりさせる |
+| `no_unused_imports` | `false` にすると未使用の `use` 文を削除せず残す。Pintのデフォルトは `true`（削除）なので通常のLaravelプロジェクトではこの項目は不要 |
 | `strict_comparison` | `==` を `===` に、`!=` を `!==` に変換して予期しない型変換のバグを防ぐ |
 | `declare_strict_types` | ファイル先頭に `declare(strict_types=1);` を自動追加して型の安全性を高める |
 
@@ -180,7 +180,7 @@ composer require laravel/pint --dev
 </Tip>
 
 <Info>
-  **パッケージ開発では `no_unused_imports` に注意してください。** トレイトやインターフェースをインポートすることで機能をオン/オフするパターンがあり、そのような場合は未使用に見える `use` 文も意図的なものです。パッケージを開発する場合はこのルールを外すか `false` に設定することを検討してください。通常のLaravelアプリケーションであれば `true` のままで問題ありません。
+  **`no_unused_imports` はパッケージ開発向けの設定です。** Pintのデフォルトは `true`（未使用の `use` 文を削除）なので、通常のLaravelプロジェクトではこの項目自体不要です。パッケージ開発ではトレイトやインターフェースのインポートで機能をオン/オフするパターンがあるため、`false` を追加しておき各パッケージの状況に合わせて `true` に変更する運用が便利です。
 </Info>
 
 ## composer.json への scripts 設定

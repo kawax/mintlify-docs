@@ -159,18 +159,18 @@ A practical `pint.json` used in real projects:
 {
     "preset": "laravel",
     "rules": {
-        "no_unused_imports": true,
+        "no_unused_imports": false,
         "strict_comparison": true,
         "declare_strict_types": true
     }
 }
 ```
 
-Why each rule is worth enabling:
+Why each rule is worth adding:
 
 | Rule | Effect |
 | --- | --- |
-| `no_unused_imports` | Removes unused `use` statements automatically, keeping files clean |
+| `no_unused_imports` | Set to `false` to keep unused `use` statements. Pint's default is `true` (remove them), so this entry is not needed in a normal Laravel application |
 | `strict_comparison` | Replaces `==` with `===` and `!=` with `!==`, preventing unexpected type-coercion bugs |
 | `declare_strict_types` | Adds `declare(strict_types=1);` to the top of every file, enforcing type safety |
 
@@ -179,7 +179,7 @@ Why each rule is worth enabling:
 </Tip>
 
 <Info>
-  **Be careful with `no_unused_imports` in package development.** Some packages import a trait or interface as a way to toggle a feature on or off, making those imports intentional even though they appear unused. If you develop packages, consider removing this rule or setting it to `false`. For standard Laravel applications, `true` is safe.
+  **`no_unused_imports` is primarily useful for package development.** Pint's default is `true` (removes unused `use` statements), so a normal Laravel application does not need this entry at all. In packages, traits and interfaces are sometimes imported specifically to toggle a feature on or off, so setting this to `false` preserves those intentional imports. A practical approach: add `"no_unused_imports": false` as a baseline and switch individual packages to `true` when you are sure all imports are used.
 </Info>
 
 ## Adding scripts to composer.json
