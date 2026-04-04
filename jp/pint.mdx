@@ -179,6 +179,10 @@ composer require laravel/pint --dev
   `strict_comparison` と `declare_strict_types` は型に厳格なコードを強制するため、既存プロジェクトに追加する際は初回の修正量が多くなることがあります。新規プロジェクトでは最初から導入することをお勧めします。
 </Tip>
 
+<Info>
+  **パッケージ開発では `no_unused_imports` に注意してください。** トレイトやインターフェースをインポートすることで機能をオン/オフするパターンがあり、そのような場合は未使用に見える `use` 文も意図的なものです。パッケージを開発する場合はこのルールを外すか `false` に設定することを検討してください。通常のLaravelアプリケーションであれば `true` のままで問題ありません。
+</Info>
+
 ## composer.json への scripts 設定
 
 `composer.json` に `pint` 用のスクリプトを登録すると、`composer pint` だけで実行できるようになります。

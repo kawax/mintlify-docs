@@ -178,6 +178,10 @@ Why each rule is worth enabling:
   `strict_comparison` and `declare_strict_types` can produce a large initial diff when added to an existing project. Start with these rules on new projects to avoid the one-time cleanup cost.
 </Tip>
 
+<Info>
+  **Be careful with `no_unused_imports` in package development.** Some packages import a trait or interface as a way to toggle a feature on or off, making those imports intentional even though they appear unused. If you develop packages, consider removing this rule or setting it to `false`. For standard Laravel applications, `true` is safe.
+</Info>
+
 ## Adding scripts to composer.json
 
 Register Pint as a Composer script so you can run it with `composer pint`:
