@@ -9,6 +9,18 @@ Laravel's event system implements the observer pattern. When something notable h
 
 This decouples your core business logic from side effects like sending emails or updating analytics. You can add, remove, or change listeners without touching the code that raised the event.
 
+```mermaid
+flowchart TD
+    A["Event dispatched<br>dispatch()"] --> B["Event Dispatcher"]
+    B --> C["Listener 1<br>(synchronous)"]
+    B --> D["Listener 2<br>(synchronous)"]
+    B --> E["Listener 3<br>implements ShouldQueue"]
+    C --> F["Runs immediately"]
+    D --> G["Runs immediately"]
+    E --> H["Pushed to queue"]
+    H --> I["Worker runs<br>asynchronously"]
+```
+
 ## Generating events and listeners
 
 Use Artisan to scaffold events and listeners:
