@@ -23,7 +23,7 @@
 - [x] `lifecycle.md`のページを中級/ガイドに作成。docs.jsonではアーキテクチャグループをガイドの一番上に移動、lifecycleをアーキテクチャの一番上に配置。つまりlifecycleが中級のデフォルトページ。Laravelへの入門時はいきなりルーティングやコントローラーを触ってリクエストのライフサイクルを理解しなくても使えるけど、本格的に学ぶならライフサイクルの理解が一番重要。Laravelの入口は2つあって、`public/index.php`からのHttpと`artisan`からのConsole。MintlifyのMermaidも使って図解。
 - [x] advancedにLaravel11以降のアプリケーション構造のページを追加。11.xブランチのreleases.mdにしか情報がないので現在は参照しにくくなっている。基本的な解説＋`Application::configure()`の先の`Illuminate\Foundation\Configuration\ApplicationBuilder`クラスまで深掘り。
 - [x] blogにMac用の「HomebrewでPHPとcomposerとnode.jsをインストールする方法」とWindows用の「WSLでPHPとcomposerとnode.jsをインストールする方法」のページを追加。node.jsは今のCLIでのAIエージェント環境を想定してnvmを使う（rootでのインストールはたまに困ることがある）。
-- [x] 既存ページにMermaidによる図解を追加。
+- [ ] 既存ページにMermaidによる図解を追加。数ページずつ追加してるので継続。
 - [x] 中級・ガイドにPintのページ追加。ドキュメントに書いてないことだと、composer.jsonにpint実行のscriptsを追加すると便利、管理者が普段使ってるpint.jsonは以下
 ```json
 {
@@ -47,3 +47,11 @@
 - 逆に新バージョンへの対応が遅いのも困る現象。10数年で大量のパッケージを乗り換えてきたし結局自ら作るようになった原因。リリースと同時にアップグレードしたい人も多いのでリリース前に対応が終わっているのがベスト。`composer.json`を変更してインストールさえ可能なら十分。不具合があってもリリース後に修正すればよい。新バージョンへの対応が遅い小規模パッケージは今ならAIでサッと代替手段を作ってしまうこともできる。
 
 ## blog ページ案
+
+優先度は低い
+
+- https://github.com/laravel で公開された新しいリポジトリの調査。private状態で開発されてどこかのタイミングで公開される。大々的に発表されることもあるけどほとんどはドキュメントもなくリポジトリ内を見ないと何も分からない。バージョンは0.xで開発段階なことが多いのでblogで書くのは初期調査結果の情報。
+- Maestro https://github.com/laravel/maestro スターターキット開発のオーケストレーター。一番新しく公開された。
+- https://github.com/laravel/agent-skills AI用のエージェントスキル。最初はClaude Code用のスキルを置いてるリポジトリだったけどリポジトリ名を変えてリニューアル。「Laravel公式のmarketplace」としてこれから整備されていくんだろう。
+- Wayfinder https://github.com/laravel/wayfinder v0.1だけど既にInertiaを使うスターターキットでは導入されている。元々使っていたZiggyからの置き換え。mainブランチが0.1、nextブランチの次期バージョンで色々変わることも確定しているので0.1でページを作ってもすぐに古くなってしまう。
+- https://github.com/laravel/roster https://github.com/laravel/ranger https://github.com/laravel/surveyor https://github.com/laravel/sentinel この辺りになるとほとんど分からなくなる。rosterはboostで使われている。
