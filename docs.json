@@ -593,21 +593,7 @@
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Laravel Docs",
-          "href": "https://laravel.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Laravel Blog",
-          "href": "https://laravel.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
+    ]
   },
   "logo": {
     "light": "/logo/light.svg",
