@@ -14,7 +14,7 @@
       "url": "https://mintlify.com/docs/mcp",
       "tools": ["*"]
     },
-    "Knowledge of Laravel": {
+    "kawax": {
       "type": "http",
       "url": "https://kawax.biz/mcp",
       "tools": ["*"]
