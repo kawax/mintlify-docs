@@ -13,6 +13,11 @@
       "type": "http",
       "url": "https://mintlify.com/docs/mcp",
       "tools": ["*"]
+    },
+    "Knowledge of Laravel": {
+      "type": "http",
+      "url": "https://kawax.biz/mcp",
+      "tools": ["*"]
     }
   }
 }
