@@ -38,6 +38,16 @@ The `PodcastController` needs to retrieve podcasts from a data source. By **inje
   A deep understanding of the service container is essential for building large Laravel applications and contributing to the Laravel core.
 </Info>
 
+```mermaid
+flowchart TD
+    A["Service Provider<br>register()"] --> B["Service Container<br>Binding Registered"]
+    B --> C{"Resolution Request<br>make() / Auto-injection"}
+    C -- "Concrete class" --> D["Auto-resolved<br>via Reflection"]
+    C -- "Interface" --> E["Resolve Registered<br>Implementation"]
+    D --> F["Instance Created<br>Injected into Constructor"]
+    E --> F
+```
+
 ## Zero configuration resolution
 
 When a class has no dependencies on interfaces—only concrete classes—you don't need to tell the container how to resolve it. For example:
