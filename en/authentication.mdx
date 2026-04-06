@@ -16,6 +16,16 @@ Laravel's authentication system is built around two concepts:
   The authentication configuration file is `config/auth.php`. For most applications the defaults work without any changes.
 </Info>
 
+```mermaid
+flowchart TD
+    A["Login Request"] --> B["Guard<br>(defines auth method)"]
+    B --> C["Provider<br>(retrieves user from DB)"]
+    C --> D{"Auth Check"}
+    D -- "Success" --> E["Save User<br>to Session"]
+    E --> F["Redirect to<br>Authenticated Page"]
+    D -- "Failure" --> G["Redirect to<br>Login Page"]
+```
+
 ## Setting up authentication with a starter kit
 
 The fastest way to add authentication to a new application is to choose a starter kit when running `laravel new`. It scaffolds login, registration, password reset, and email verification automatically.

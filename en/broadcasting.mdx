@@ -18,6 +18,15 @@ The flow is:
   Broadcasting is built on top of Laravel's event system. Events and listeners are the foundation — broadcasting adds a delivery channel. Make sure you're comfortable with [events and listeners](/en/events) before continuing.
 </Info>
 
+```mermaid
+flowchart LR
+    A["Server-side<br>Event Fired<br>dispatch()"] --> B["Broadcast<br>Driver<br>(Reverb, etc.)"]
+    B --> C["WebSocket<br>Server"]
+    C --> D["Channel<br>Authorization Check"]
+    D --> E["Client<br>Laravel Echo"]
+    E --> F["Real-time<br>UI Update"]
+```
+
 ## Setup
 
 Broadcasting is disabled in new Laravel apps. Enable it with:

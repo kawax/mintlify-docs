@@ -13,6 +13,17 @@ Beyond authentication, you can write middleware for logging, CSRF protection, ra
   User-defined middleware lives in the `app/Http/Middleware` directory.
 </Info>
 
+```mermaid
+flowchart TD
+    A["HTTP Request"] --> B["Global Middleware<br>(applied to all requests)"]
+    B --> C["Route Middleware<br>(applied to specific routes)"]
+    C --> D["Controller / Closure"]
+    D --> E["Response Generated"]
+    E --> F["Route Middleware<br>(post-processing)"]
+    F --> G["Global Middleware<br>(post-processing)"]
+    G --> H["HTTP Response"]
+```
+
 ## Built-in middleware
 
 Laravel ships with two default middleware groups: `web` and `api`. The `web` group is automatically applied to routes in `routes/web.php`, and the `api` group to routes in `routes/api.php`.
