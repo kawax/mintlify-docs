@@ -32,6 +32,24 @@ Schedule::call(function () {
   ```
 </Info>
 
+### スケジューラーの実行フロー
+
+```mermaid
+flowchart TD
+    A["* * * * * artisan schedule:run<br>（毎分 cron が呼び出す）"] --> B["Console Kernel"]
+    B --> C["schedule() メソッド呼び出し"]
+    C --> D["登録済みタスクを順番に評価"]
+    D --> E{"Cron 式が現在時刻に<br>一致しているか?"}
+    E -->|"一致しない"| F["スキップ"]
+    E -->|"一致する"| G{"when / skip /<br>environments 条件チェック"}
+    G -->|"条件不一致"| F
+    G -->|"条件一致"| H{"メンテナンス<br>モード中?"}
+    H -->|"通常モード"| I["タスク実行<br>(before フック → 本体 → after フック)"]
+    H -->|"メンテナンスモード"| J{"evenInMaintenanceMode()<br>が設定されているか?"}
+    J -->|"はい"| I
+    J -->|"いいえ"| F
+```
+
 ## スケジュールの定義方法
 
 スケジュールの定義は `routes/console.php` に記述します。
@@ -309,6 +327,24 @@ Schedule::command('report:generate')
   この機能を使うには、アプリケーションのデフォルトキャッシュドライバを `database`、`memcached`、`dynamodb`、または `redis` に設定し、すべてのサーバーが同じキャッシュサーバーに接続している必要があります。
 </Warning>
 
+### onOneServer() による分散実行制御フロー
+
+```mermaid
+flowchart TD
+    A["複数サーバーで<br>artisan schedule:run が同時実行"] --> B["サーバー 1"]
+    A --> C["サーバー 2"]
+    A --> D["サーバー 3"]
+
+    B --> E["共有キャッシュサーバーで<br>アトミックロックを取得試行"]
+    C --> E
+    D --> E
+
+    E -->|"取得成功（最初の 1 台）"| F["タスクを実行"]
+    E -->|"取得失敗（他のサーバー）"| G["タスクをスキップ"]
+
+    F --> H["実行完了後にロックを解放"]
+```
+
 ## タスクのグループ化
 
 複数のタスクに同じ設定を適用する場合は `group` メソッドを使ってまとめられます。
@@ -350,6 +386,17 @@ Schedule::command('analytics:report')
 
 ```php
 Schedule::command('emails:send')->evenInMaintenanceMode();
+```
+
+### メンテナンスモードの対応フロー
+
+```mermaid
+flowchart TD
+    A["artisan schedule:run"] --> B{"アプリがメンテナンス<br>モードか?<br>(artisan down)"}
+    B -->|"通常モード"| C["タスクを通常実行"]
+    B -->|"メンテナンスモード"| D{"タスクに<br>evenInMaintenanceMode()<br>が設定されているか?"}
+    D -->|"はい"| C
+    D -->|"いいえ"| E["タスクをスキップ"]
 ```
 
 ## スケジューラの一時停止
