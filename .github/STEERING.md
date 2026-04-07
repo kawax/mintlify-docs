@@ -51,7 +51,7 @@
 優先度は低い
 
 - https://github.com/laravel で公開された新しいリポジトリの調査。private状態で開発されてどこかのタイミングで公開される。大々的に発表されることもあるけどほとんどはドキュメントもなくリポジトリ内を見ないと何も分からない。バージョンは0.xで開発段階なことが多いのでblogで書くのは初期調査結果の情報。
-- Maestro https://github.com/laravel/maestro スターターキット開発のオーケストレーター。一番新しく公開された。
+- [x] Maestro https://github.com/laravel/maestro スターターキット開発のオーケストレーター。一番新しく公開された。ユーザー向けパッケージではない。
 - https://github.com/laravel/agent-skills AI用のエージェントスキル。最初はClaude Code用のスキルを置いてるリポジトリだったけどリポジトリ名を変えてリニューアル。「Laravel公式のmarketplace」としてこれから整備されていくんだろう。
-- Wayfinder https://github.com/laravel/wayfinder v0.1だけど既にInertiaを使うスターターキットでは導入されている。元々使っていたZiggyからの置き換え。mainブランチが0.1、nextブランチの次期バージョンで色々変わることも確定しているので0.1でページを作ってもすぐに古くなってしまう。
+- [x] Wayfinder https://github.com/laravel/wayfinder v0.1だけど既にInertiaを使うスターターキットでは導入されている。元々使っていたZiggyからの置き換え。mainブランチが0.1、nextブランチの次期バージョンで色々変わることも確定しているので0.1でページを作ってもすぐに古くなってしまう。
 - https://github.com/laravel/roster https://github.com/laravel/ranger https://github.com/laravel/surveyor https://github.com/laravel/sentinel この辺りになるとほとんど分からなくなる。rosterはboostで使われている。
