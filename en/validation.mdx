@@ -7,6 +7,17 @@ description: "How to validate incoming request data in Laravel using the validat
 
 Validation is the process of verifying that data submitted by the user meets the format and rules your application expects. Laravel provides a simple, expressive validation system built into the request object, with no third-party packages required.
 
+```mermaid
+flowchart TD
+    A["HTTP request received"] --> B["Apply validation rules"]
+    B --> C{{"Validation<br>passed?"}}
+    C -->|"Success"| D["Retrieve validated data"]
+    D --> E["Execute controller logic"]
+    E --> F["Success response"]
+    C -->|"Failure<br>(web request)"| G["Redirect back<br>Store errors in session"]
+    C -->|"Failure<br>(API request)"| H["422 Unprocessable Entity<br>JSON error response"]
+```
+
 ## Validating in a controller
 
 ### Using `$request->validate()`
@@ -144,6 +155,19 @@ Use the `@error` directive to show an inline error message for a specific field:
 ### When to use them
 
 When validation logic becomes complex, extract it into a dedicated "form request" class. A form request encapsulates both the validation rules and the authorization check for a request.
+
+```mermaid
+flowchart TD
+    A["Controller method called"] --> B["FormRequest instance created"]
+    B --> C["Run authorize() method"]
+    C --> D{{"Authorized?"}}
+    D -->|"false"| E["403 Forbidden response"]
+    D -->|"true"| F["Run rules() method"]
+    F --> G["Execute validation"]
+    G --> H{{"Validation<br>passed?"}}
+    H -->|"Failure"| I["Validation<br>error response"]
+    H -->|"Success"| J["Controller method executed"]
+```
 
 ### Creating a form request
 

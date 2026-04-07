@@ -19,6 +19,17 @@ Route::get('/greeting', function () {
 
 All Laravel routes are defined in the files inside the `routes/` directory. Laravel automatically loads these files based on the configuration in `bootstrap/app.php`.
 
+```mermaid
+flowchart LR
+    A["Incoming request"] --> B{{"Request type"}}
+    B -->|"Browser<br>Session / CSRF"| C["routes/web.php<br>web middleware group"]
+    B -->|"API<br>Stateless"| D["routes/api.php<br>api middleware group"]
+    B -->|"CLI command"| E["routes/console.php<br>Artisan command definitions"]
+    C --> F["Controller / Closure"]
+    D --> F
+    E --> G["Command handler"]
+```
+
 Define browser-facing routes in `routes/web.php`. Routes in this file have the `web` middleware group applied, which provides session handling, CSRF protection, and cookie encryption:
 
 ```php
@@ -158,6 +169,19 @@ return redirect()->route('profile');
 ## Route groups
 
 Group related routes to share middleware, controllers, prefixes, and other attributes without repeating them on each route.
+
+```mermaid
+flowchart TD
+    A["HTTP request"] --> B["Router"]
+    B --> C{{"Matching route<br>found?"}}
+    C -->|"No"| D["404 response"]
+    C -->|"Yes"| E["Check route middleware"]
+    E --> F{{"Middleware<br>passed?"}}
+    F -->|"Rejected"| G["Redirect /<br>error response"]
+    F -->|"Passed"| H["Controller /<br>closure executed"]
+    H --> I["Response generated"]
+    I --> J["Sent to client"]
+```
 
 ### Middleware
 

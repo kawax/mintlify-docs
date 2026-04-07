@@ -9,6 +9,15 @@ Service providers are the central place for bootstrapping all Laravel applicatio
 
 "Bootstrapping" means **registering** things: service container bindings, event listeners, middleware, and routes. Service providers are where you configure your application.
 
+```mermaid
+flowchart TD
+    A["Application boot"] --> B["Load bootstrap/providers.php"]
+    B --> C["Instantiate all providers"]
+    C --> D["Run register() on all providers<br>Register bindings in the service container only"]
+    D --> E["Run boot() on all providers<br>View composers, event listeners, etc."]
+    E --> F["Application ready<br>Begin handling requests"]
+```
+
 Laravel uses dozens of service providers internally to bootstrap core services like the mailer, queue, and cache. Many are "deferred" providers—they don't load on every request, only when their services are actually needed.
 
 All user-defined service providers are registered in `bootstrap/providers.php`.
@@ -230,6 +239,18 @@ Here's a complete example of a custom service provider that registers a payment 
 ## Deferred providers
 
 If a provider only registers container bindings, you can defer loading it until one of its bindings is actually needed. This prevents it from loading on every request, improving performance.
+
+```mermaid
+flowchart TD
+    A["Application boot"] --> B["Load and initialize regular providers"]
+    B --> C["Deferred providers:<br>only record the list of provided services"]
+    C --> D["Handle request"]
+    D --> E{{"A deferred provider's<br>service requested?"}}
+    E -->|"No"| F["Provider never loaded<br>Memory and CPU saved"]
+    E -->|"Yes"| G["Load the provider on demand"]
+    G --> H["Run register()"]
+    H --> I["Resolve service from container"]
+```
 
 Implement `DeferrableProvider` and define a `provides` method that returns the bindings the provider registers:
 
