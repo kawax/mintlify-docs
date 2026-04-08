@@ -26,6 +26,22 @@ Schedule::call(function () {
   Run `php artisan schedule:list` to see all defined tasks and when they will next execute.
 </Info>
 
+### How the scheduler works
+
+```mermaid
+flowchart TD
+    A["* * * * * artisan schedule:run<br>(cron calls this every minute)"] --> B["Check all registered tasks"]
+    B --> C{"Any tasks due?"}
+    C -->|"No"| D["Exit"]
+    C -->|"Yes"| E{"when / skip /<br>environments conditions pass?"}
+    E -->|"No"| D
+    E -->|"Yes"| F{"Application in<br>maintenance mode?"}
+    F -->|"No"| G["Execute task<br>(before hook → body → after hook)"]
+    F -->|"Yes"| H{"evenInMaintenanceMode()<br>set?"}
+    H -->|"Yes"| G
+    H -->|"No"| D
+```
+
 ## Defining schedules
 
 Write schedules in `routes/console.php`. You can also use the `withSchedule` method in `bootstrap/app.php`:
@@ -232,6 +248,24 @@ Schedule::command('report:generate')
   This feature requires your default cache driver to be `database`, `memcached`, `dynamodb`, or `redis`, and all servers must share the same cache server.
 </Warning>
 
+### How onOneServer() works
+
+```mermaid
+flowchart TD
+    A["Multiple servers run<br>artisan schedule:run simultaneously"] --> B["Server 1"]
+    A --> C["Server 2"]
+    A --> D["Server 3"]
+
+    B --> E["Attempt to acquire atomic lock<br>on shared cache server"]
+    C --> E
+    D --> E
+
+    E -->|"Lock acquired (first server)"| F["Execute the task"]
+    E -->|"Lock failed (other servers)"| G["Skip the task"]
+
+    F --> H["Release lock after completion"]
+```
+
 ## Grouping tasks
 
 Apply shared configuration to multiple tasks at once:
@@ -270,6 +304,17 @@ Scheduled tasks are skipped when the application is in maintenance mode. To forc
 
 ```php
 Schedule::command('emails:send')->evenInMaintenanceMode();
+```
+
+### Maintenance mode handling flow
+
+```mermaid
+flowchart TD
+    A["artisan schedule:run"] --> B{"Is the application in<br>maintenance mode?<br>(artisan down)"}
+    B -->|"No"| C["Run tasks normally"]
+    B -->|"Yes"| D{"Is evenInMaintenanceMode()<br>set on the task?"}
+    D -->|"Yes"| C
+    D -->|"No"| E["Skip the task"]
 ```
 
 ## Pausing the scheduler

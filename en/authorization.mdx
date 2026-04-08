@@ -14,6 +14,25 @@ Most applications use both. Gates handle broad, model-independent checks; polici
 
 ## Gates
 
+### Gate authorization flow
+
+```mermaid
+flowchart TD
+    A["AppServiceProvider::boot()<br>(App\\Providers\\AppServiceProvider)"] --> B["Gate::define('ability', fn)<br>Register authorization logic"]
+    C["Authorization check from controller"] --> D{"Gate::before()<br>callback set?"}
+    D -->|"Yes"| E{"before() return value"}
+    E -->|"true / false"| F["Use before() result as final decision"]
+    E -->|"null"| G["Execute define() closure"]
+    D -->|"No"| G
+    G --> H{"Closure return value"}
+    H -->|"true"| I["✓ Access allowed"]
+    H -->|"false"| J["✗ Access denied"]
+    F -->|"true"| I
+    F -->|"false"| J
+    J -->|"Gate::allows()"| K["Returns false<br>→ call abort(403) manually"]
+    J -->|"Gate::authorize()"| L["AuthorizationException<br>→ 403 Forbidden automatically"]
+```
+
 ### Defining gates
 
 Define gates inside the `boot` method of `App\Providers\AppServiceProvider` using the `Gate` facade. Gates receive the authenticated user as their first argument, plus any additional arguments you pass:
@@ -103,6 +122,24 @@ if ($response->allowed()) {
 ```
 
 ## Policies
+
+### Policy authorization flow
+
+```mermaid
+flowchart TD
+    A["HTTP Request"] --> B["Controller"]
+    B --> C["Gate::authorize('update', $post)"]
+    C --> D{"PostPolicy::before()<br>defined?"}
+    D -->|"Yes"| E{"before() return value"}
+    E -->|"true / false"| F["Use before() result as final decision"]
+    E -->|"null"| G["Execute PostPolicy::update(User, Post)"]
+    D -->|"No"| G
+    G --> H{"$user->id === $post->user_id?"}
+    H -->|"true"| I["✓ Continue processing"]
+    H -->|"false"| J["✗ AuthorizationException<br>→ 403 Forbidden"]
+    F -->|"true"| I
+    F -->|"false"| J
+```
 
 ### Generating policies
 
@@ -216,6 +253,21 @@ public function before(User $user, string $ability): bool|null
 ```
 
 Returning `null` from `before` delegates to the specific policy method.
+
+### Before callback execution order
+
+```mermaid
+flowchart TD
+    A["Authorization check starts<br>authorize('update', $post)"] --> B["Run PostPolicy::before()"]
+    B --> C{"Return value is null?"}
+    C -->|"Non-null (true / false)"| D["Use before() result as final decision"]
+    C -->|"null"| E["Run the specific policy method<br>update() / delete() etc."]
+    E --> F{"Policy method return value"}
+    F -->|"true"| G["✓ Access allowed"]
+    F -->|"false"| H["✗ Access denied → 403"]
+    D -->|"true (admin bypass)"| G
+    D -->|"false"| H
+```
 
 ## Authorizing actions using policies
 

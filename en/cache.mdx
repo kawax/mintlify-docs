@@ -19,6 +19,37 @@ CACHE_STORE=database
 # CACHE_STORE=memcached
 ```
 
+### Cache driver hierarchy
+
+Choose a driver based on the speed and infrastructure requirements of your application:
+
+```mermaid
+flowchart LR
+    A["Application"] --> B["Cache Facade"]
+
+    subgraph L1 ["L1: Per-request (fastest)"]
+        C["array<br>Testing / development"]
+    end
+
+    subgraph L2 ["L2: In-memory (fast)"]
+        E["Redis<br>Recommended for production"]
+        F["Memcached<br>Distributed cache"]
+    end
+
+    subgraph L3 ["L3: Persistent storage (standard)"]
+        G["database (default)"]
+        H["file"]
+        I["DynamoDB (AWS)"]
+    end
+
+    B --> C
+    B --> E
+    B --> F
+    B --> G
+    B --> H
+    B --> I
+```
+
 ### Database driver
 
 The `database` driver stores cached data in a database table. New Laravel projects include the migration automatically. If yours doesn't, create the table:
@@ -109,6 +140,18 @@ $users = Cache::remember('users', $seconds, function () {
 });
 ```
 
+### How remember() works
+
+```mermaid
+flowchart TD
+    A["Cache::remember('key', $ttl, fn)"] --> B{"Does 'key' exist<br>in the cache store?"}
+    B -->|"Hit"| C["Return cached value"]
+    B -->|"Miss"| D["Execute callback fn<br>e.g. DB query / API call"]
+    D --> E["Store result in cache<br>with TTL = $ttl seconds"]
+    E --> F["Return value"]
+    C --> F
+```
+
 Store the result forever if it doesn't exist:
 
 ```php
@@ -169,6 +212,25 @@ $john = Cache::tags(['people', 'artists'])->get('John');
 
 // Flush all items tagged with 'people'
 Cache::tags('people')->flush();
+```
+
+### How cache tags work
+
+Items tagged with multiple tags can be flushed by any of their tags:
+
+```mermaid
+flowchart TD
+    A["Cache::tags(['people', 'artists'])<br>.put('John', $data)"] --> B["John's cache entry"]
+    C["Cache::tags(['people', 'authors'])<br>.put('Anne', $data)"] --> D["Anne's cache entry"]
+
+    B --> T1["Tag: people"]
+    B --> T2["Tag: artists"]
+    D --> T1
+    D --> T3["Tag: authors"]
+
+    T1 -->|"flush()"| E["Removes John and Anne"]
+    T2 -->|"flush()"| F["Removes John only"]
+    T3 -->|"flush()"| G["Removes Anne only"]
 ```
 
 ## Atomic locks
