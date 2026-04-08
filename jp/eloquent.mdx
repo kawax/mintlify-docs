@@ -116,6 +116,20 @@ class Post extends Model
   ユーザー入力をそのまま渡す場合は意図しないカラムが書き換えられる危険があるため、`$fillable` で許可するカラムを明示的に指定することを推奨します。
 </Warning>
 
+## Eloquentクエリ実行フロー
+
+`User::where()->get()` のようなクエリがどのように実行されるか、内部の流れを示します。
+
+```mermaid
+flowchart LR
+    A["User::where('active', true)"] --> B["クエリビルダー構築"]
+    B --> C["->get() 呼び出し"]
+    C --> D["SQL生成"]
+    D --> E["データベース実行"]
+    E --> F["結果をEloquentモデルに変換"]
+    F --> G["Collectionとして返却"]
+```
+
 ## 基本的なCRUD操作
 
 ### レコードの取得（Read）
@@ -292,6 +306,24 @@ class PostController extends Controller
   コントローラーのメソッド引数に `Post $post` と書くと、Laravelがルートパラメーターからモデルを自動的に取得してくれます（ルートモデルバインディング）。
   `Post::findOrFail($id)` を自分で書く必要がなくなります。
 </Tip>
+
+## モデルイベントのライフサイクル
+
+`save()` を呼び出したときに発火するイベントの流れを示します。新規作成か更新かで異なるイベントが発火しますが、`saving`・`saved` は両方の場合に共通して発火します。
+
+```mermaid
+flowchart TD
+    A["新規インスタンス生成"] --> B{"save()"}
+    B --> I["saving イベント"]
+    I -->|"新規"| C["creating イベント"]
+    C --> D["INSERT実行"]
+    D --> E["created イベント"]
+    I -->|"更新"| F["updating イベント"]
+    F --> G["UPDATE実行"]
+    G --> H["updated イベント"]
+    E --> J["saved イベント"]
+    H --> J
+```
 
 ## 次のステップ
 
