@@ -358,9 +358,9 @@ public function textGateway(): TextGateway
 
 ## テスト方法
 
-### Ai::fake() を使う
+### エージェントクラスの fake() を使う
 
-カスタムプロバイダーを使うエージェントのテストには、SDKが提供する `Ai::fakeAgent()` をそのまま使えます。カスタムプロバイダーかどうかに関係なく、フェイクゲートウェイがプロバイダーにセットされます。
+カスタムプロバイダーを使うエージェントのテストには、エージェントクラスの `fake()` メソッドを使います。カスタムプロバイダーかどうかに関係なく、フェイクゲートウェイがプロバイダーにセットされます。
 
 ```php
 <?php
@@ -369,7 +369,6 @@ namespace Tests\Feature;
 
 use App\Ai\Agents\SummaryAgent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Ai\Ai;
 use Tests\TestCase;
 
 class SummaryAgentTest extends TestCase
@@ -378,13 +377,13 @@ class SummaryAgentTest extends TestCase
 
     public function test_summary_agent_returns_text(): void
     {
-        Ai::fakeAgent(SummaryAgent::class, ['これは要約です。']);
+        SummaryAgent::fake(['これは要約です。']);
 
         $response = SummaryAgent::make()->prompt('長い記事のテキスト...', provider: 'my-inference');
 
         $this->assertEquals('これは要約です。', $response->text);
 
-        Ai::assertAgentWasPrompted(SummaryAgent::class, '長い記事のテキスト...');
+        SummaryAgent::assertPrompted('長い記事のテキスト...');
     }
 }
 ```
