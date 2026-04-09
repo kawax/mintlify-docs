@@ -155,6 +155,18 @@ public function content(): Content
 
 `Mail` ファサードの `to()` メソッドで宛先を指定し、`send()` でメールを送信します。
 
+```mermaid
+flowchart TD
+    A["Mail::to()->send(new OrderShipped())"] --> B{"ShouldQueue<br>実装?"}
+    B -- "No" --> C["同期送信<br>Mailerへ"]
+    B -- "Yes" --> D["キューに登録<br>バックグラウンド送信"]
+    D --> C
+    C --> E{"MAILドライバー"}
+    E --> F["smtp"]
+    E --> G["ses / mailgun<br>/ postmark"]
+    E --> H["log<br>(開発用)"]
+```
+
 ```php
 <?php
 

@@ -179,6 +179,18 @@ public function content(): Content
 
 Use the `Mail` facade to send a mailable:
 
+```mermaid
+flowchart TD
+    A["Mail::to()->send(new OrderShipped())"] --> B{"ShouldQueue<br>implemented?"}
+    B -- "No" --> C["Synchronous send<br>via Mailer"]
+    B -- "Yes" --> D["Queued<br>background send"]
+    D --> C
+    C --> E{"MAIL driver"}
+    E --> F["smtp"]
+    E --> G["ses / mailgun<br>/ postmark"]
+    E --> H["log<br>(development)"]
+```
+
 ```php
 use App\Mail\OrderShipped;
 use Illuminate\Support\Facades\Mail;

@@ -28,6 +28,15 @@ In a Laravel application, a facade is a class that provides access to an object 
 
 The base class uses PHP's `__callStatic()` magic method to forward calls from your facade to an object resolved from the container. Here's an example:
 
+```mermaid
+flowchart LR
+    A["Cache::get('key')"] --> B["Facade::__callStatic()"]
+    B --> C["getFacadeAccessor()<br>→ 'cache'"]
+    C --> D["Service Container<br>make('cache')"]
+    D --> E["Concrete instance<br>CacheManager"]
+    E --> F["get('key')<br>executed"]
+```
+
 ```php
 <?php
 

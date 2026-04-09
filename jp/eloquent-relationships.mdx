@@ -23,6 +23,13 @@ Eloquentが対応する主なリレーションは以下のとおりです。
 | `hasMany` | 1対多（親が複数の子を持つ） |
 | `belongsToMany` | 多対多（中間テーブルを使う） |
 
+```mermaid
+erDiagram
+    users ||--o| profiles : "hasOne / belongsTo<br>(profiles.user_id)"
+    posts ||--o{ comments : "hasMany / belongsTo<br>(comments.post_id)"
+    posts }o--o{ tags : "belongsToMany<br>(post_tag 中間テーブル)"
+```
+
 ## hasOne（1対1）
 
 `hasOne` は、あるモデルが別のモデルを1つだけ持つ関係を表します。たとえば `User` が1つの `Profile` を持つ場合です。

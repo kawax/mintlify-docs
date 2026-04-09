@@ -63,6 +63,17 @@ Notification::sendNow($developers, new DeploymentCompleted($deployment));
 
 `via()` メソッドで使用するチャンネルを配列で返します。
 
+```mermaid
+flowchart TD
+    A["$user->notify(new InvoicePaid())"] --> B["via() で<br>チャンネルを決定"]
+    B --> C{"チャンネル選択"}
+    C --> D["mail<br>toMail()"]
+    C --> E["database<br>toArray()"]
+    C --> F["broadcast<br>toBroadcast()"]
+    C --> G["vonage<br>toVonage()"]
+    C --> H["slack<br>toSlack()"]
+```
+
 ```php
 public function via(object $notifiable): array
 {
