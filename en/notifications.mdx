@@ -47,6 +47,17 @@ Notification::send($users, new InvoicePaid($invoice));
 
 Every notification class has a `via` method that returns which channels to use:
 
+```mermaid
+flowchart TD
+    A["$user->notify(new InvoicePaid())"] --> B["via() determines<br>channels"]
+    B --> C{"Channel selection"}
+    C --> D["mail<br>toMail()"]
+    C --> E["database<br>toArray()"]
+    C --> F["broadcast<br>toBroadcast()"]
+    C --> G["vonage<br>toVonage()"]
+    C --> H["slack<br>toSlack()"]
+```
+
 ```php
 /**
  * Get the notification's delivery channels.
