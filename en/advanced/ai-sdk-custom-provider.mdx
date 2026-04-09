@@ -358,9 +358,9 @@ public function textGateway(): TextGateway
 
 ## Testing
 
-### Using Ai::fakeAgent()
+### Using Agent::fake()
 
-You can use the SDK's built-in `Ai::fakeAgent()` directly to test agents that use your custom provider. Regardless of whether a custom provider is in use, the fake gateway is set on the provider.
+To test agents that use your custom provider, call the `fake` method on the agent class. Regardless of whether a custom provider is in use, the fake gateway is set on the provider.
 
 ```php
 <?php
@@ -369,7 +369,6 @@ namespace Tests\Feature;
 
 use App\Ai\Agents\SummaryAgent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Ai\Ai;
 use Tests\TestCase;
 
 class SummaryAgentTest extends TestCase
@@ -378,13 +377,13 @@ class SummaryAgentTest extends TestCase
 
     public function test_summary_agent_returns_text(): void
     {
-        Ai::fakeAgent(SummaryAgent::class, ['This is a summary.']);
+        SummaryAgent::fake(['This is a summary.']);
 
         $response = SummaryAgent::make()->prompt('Long article text...', provider: 'my-inference');
 
         $this->assertEquals('This is a summary.', $response->text);
 
-        Ai::assertAgentWasPrompted(SummaryAgent::class, 'Long article text...');
+        SummaryAgent::assertPrompted('Long article text...');
     }
 }
 ```

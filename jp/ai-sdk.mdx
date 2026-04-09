@@ -576,22 +576,39 @@ $sentiment = $response['sentiment'];
 
 ## テスト
 
-Laravel AI SDK はテスト用のフェイク機能を提供します。`Ai::fake()` を使うと実際の API を呼び出さずにテストできます。
+Laravel AI SDK はテスト用のフェイク機能を提供します。エージェントクラスの `fake()` メソッドを呼び出すと実際の API を呼び出さずにテストできます。
 
 ```php
-use Laravel\Ai\Facades\Ai;
-use Laravel\Ai\Testing\AgentFake;
+use App\Ai\Agents\SalesCoach;
+use Laravel\Ai\Prompts\AgentPrompt;
 
-Ai::fake([
-    SalesCoach::class => AgentFake::make()
-        ->withTextResponse('スコアは8点です。')
-]);
+// すべてのプロンプトに固定のレスポンスを返す
+SalesCoach::fake(['スコアは8点です。']);
 
 $response = (new SalesCoach)->prompt('トランスクリプトを分析してください。');
 
 expect((string) $response)->toBe('スコアは8点です。');
+
+// プロンプトが送られたことを検証する
+SalesCoach::assertPrompted('トランスクリプトを分析してください。');
+```
+
+クロージャを使うと、プロンプトの内容に応じてレスポンスを動的に変えることもできます。
+
+```php
+SalesCoach::fake(function (AgentPrompt $prompt) {
+    return 'Response for: '.$prompt->prompt;
+});
+```
+
+`agent()` ヘルパーで作成した匿名エージェントをテストする場合は `AnonymousAgent::fake()` を使います。
+
+```php
+use Laravel\Ai\AnonymousAgent;
+
+AnonymousAgent::fake(['テスト用レスポンス']);
 ```
 
 <Warning>
-  テストで実際の API キーが使われないよう、必ず `Ai::fake()` を使用してください。API 呼び出しのコストやレート制限を回避できます。
+  テストで実際の API キーが使われないよう、必ずエージェントクラスの `fake()` メソッドを使用してください。API 呼び出しのコストやレート制限を回避できます。
 </Warning>

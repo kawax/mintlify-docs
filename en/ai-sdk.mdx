@@ -559,22 +559,39 @@ $sentiment = $response['sentiment'];
 
 ## Testing
 
-The SDK provides a fake implementation so you can test agent behaviour without calling real APIs:
+The SDK provides a fake implementation so you can test agent behaviour without calling real APIs. Call the `fake` method on the agent class:
 
 ```php
-use Laravel\Ai\Facades\Ai;
-use Laravel\Ai\Testing\AgentFake;
+use App\Ai\Agents\SalesCoach;
+use Laravel\Ai\Prompts\AgentPrompt;
 
-Ai::fake([
-    SalesCoach::class => AgentFake::make()
-        ->withTextResponse('Your score is 8 out of 10.'),
-]);
+// Return a fixed response for every prompt...
+SalesCoach::fake(['Your score is 8 out of 10.']);
 
 $response = (new SalesCoach)->prompt('Please analyse this transcript.');
 
 expect((string) $response)->toBe('Your score is 8 out of 10.');
+
+// Assert that the expected prompt was received...
+SalesCoach::assertPrompted('Please analyse this transcript.');
+```
+
+You may also pass a closure to dynamically generate responses based on the incoming prompt:
+
+```php
+SalesCoach::fake(function (AgentPrompt $prompt) {
+    return 'Response for: '.$prompt->prompt;
+});
+```
+
+To test anonymous agents created with the `agent()` helper, use `AnonymousAgent::fake()`:
+
+```php
+use Laravel\Ai\AnonymousAgent;
+
+AnonymousAgent::fake(['Test response']);
 ```
 
 <Warning>
-  Always use `Ai::fake()` in tests to avoid making real API calls. This prevents unexpected costs and rate-limit errors.
+  Always call `fake()` on the agent class in tests to avoid making real API calls. This prevents unexpected costs and rate-limit errors.
 </Warning>
