@@ -44,10 +44,10 @@ Nightwatch uses a lightweight agent process between your Laravel application and
 
 ```mermaid
 sequenceDiagram
-    participant App as "Laravel App"
-    participant Agent as "Nightwatch Agent<br>(php artisan nightwatch:agent)"
-    participant Cloud as "Nightwatch Cloud"
-    participant Dashboard as "Dashboard<br>(nightwatch.laravel.com)"
+    participant App as Laravel App
+    participant Agent as Nightwatch Agent<br>(php artisan nightwatch:agent)
+    participant Cloud as Nightwatch Cloud
+    participant Dashboard as Dashboard<br>(nightwatch.laravel.com)
 
     App->>Agent: Send event data<br>(127.0.0.1:2407)
     Agent->>Cloud: Batch upload
