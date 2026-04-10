@@ -117,6 +117,7 @@ Do not use raw HTML for layout when a Mintlify component exists.
 公式ドキュメントではフローチャートなどは使われていないので公式よりも理解しやすくなる要素として使うと効果的な箇所ではMermaidでの図解を積極的に入れていく。
 
 Mermaid内での改行は`\n`ではなく`<br>`で行う。`\n`では改行されない。日本語の場合はダブルクォーテーションで囲むとより確実。`["ここで<br>改行"]`
+ただし`erDiagram`では`<br>`でも`\n`でも改行できてない。GitHub上では改行される。Mintlifyでは改行されない。表示方法の違いなのか動作に違いがあるので`erDiagram`では改行を避ける。
 
 ## Adding a new page
 
