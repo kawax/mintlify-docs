@@ -19,6 +19,6 @@ gh aw compile
 cd ../ && gh extension upgrade github/gh-aw && gh aw upgrade && gh aw compile
 ```
 
-AWからissueを作ってCopilotをアサインしてコーディングエージェントを起動、はまれに失敗する。
+AWからissueを作ってCopilotをアサインしてクラウドエージェントを起動、はまれに失敗する。
 GitHub側が原因なので直るまで待つ。
-手動でCopilotのアサインを解除して再度アサインすればコーディングエージェントが起動する。
+手動でCopilotのアサインを解除して再度アサインすればクラウドエージェントが起動する。
