@@ -34,14 +34,9 @@
                 ]
               },
               {
-                "group": "コントローラー",
-                "pages": [
-                  "jp/controllers"
-                ]
-              },
-              {
                 "group": "リクエスト処理",
                 "pages": [
+                  "jp/controllers",
                   "jp/middleware",
                   "jp/requests",
                   "jp/validation",
@@ -297,8 +292,13 @@
                   "jp/blog/pest-introduction",
                   "jp/blog/laravel-pennant",
                   "jp/blog/telescope-introduction",
+                  "jp/blog/wayfinder-introduction"
+                ]
+              },
+              {
+                "group": "新リポジトリ調査",
+                "pages": [
                   "jp/blog/maestro-introduction",
-                  "jp/blog/wayfinder-introduction",
                   "jp/blog/agent-skills-introduction"
                 ]
               },
