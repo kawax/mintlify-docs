@@ -3,21 +3,29 @@ description: Daily commander that reviews the documentation project, decides wha
 on:
   workflow_dispatch:
   schedule: daily around 4:00 utc+9
+
+engine:
+  id: copilot
+  version: "1.0.21"
+
 permissions:
   contents: read
   issues: read
   discussions: read
   pull-requests: read
+
 tools:
   github:
     toolsets: [default, discussions]
   web-fetch:
+
 network:
   allowed:
     - defaults
     - laravel.com
     - "*.laravel.com"
     - inertiajs.com
+
 safe-outputs:
   create-issue:
     max: 3
