@@ -24,9 +24,9 @@ The main relationship types Eloquent supports:
 
 ```mermaid
 erDiagram
-    users ||--o| profiles : "hasOne / belongsTo<br>(profiles.user_id)"
-    posts ||--o{ comments : "hasMany / belongsTo<br>(comments.post_id)"
-    posts }o--o{ tags : "belongsToMany<br>(post_tag pivot table)"
+    users ||--o| profiles : "hasOne / belongsTo (profiles.user_id)"
+    posts ||--o{ comments : "hasMany / belongsTo (comments.post_id)"
+    posts }o--o{ tags : "belongsToMany (post_tag pivot table)"
 ```
 
 ## hasOne (one-to-one)
