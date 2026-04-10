@@ -1,0 +1,223 @@
+---
+title: "Installing PHP, Composer, and Node.js with Homebrew (macOS)"
+description: "A step-by-step guide to installing PHP, Composer, and Node.js on macOS using Homebrew to set up a Laravel development environment."
+---
+
+## Introduction
+
+The Laravel team provides [Herd](https://herd.laravel.com/) and `php.new` for beginners, but senior engineers typically prefer managing each tool individually with a package manager. This gives you full version control and makes it easy to switch between different PHP versions across multiple projects.
+
+This guide walks you through installing PHP, Composer, and Node.js (via nvm) using **Homebrew**, all the way to a working `laravel new` setup.
+
+<Info>
+  Target environment: macOS 13 Ventura or later. Works on both Apple Silicon (M1/M2/M3) and Intel.
+</Info>
+
+---
+
+## Installing Homebrew
+
+Homebrew is the package manager for macOS. If you haven't installed it yet, run the following in your terminal:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+After installation, on Apple Silicon the following line is automatically added to your shell config file (e.g. `~/.zprofile`). If you added it manually, reload your config:
+
+```bash
+eval "$(/opt/homebrew/bin/brew shellenv)"
+```
+
+Verify the installation:
+
+```bash
+brew --version
+```
+
+---
+
+## Installing PHP
+
+<Steps>
+  <Step title="Install the latest PHP">
+    The Homebrew `php` formula always points to the latest stable version. Laravel 13 requires PHP 8.3 or higher.
+
+    ```bash
+    brew install php
+    ```
+  </Step>
+
+  <Step title="Verify the version">
+    ```bash
+    php --version
+    ```
+
+    You should see `PHP 8.3.x` or higher.
+  </Step>
+
+  <Step title="(Optional) Use a specific version">
+    If you need to manage multiple PHP versions, install a versioned formula:
+
+    ```bash
+    brew install php@8.3
+    ```
+
+    Switch between versions using `brew link`:
+
+    ```bash
+    brew unlink php
+    brew link php@8.3 --force --overwrite
+    ```
+
+    Verify the currently linked version:
+
+    ```bash
+    php --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Installing Composer
+
+<Steps>
+  <Step title="Install Composer">
+    You can install it directly via Homebrew:
+
+    ```bash
+    brew install composer
+    ```
+  </Step>
+
+  <Step title="Verify the version">
+    ```bash
+    composer --version
+    ```
+  </Step>
+
+  <Step title="Set the global install path">
+    To use packages installed with `composer global require` (such as the Laravel installer), add `~/.composer/vendor/bin` to your `PATH`.
+
+    Add the following to `~/.zshrc` (or `~/.bashrc`):
+
+    ```bash
+    export PATH="$HOME/.composer/vendor/bin:$PATH"
+    ```
+
+    Apply the changes:
+
+    ```bash
+    source ~/.zshrc
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Installing nvm
+
+Node.js is installed per-user using nvm (Node Version Manager). Because no `root` privileges are needed, it works well alongside AI tools and CLIs that rely on global npm packages.
+
+<Steps>
+  <Step title="Install nvm">
+    Check the [nvm GitHub repository](https://github.com/nvm-sh/nvm) for the latest install script.
+
+    ```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Add the snippet to your shell config">
+    The install script automatically appends the following to `~/.zshrc` (or `~/.bashrc`). If it wasn't added, do so manually:
+
+    ```bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    ```
+
+    Apply the changes:
+
+    ```bash
+    source ~/.zshrc
+    ```
+  </Step>
+
+  <Step title="Verify the installation">
+    ```bash
+    nvm --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Installing Node.js
+
+<Steps>
+  <Step title="Install the LTS version">
+    ```bash
+    nvm install --lts
+    ```
+  </Step>
+
+  <Step title="Set it as the default">
+    Set the default version so it's used automatically in new terminal sessions:
+
+    ```bash
+    nvm alias default node
+    ```
+  </Step>
+
+  <Step title="Verify the versions">
+    ```bash
+    node --version
+    npm --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Verifying the Laravel Installation
+
+<Steps>
+  <Step title="Install the Laravel installer">
+    ```bash
+    composer global require laravel/installer
+    ```
+  </Step>
+
+  <Step title="Create a new project">
+    ```bash
+    laravel new my-app
+    ```
+
+    An interactive setup will begin where you can choose a starter kit, authentication options, and more.
+  </Step>
+
+  <Step title="Start the development server">
+    ```bash
+    cd my-app
+    php artisan serve
+    ```
+
+    Open `http://localhost:8000` in your browser. If you see the Laravel welcome page, you're all set.
+  </Step>
+</Steps>
+
+---
+
+## Homebrew vs. Herd
+
+| | Manual Homebrew setup | Herd |
+|---|---|---|
+| **Target user** | Developers who want fine-grained version and config control | Beginners and solo developers who want a quick start |
+| **PHP version switching** | Manual via `brew link` | Easy switching from the GUI |
+| **Local domains** | Manual `/etc/hosts` editing | Automatic `.test` domains |
+| **Service management** | `brew services` | Start/stop from the GUI |
+| **Customizability** | High | Limited |
+
+The manual Homebrew approach is best when you want to match your team or CI environment's configuration, or when you frequently switch between multiple PHP versions.
