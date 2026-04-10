@@ -292,7 +292,8 @@
                   "jp/blog/pest-introduction",
                   "jp/blog/laravel-pennant",
                   "jp/blog/telescope-introduction",
-                  "jp/blog/wayfinder-introduction"
+                  "jp/blog/wayfinder-introduction",
+                  "jp/blog/nightwatch-introduction"
                 ]
               },
               {
@@ -582,7 +583,8 @@
                   "en/blog/inertia-introduction",
                   "en/blog/pest-introduction",
                   "en/blog/laravel-pennant",
-                  "en/blog/telescope-introduction"
+                  "en/blog/telescope-introduction",
+                  "en/blog/nightwatch-introduction"
                 ]
               },
               {
