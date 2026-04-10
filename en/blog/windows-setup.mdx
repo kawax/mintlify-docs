@@ -1,0 +1,261 @@
+---
+title: "Installing PHP, Composer, and Node.js with WSL (Windows)"
+description: "A step-by-step guide to installing PHP, Composer, and Node.js on Windows 10/11 using WSL 2 to set up a Laravel development environment."
+---
+
+## Introduction
+
+The best practice for Laravel development on Windows is to use **WSL (Windows Subsystem for Linux)**. It lets you use the Linux toolchain directly, so the same commands work on macOS, your local Windows machine, and production servers.
+
+This guide walks you through installing PHP, Composer, and Node.js (via nvm) on Ubuntu inside WSL 2, all the way to a working `laravel new` setup.
+
+<Info>
+  Target environment: Windows 10 (version 2004 or later) or Windows 11, using WSL 2.
+</Info>
+
+---
+
+## Installing WSL
+
+<Steps>
+  <Step title="Open PowerShell as Administrator">
+    Search for "PowerShell" in the Start menu and select "Run as administrator".
+  </Step>
+
+  <Step title="Install WSL and Ubuntu">
+    ```powershell
+    wsl --install
+    ```
+
+    This command installs WSL 2 and Ubuntu (the default distribution). Restart your PC when it finishes.
+  </Step>
+
+  <Step title="Set up Ubuntu">
+    After restarting, Ubuntu will launch automatically. Set a username and password. This password will be used with the `sudo` command.
+
+    <Warning>
+      The password will not appear on screen while you type. Enter it carefully.
+    </Warning>
+  </Step>
+
+  <Step title="Update the package list">
+    Run the following in the Ubuntu terminal:
+
+    ```bash
+    sudo apt update && sudo apt upgrade -y
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Installing PHP
+
+Ubuntu's default repositories may include an outdated PHP version. Use the `ondrej/php` PPA to install the latest version.
+
+<Steps>
+  <Step title="Install required packages">
+    ```bash
+    sudo apt install -y software-properties-common
+    ```
+  </Step>
+
+  <Step title="Add the ondrej/php PPA">
+    ```bash
+    sudo add-apt-repository ppa:ondrej/php
+    sudo apt update
+    ```
+  </Step>
+
+  <Step title="Install PHP 8.3 and the required extensions">
+    Laravel 13 requires PHP 8.3 or higher.
+
+    ```bash
+    sudo apt install -y php8.3 php8.3-cli php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-sqlite3 php8.3-mysql
+    ```
+  </Step>
+
+  <Step title="Verify the version">
+    ```bash
+    php --version
+    ```
+
+    You should see `PHP 8.3.x` or higher.
+  </Step>
+
+  <Step title="(Optional) Switch between multiple versions">
+    If you need multiple PHP versions, switch between them using `update-alternatives`:
+
+    ```bash
+    sudo update-alternatives --config php
+    ```
+
+    A list of installed versions will appear. Enter the number of the version you want to use.
+  </Step>
+</Steps>
+
+---
+
+## Installing Composer
+
+Install Composer using the official installer.
+
+<Steps>
+  <Step title="Check required packages">
+    ```bash
+    sudo apt install -y curl php8.3-cli unzip
+    ```
+  </Step>
+
+  <Step title="Download and run the official installer">
+    ```bash
+    curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
+    sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    ```
+  </Step>
+
+  <Step title="Verify the version">
+    ```bash
+    composer --version
+    ```
+  </Step>
+
+  <Step title="Set the global install path">
+    To use packages installed with `composer global require` (such as the Laravel installer), add `~/.composer/vendor/bin` to your `PATH`.
+
+    Add the following to `~/.bashrc` (or `~/.zshrc`):
+
+    ```bash
+    export PATH="$HOME/.composer/vendor/bin:$PATH"
+    ```
+
+    Apply the changes:
+
+    ```bash
+    source ~/.bashrc
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Installing nvm
+
+Node.js is installed per-user using nvm (Node Version Manager). No `sudo` required, which makes it a great fit alongside AI tools and CLIs that rely on global npm packages.
+
+<Steps>
+  <Step title="Install nvm">
+    Check the [nvm GitHub repository](https://github.com/nvm-sh/nvm) for the latest install script.
+
+    ```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Add the snippet to your shell config">
+    The install script automatically appends the following to `~/.bashrc`. If it wasn't added, do so manually:
+
+    ```bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    ```
+
+    Apply the changes:
+
+    ```bash
+    source ~/.bashrc
+    ```
+
+    If you use zsh, add the same snippet to `~/.zshrc` and run `source ~/.zshrc`.
+  </Step>
+
+  <Step title="Verify the installation">
+    ```bash
+    nvm --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Installing Node.js
+
+<Steps>
+  <Step title="Install the LTS version">
+    ```bash
+    nvm install --lts
+    ```
+  </Step>
+
+  <Step title="Set it as the default">
+    Set the default version so it's used automatically in new terminal sessions:
+
+    ```bash
+    nvm alias default node
+    ```
+  </Step>
+
+  <Step title="Verify the versions">
+    ```bash
+    node --version
+    npm --version
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Verifying the Laravel Installation
+
+<Steps>
+  <Step title="Install the Laravel installer">
+    ```bash
+    composer global require laravel/installer
+    ```
+  </Step>
+
+  <Step title="Create a new project">
+    ```bash
+    laravel new my-app
+    ```
+
+    An interactive setup will begin where you can choose a starter kit, authentication options, and more.
+  </Step>
+
+  <Step title="Start the development server">
+    ```bash
+    cd my-app
+    php artisan serve
+    ```
+
+    Open `http://localhost:8000` in your browser. If you see the Laravel welcome page, you're all set.
+
+    <Tip>
+      If you can't access `localhost` from the Windows browser via WSL, try starting the server with `php artisan serve --host=0.0.0.0`.
+    </Tip>
+  </Step>
+</Steps>
+
+---
+
+## Bonus: Tools to Boost Productivity
+
+### Windows Terminal
+
+Windows Terminal lets you manage WSL, PowerShell, and Command Prompt in multiple tabs from one place. Install it for free from the Microsoft Store.
+
+- Run multiple shells in parallel using tabs
+- Set Ubuntu as the default shell
+- Freely customize fonts and color schemes
+
+### VS Code Remote - WSL Extension
+
+The [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) extension for VS Code lets you edit files inside WSL directly from the Windows VS Code interface.
+
+```bash
+# Open your project in VS Code from the WSL terminal
+code .
+```
+
+On first run, the VS Code server is automatically installed inside WSL. After that, you can develop with the same feel as a native environment.

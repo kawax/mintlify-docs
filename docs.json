@@ -591,6 +591,20 @@
                   "en/blog/upgrade-12-to-13",
                   "en/blog/upgrade-11-to-12"
                 ]
+              },
+              {
+                "group": "New Repository Reports",
+                "pages": [
+                  "en/blog/maestro-introduction",
+                  "en/blog/agent-skills-introduction"
+                ]
+              },
+              {
+                "group": "Environment Setup",
+                "pages": [
+                  "en/blog/mac-setup",
+                  "en/blog/windows-setup"
+                ]
               }
             ]
           }
