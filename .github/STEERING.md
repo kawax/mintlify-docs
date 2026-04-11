@@ -24,7 +24,7 @@
 - [x] advancedにLaravel11以降のアプリケーション構造のページを追加。11.xブランチのreleases.mdにしか情報がないので現在は参照しにくくなっている。基本的な解説＋`Application::configure()`の先の`Illuminate\Foundation\Configuration\ApplicationBuilder`クラスまで深掘り。
 - [x] blogにMac用の「HomebrewでPHPとcomposerとnode.jsをインストールする方法」とWindows用の「WSLでPHPとcomposerとnode.jsをインストールする方法」のページを追加。node.jsは今のCLIでのAIエージェント環境を想定してnvmを使う（rootでのインストールはたまに困ることがある）。
 - [x] 既存ページにMermaidによる図解を追加。数ページずつ追加してるので継続。→細かいページまで追加するようになってきたので十分。今後は既存ページの改修時に必要に応じて追加していく。
-- [ ] advanced デザインパターングループに`Illuminate\Support\Manager`の解説ページ。Laravel4.0の頃からあるLaravelのドライバーシステムを支えるクラス、だけどフレームワーク内部では〇〇Managerの名前だけど`Illuminate\Support\Manager`は使ってないことが徐々に増えた。CacheManagerやQueueManagerは使ってない、SessionManagerやSocialiteは使っている。`Illuminate\Support\MultipleInstanceManager`はLaravel10で追加されたけど情報が少ない。自作パッケージで複数のドライバーに対応したい時に使える。
+- [ ] advanced デザインパターングループに`Illuminate\Support\Manager`の解説ページ。Laravel4.0の頃からあるLaravelのドライバーシステムを支えるクラス、だけどフレームワーク内部では〇〇Managerの名前だけど`Illuminate\Support\Manager`は使ってないことが徐々に増えた。CacheManagerやQueueManagerは使ってない、SessionManagerやSocialiteは使っている。継承して使ってなくても`extend()`で拡張などの基本機能は同じなのでフレームワーク内部動作の理解には大事。`Illuminate\Support\MultipleInstanceManager`はLaravel10で追加されたけど情報が少ない。自作パッケージで複数のドライバーに対応したい時に使える。
 
 ## 継続対応
 
