@@ -24,22 +24,13 @@
 - [x] advancedにLaravel11以降のアプリケーション構造のページを追加。11.xブランチのreleases.mdにしか情報がないので現在は参照しにくくなっている。基本的な解説＋`Application::configure()`の先の`Illuminate\Foundation\Configuration\ApplicationBuilder`クラスまで深掘り。
 - [x] blogにMac用の「HomebrewでPHPとcomposerとnode.jsをインストールする方法」とWindows用の「WSLでPHPとcomposerとnode.jsをインストールする方法」のページを追加。node.jsは今のCLIでのAIエージェント環境を想定してnvmを使う（rootでのインストールはたまに困ることがある）。
 - [x] 既存ページにMermaidによる図解を追加。数ページずつ追加してるので継続。→細かいページまで追加するようになってきたので十分。今後は既存ページの改修時に必要に応じて追加していく。
-- [x] 中級・ガイドにPintのページ追加。ドキュメントに書いてないことだと、composer.jsonにpint実行のscriptsを追加すると便利、管理者が普段使ってるpint.jsonは以下
-```json
-{
-    "preset": "laravel",
-    "rules": {
-        "no_unused_imports": false,
-        "strict_comparison": true,
-        "declare_strict_types": true
-    }
-}
-```
+- [ ] デザインパターングループに`Illuminate\Support\Manager`の解説ページ。Laravel4.0の頃からあるLaravelのドライバーシステムを支えるクラス、だけどフレームワーク内部では〇〇Managerの名前だけど`Illuminate\Support\Manager`は使ってないことが徐々に増えた。CacheManagerやQueueManagerは使ってない、SessionManagerやSocialiteは使っている。`Illuminate\Support\MultipleInstanceManager`はLaravel10で追加されたけど情報が少ない。自作パッケージで複数のドライバーに対応したい時に使える。
 
 ## 継続対応
 
 - 新規ページ追加、翻訳ページ追加、既存ページの再レビュー・改修のタスクをバランスよくやっていく。AI SDKのような新しい機能のページはハルシネーションが発生していて管理者が発見して修正しているのでたまに再レビューが必要。
 - docs.jsonの`navigation`を全体を見て再配置。ページを追加していくだけだと適切な分類ではなくなるのでたまに修正。
+- ページ間リンクの追加。
 
 ## advanced ページ案
 
