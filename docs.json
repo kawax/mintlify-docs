@@ -220,7 +220,8 @@
                   "jp/advanced/pipeline",
                   "jp/advanced/macroable",
                   "jp/advanced/conditionable",
-                  "jp/advanced/higher-order-messages"
+                  "jp/advanced/higher-order-messages",
+                  "jp/advanced/manager"
                 ]
               },
               {
@@ -524,7 +525,8 @@
                   "en/advanced/pipeline",
                   "en/advanced/macroable",
                   "en/advanced/conditionable",
-                  "en/advanced/higher-order-messages"
+                  "en/advanced/higher-order-messages",
+                  "en/advanced/manager"
                 ]
               },
               {
