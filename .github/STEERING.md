@@ -35,8 +35,11 @@
     }
 }
 ```
-- [ ] docs.jsonの`navigation`を全体を見て再配置。ページを追加していくだけだと適切な分類ではなくなるのでたまに修正。
-- [ ] 新規ページ追加、翻訳ページ追加、既存ページの再レビュー・改修のタスクをバランスよくやっていく。AI SDKのような新しい機能のページはハルシネーションが発生していて管理者が発見して修正しているのでたまに再レビューが必要。
+
+## 継続対応
+
+- 新規ページ追加、翻訳ページ追加、既存ページの再レビュー・改修のタスクをバランスよくやっていく。AI SDKのような新しい機能のページはハルシネーションが発生していて管理者が発見して修正しているのでたまに再レビューが必要。
+- docs.jsonの`navigation`を全体を見て再配置。ページを追加していくだけだと適切な分類ではなくなるのでたまに修正。
 
 ## advanced ページ案
 
@@ -47,7 +50,7 @@
 - PHPのバージョンアップへの対応：Laravelの変更と同時に変更する。`"php": "^8.2",`。Laravel12に合わせて8.2以上にするか、Laravel13に合わせて8.3以上にするか、新機能を使ってるので8.4にするか、などは各パッケージ次第。
 - 良かれと思っていつまでも旧バージョンのサポートを続けない。Laravelエコシステム全体でバージョンアップしていくべきなのでパッケージ開発者としても貢献していく。
 - 逆に新バージョンへの対応が遅いのも困る現象。10数年で大量のパッケージを乗り換えてきたし結局自ら作るようになった原因。リリースと同時にアップグレードしたい人も多いのでリリース前に対応が終わっているのがベスト。`composer.json`を変更してインストールさえ可能なら十分。不具合があってもリリース後に修正すればよい。新バージョンへの対応が遅い小規模パッケージは今ならAIでサッと代替手段を作ってしまうこともできる。
-- https://github.com/laravel/nightwatch Laravel Nightwatchはホスト型アプリケーション監視プラットフォーム。このリポジトリはNightwatchで監視するためのパッケージ。TelescopeとかPulseとか微妙に似たパッケージを公開してきたけどこれは有料サービス。 https://nightwatch.laravel.com/docs/start-guide 。2025年はLaravel CloudとLaravel Nightwatchに注力していた印象。一応無料プランでも使えるけど何も設定しないとすぐにイベントログがいっぱいになる。サンプリングレートを低くしたり `NIGHTWATCH_REQUEST_SAMPLE_RATE=0.1`、クエリーの収集を全て無効にする工夫が必要。 `NIGHTWATCH_IGNORE_QUERIES=true`
+- [x] https://github.com/laravel/nightwatch Laravel Nightwatchはホスト型アプリケーション監視プラットフォーム。このリポジトリはNightwatchで監視するためのパッケージ。TelescopeとかPulseとか微妙に似たパッケージを公開してきたけどこれは有料サービス。 https://nightwatch.laravel.com/docs/start-guide 。2025年はLaravel CloudとLaravel Nightwatchに注力していた印象。一応無料プランでも使えるけど何も設定しないとすぐにイベントログがいっぱいになる。サンプリングレートを低くしたり `NIGHTWATCH_REQUEST_SAMPLE_RATE=0.1`、クエリーの収集を全て無効にする工夫が必要。 `NIGHTWATCH_IGNORE_QUERIES=true`
 - Laravel Cloudも2025年からなので実際に使った人しか知らない情報が多い。一般的なLaravel専用PaaSって部分以上だと、Task SchedulerやバックグラウンドプロセスやNightwatch連携はForge同様に簡単、Octaneの使用が簡単、Inertia SSRの使用が簡単、WebSocketサーバーが簡単に導入可能。Laravelの高度な機能まで使い込んでる人が欲しい機能が全部揃っている。Forgeと比べて足りないのはroot権限がない。
 
 ## blog ページ案
