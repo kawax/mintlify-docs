@@ -584,14 +584,17 @@
                   "en/blog/pest-introduction",
                   "en/blog/laravel-pennant",
                   "en/blog/telescope-introduction",
-                  "en/blog/nightwatch-introduction"
+                  "en/blog/nightwatch-introduction",
+                  "en/blog/wayfinder-introduction"
                 ]
               },
               {
                 "group": "Upgrade Guides",
                 "pages": [
                   "en/blog/upgrade-12-to-13",
-                  "en/blog/upgrade-11-to-12"
+                  "en/blog/upgrade-11-to-12",
+                  "en/blog/upgrade-10-to-11",
+                  "en/blog/upgrade-9-to-10"
                 ]
               },
               {

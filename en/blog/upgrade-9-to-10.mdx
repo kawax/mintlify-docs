@@ -1,0 +1,389 @@
+---
+title: "Upgrade guide: Laravel 9 to 10"
+description: "Step-by-step instructions for upgrading from Laravel 9.x to Laravel 10.x, including all breaking changes and required dependency updates."
+---
+
+## Introduction
+
+Laravel 10 was released on February 14, 2023. This guide covers everything you need to upgrade a Laravel 9.x application to 10.x.
+
+<Info>
+  Estimated upgrade time: **about 10 minutes**. The actual impact depends on the size of your application and which features you use.
+</Info>
+
+### Automated upgrade with Laravel Shift
+
+You can automate much of the upgrade process using [Laravel Shift](https://laravelshift.com/). Shift automatically updates your dependencies and configuration files.
+
+---
+
+## Changes by impact level
+
+### High impact
+
+- Updating dependencies
+- Updating `minimum-stability`
+
+### Medium impact
+
+- Database expression changes
+- Removing the `$dates` property from models
+- Monolog 3
+- Redis cache tags
+- Service mocking changes
+- Language directory
+
+### Low impact
+
+- Closure validation rule messages
+- Form request `after` method
+- Public path binding
+- `QueryException` constructor
+- Rate limiter return value
+- Removing `Redirect::home`
+- Removing `Bus::dispatchNow`
+- `registerPolicies` method
+- ULID columns
+
+---
+
+## Upgrade steps
+
+### Updating dependencies
+
+**High impact**
+
+Update the following entries in your `composer.json`:
+
+```json
+{
+  "require": {
+    "laravel/framework": "^10.0",
+    "laravel/sanctum": "^3.2",
+    "doctrine/dbal": "^3.0",
+    "spatie/laravel-ignition": "^2.0"
+  }
+}
+```
+
+If you use these optional packages, update them as well:
+
+```json
+{
+  "require": {
+    "laravel/passport": "^11.0",
+    "laravel/ui": "^4.0"
+  }
+}
+```
+
+If you're upgrading to PHPUnit 10, also update:
+
+```json
+{
+  "require-dev": {
+    "nunomaduro/collision": "^7.0",
+    "phpunit/phpunit": "^10.0"
+  }
+}
+```
+
+<Warning>
+  If you upgrade to PHPUnit 10, remove the `processUncoveredFiles` attribute from the `<coverage>` section of your `phpunit.xml`.
+</Warning>
+
+Then install the updated dependencies:
+
+```shell
+composer update
+```
+
+If you're upgrading from Sanctum 2.x to 3.x, also consult the [Sanctum 3.x upgrade guide](https://github.com/laravel/sanctum/blob/3.x/UPGRADE.md).
+
+---
+
+### Updating `minimum-stability`
+
+**High impact**
+
+Update `minimum-stability` in your `composer.json` to `stable`. Since `stable` is the default, you can also remove the setting entirely.
+
+```json
+"minimum-stability": "stable"
+```
+
+---
+
+## PHP version requirements
+
+**High impact**
+
+Laravel 10 requires **PHP 8.1.0 or higher** and **Composer 2.2.0 or higher**.
+
+---
+
+## Breaking changes
+
+### Application
+
+#### Public path binding
+
+**Low impact**
+
+If you customized the public path by binding `path.public` in the container, switch to the `usePublicPath` method on `Illuminate\Foundation\Application`:
+
+```php
+app()->usePublicPath(__DIR__.'/public');
+```
+
+---
+
+### Authorization
+
+#### `registerPolicies` method
+
+**Low impact**
+
+The `registerPolicies` method on `AuthServiceProvider` is now called automatically by the framework. You can remove the explicit call from your `boot` method.
+
+---
+
+### Cache
+
+#### Redis cache tags
+
+**Medium impact**
+
+`Cache::tags()` is now only recommended for applications that use Memcached as the cache driver. If you use Redis as your cache driver, consider migrating to Memcached.
+
+---
+
+### Database
+
+#### Database expression changes
+
+**Medium impact**
+
+Database expressions created with `DB::raw` have been rewritten. To retrieve the raw string value of an expression, use the `getValue(Grammar $grammar)` method. Casting to `(string)` is no longer supported.
+
+```php
+use Illuminate\Support\Facades\DB;
+
+$expression = DB::raw('select 1');
+
+// Before
+$string = (string) $expression;
+
+// After
+$string = $expression->getValue(DB::connection()->getQueryGrammar());
+```
+
+This generally does not affect end-user applications, but update any code that casts a database expression to a string.
+
+#### `QueryException` constructor
+
+**Very low impact**
+
+The `Illuminate\Database\QueryException` constructor now accepts a string connection name as its first argument. Update any code that throws this exception manually.
+
+#### ULID columns
+
+**Low impact**
+
+When you call the `ulid` method in a migration without arguments, the column is now named `ulid`. In earlier releases, calling it without arguments incorrectly created a column named `uuid`.
+
+```php
+// Column is now named "ulid"
+$table->ulid();
+
+// To set the name explicitly
+$table->ulid('ulid');
+```
+
+---
+
+### Eloquent
+
+#### The model `$dates` property
+
+**Medium impact**
+
+The deprecated `$dates` property on Eloquent models has been removed. Use the `$casts` property instead.
+
+```php
+// Before
+protected $dates = ['deployed_at'];
+
+// After
+protected $casts = [
+    'deployed_at' => 'datetime',
+];
+```
+
+---
+
+### Localization
+
+#### Language directory
+
+**No impact**
+
+Existing applications are not affected, but the skeleton for new Laravel applications no longer includes a `lang` directory by default. If you need it, publish it with the Artisan command:
+
+```shell
+php artisan lang:publish
+```
+
+---
+
+### Logging
+
+#### Monolog 3
+
+**Medium impact**
+
+Laravel's Monolog dependency has been updated to Monolog 3.x. If your application uses Monolog directly, review the [Monolog upgrade guide](https://github.com/Seldaek/monolog/blob/main/UPGRADE.md).
+
+If you use a third-party logging service such as BugSnag or Rollbar, you may need to upgrade to a version that supports Monolog 3.x and Laravel 10.x.
+
+<Tip>
+  Full details on Monolog 3.x changes are available in the [Monolog 3.x upgrade guide](https://github.com/Seldaek/monolog/blob/3.x/UPGRADE.md).
+</Tip>
+
+---
+
+### Queues
+
+#### Removing `Bus::dispatchNow`
+
+**Low impact**
+
+The deprecated `Bus::dispatchNow` and `dispatch_now` helpers have been removed. Use `Bus::dispatchSync` and `dispatch_sync` instead.
+
+```php
+// Before
+Bus::dispatchNow(new MyJob());
+dispatch_now(new MyJob());
+
+// After
+Bus::dispatchSync(new MyJob());
+dispatch_sync(new MyJob());
+```
+
+---
+
+### Routing
+
+#### Middleware aliases
+
+**Optional**
+
+In new Laravel applications, the `$routeMiddleware` property on `App\Http\Kernel` has been renamed to `$middlewareAliases`. Applying this change to existing applications is optional.
+
+#### Rate limiter return value
+
+**Low impact**
+
+When you call `RateLimiter::attempt`, the return value of the provided closure is now returned directly. If the closure returns nothing or `null`, the method returns `true`.
+
+```php
+$value = RateLimiter::attempt('key', 10, fn () => ['example'], 1);
+
+$value; // ['example']
+```
+
+#### Removing `Redirect::home`
+
+**Very low impact**
+
+The deprecated `Redirect::home` method has been removed. Redirect to an explicit named route instead.
+
+```php
+// Before
+return Redirect::home();
+
+// After
+return Redirect::route('home');
+```
+
+---
+
+### Testing
+
+#### Service mocking
+
+**Medium impact**
+
+The deprecated `MocksApplicationServices` trait has been removed from the framework. This trait provided test methods such as `expectsEvents`, `expectsJobs`, and `expectsNotifications`.
+
+Migrate to `Event::fake`, `Bus::fake`, and `Notification::fake` respectively.
+
+```php
+// Before
+$this->expectsEvents(OrderShipped::class);
+
+// After
+Event::fake();
+// ... test code ...
+Event::assertDispatched(OrderShipped::class);
+```
+
+---
+
+### Validation
+
+#### Closure validation rule messages
+
+**Very low impact**
+
+When a closure-based custom validation rule calls the `$fail` callback multiple times, messages are now appended to an array instead of overwriting each other.
+
+The `$fail` callback also now returns an object. Update any code that type-hints the return value of a validation closure.
+
+```php
+public function rules()
+{
+    return [
+        'name' => [
+            function ($attribute, $value, $fail) {
+                $fail('validation.translation.key')->translate();
+            },
+        ],
+    ];
+}
+```
+
+#### Form request `after` method
+
+**Very low impact**
+
+The `after` method is now reserved by Laravel on form requests. If you have defined an `after` method on a form request, rename or update it to use the new "after validation" hook feature.
+
+---
+
+## Summary
+
+Laravel 10 is a relatively small release and the upgrade is quick to complete.
+
+| Change | Impact | Action required |
+|--------|--------|-----------------|
+| Update `composer.json` dependencies | High | Change to `laravel/framework ^10.0` |
+| PHP 8.1 / Composer 2.2 required | High | Check and update versions |
+| Database expression changes | Medium | Replace `(string)` cast with `getValue()` |
+| `$dates` property removed | Medium | Migrate to `$casts` |
+| Monolog 3 | Medium | Review if you use Monolog directly |
+| Redis cache tags | Medium | Consider migrating to Memcached |
+| `MocksApplicationServices` removed | Medium | Migrate to `Event::fake` etc. |
+| `Bus::dispatchNow` removed | Low | Switch to `Bus::dispatchSync` |
+| ULID column naming | Low | Review `ulid()` calls in migrations |
+| `Redirect::home` removed | Very low | Switch to `Redirect::route('home')` |
+
+---
+
+## References
+
+- [Official upgrade guide](https://laravel.com/docs/10.x/upgrade)
+- [laravel/laravel diff (9.x → 10.x)](https://github.com/laravel/laravel/compare/9.x...10.x)
+- [Laravel Shift](https://laravelshift.com) — automated upgrade service
+- [Sanctum upgrade guide (2.x → 3.x)](https://github.com/laravel/sanctum/blob/3.x/UPGRADE.md)
+- [Monolog 3.x upgrade guide](https://github.com/Seldaek/monolog/blob/3.x/UPGRADE.md)

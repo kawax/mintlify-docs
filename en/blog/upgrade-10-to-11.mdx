@@ -1,0 +1,411 @@
+---
+title: "Upgrade guide: Laravel 10 to 11"
+description: "Step-by-step instructions for upgrading from Laravel 10.x to Laravel 11.x, including the simplified application structure, all breaking changes, and required dependency updates."
+---
+
+## Introduction
+
+Laravel 11 was released in March 2024. This guide covers everything you need to upgrade a Laravel 10.x application to 11.x.
+
+<Info>
+  Estimated upgrade time: **about 15 minutes**. The actual impact depends on the size of your application and which features you use.
+</Info>
+
+### Automated upgrade with Laravel Shift
+
+You can automate much of the upgrade process using [Laravel Shift](https://laravelshift.com/). Shift automatically updates your dependencies and configuration files.
+
+---
+
+## Changes by impact level
+
+### High impact
+
+- Updating dependencies
+- Application structure changes
+- Floating-point type changes
+- Column modifier persistence when altering columns
+- SQLite minimum version
+- Sanctum update
+
+### Medium impact
+
+- Carbon 3
+- Password rehashing
+- Per-second rate limiting
+- Spatie Once package
+
+### Low impact
+
+- Doctrine DBAL removal
+- Eloquent model `casts` method
+- Spatial type changes
+- `Enumerable` contract
+- `UserProvider` contract
+- `Authenticatable` contract
+
+---
+
+## Upgrade steps
+
+### Updating dependencies
+
+**High impact**
+
+Update the following entries in your `composer.json`:
+
+```json
+{
+  "require": {
+    "laravel/framework": "^11.0",
+    "nunomaduro/collision": "^8.1"
+  }
+}
+```
+
+If you use these optional packages, update them as well:
+
+```json
+{
+  "require": {
+    "laravel/breeze": "^2.0",
+    "laravel/cashier": "^15.0",
+    "laravel/dusk": "^8.0",
+    "laravel/jetstream": "^5.0",
+    "laravel/octane": "^2.3",
+    "laravel/passport": "^12.0",
+    "laravel/sanctum": "^4.0",
+    "laravel/scout": "^10.0",
+    "laravel/spark-stripe": "^5.0",
+    "laravel/telescope": "^5.0",
+    "livewire/livewire": "^3.4",
+    "inertiajs/inertia-laravel": "^1.0"
+  }
+}
+```
+
+Then install the updated dependencies:
+
+```shell
+composer update
+```
+
+If you use Cashier Stripe, Passport, Sanctum, Spark Stripe, or Telescope, publish their migrations:
+
+```shell
+php artisan vendor:publish --tag=cashier-migrations
+php artisan vendor:publish --tag=passport-migrations
+php artisan vendor:publish --tag=sanctum-migrations
+php artisan vendor:publish --tag=spark-migrations
+php artisan vendor:publish --tag=telescope-migrations
+```
+
+If you use the Laravel installer, update it as well:
+
+```shell
+composer global require laravel/installer:^5.6
+```
+
+If you previously added `doctrine/dbal` manually, you can remove it. Laravel 11 no longer depends on it.
+
+---
+
+## PHP version requirements
+
+**High impact**
+
+Laravel 11 requires **PHP 8.2.0 or higher**. Laravel's HTTP client also requires **curl 7.34.0 or higher**.
+
+---
+
+## Application structure changes
+
+**High impact**
+
+Laravel 11 introduces a simplified default application structure with significantly fewer service providers, middleware, and configuration files.
+
+However, **you do not need to migrate your application structure** when upgrading from Laravel 10 to 11. Laravel 11 is designed to support the Laravel 10 application structure as-is.
+
+Key structural changes in new Laravel 11 applications:
+
+- Middleware, exception handlers, and routing are now configured directly in `bootstrap/app.php`
+- `app/Http/Kernel.php` is removed and consolidated into `bootstrap/app.php`
+- The default number of service providers is reduced; they are managed in `bootstrap/providers.php`
+- Fewer files in `config/` (publish them on demand with `php artisan config:publish`)
+
+---
+
+## Breaking changes
+
+### Authentication
+
+#### Password rehashing
+
+**Medium impact**
+
+Laravel 11 automatically rehashes passwords at login if the hashing algorithm's "work factor" has changed.
+
+If your `User` model's password field is named something other than `password`, specify it with the `authPasswordName` property:
+
+```php
+class User extends Authenticatable
+{
+    protected $authPasswordName = 'custom_password_field';
+}
+```
+
+To disable this behavior, add the following to `config/hashing.php`:
+
+```php
+'rehash_on_login' => false,
+```
+
+#### `UserProvider` contract
+
+**Low impact**
+
+The `Illuminate\Contracts\Auth\UserProvider` contract has a new `rehashPasswordIfRequired` method. If you have a class that implements this interface, add the method:
+
+```php
+public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false);
+```
+
+#### `Authenticatable` contract
+
+**Low impact**
+
+The `Illuminate\Contracts\Auth\Authenticatable` contract has a new `getAuthPasswordName` method. If you have a class that implements this interface, add the method:
+
+```php
+public function getAuthPasswordName()
+{
+    return 'password';
+}
+```
+
+---
+
+### Database
+
+#### SQLite minimum version
+
+**High impact**
+
+If you use SQLite, you now need **SQLite 3.26.0 or higher**.
+
+Note that new Laravel 11 projects default to SQLite as the database driver.
+
+#### Column modifier persistence when altering columns
+
+**High impact**
+
+When altering a column, you must now explicitly re-specify all modifiers you want to keep. Any attribute not listed will be dropped.
+
+```php
+// Laravel 10: unsigned, default, and comment were preserved automatically
+Schema::table('users', function (Blueprint $table) {
+    $table->integer('votes')->nullable()->change();
+});
+
+// Laravel 11: all attributes must be listed explicitly
+Schema::table('users', function (Blueprint $table) {
+    $table->integer('votes')
+        ->unsigned()
+        ->default(1)
+        ->comment('The vote count')
+        ->nullable()
+        ->change();
+});
+```
+
+If you'd rather not update all existing migrations, squash them first:
+
+```shell
+php artisan schema:dump
+```
+
+#### Floating-point type changes
+
+**High impact**
+
+The `double` and `float` migration column types are now consistent across all databases.
+
+```php
+// double: total digits and decimal places arguments are no longer needed
+$table->double('amount');
+
+// float: only an optional precision argument
+$table->float('amount', precision: 53);
+```
+
+The `unsignedDecimal`, `unsignedDouble`, and `unsignedFloat` methods have been removed. Use method chaining to add the `unsigned` attribute:
+
+```php
+$table->decimal('amount', total: 8, places: 2)->unsigned();
+$table->double('amount')->unsigned();
+$table->float('amount', precision: 53)->unsigned();
+```
+
+#### Eloquent model `casts` method
+
+**Low impact**
+
+The base Eloquent model class now defines a `casts` method. If any of your models define a `casts` relationship, the name will conflict and must be changed.
+
+#### MariaDB dedicated driver
+
+**Very low impact**
+
+Laravel 11 adds a dedicated database driver for MariaDB. If you connect to MariaDB, you can now use the `mariadb` driver:
+
+```php
+'driver' => 'mariadb',
+```
+
+#### Spatial type changes
+
+**Low impact**
+
+Spatial column types are now consistent across all databases. Replace `point`, `lineString`, `polygon`, and similar methods with `geometry` or `geography`:
+
+```php
+$table->geometry('shapes');
+$table->geography('coordinates');
+```
+
+To specify a type and spatial reference system explicitly, pass `subtype` and `srid`:
+
+```php
+$table->geometry('dimension', subtype: 'polygon', srid: 0);
+$table->geography('latitude', subtype: 'point', srid: 4326);
+```
+
+#### Doctrine DBAL removal
+
+**Low impact**
+
+Laravel has removed its dependency on Doctrine DBAL. The following classes and methods have been removed:
+
+- `Schema\Builder::useNativeSchemaOperationsIfPossible()`
+- `Connection::getDoctrineConnection()`
+- `Connection::getDoctrineSchemaManager()`
+- `Connection::registerDoctrineType()`
+- `DatabaseManager::registerDoctrineType()`
+- `Schema\Grammars\ChangeColumn` class
+- `Schema\Grammars\RenameColumn` class
+
+Use the new native schema inspection methods instead: `Schema::getTables()`, `Schema::getColumns()`, `Schema::getIndexes()`, and `Schema::getForeignKeys()`.
+
+---
+
+### Dates
+
+#### Carbon 3
+
+**Medium impact**
+
+Laravel 11 supports both Carbon 2 and Carbon 3. If you upgrade to Carbon 3, note that `diffIn*` methods now return floating-point numbers and use negative values to indicate direction in time.
+
+---
+
+### Rate limiting
+
+#### Per-second rate limiting
+
+**Medium impact**
+
+Laravel 11 now supports per-second rate limiting instead of per-minute. The `GlobalLimit` and `Limit` class constructors now accept seconds.
+
+```php
+// Before (minutes)
+new GlobalLimit($attempts, 2); // 2 minutes
+
+// After (seconds)
+new GlobalLimit($attempts, 2 * 60); // 120 seconds
+```
+
+The `decayMinutes` property on `Limit` has been renamed to `decaySeconds`.
+
+The `ThrottlesExceptions` and `ThrottlesExceptionsWithRedis` constructors also now accept seconds:
+
+```php
+new ThrottlesExceptions($attempts, 2 * 60);
+new ThrottlesExceptionsWithRedis($attempts, 2 * 60);
+```
+
+---
+
+### Packages
+
+#### Publishing service providers
+
+**Very low impact**
+
+New Laravel 11 applications no longer have a `providers` array in `config/app.php`. If your package publishes a service provider, use the `ServiceProvider::addProviderToBootstrapFile` method:
+
+```php
+use Illuminate\Support\ServiceProvider;
+
+ServiceProvider::addProviderToBootstrapFile(Provider::class);
+```
+
+---
+
+### Sanctum
+
+#### Sanctum update
+
+**High impact**
+
+Laravel 11 does not support Sanctum 3.x. Update the Sanctum constraint in your `composer.json` to `^4.0`.
+
+Sanctum 4.0 no longer auto-loads migrations. Publish them manually:
+
+```shell
+php artisan vendor:publish --tag=sanctum-migrations
+```
+
+Also update the middleware configuration in `config/sanctum.php`:
+
+```php
+'middleware' => [
+    'authenticate_session' => Laravel\Sanctum\Http\Middleware\AuthenticateSession::class,
+    'encrypt_cookies' => Illuminate\Cookie\Middleware\EncryptCookies::class,
+    'validate_csrf_token' => Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+],
+```
+
+---
+
+### Spatie Once package
+
+**Medium impact**
+
+Laravel 11 ships its own [`once` helper](https://laravel.com/docs/11.x/helpers#method-once). If you use the `spatie/once` package, remove it from `composer.json` to avoid conflicts.
+
+---
+
+## Summary
+
+Laravel 11 includes significant structural changes, but since the Laravel 10 application structure continues to work, you can upgrade incrementally.
+
+| Change | Impact | Action required |
+|--------|--------|-----------------|
+| Update `composer.json` dependencies | High | Change to `laravel/framework ^11.0` |
+| PHP 8.2 required | High | Check your PHP version |
+| Column modifier persistence | High | Review all `change()` calls in migrations |
+| Floating-point type changes | High | Review `double`/`float` column definitions |
+| SQLite 3.26.0+ required | High | Check your SQLite version |
+| Sanctum `^4.0` | High | Publish migrations |
+| Carbon 3 | Medium | Review `diffIn*` method return values |
+| Per-second rate limiting | Medium | Change `decayMinutes` to `decaySeconds` |
+| Doctrine DBAL removed | Low | Migrate to native schema methods |
+
+---
+
+## References
+
+- [Official upgrade guide](https://laravel.com/docs/11.x/upgrade)
+- [laravel/laravel diff (10.x → 11.x)](https://github.com/laravel/laravel/compare/10.x...11.x)
+- [Laravel Shift](https://laravelshift.com) — automated upgrade service
+- [Carbon 3 changelog](https://github.com/briannesbitt/Carbon/releases/tag/3.0.0)
