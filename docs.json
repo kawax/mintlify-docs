@@ -50,7 +50,8 @@
                                     "jp/migrations",
                                     "jp/seeding",
                                     "jp/eloquent",
-                                    "jp/eloquent-relationships"
+                                    "jp/eloquent-relationships",
+                                    "jp/eloquent-factories"
                                 ]
                             },
                             {
@@ -359,7 +360,8 @@
                                     "en/migrations",
                                     "en/seeding",
                                     "en/eloquent",
-                                    "en/eloquent-relationships"
+                                    "en/eloquent-relationships",
+                                    "en/eloquent-factories"
                                 ]
                             },
                             {
