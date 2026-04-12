@@ -109,6 +109,12 @@
           ]
         },
         {
+          "group": "Eloquent",
+          "pages": [
+            "en/eloquent-mutators"
+          ]
+        },
+        {
           "group": "HTTP & External",
           "pages": [
             "en/http-client"
