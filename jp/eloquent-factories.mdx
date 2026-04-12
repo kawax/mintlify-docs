@@ -19,6 +19,9 @@ use Illuminate\Support\Str;
 
 class UserFactory extends Factory
 {
+    // 同じパスワードを毎回再ハッシュしないためにキャッシュする
+    protected static ?string $password;
+
     public function definition(): array
     {
         return [
@@ -36,7 +39,7 @@ class UserFactory extends Factory
 
 ```mermaid
 flowchart LR
-    F["Factory<br>database/factories/UserFactory"] -->|"make() / create()"| M["Model Instance<br>App\Models\User"]
+    F["Factory<br>database/factories/UserFactory"] -->|"make() / create()"| M["Model Instance<br>App\\Models\\User"]
     M -->|"create()"| DB[("Database")]
     F -->|"Faker"| R["ランダムデータ<br>name, email, ..."]
     R --> F

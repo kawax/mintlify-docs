@@ -18,6 +18,9 @@ use Illuminate\Support\Str;
 
 class UserFactory extends Factory
 {
+    // Cached to avoid re-hashing the same password on every call
+    protected static ?string $password;
+
     public function definition(): array
     {
         return [
@@ -35,7 +38,7 @@ Via the `fake()` helper, factories have access to the [Faker](https://github.com
 
 ```mermaid
 flowchart LR
-    F["Factory<br>database/factories/UserFactory"] -->|"make() / create()"| M["Model Instance<br>App\Models\User"]
+    F["Factory<br>database/factories/UserFactory"] -->|"make() / create()"| M["Model Instance<br>App\\Models\\User"]
     M -->|"create()"| DB[("Database")]
     F -->|"Faker"| R["Random Data<br>name, email, ..."]
     R --> F
