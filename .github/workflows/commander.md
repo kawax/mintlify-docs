@@ -2,7 +2,9 @@
 description: Daily commander that reviews the documentation project, decides what work to do, creates issues for Copilot coding agent, and records activity in discussions.
 on:
   workflow_dispatch:
-  schedule: daily around 4:00 utc+9
+  schedule: 
+    - cron: daily around 4:00 utc+9
+    - cron: daily around 16:00 utc+9
 
 engine:
   id: copilot
