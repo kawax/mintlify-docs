@@ -1,660 +1,660 @@
 {
-    "$schema": "https://mintlify.com/docs.json",
-    "theme": "luma",
-    "name": "Knowledge of Laravel",
-    "colors": {
-        "primary": "#16A34A",
-        "light": "#07C983",
-        "dark": "#15803D"
-    },
-    "favicon": "/favicon.svg",
-    "navigation": {
-        "languages": [
-            {
-                "language": "jp",
-                "default": true,
-                "tabs": [
-                    {
-                        "tab": "チュートリアル",
-                        "groups": [
-                            {
-                                "group": "はじめに",
-                                "pages": [
-                                    "jp/introduction",
-                                    "jp/installation",
-                                    "jp/directory-structure"
-                                ]
-                            },
-                            {
-                                "group": "基本",
-                                "pages": [
-                                    "jp/routing",
-                                    "jp/views",
-                                    "jp/blade"
-                                ]
-                            },
-                            {
-                                "group": "リクエスト処理",
-                                "pages": [
-                                    "jp/controllers",
-                                    "jp/middleware",
-                                    "jp/requests",
-                                    "jp/validation",
-                                    "jp/responses",
-                                    "jp/session"
-                                ]
-                            },
-                            {
-                                "group": "データベース",
-                                "pages": [
-                                    "jp/migrations",
-                                    "jp/seeding",
-                                    "jp/eloquent",
-                                    "jp/eloquent-relationships",
-                                    "jp/eloquent-factories"
-                                ]
-                            },
-                            {
-                                "group": "認証",
-                                "pages": [
-                                    "jp/authentication",
-                                    "jp/starter-kits"
-                                ]
-                            },
-                            {
-                                "group": "テストとデプロイ",
-                                "pages": [
-                                    "jp/testing",
-                                    "jp/deployment"
-                                ]
-                            },
-                            {
-                                "group": "AI開発支援",
-                                "pages": [
-                                    "jp/ai"
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "tab": "ガイド",
-                        "groups": [
-                            {
-                                "group": "アーキテクチャ",
-                                "pages": [
-                                    "jp/lifecycle",
-                                    "jp/service-container",
-                                    "jp/service-providers",
-                                    "jp/facades",
-                                    "jp/contracts"
-                                ]
-                            },
-                            {
-                                "group": "データベース",
-                                "pages": [
-                                    "jp/query-builder",
-                                    "jp/pagination"
-                                ]
-                            },
-                            {
-                                "group": "Eloquent",
-                                "pages": [
-                                    "jp/eloquent-resources"
-                                ]
-                            },
-                            {
-                                "group": "セキュリティ",
-                                "pages": [
-                                    "jp/authorization",
-                                    "jp/sanctum",
-                                    "jp/hashing"
-                                ]
-                            },
-                            {
-                                "group": "イベント",
-                                "pages": [
-                                    "jp/events"
-                                ]
-                            },
-                            {
-                                "group": "メールと通知",
-                                "pages": [
-                                    "jp/mail",
-                                    "jp/notifications"
-                                ]
-                            },
-                            {
-                                "group": "非同期処理",
-                                "pages": [
-                                    "jp/queues",
-                                    "jp/concurrency"
-                                ]
-                            },
-                            {
-                                "group": "リアルタイム通信",
-                                "pages": [
-                                    "jp/broadcasting"
-                                ]
-                            },
-                            {
-                                "group": "スケジューリング",
-                                "pages": [
-                                    "jp/scheduling"
-                                ]
-                            },
-                            {
-                                "group": "キャッシュと最適化",
-                                "pages": [
-                                    "jp/cache"
-                                ]
-                            },
-                            {
-                                "group": "ヘルパーとコレクション",
-                                "pages": [
-                                    "jp/helpers",
-                                    "jp/strings",
-                                    "jp/collections"
-                                ]
-                            },
-                            {
-                                "group": "国際化",
-                                "pages": [
-                                    "jp/localization"
-                                ]
-                            },
-                            {
-                                "group": "外部通信",
-                                "pages": [
-                                    "jp/http-client"
-                                ]
-                            },
-                            {
-                                "group": "ファイルとストレージ",
-                                "pages": [
-                                    "jp/filesystem"
-                                ]
-                            },
-                            {
-                                "group": "デバッグと監視",
-                                "pages": [
-                                    "jp/context",
-                                    "jp/error-handling",
-                                    "jp/logging"
-                                ]
-                            },
-                            {
-                                "group": "コンソールとCLI",
-                                "pages": [
-                                    "jp/artisan",
-                                    "jp/pint"
-                                ]
-                            },
-                            {
-                                "group": "フロントエンド",
-                                "pages": [
-                                    "jp/vite"
-                                ]
-                            },
-                            {
-                                "group": "AI開発",
-                                "pages": [
-                                    "jp/boost",
-                                    "jp/mcp",
-                                    "jp/ai-sdk"
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "tab": "応用トピック",
-                        "groups": [
-                            {
-                                "group": "AI開発",
-                                "pages": [
-                                    "jp/advanced/mcp-server",
-                                    "jp/advanced/boost-custom-agent",
-                                    "jp/advanced/ai-sdk-custom-provider"
-                                ]
-                            },
-                            {
-                                "group": "デザインパターン",
-                                "pages": [
-                                    "jp/advanced/pipeline",
-                                    "jp/advanced/macroable",
-                                    "jp/advanced/conditionable",
-                                    "jp/advanced/higher-order-messages",
-                                    "jp/advanced/manager"
-                                ]
-                            },
-                            {
-                                "group": "バリデーション拡張",
-                                "pages": [
-                                    "jp/advanced/custom-validation-rules"
-                                ]
-                            },
-                            {
-                                "group": "アプリケーション構造",
-                                "pages": [
-                                    "jp/advanced/app-structure"
-                                ]
-                            },
-                            {
-                                "group": "Laravel 13 新機能",
-                                "pages": [
-                                    "jp/advanced/php-attributes"
-                                ]
-                            },
-                            {
-                                "group": "Eloquent 深掘り",
-                                "pages": [
-                                    "jp/advanced/eloquent-observers",
-                                    "jp/advanced/eloquent-scopes",
-                                    "jp/advanced/eloquent-casts"
-                                ]
-                            },
-                            {
-                                "group": "認証の拡張",
-                                "pages": [
-                                    "jp/advanced/custom-auth-guard"
-                                ]
-                            },
-                            {
-                                "group": "セキュリティ",
-                                "pages": [
-                                    "jp/advanced/rate-limiting"
-                                ]
-                            },
-                            {
-                                "group": "パッケージ開発",
-                                "pages": [
-                                    "jp/advanced/package-development"
-                                ]
-                            },
-                            {
-                                "group": "テスト",
-                                "pages": [
-                                    "jp/advanced/testing-pest"
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "tab": "ブログ",
-                        "groups": [
-                            {
-                                "group": "Laravel 13",
-                                "pages": [
-                                    "jp/blog/laravel-13-new-features"
-                                ]
-                            },
-                            {
-                                "group": "パッケージ紹介",
-                                "pages": [
-                                    "jp/blog/livewire-introduction",
-                                    "jp/blog/inertia-introduction",
-                                    "jp/blog/pest-introduction",
-                                    "jp/blog/laravel-pennant",
-                                    "jp/blog/telescope-introduction",
-                                    "jp/blog/wayfinder-introduction",
-                                    "jp/blog/nightwatch-introduction"
-                                ]
-                            },
-                            {
-                                "group": "新リポジトリ調査",
-                                "pages": [
-                                    "jp/blog/maestro-introduction",
-                                    "jp/blog/agent-skills-introduction"
-                                ]
-                            },
-                            {
-                                "group": "アップグレードガイド",
-                                "pages": [
-                                    "jp/blog/upgrade-12-to-13",
-                                    "jp/blog/upgrade-11-to-12",
-                                    "jp/blog/upgrade-10-to-11",
-                                    "jp/blog/upgrade-9-to-10"
-                                ]
-                            },
-                            {
-                                "group": "環境構築",
-                                "pages": [
-                                    "jp/blog/mac-setup",
-                                    "jp/blog/windows-setup"
-                                ]
-                            }
-                        ]
-                    }
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "luma",
+  "name": "Knowledge of Laravel",
+  "colors": {
+    "primary": "#16A34A",
+    "light": "#07C983",
+    "dark": "#15803D"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "languages": [
+      {
+        "language": "jp",
+        "default": true,
+        "tabs": [
+          {
+            "tab": "チュートリアル",
+            "groups": [
+              {
+                "group": "はじめに",
+                "pages": [
+                  "jp/introduction",
+                  "jp/installation",
+                  "jp/directory-structure"
                 ]
-            },
-            {
-                "language": "en",
-                "tabs": [
-                    {
-                        "tab": "Tutorial",
-                        "groups": [
-                            {
-                                "group": "Getting Started",
-                                "pages": [
-                                    "en/introduction",
-                                    "en/installation",
-                                    "en/directory-structure"
-                                ]
-                            },
-                            {
-                                "group": "Basics",
-                                "pages": [
-                                    "en/routing",
-                                    "en/views",
-                                    "en/blade",
-                                    "en/controllers",
-                                    "en/middleware",
-                                    "en/requests",
-                                    "en/validation",
-                                    "en/responses",
-                                    "en/session"
-                                ]
-                            },
-                            {
-                                "group": "Database",
-                                "pages": [
-                                    "en/migrations",
-                                    "en/seeding",
-                                    "en/eloquent",
-                                    "en/eloquent-relationships",
-                                    "en/eloquent-factories"
-                                ]
-                            },
-                            {
-                                "group": "Authentication",
-                                "pages": [
-                                    "en/authentication",
-                                    "en/starter-kits"
-                                ]
-                            },
-                            {
-                                "group": "Testing and Deployment",
-                                "pages": [
-                                    "en/testing",
-                                    "en/deployment"
-                                ]
-                            },
-                            {
-                                "group": "AI Development",
-                                "pages": [
-                                    "en/ai"
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "tab": "Guide",
-                        "groups": [
-                            {
-                                "group": "Architecture",
-                                "pages": [
-                                    "en/lifecycle",
-                                    "en/service-container",
-                                    "en/service-providers",
-                                    "en/facades",
-                                    "en/contracts"
-                                ]
-                            },
-                            {
-                                "group": "Security",
-                                "pages": [
-                                    "en/authorization",
-                                    "en/hashing",
-                                    "en/sanctum"
-                                ]
-                            },
-                            {
-                                "group": "Mail & Notifications",
-                                "pages": [
-                                    "en/mail",
-                                    "en/notifications"
-                                ]
-                            },
-                            {
-                                "group": "Async Processing",
-                                "pages": [
-                                    "en/queues",
-                                    "en/events",
-                                    "en/concurrency",
-                                    "en/scheduling"
-                                ]
-                            },
-                            {
-                                "group": "Caching",
-                                "pages": [
-                                    "en/cache"
-                                ]
-                            },
-                            {
-                                "group": "Database",
-                                "pages": [
-                                    "en/query-builder",
-                                    "en/pagination",
-                                    "en/eloquent-resources"
-                                ]
-                            },
-                            {
-                                "group": "HTTP & External",
-                                "pages": [
-                                    "en/http-client"
-                                ]
-                            },
-                            {
-                                "group": "Console & CLI",
-                                "pages": [
-                                    "en/artisan",
-                                    "en/pint"
-                                ]
-                            },
-                            {
-                                "group": "Frontend",
-                                "pages": [
-                                    "en/vite"
-                                ]
-                            },
-                            {
-                                "group": "File Storage",
-                                "pages": [
-                                    "en/filesystem"
-                                ]
-                            },
-                            {
-                                "group": "Debug & Monitoring",
-                                "pages": [
-                                    "en/context",
-                                    "en/error-handling",
-                                    "en/logging"
-                                ]
-                            },
-                            {
-                                "group": "Helpers & Collections",
-                                "pages": [
-                                    "en/helpers",
-                                    "en/strings",
-                                    "en/collections"
-                                ]
-                            },
-                            {
-                                "group": "Internationalization",
-                                "pages": [
-                                    "en/localization"
-                                ]
-                            },
-                            {
-                                "group": "AI Development",
-                                "pages": [
-                                    "en/boost",
-                                    "en/mcp",
-                                    "en/ai-sdk"
-                                ]
-                            },
-                            {
-                                "group": "Real-time",
-                                "pages": [
-                                    "en/broadcasting"
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "tab": "Advanced Topics",
-                        "groups": [
-                            {
-                                "group": "AI Development",
-                                "pages": [
-                                    "en/advanced/mcp-server",
-                                    "en/advanced/boost-custom-agent",
-                                    "en/advanced/ai-sdk-custom-provider"
-                                ]
-                            },
-                            {
-                                "group": "Application Structure",
-                                "pages": [
-                                    "en/advanced/app-structure"
-                                ]
-                            },
-                            {
-                                "group": "Laravel 13 New Features",
-                                "pages": [
-                                    "en/advanced/php-attributes"
-                                ]
-                            },
-                            {
-                                "group": "Design Patterns",
-                                "pages": [
-                                    "en/advanced/pipeline",
-                                    "en/advanced/macroable",
-                                    "en/advanced/conditionable",
-                                    "en/advanced/higher-order-messages",
-                                    "en/advanced/manager"
-                                ]
-                            },
-                            {
-                                "group": "Eloquent Deep Dive",
-                                "pages": [
-                                    "en/advanced/eloquent-observers",
-                                    "en/advanced/eloquent-scopes",
-                                    "en/advanced/eloquent-casts"
-                                ]
-                            },
-                            {
-                                "group": "Validation Extensions",
-                                "pages": [
-                                    "en/advanced/custom-validation-rules"
-                                ]
-                            },
-                            {
-                                "group": "Authentication Extensions",
-                                "pages": [
-                                    "en/advanced/custom-auth-guard"
-                                ]
-                            },
-                            {
-                                "group": "Security",
-                                "pages": [
-                                    "en/advanced/rate-limiting"
-                                ]
-                            },
-                            {
-                                "group": "Package Development",
-                                "pages": [
-                                    "en/advanced/package-development"
-                                ]
-                            },
-                            {
-                                "group": "Testing",
-                                "pages": [
-                                    "en/advanced/testing-pest"
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "tab": "Blog",
-                        "groups": [
-                            {
-                                "group": "Laravel 13",
-                                "pages": [
-                                    "en/blog/laravel-13-new-features"
-                                ]
-                            },
-                            {
-                                "group": "Package Introduction",
-                                "pages": [
-                                    "en/blog/livewire-introduction",
-                                    "en/blog/inertia-introduction",
-                                    "en/blog/pest-introduction",
-                                    "en/blog/laravel-pennant",
-                                    "en/blog/telescope-introduction",
-                                    "en/blog/nightwatch-introduction",
-                                    "en/blog/wayfinder-introduction"
-                                ]
-                            },
-                            {
-                                "group": "Upgrade Guides",
-                                "pages": [
-                                    "en/blog/upgrade-12-to-13",
-                                    "en/blog/upgrade-11-to-12",
-                                    "en/blog/upgrade-10-to-11",
-                                    "en/blog/upgrade-9-to-10"
-                                ]
-                            },
-                            {
-                                "group": "New Repository Reports",
-                                "pages": [
-                                    "en/blog/maestro-introduction",
-                                    "en/blog/agent-skills-introduction"
-                                ]
-                            },
-                            {
-                                "group": "Environment Setup",
-                                "pages": [
-                                    "en/blog/mac-setup",
-                                    "en/blog/windows-setup"
-                                ]
-                            }
-                        ]
-                    }
+              },
+              {
+                "group": "基本",
+                "pages": [
+                  "jp/routing",
+                  "jp/views",
+                  "jp/blade"
                 ]
-            }
+              },
+              {
+                "group": "リクエスト処理",
+                "pages": [
+                  "jp/controllers",
+                  "jp/middleware",
+                  "jp/requests",
+                  "jp/validation",
+                  "jp/responses",
+                  "jp/session"
+                ]
+              },
+              {
+                "group": "データベース",
+                "pages": [
+                  "jp/migrations",
+                  "jp/seeding",
+                  "jp/eloquent",
+                  "jp/eloquent-relationships",
+                  "jp/eloquent-factories"
+                ]
+              },
+              {
+                "group": "認証",
+                "pages": [
+                  "jp/authentication",
+                  "jp/starter-kits"
+                ]
+              },
+              {
+                "group": "テストとデプロイ",
+                "pages": [
+                  "jp/testing",
+                  "jp/deployment"
+                ]
+              },
+              {
+                "group": "AI開発支援",
+                "pages": [
+                  "jp/ai"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "ガイド",
+            "groups": [
+              {
+                "group": "アーキテクチャ",
+                "pages": [
+                  "jp/lifecycle",
+                  "jp/service-container",
+                  "jp/service-providers",
+                  "jp/facades",
+                  "jp/contracts"
+                ]
+              },
+              {
+                "group": "データベース",
+                "pages": [
+                  "jp/query-builder",
+                  "jp/pagination"
+                ]
+              },
+              {
+                "group": "Eloquent",
+                "pages": [
+                  "jp/eloquent-resources"
+                ]
+              },
+              {
+                "group": "セキュリティ",
+                "pages": [
+                  "jp/authorization",
+                  "jp/sanctum",
+                  "jp/hashing"
+                ]
+              },
+              {
+                "group": "イベント",
+                "pages": [
+                  "jp/events"
+                ]
+              },
+              {
+                "group": "メールと通知",
+                "pages": [
+                  "jp/mail",
+                  "jp/notifications"
+                ]
+              },
+              {
+                "group": "非同期処理",
+                "pages": [
+                  "jp/queues",
+                  "jp/concurrency"
+                ]
+              },
+              {
+                "group": "リアルタイム通信",
+                "pages": [
+                  "jp/broadcasting"
+                ]
+              },
+              {
+                "group": "スケジューリング",
+                "pages": [
+                  "jp/scheduling"
+                ]
+              },
+              {
+                "group": "キャッシュと最適化",
+                "pages": [
+                  "jp/cache"
+                ]
+              },
+              {
+                "group": "ヘルパーとコレクション",
+                "pages": [
+                  "jp/helpers",
+                  "jp/strings",
+                  "jp/collections"
+                ]
+              },
+              {
+                "group": "国際化",
+                "pages": [
+                  "jp/localization"
+                ]
+              },
+              {
+                "group": "外部通信",
+                "pages": [
+                  "jp/http-client"
+                ]
+              },
+              {
+                "group": "ファイルとストレージ",
+                "pages": [
+                  "jp/filesystem"
+                ]
+              },
+              {
+                "group": "デバッグと監視",
+                "pages": [
+                  "jp/context",
+                  "jp/error-handling",
+                  "jp/logging"
+                ]
+              },
+              {
+                "group": "コンソールとCLI",
+                "pages": [
+                  "jp/artisan",
+                  "jp/pint"
+                ]
+              },
+              {
+                "group": "フロントエンド",
+                "pages": [
+                  "jp/vite"
+                ]
+              },
+              {
+                "group": "AI開発",
+                "pages": [
+                  "jp/boost",
+                  "jp/mcp",
+                  "jp/ai-sdk"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "応用トピック",
+            "groups": [
+              {
+                "group": "AI開発",
+                "pages": [
+                  "jp/advanced/mcp-server",
+                  "jp/advanced/boost-custom-agent",
+                  "jp/advanced/ai-sdk-custom-provider"
+                ]
+              },
+              {
+                "group": "デザインパターン",
+                "pages": [
+                  "jp/advanced/pipeline",
+                  "jp/advanced/macroable",
+                  "jp/advanced/conditionable",
+                  "jp/advanced/higher-order-messages",
+                  "jp/advanced/manager"
+                ]
+              },
+              {
+                "group": "バリデーション拡張",
+                "pages": [
+                  "jp/advanced/custom-validation-rules"
+                ]
+              },
+              {
+                "group": "アプリケーション構造",
+                "pages": [
+                  "jp/advanced/app-structure"
+                ]
+              },
+              {
+                "group": "Laravel 13 新機能",
+                "pages": [
+                  "jp/advanced/php-attributes"
+                ]
+              },
+              {
+                "group": "Eloquent 深掘り",
+                "pages": [
+                  "jp/advanced/eloquent-observers",
+                  "jp/advanced/eloquent-scopes",
+                  "jp/advanced/eloquent-casts"
+                ]
+              },
+              {
+                "group": "認証の拡張",
+                "pages": [
+                  "jp/advanced/custom-auth-guard"
+                ]
+              },
+              {
+                "group": "セキュリティ",
+                "pages": [
+                  "jp/advanced/rate-limiting"
+                ]
+              },
+              {
+                "group": "パッケージ開発",
+                "pages": [
+                  "jp/advanced/package-development"
+                ]
+              },
+              {
+                "group": "テスト",
+                "pages": [
+                  "jp/advanced/testing-pest"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "ブログ",
+            "groups": [
+              {
+                "group": "Laravel 13",
+                "pages": [
+                  "jp/blog/laravel-13-new-features"
+                ]
+              },
+              {
+                "group": "パッケージ紹介",
+                "pages": [
+                  "jp/blog/livewire-introduction",
+                  "jp/blog/inertia-introduction",
+                  "jp/blog/pest-introduction",
+                  "jp/blog/laravel-pennant",
+                  "jp/blog/telescope-introduction",
+                  "jp/blog/wayfinder-introduction",
+                  "jp/blog/nightwatch-introduction"
+                ]
+              },
+              {
+                "group": "新リポジトリ調査",
+                "pages": [
+                  "jp/blog/maestro-introduction",
+                  "jp/blog/agent-skills-introduction"
+                ]
+              },
+              {
+                "group": "アップグレードガイド",
+                "pages": [
+                  "jp/blog/upgrade-12-to-13",
+                  "jp/blog/upgrade-11-to-12",
+                  "jp/blog/upgrade-10-to-11",
+                  "jp/blog/upgrade-9-to-10"
+                ]
+              },
+              {
+                "group": "環境構築",
+                "pages": [
+                  "jp/blog/mac-setup",
+                  "jp/blog/windows-setup"
+                ]
+              }
+            ]
+          }
         ]
-    },
-    "logo": {
-        "light": "/logo/light.svg",
-        "dark": "/logo/dark.svg",
-        "href": "/"
-    },
-    "navbar": {},
-    "contextual": {
-        "options": [
-            "copy",
-            "view",
-            "chatgpt",
-            "claude",
-            "perplexity",
-            "mcp",
-            "cursor",
-            "vscode"
+      },
+      {
+        "language": "en",
+        "tabs": [
+          {
+            "tab": "Tutorial",
+            "groups": [
+              {
+                "group": "Getting Started",
+                "pages": [
+                  "en/introduction",
+                  "en/installation",
+                  "en/directory-structure"
+                ]
+              },
+              {
+                "group": "Basics",
+                "pages": [
+                  "en/routing",
+                  "en/views",
+                  "en/blade",
+                  "en/controllers",
+                  "en/middleware",
+                  "en/requests",
+                  "en/validation",
+                  "en/responses",
+                  "en/session"
+                ]
+              },
+              {
+                "group": "Database",
+                "pages": [
+                  "en/migrations",
+                  "en/seeding",
+                  "en/eloquent",
+                  "en/eloquent-relationships",
+                  "en/eloquent-factories"
+                ]
+              },
+              {
+                "group": "Authentication",
+                "pages": [
+                  "en/authentication",
+                  "en/starter-kits"
+                ]
+              },
+              {
+                "group": "Testing and Deployment",
+                "pages": [
+                  "en/testing",
+                  "en/deployment"
+                ]
+              },
+              {
+                "group": "AI Development",
+                "pages": [
+                  "en/ai"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Guide",
+            "groups": [
+              {
+                "group": "Architecture",
+                "pages": [
+                  "en/lifecycle",
+                  "en/service-container",
+                  "en/service-providers",
+                  "en/facades",
+                  "en/contracts"
+                ]
+              },
+              {
+                "group": "Security",
+                "pages": [
+                  "en/authorization",
+                  "en/hashing",
+                  "en/sanctum"
+                ]
+              },
+              {
+                "group": "Mail & Notifications",
+                "pages": [
+                  "en/mail",
+                  "en/notifications"
+                ]
+              },
+              {
+                "group": "Async Processing",
+                "pages": [
+                  "en/queues",
+                  "en/events",
+                  "en/concurrency",
+                  "en/scheduling"
+                ]
+              },
+              {
+                "group": "Caching",
+                "pages": [
+                  "en/cache"
+                ]
+              },
+              {
+                "group": "Database",
+                "pages": [
+                  "en/query-builder",
+                  "en/pagination",
+                  "en/eloquent-resources"
+                ]
+              },
+              {
+                "group": "HTTP & External",
+                "pages": [
+                  "en/http-client"
+                ]
+              },
+              {
+                "group": "Console & CLI",
+                "pages": [
+                  "en/artisan",
+                  "en/pint"
+                ]
+              },
+              {
+                "group": "Frontend",
+                "pages": [
+                  "en/vite"
+                ]
+              },
+              {
+                "group": "File Storage",
+                "pages": [
+                  "en/filesystem"
+                ]
+              },
+              {
+                "group": "Debug & Monitoring",
+                "pages": [
+                  "en/context",
+                  "en/error-handling",
+                  "en/logging"
+                ]
+              },
+              {
+                "group": "Helpers & Collections",
+                "pages": [
+                  "en/helpers",
+                  "en/strings",
+                  "en/collections"
+                ]
+              },
+              {
+                "group": "Internationalization",
+                "pages": [
+                  "en/localization"
+                ]
+              },
+              {
+                "group": "AI Development",
+                "pages": [
+                  "en/boost",
+                  "en/mcp",
+                  "en/ai-sdk"
+                ]
+              },
+              {
+                "group": "Real-time",
+                "pages": [
+                  "en/broadcasting"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Advanced Topics",
+            "groups": [
+              {
+                "group": "AI Development",
+                "pages": [
+                  "en/advanced/mcp-server",
+                  "en/advanced/boost-custom-agent",
+                  "en/advanced/ai-sdk-custom-provider"
+                ]
+              },
+              {
+                "group": "Application Structure",
+                "pages": [
+                  "en/advanced/app-structure"
+                ]
+              },
+              {
+                "group": "Laravel 13 New Features",
+                "pages": [
+                  "en/advanced/php-attributes"
+                ]
+              },
+              {
+                "group": "Design Patterns",
+                "pages": [
+                  "en/advanced/pipeline",
+                  "en/advanced/macroable",
+                  "en/advanced/conditionable",
+                  "en/advanced/higher-order-messages",
+                  "en/advanced/manager"
+                ]
+              },
+              {
+                "group": "Eloquent Deep Dive",
+                "pages": [
+                  "en/advanced/eloquent-observers",
+                  "en/advanced/eloquent-scopes",
+                  "en/advanced/eloquent-casts"
+                ]
+              },
+              {
+                "group": "Validation Extensions",
+                "pages": [
+                  "en/advanced/custom-validation-rules"
+                ]
+              },
+              {
+                "group": "Authentication Extensions",
+                "pages": [
+                  "en/advanced/custom-auth-guard"
+                ]
+              },
+              {
+                "group": "Security",
+                "pages": [
+                  "en/advanced/rate-limiting"
+                ]
+              },
+              {
+                "group": "Package Development",
+                "pages": [
+                  "en/advanced/package-development"
+                ]
+              },
+              {
+                "group": "Testing",
+                "pages": [
+                  "en/advanced/testing-pest"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Blog",
+            "groups": [
+              {
+                "group": "Laravel 13",
+                "pages": [
+                  "en/blog/laravel-13-new-features"
+                ]
+              },
+              {
+                "group": "Package Introduction",
+                "pages": [
+                  "en/blog/livewire-introduction",
+                  "en/blog/inertia-introduction",
+                  "en/blog/pest-introduction",
+                  "en/blog/laravel-pennant",
+                  "en/blog/telescope-introduction",
+                  "en/blog/nightwatch-introduction",
+                  "en/blog/wayfinder-introduction"
+                ]
+              },
+              {
+                "group": "Upgrade Guides",
+                "pages": [
+                  "en/blog/upgrade-12-to-13",
+                  "en/blog/upgrade-11-to-12",
+                  "en/blog/upgrade-10-to-11",
+                  "en/blog/upgrade-9-to-10"
+                ]
+              },
+              {
+                "group": "New Repository Reports",
+                "pages": [
+                  "en/blog/maestro-introduction",
+                  "en/blog/agent-skills-introduction"
+                ]
+              },
+              {
+                "group": "Environment Setup",
+                "pages": [
+                  "en/blog/mac-setup",
+                  "en/blog/windows-setup"
+                ]
+              }
+            ]
+          }
         ]
-    },
-    "footer": {
-        "socials": {
-            "github": "https://github.com/invokable"
-        }
-    },
-    "styling": {
-        "eyebrows": "breadcrumbs"
-    },
-    "metadata": {
-        "timestamp": true
-    },
-    "seo": {
-        "metatags": {
-            "canonical": "https://kawax.biz"
-        }
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "/"
+  },
+  "navbar": {},
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/invokable"
     }
+  },
+  "styling": {
+    "eyebrows": "breadcrumbs"
+  },
+  "metadata": {
+    "timestamp": true
+  },
+  "seo": {
+    "metatags": {
+      "canonical": "https://kawax.biz"
+    }
+  }
 }
