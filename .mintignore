@@ -7,3 +7,7 @@ drafts/
 *.draft.mdx
 
 .vscode/
+
+.gitattributes
+.mcp.json
+skills-lock.json
