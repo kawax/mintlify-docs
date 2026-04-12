@@ -1,5 +1,5 @@
 {
-  "servers": {
+  "mcpServers": {
     "github-agentic-workflows": {
       "type": "local",
       "command": "gh",
@@ -7,17 +7,23 @@
         "aw",
         "mcp-server"
       ],
-      "tools": ["*"]
+      "tools": [
+        "*"
+      ]
     },
     "Mintlify": {
       "type": "http",
       "url": "https://mintlify.com/docs/mcp",
-      "tools": ["*"]
+      "tools": [
+        "*"
+      ]
     },
     "kawax": {
       "type": "http",
       "url": "https://kawax.biz/mcp",
-      "tools": ["*"]
+      "tools": [
+        "*"
+      ]
     }
   }
 }
