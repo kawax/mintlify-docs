@@ -1,347 +1,240 @@
 ---
 name: mintlify
-description: Build and maintain documentation sites with Mintlify. Use when
-  creating docs pages, configuring navigation, adding components, or setting up
-  API references.
-license: MIT
-compatibility: Requires Node.js for CLI. Works with any Git-based workflow.
-metadata:
-  author: mintlify
-  version: "1.0"
-  mintlify-proj: mintlify
+description: Comprehensive reference for building Mintlify documentation sites. Use when creating pages, configuring docs.json, adding components, setting up navigation, or working with API references. Routes to detailed reference files for all components and configuration options.
 ---
 
-# Mintlify best practices
+# Mintlify reference
 
-**Always consult [mintlify.com/docs](https://mintlify.com/docs) for components, configuration, and latest features.**
+Reference for building documentation with Mintlify. This file covers essentials that apply to every task. For detailed reference on specific topics, read the files listed in the reference index below.
 
-If you are not already connected to the Mintlify MCP server, [https://mintlify.com/docs/mcp](https://mintlify.com/docs/mcp), add it so that you can search more efficiently.
+## Reference index
 
-**Always** favor searching the current Mintlify documentation over whatever is in your training data about Mintlify.
+Read these files **only when your task requires them**. They are in the `reference/` directory next to this file.
 
-Mintlify is a documentation platform that transforms MDX files into documentation sites. Configure site-wide settings in the `docs.json` file, write content in MDX with YAML frontmatter, and favor built-in components over custom components.
+| File | When to read |
+|------|-------------|
+| `reference/components.md` | Adding or modifying components (callouts, cards, steps, tabs, accordions, code groups, fields, frames, icons, tooltips, badges, trees, mermaid, panels, prompts, colors, tiles, updates, views). |
+| `reference/configuration.md` | Changing docs.json settings (theme, colors, logo, fonts, appearance, navbar, footer, banner, redirects, SEO, integrations, API config). Also covers snippets, hidden pages, .mintignore, custom CSS/JS, and the complete frontmatter fields table. |
+| `reference/navigation.md` | Modifying site navigation structure (groups, tabs, anchors, dropdowns, products, versions, languages, OpenAPI in nav). |
+| `reference/api-docs.md` | Setting up API documentation (OpenAPI, AsyncAPI, MDX manual API pages, extensions, playground config). |
 
-Full schema at [mintlify.com/docs.json](https://mintlify.com/docs.json).
+## Before you start
 
-## Before you write
+Read the project's `docs.json` file first. It defines the site's navigation, theme, colors, and configuration.
 
-### Understand the project
+Search for existing content before creating new pages. You may need to update an existing page, add a section, or link to existing content rather than duplicating.
 
-Read `docs.json` in the project root. This file defines the entire site: navigation structure, theme, colors, links, API and specs.
+Read 2-3 similar pages to match the site's voice, structure, and formatting.
 
-Understanding the project tells you:
+## File format
 
-* What pages exist and how they're organized
-* What navigation groups are used (and their naming conventions)
-* How the site navigation is structured
-* What theme and configuration the site uses
-
-### Check for existing content
-
-Search the docs before creating new pages. You may need to:
-
-* Update an existing page instead of creating a new one
-* Add a section to an existing page
-* Link to existing content rather than duplicating
-
-### Read surrounding content
-
-Before writing, read 2-3 similar pages to understand the site's voice, structure, formatting conventions, and level of detail.
-
-### Understand Mintlify components
-
-Review the Mintlify [components](https://www.mintlify.com/docs/components) to select and use any relevant components for the documentation request that you are working on.
-
-## Quick reference
-
-### CLI commands
-
-* `npm i -g mint` - Install the Mintlify CLI
-* `mint dev` - Local preview at localhost:3000
-* `mint broken-links` - Check internal links
-* `mint a11y` - Check for accessibility issues in content
-* `mint rename` - Rename/move files and update references
-* `mint validate` - Validate documentation builds
-
-### Required files
-
-* `docs.json` - Site configuration (navigation, theme, integrations, etc.). See [global settings](https://mintlify.com/docs/settings/global) for all options.
-* `*.mdx` files - Documentation pages with YAML frontmatter
-
-### Example file structure
+Mintlify uses MDX files (`.mdx` or `.md`) with YAML frontmatter.
 
 ```
 project/
-├── docs.json           # Site configuration
-├── introduction.mdx
+├── docs.json           # Site configuration (required)
+├── index.mdx
 ├── quickstart.mdx
 ├── guides/
 │   └── example.mdx
-├── openapi.yml         # API specification
+├── openapi.yml         # API specification (optional)
 ├── images/             # Static assets
 │   └── example.png
 └── snippets/           # Reusable components
     └── component.jsx
 ```
 
+### File naming
+
+- Match existing patterns in the directory
+- If no existing files or mixed file naming patterns, use kebab-case: `getting-started.mdx`
+- Add new pages to `docs.json` navigation or they won't appear in the sidebar
+
+### Internal links
+
+- Use root-relative paths without file extensions: `/getting-started/quickstart`
+- Do not use relative paths (`../`) or absolute URLs for internal pages
+
+### Images
+
+Store images in an `images/` directory. Reference with root-relative paths. All images require descriptive alt text.
+
+```mdx
+![Dashboard showing analytics overview](/images/dashboard.png)
+```
+
 ## Page frontmatter
 
-Every page requires `title` in its frontmatter. Include `description` for SEO and navigation.
+Every page requires `title` in its frontmatter. Include `description` and `keywords` for SEO.
 
-```yaml theme={null}
+```yaml
 ---
 title: "Clear, descriptive title"
 description: "Concise summary for SEO and navigation."
+keywords: ["relevant", "search", "terms"]
 ---
 ```
 
-Optional frontmatter fields:
+### Common frontmatter fields
 
-* `sidebarTitle`: Short title for sidebar navigation.
-* `icon`: Lucide or Font Awesome icon name, URL, or file path.
-* `tag`: Label next to the page title in the sidebar (for example, "NEW").
-* `mode`: Page layout mode (`default`, `wide`, `custom`).
-* `keywords`: Array of terms related to the page content for local search and SEO.
-* Any custom YAML fields for use with personalization or conditional content.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | Yes | Page title in navigation and browser tabs. |
+| `description` | string | No | Brief description for SEO. Displays under the title. |
+| `sidebarTitle` | string | No | Short title for sidebar navigation. |
+| `icon` | string | No | Lucide, Font Awesome, or Tabler icon name. Also accepts a URL or file path. |
+| `tag` | string | No | Label next to page title in sidebar (e.g., "NEW"). |
+| `hidden` | boolean | No | Remove from sidebar. Page still accessible by URL. |
+| `mode` | string | No | Page layout: `default`, `wide`, `custom`, `frame`, `center`. |
+| `keywords` | array | No | Search terms for internal search and SEO. |
+| `api` | string | No | API endpoint for interactive playground (e.g., `"POST /users"`). |
+| `openapi` | string | No | OpenAPI endpoint reference (e.g., `"GET /endpoint"`). |
 
-## File conventions
+## Quick component reference
 
-* Match existing naming patterns in the directory
-* If there are no existing files or inconsistent file naming patterns, use kebab-case: `getting-started.mdx`, `api-reference.mdx`
-* Use root-relative paths without file extensions for internal links: `/getting-started/quickstart`
-* Do not use relative paths (`../`) or absolute URLs for internal pages
-* When you create a new page, add it to `docs.json` navigation or it won't appear in the sidebar
+Below are the most commonly used components. For full props and all 24 components, read `reference/components.md`.
 
-## Organize content
+### Callouts
 
-When a user asks about anything related to site-wide configurations, start by understanding the [global settings](https://www.mintlify.com/docs/organize/settings). See if a setting in the `docs.json` file can be updated to achieve what the user wants.
+```mdx
+<Note>Supplementary information, safe to skip.</Note>
+<Info>Helpful context such as permissions or prerequisites.</Info>
+<Tip>Recommendations or best practices.</Tip>
+<Warning>Potentially destructive actions or important caveats.</Warning>
+<Check>Success confirmation or completed status.</Check>
+<Danger>Critical warnings about data loss or breaking changes.</Danger>
+```
 
-### Navigation
+### Steps
 
-The `navigation` property in `docs.json` controls site structure. Choose one primary pattern at the root level, then nest others within it.
+```mdx
+<Steps>
+  <Step title="First step">
+    Instructions for step one.
+  </Step>
+  <Step title="Second step">
+    Instructions for step two.
+  </Step>
+</Steps>
+```
 
-**Choose your primary pattern:**
+### Tabs and code groups
 
-| Pattern       | When to use                                                                                    |
-| ------------- | ---------------------------------------------------------------------------------------------- |
-| **Groups**    | Default. Single audience, straightforward hierarchy                                            |
-| **Tabs**      | Distinct sections with different audiences (Guides vs API Reference) or content types          |
-| **Anchors**   | Want persistent section links at sidebar top. Good for separating docs from external resources |
-| **Dropdowns** | Multiple doc sections users switch between, but not distinct enough for tabs                   |
-| **Products**  | Multi-product company with separate documentation per product                                  |
-| **Versions**  | Maintaining docs for multiple API/product versions simultaneously                              |
-| **Languages** | Localized content                                                                              |
+```mdx
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    npm install package-name
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```bash
+    yarn add package-name
+    ```
+  </Tab>
+</Tabs>
+```
 
-**Within your primary pattern:**
+```mdx
+<CodeGroup>
 
-* **Groups** - Organize related pages. Can nest groups within groups, but keep hierarchy shallow
-* **Menus** - Add dropdown navigation within tabs for quick jumps to specific pages
-* **`expanded: false`** - Collapse nested groups by default. Use for reference sections users browse selectively
-* **`openapi`** - Auto-generate pages from OpenAPI spec. Add at group/tab level to inherit
+```javascript example.js
+const greeting = "Hello, world!";
+```
 
-**Common combinations:**
+```python example.py
+greeting = "Hello, world!"
+```
 
-* Tabs containing groups (most common for docs with API reference)
-* Products containing tabs (multi-product SaaS)
-* Versions containing tabs (versioned API docs)
-* Anchors containing groups (simple docs with external resource links)
+</CodeGroup>
+```
 
-### Links and paths
+### Cards and columns
 
-* **Internal links:** Root-relative, no extension: `/getting-started/quickstart`
-* **Images:** Store in `/images`, reference as `/images/example.png`
-* **External links:** Use full URLs, they open in new tabs automatically
+```mdx
+<Columns cols={2}>
+  <Card title="First card" icon="rocket" href="/quickstart">
+    Card description text.
+  </Card>
+  <Card title="Second card" icon="book" href="/guides">
+    Card description text.
+  </Card>
+</Columns>
+```
 
-## Customize docs sites
+Use `<Columns>` to arrange cards (or other content) in a grid. `cols` accepts 1-4.
 
-**What to customize where:**
+### Accordions
 
-* **Brand colors, fonts, logo** → `docs.json`. See [global settings](https://mintlify.com/docs/settings/global)
-* **Component styling, layout tweaks** → `custom.css` at project root
-* **Dark mode** → Enabled by default. Only disable with `"appearance": "light"` in `docs.json` if brand requires it
+```mdx
+<AccordionGroup>
+  <Accordion title="First section">Content one.</Accordion>
+  <Accordion title="Second section">Content two.</Accordion>
+</AccordionGroup>
+```
 
-Start with `docs.json`. Only add `custom.css` when you need styling that config doesn't support.
+## CLI commands
 
-## Write content
+Install the CLI with `npm i -g mint`.
 
-### Components
+### Local development
 
-The [components overview](https://mintlify.com/docs/components) organizes all components by purpose: structure content, draw attention, show/hide content, document APIs, link to pages, and add visual context. Start there to find the right component.
+- `mint dev` — Start local preview at localhost:3000. `--no-open` skips browser launch. `--groups <names>` mocks user groups.
+- `mint validate` — Strict build validation; exits non-zero on warnings or errors.
+- `mint export` — Export a static site zip for air-gapped deployment. `--output <file>` sets the output path (default: `export.zip`).
 
-**Common decision points:**
+### Content quality
 
-| Need                       | Use                     |
-| -------------------------- | ----------------------- |
-| Hide optional details      | `<Accordion>`           |
-| Long code examples         | `<Expandable>`          |
-| User chooses one option    | `<Tabs>`                |
-| Linked navigation cards    | `<Card>` in `<Columns>` |
-| Sequential instructions    | `<Steps>`               |
-| Code in multiple languages | `<CodeGroup>`           |
-| API parameters             | `<ParamField>`          |
-| API response fields        | `<ResponseField>`       |
+- `mint broken-links` — Check for broken internal links. `--check-anchors` validates `#` anchors. `--check-external` checks external URLs. `--check-snippets` checks links inside `<Snippet>` components.
+- `mint a11y` — Accessibility checks (alt text, color contrast). `--skip-contrast` or `--skip-alt-text` to narrow scope.
 
-**Callouts by severity:**
+### Analytics
 
-* `<Note>` - Supplementary info, safe to skip
-* `<Info>` - Helpful context such as permissions
-* `<Tip>` - Recommendations or best practices
-* `<Warning>` - Potentially destructive actions
-* `<Check>` - Success confirmation
+- `mint analytics stats` — KPI numbers (views, visitors, searches). Options: `--subdomain`, `--from`, `--to`, `--format` (table/plain/json/graph), `--agents`/`--humans` to filter traffic, `--page` to filter to one path.
+- `mint analytics search` — Search analytics. `--query` filters by search term substring.
+- `mint analytics feedback` — Feedback analytics. `--type` (code or page).
+- `mint analytics conversation list` — List assistant conversations.
+- `mint analytics conversation view <id>` — View a single conversation.
+- `mint analytics conversation buckets list` — List conversation category buckets.
+- `mint analytics conversation buckets view <id>` — View conversations in a bucket.
 
-### Reusable content
+### Authentication
 
-**When to use snippets:**
+- `mint login` — Authenticate your Mintlify account.
+- `mint logout` — Log out of your account.
+- `mint status` — Show current authentication status.
 
-* Exact content appears on more than one page
-* Complex components you want to maintain in one place
-* Shared content across teams/repos
+### Configuration
 
-**When NOT to use snippets:**
+- `mint config set <key> <value>` — Persist a config value. Valid keys: `subdomain`, `dateFrom`, `dateTo`.
+- `mint config get <key>` — Read a stored config value.
+- `mint config clear <key>` — Remove a stored config value.
 
-* Slight variations needed per page (leads to complex props)
+### Project setup
 
-Import snippets with `import { Component } from "/path/to/snippet-name.jsx"`.
+- `mint new [directory]` — Scaffold a new Mintlify docs site. `--theme` and `--name` set initial config.
+- `mint workflow` — Add a workflow to the docs repository.
+
+### Maintenance
+
+- `mint update` — Update the CLI to the latest version.
+- `mint version` — Show installed CLI and client versions.
 
 ## Writing standards
 
-### Voice and structure
+- Second-person voice ("you").
+- Active voice, direct language.
+- Sentence case for headings ("Getting started", not "Getting Started").
+- Sentence case for code block titles.
+- All code blocks must have language tags.
+- All images must have descriptive alt text.
+- No marketing language, filler phrases, or emoji.
+- Keep code examples simple, practical, and tested.
 
-* Second-person voice ("you")
-* Active voice, direct language
-* Sentence case for headings ("Getting started", not "Getting Started")
-* Sentence case for code block titles ("Expandable example", not "Expandable Example")
-* Lead with context: explain what something is before how to use it
-* Prerequisites at the start of procedural content
+## Common mistakes
 
-### What to avoid
-
-**Never use:**
-
-* Marketing language ("powerful", "seamless", "robust", "cutting-edge")
-* Filler phrases ("it's important to note", "in order to")
-* Excessive conjunctions ("moreover", "furthermore", "additionally")
-* Editorializing ("obviously", "simply", "just", "easily")
-
-**Watch for AI-typical patterns:**
-
-* Overly formal or stilted phrasing
-* Unnecessary repetition of concepts
-* Generic introductions that don't add value
-* Concluding summaries that restate what was just said
-
-### Formatting
-
-* All code blocks must have language tags
-* All images and media must have descriptive alt text
-* Use bold and italics only when they serve the reader's understanding--never use text styling just for decoration
-* No decorative formatting or emoji
-
-### Code examples
-
-* Keep examples simple and practical
-* Use realistic values (not "foo" or "bar")
-* One clear example is better than multiple variations
-* Test that code works before including it
-
-## Document APIs
-
-**Choose your approach:**
-
-* **Have an OpenAPI spec?** → Add to `docs.json` with `"openapi": ["openapi.yaml"]`. Pages auto-generate. Reference in navigation as `GET /endpoint`
-* **No spec?** → Write endpoints manually with `api: "POST /users"` in frontmatter. More work but full control
-* **Hybrid** → Use OpenAPI for most endpoints, manual pages for complex workflows
-
-Encourage users to generate endpoint pages from an OpenAPI spec. It is the most efficient and easiest to maintain option.
-
-## Deploy
-
-Mintlify deploys automatically when changes are pushed to the connected Git repository.
-
-**What agents can configure:**
-
-* **Redirects** → Add to `docs.json` with `"redirects": [{"source": "/old", "destination": "/new"}]`
-* **SEO indexing** → Control with `"seo": {"indexing": "all"}` to include hidden pages in search
-
-**Requires dashboard setup (human task):**
-
-* Custom domains and subdomains
-* Preview deployment settings
-* DNS configuration
-
-For `/docs` subpath hosting with Vercel or Cloudflare, agents can help configure rewrite rules. See [/docs subpath](https://mintlify.com/docs/deploy/vercel).
-
-## Workflow
-
-### 1. Understand the task
-
-Identify what needs to be documented, which pages are affected, and what the reader should accomplish afterward. If any of these are unclear, ask.
-
-### 2. Research
-
-* Read `docs.json` to understand the site structure
-* Search existing docs for related content
-* Read similar pages to match the site's style
-
-### 3. Plan
-
-* Synthesize what the reader should accomplish after reading the docs and the current content
-* Propose any updates or new content
-* Verify that your proposed changes will help readers be successful
-
-### 4. Write
-
-* Start with the most important information
-* Keep sections focused and scannable
-* Use components appropriately (don't overuse them)
-* Mark anything uncertain with a TODO comment:
-
-```mdx theme={null}
-{/* TODO: Verify the default timeout value */}
-```
-
-### 5. Update navigation
-
-If you created a new page, add it to the appropriate group in `docs.json`.
-
-### 6. Verify
-
-Before submitting:
-
-* [ ] Frontmatter includes title and description
-* [ ] All code blocks have language tags
-* [ ] Internal links use root-relative paths without file extensions
-* [ ] New pages are added to `docs.json` navigation
-* [ ] Content matches the style of surrounding pages
-* [ ] No marketing language or filler phrases
-* [ ] TODOs are clearly marked for anything uncertain
-* [ ] Run `mint broken-links` to check links
-* [ ] Run `mint validate` to find any errors
-
-## Edge cases
-
-### Migrations
-
-If a user asks about migrating to Mintlify, ask if they are using ReadMe or Docusaurus. If they are, use the [@mintlify/scraping](https://www.npmjs.com/package/@mintlify/scraping) CLI to migrate content. If they are using a different platform to host their documentation, help them manually convert their content to MDX pages using Mintlify components.
-
-### Hidden pages
-
-Any page that is not included in the `docs.json` navigation is hidden. Use hidden pages for content that should be accessible by URL or indexed for the assistant or search, but not discoverable through the sidebar navigation.
-
-### Exclude pages
-
-The `.mintignore` file is used to exclude files from a documentation repository from being processed.
-
-## Common gotchas
-
-1. **Component imports** - JSX components need explicit import, MDX components don't
-2. **Frontmatter required** - Every MDX file needs `title` at minimum
-3. **Code block language** - Always specify language identifier
-4. **Never use `mint.json`** - `mint.json` is deprecated. Only ever use `docs.json`
-
-## Resources
-
-* [Documentation](https://mintlify.com/docs)
-* [Configuration schema](https://mintlify.com/docs.json)
-* [Feature requests](https://github.com/orgs/mintlify/discussions/categories/feature-requests)
-* [Bugs and feedback](https://github.com/orgs/mintlify/discussions/categories/bugs-feedback)
+- Missing language tag on a code block (use ` ```python `, not ` ``` `).
+- Using relative paths (`../page`) instead of root-relative (`/section/page`).
+- Forgetting to add new pages to `docs.json` navigation.
+- Images without alt text.
+- Adding file extensions to internal links (`/page.mdx` instead of `/page`).
