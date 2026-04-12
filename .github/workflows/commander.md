@@ -25,6 +25,7 @@ network:
     - laravel.com
     - "*.laravel.com"
     - inertiajs.com
+    - fluxui.dev
 
 safe-outputs:
   create-issue:
