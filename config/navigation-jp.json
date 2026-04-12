@@ -8,7 +8,8 @@
           "pages": [
             "jp/introduction",
             "jp/installation",
-            "jp/directory-structure"
+            "jp/directory-structure",
+            "jp/configuration"
           ]
         },
         {

@@ -8,7 +8,8 @@
           "pages": [
             "en/introduction",
             "en/installation",
-            "en/directory-structure"
+            "en/directory-structure",
+            "en/configuration"
           ]
         },
         {

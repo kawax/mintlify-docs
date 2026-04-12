@@ -1,0 +1,295 @@
+---
+title: "設定"
+description: "Laravelの設定ファイル、環境変数(.env)、設定値へのアクセス方法、キャッシュ、デバッグモード、メンテナンスモードを解説します。"
+---
+
+## はじめに
+
+Laravelフレームワークの設定ファイルはすべて `config/` ディレクトリに格納されています。各オプションにはコメントが付いているので、ファイルを開いて利用可能なオプションを確認してみてください。
+
+設定ファイルでは、データベース接続情報・メールサーバー情報・アプリケーションURLや暗号化キーなど、さまざまなコア設定値を管理します。
+
+```mermaid
+flowchart LR
+    A[".env ファイル"] -->|env()| B["config/ ファイル"]
+    B -->|config()| C["アプリケーション"]
+```
+
+### `about` コマンド
+
+`about` Artisanコマンドを使うと、アプリケーションの設定・ドライバー・環境の概要を確認できます。
+
+```shell
+php artisan about
+```
+
+特定のセクションだけを確認したい場合は `--only` オプションを使います。
+
+```shell
+php artisan about --only=environment
+```
+
+特定の設定ファイルの値を詳しく確認するには `config:show` コマンドが便利です。
+
+```shell
+php artisan config:show database
+```
+
+## 環境設定(.env)
+
+実行環境によって設定値を切り替えたい場合がよくあります。たとえば、ローカルと本番でキャッシュドライバーを変えたいケースなどです。
+
+Laravelはこれを簡単にするために [DotEnv](https://github.com/vlucas/phpdotenv) PHPライブラリを利用しています。新規インストール時、アプリケーションのルートディレクトリには一般的な環境変数が定義された `.env.example` ファイルが含まれており、インストールプロセス中に自動的に `.env` にコピーされます。
+
+<Info>
+  チームで開発する場合は、`.env.example` ファイルを更新しながらリポジトリに含めておくと便利です。プレースホルダー値を設定しておくことで、チームの他の開発者がどの環境変数が必要かを明確に把握できます。
+</Info>
+
+### 環境ファイルのセキュリティ
+
+<Warning>
+  `.env` ファイルはソースコントロールにコミットしないでください。開発者やサーバーごとに異なる設定が必要であり、リポジトリに含めるとインシデント発生時に機密情報が漏洩するリスクがあります。
+</Warning>
+
+ただし、Laravelには環境ファイルを暗号化する機能が組み込まれており、暗号化された状態であればソースコントロールに安全に保存できます。
+
+### 追加の環境ファイル
+
+アプリケーション起動時、Laravelは `APP_ENV` 環境変数またはCLIの `--env` 引数が指定されているかを確認します。指定されている場合、`.env.[APP_ENV]` ファイルが存在すればそれを読み込みます。存在しない場合はデフォルトの `.env` ファイルが使われます。
+
+### 環境変数の型
+
+`.env` ファイルの変数はすべて文字列として解析されますが、`env()` 関数からより幅広い型を返せるよう、以下の特殊な値が用意されています。
+
+| `.env` の値 | `env()` の返り値 |
+| ----------- | --------------- |
+| `true`      | `(bool) true`   |
+| `(true)`    | `(bool) true`   |
+| `false`     | `(bool) false`  |
+| `(false)`   | `(bool) false`  |
+| `empty`     | `(string) ''`   |
+| `(empty)`   | `(string) ''`   |
+| `null`      | `(null) null`   |
+| `(null)`    | `(null) null`   |
+
+スペースを含む値を設定するにはダブルクォートで囲みます。
+
+```ini
+APP_NAME="My Application"
+```
+
+### 環境変数の取得
+
+`.env` ファイルに記述したすべての変数は、リクエストを受け取ったとき `$_ENV` PHPスーパーグローバルに読み込まれます。設定ファイル内では `env()` 関数を使って値を取得できます。
+
+```php
+'debug' => (bool) env('APP_DEBUG', false),
+```
+
+第2引数はデフォルト値です。その環境変数が存在しない場合に返されます。
+
+### 現在の環境を確認する
+
+現在の環境は `.env` ファイルの `APP_ENV` 変数で決まります。`App` ファサードの `environment` メソッドで取得できます。
+
+```php
+use Illuminate\Support\Facades\App;
+
+$environment = App::environment();
+```
+
+引数を渡して特定の環境かどうかを確認することもできます。
+
+```php
+if (App::environment('local')) {
+    // ローカル環境
+}
+
+if (App::environment(['local', 'staging'])) {
+    // ローカルまたはステージング環境
+}
+```
+
+### 環境ファイルの暗号化
+
+暗号化されていない環境ファイルはソースコントロールに保存すべきではありませんが、Laravelには環境ファイルを暗号化する機能があります。
+
+```shell
+php artisan env:encrypt
+```
+
+実行すると `.env` が暗号化され、暗号化された内容が `.env.encrypted` ファイルに保存されます。復号キーはコマンドの出力に表示されるので、安全なパスワードマネージャーに保存してください。
+
+復号するには `env:decrypt` コマンドを使います。
+
+```shell
+php artisan env:decrypt
+```
+
+## 設定値へのアクセス
+
+`Config` ファサードまたはグローバルの `config()` 関数を使って、アプリケーションのどこからでも設定値にアクセスできます。「ドット記法」を使い、ファイル名とオプション名を組み合わせて指定します。
+
+```php
+use Illuminate\Support\Facades\Config;
+
+$value = Config::get('app.timezone');
+
+// グローバル関数でも取得できる
+$value = config('app.timezone');
+
+// 存在しない場合のデフォルト値を指定する
+$value = config('app.timezone', 'Asia/Tokyo');
+```
+
+実行時に設定値を変更するには `Config::set()` または配列を `config()` に渡します。
+
+```php
+Config::set('app.timezone', 'America/Chicago');
+
+config(['app.timezone' => 'America/Chicago']);
+```
+
+型付きの取得メソッドも用意されており、型が一致しない場合は例外がスローされます。
+
+```php
+Config::string('config-key');
+Config::integer('config-key');
+Config::float('config-key');
+Config::boolean('config-key');
+Config::array('config-key');
+Config::collection('config-key');
+```
+
+## 設定のキャッシュ
+
+アプリケーションのパフォーマンスを向上させるには、すべての設定ファイルを1つのファイルにキャッシュします。
+
+```shell
+php artisan config:cache
+```
+
+このコマンドはすべての設定オプションを1つのファイルにまとめ、フレームワークが素早く読み込めるようにします。
+
+<Warning>
+  `config:cache` コマンドは本番環境のデプロイプロセスの一部として実行してください。ローカル開発中は設定が頻繁に変わるため、実行しないことを推奨します。
+</Warning>
+
+キャッシュが作成されると、`.env` ファイルはフレームワークのリクエストやArtisanコマンド実行時に読み込まれなくなります。そのため `env()` 関数はシステムレベルの環境変数のみを返します。
+
+<Tip>
+  このため、`env()` 関数は必ず `config/` ディレクトリ内の設定ファイルからのみ呼び出すようにしてください。アプリケーション内の他の場所からは `config()` 関数を使って設定値を取得します。
+</Tip>
+
+キャッシュを削除するには `config:clear` コマンドを使います。
+
+```shell
+php artisan config:clear
+```
+
+### 設定ファイルの公開
+
+Laravelの設定ファイルの多くはすでに `config/` ディレクトリに公開されていますが、`cors.php` や `view.php` など一部のファイルはデフォルトでは公開されていません。
+
+未公開の設定ファイルを公開するには `config:publish` コマンドを使います。
+
+```shell
+php artisan config:publish
+
+php artisan config:publish --all
+```
+
+## デバッグモード
+
+`config/app.php` の `debug` オプションは、エラー情報をユーザーにどの程度表示するかを決定します。このオプションはデフォルトで `.env` ファイルの `APP_DEBUG` 環境変数の値に従います。
+
+<Warning>
+  **本番環境では `APP_DEBUG` を必ず `false` に設定してください。** `true` のままにすると、アプリケーションの機密設定値がエンドユーザーに公開される危険があります。
+</Warning>
+
+```ini
+# ローカル開発
+APP_DEBUG=true
+
+# 本番環境
+APP_DEBUG=false
+```
+
+## メンテナンスモード
+
+アプリケーションがメンテナンスモードのとき、すべてのリクエストに対してカスタムビューが表示されます。これにより、アップデート中や保守作業中にアプリケーションを一時的に「無効化」できます。
+
+### メンテナンスモードの有効化
+
+```shell
+php artisan down
+```
+
+`--refresh` オプションを指定すると、ブラウザが指定秒数後に自動的にリロードされます。
+
+```shell
+php artisan down --refresh=15
+```
+
+`--retry` オプションは `Retry-After` HTTPヘッダーの値として設定されます。
+
+```shell
+php artisan down --retry=60
+```
+
+### メンテナンスモードのバイパス
+
+シークレットトークンを使って特定のユーザーだけがアクセスできるようにするには `--secret` オプションを使います。
+
+```shell
+php artisan down --secret="1630542a-246b-4b66-afa1-dd72a4c43515"
+```
+
+`--with-secret` オプションを使うとLaravelがトークンを自動生成します。
+
+```shell
+php artisan down --with-secret
+```
+
+### 複数サーバーでのメンテナンスモード
+
+デフォルトではLaravelはファイルベースでメンテナンスモードを管理します。複数サーバー構成の場合は、キャッシュベースの方法が便利です。
+
+```ini
+APP_MAINTENANCE_DRIVER=cache
+APP_MAINTENANCE_STORE=database
+```
+
+### メンテナンスビューの事前レンダリング
+
+デプロイ中に `php artisan down` を実行する場合、依存関係更新中にアクセスしたユーザーがエラーを目にすることがあります。これを防ぐには `--render` オプションでビューを事前レンダリングします。
+
+```shell
+php artisan down --render="errors::503"
+```
+
+メンテナンスモード中にすべてのリクエストを特定のURLにリダイレクトすることもできます。
+
+```shell
+php artisan down --redirect=/
+```
+
+### メンテナンスモードの無効化
+
+```shell
+php artisan up
+```
+
+<Info>
+  メンテナンスモードのデフォルトテンプレートは `resources/views/errors/503.blade.php` を作成することでカスタマイズできます。
+</Info>
+
+<Tip>
+  ダウンタイムを完全になくしたい場合は、[Laravel Cloud](https://cloud.laravel.com) のようなフルマネージドプラットフォームの利用を検討してください。
+</Tip>
+
+## 次のステップ
+
+<Card title="ルーティング" icon="route" href="/jp/routing">
+  URLとコントローラーを結びつけるルーティングの基礎を学びます。
+</Card>
