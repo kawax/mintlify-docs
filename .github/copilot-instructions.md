@@ -128,4 +128,4 @@ Do not use raw HTML for layout when a Mintlify component exists.
 
 ## デプロイ
 
-mainブランチへのマージでMintlifyに自動的に公開されるはずだけどコーディングエージェントからのプルリクでは動かないので管理者が手動デプロイする。
+mainブランチへのマージ後にMintlifyダッシュボードで管理者が手動デプロイする。
