@@ -1,0 +1,294 @@
+{
+  "tabs": [
+    {
+      "tab": "Tutorial",
+      "groups": [
+        {
+          "group": "Getting Started",
+          "pages": [
+            "en/introduction",
+            "en/installation",
+            "en/directory-structure"
+          ]
+        },
+        {
+          "group": "Basics",
+          "pages": [
+            "en/routing",
+            "en/views",
+            "en/blade",
+            "en/controllers",
+            "en/middleware",
+            "en/requests",
+            "en/validation",
+            "en/responses",
+            "en/session"
+          ]
+        },
+        {
+          "group": "Database",
+          "pages": [
+            "en/migrations",
+            "en/seeding",
+            "en/eloquent",
+            "en/eloquent-relationships",
+            "en/eloquent-factories"
+          ]
+        },
+        {
+          "group": "Authentication",
+          "pages": [
+            "en/authentication",
+            "en/starter-kits"
+          ]
+        },
+        {
+          "group": "Testing and Deployment",
+          "pages": [
+            "en/testing",
+            "en/deployment"
+          ]
+        },
+        {
+          "group": "AI Development",
+          "pages": [
+            "en/ai"
+          ]
+        }
+      ]
+    },
+    {
+      "tab": "Guide",
+      "groups": [
+        {
+          "group": "Architecture",
+          "pages": [
+            "en/lifecycle",
+            "en/service-container",
+            "en/service-providers",
+            "en/facades",
+            "en/contracts"
+          ]
+        },
+        {
+          "group": "Security",
+          "pages": [
+            "en/authorization",
+            "en/hashing",
+            "en/sanctum"
+          ]
+        },
+        {
+          "group": "Mail & Notifications",
+          "pages": [
+            "en/mail",
+            "en/notifications"
+          ]
+        },
+        {
+          "group": "Async Processing",
+          "pages": [
+            "en/queues",
+            "en/events",
+            "en/concurrency",
+            "en/scheduling"
+          ]
+        },
+        {
+          "group": "Caching",
+          "pages": [
+            "en/cache"
+          ]
+        },
+        {
+          "group": "Database",
+          "pages": [
+            "en/query-builder",
+            "en/pagination",
+            "en/eloquent-resources"
+          ]
+        },
+        {
+          "group": "HTTP & External",
+          "pages": [
+            "en/http-client"
+          ]
+        },
+        {
+          "group": "Console & CLI",
+          "pages": [
+            "en/artisan",
+            "en/pint"
+          ]
+        },
+        {
+          "group": "Frontend",
+          "pages": [
+            "en/vite"
+          ]
+        },
+        {
+          "group": "File Storage",
+          "pages": [
+            "en/filesystem"
+          ]
+        },
+        {
+          "group": "Debug & Monitoring",
+          "pages": [
+            "en/context",
+            "en/error-handling",
+            "en/logging"
+          ]
+        },
+        {
+          "group": "Helpers & Collections",
+          "pages": [
+            "en/helpers",
+            "en/strings",
+            "en/collections"
+          ]
+        },
+        {
+          "group": "Internationalization",
+          "pages": [
+            "en/localization"
+          ]
+        },
+        {
+          "group": "AI Development",
+          "pages": [
+            "en/boost",
+            "en/mcp",
+            "en/ai-sdk"
+          ]
+        },
+        {
+          "group": "Real-time",
+          "pages": [
+            "en/broadcasting"
+          ]
+        }
+      ]
+    },
+    {
+      "tab": "Advanced Topics",
+      "groups": [
+        {
+          "group": "AI Development",
+          "pages": [
+            "en/advanced/mcp-server",
+            "en/advanced/boost-custom-agent",
+            "en/advanced/ai-sdk-custom-provider"
+          ]
+        },
+        {
+          "group": "Application Structure",
+          "pages": [
+            "en/advanced/app-structure"
+          ]
+        },
+        {
+          "group": "Laravel 13 New Features",
+          "pages": [
+            "en/advanced/php-attributes"
+          ]
+        },
+        {
+          "group": "Design Patterns",
+          "pages": [
+            "en/advanced/pipeline",
+            "en/advanced/macroable",
+            "en/advanced/conditionable",
+            "en/advanced/higher-order-messages",
+            "en/advanced/manager"
+          ]
+        },
+        {
+          "group": "Eloquent Deep Dive",
+          "pages": [
+            "en/advanced/eloquent-observers",
+            "en/advanced/eloquent-scopes",
+            "en/advanced/eloquent-casts"
+          ]
+        },
+        {
+          "group": "Validation Extensions",
+          "pages": [
+            "en/advanced/custom-validation-rules"
+          ]
+        },
+        {
+          "group": "Authentication Extensions",
+          "pages": [
+            "en/advanced/custom-auth-guard"
+          ]
+        },
+        {
+          "group": "Security",
+          "pages": [
+            "en/advanced/rate-limiting"
+          ]
+        },
+        {
+          "group": "Package Development",
+          "pages": [
+            "en/advanced/package-development"
+          ]
+        },
+        {
+          "group": "Testing",
+          "pages": [
+            "en/advanced/testing-pest"
+          ]
+        }
+      ]
+    },
+    {
+      "tab": "Blog",
+      "groups": [
+        {
+          "group": "Laravel 13",
+          "pages": [
+            "en/blog/laravel-13-new-features"
+          ]
+        },
+        {
+          "group": "Package Introduction",
+          "pages": [
+            "en/blog/livewire-introduction",
+            "en/blog/inertia-introduction",
+            "en/blog/pest-introduction",
+            "en/blog/laravel-pennant",
+            "en/blog/telescope-introduction",
+            "en/blog/nightwatch-introduction",
+            "en/blog/wayfinder-introduction"
+          ]
+        },
+        {
+          "group": "Upgrade Guides",
+          "pages": [
+            "en/blog/upgrade-12-to-13",
+            "en/blog/upgrade-11-to-12",
+            "en/blog/upgrade-10-to-11",
+            "en/blog/upgrade-9-to-10"
+          ]
+        },
+        {
+          "group": "New Repository Reports",
+          "pages": [
+            "en/blog/maestro-introduction",
+            "en/blog/agent-skills-introduction"
+          ]
+        },
+        {
+          "group": "Environment Setup",
+          "pages": [
+            "en/blog/mac-setup",
+            "en/blog/windows-setup"
+          ]
+        }
+      ]
+    }
+  ]
+}
