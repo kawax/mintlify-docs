@@ -98,7 +98,8 @@
         {
           "group": "Caching",
           "pages": [
-            "en/cache"
+            "en/cache",
+            "en/redis"
           ]
         },
         {

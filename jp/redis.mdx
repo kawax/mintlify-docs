@@ -1,0 +1,530 @@
+---
+title: "Redis"
+description: "LaravelアプリケーションでRedisを使ったキャッシュ・セッション・キュー・Pub/Subの設定と操作方法"
+---
+
+Redis はインメモリのキー・バリューストアで、Laravel の多くの機能のバックエンドとして使われます。
+設定から操作・Pub/Sub まで、Laravel での Redis の使い方を解説します。
+
+<CardGroup cols={3}>
+  <Card title="キャッシュ" icon="database" href="/jp/cache">
+    Redis をキャッシュドライバとして使う
+  </Card>
+  <Card title="キュー" icon="list" href="/jp/queues">
+    Redis をキュードライバとして使う
+  </Card>
+  <Card title="ブロードキャスト" icon="radio" href="/jp/broadcasting">
+    Pub/Sub でリアルタイム通信
+  </Card>
+</CardGroup>
+
+## Redis とは
+
+[Redis](https://redis.io) はオープンソースの高速なキー・バリューストアです。
+文字列・ハッシュ・リスト・セット・ソート済みセットなど多様なデータ構造をサポートし、データ構造サーバーとも呼ばれます。
+
+Laravel では以下の用途で Redis が使われます。
+
+```mermaid
+flowchart LR
+    A["Laravel<br>アプリケーション"] --> B["Redis"]
+
+    subgraph uses ["主な用途"]
+        C["キャッシュ<br>Cache"]
+        D["セッション<br>Session"]
+        E["キュー<br>Queue"]
+        F["ブロードキャスト<br>Broadcasting"]
+    end
+
+    B --> C
+    B --> D
+    B --> E
+    B --> F
+```
+
+## クライアントの選択
+
+Laravel は **PhpRedis**（PHP 拡張）と **Predis**（PHP パッケージ）の 2 つのクライアントをサポートしています。
+
+| 項目 | PhpRedis | Predis |
+|---|---|---|
+| 実装 | C 言語による PHP 拡張 | 純粋な PHP パッケージ |
+| インストール | PECL 拡張が必要 | `composer require` で完結 |
+| パフォーマンス | 高速 | PhpRedis より若干低速 |
+| Laravel Sail | デフォルトで導入済み | 別途インストールが必要 |
+| 推奨環境 | 本番環境 | 開発環境・インストールが難しい環境 |
+
+<Info>
+  Laravel 13 ではデフォルトクライアントが PhpRedis です。本番環境では PhpRedis の使用を推奨します。
+  Laravel Sail を使っている場合は PhpRedis がすでにインストールされています。
+</Info>
+
+## 設定
+
+### config/database.php
+
+Redis の設定は `config/database.php` の `redis` 配列で管理します。
+
+```php
+'redis' => [
+
+    'client' => env('REDIS_CLIENT', 'phpredis'),
+
+    'options' => [
+        'cluster' => env('REDIS_CLUSTER', 'redis'),
+        'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+    ],
+
+    'default' => [
+        'url' => env('REDIS_URL'),
+        'host' => env('REDIS_HOST', '127.0.0.1'),
+        'username' => env('REDIS_USERNAME'),
+        'password' => env('REDIS_PASSWORD'),
+        'port' => env('REDIS_PORT', '6379'),
+        'database' => env('REDIS_DB', '0'),
+    ],
+
+    'cache' => [
+        'url' => env('REDIS_URL'),
+        'host' => env('REDIS_HOST', '127.0.0.1'),
+        'username' => env('REDIS_USERNAME'),
+        'password' => env('REDIS_PASSWORD'),
+        'port' => env('REDIS_PORT', '6379'),
+        'database' => env('REDIS_CACHE_DB', '1'),
+    ],
+
+],
+```
+
+### 環境変数
+
+`.env` で接続先を設定します。
+
+```ini
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=null
+REDIS_DB=0
+REDIS_CACHE_DB=1
+```
+
+URL 形式での指定も可能です。
+
+```php
+'default' => [
+    'url' => 'tcp://127.0.0.1:6379?database=0',
+],
+
+'cache' => [
+    'url' => 'tls://user:password@127.0.0.1:6380?database=1',
+],
+```
+
+### TLS / SSL 接続
+
+TLS 暗号化を使う場合は `scheme` オプションを指定します。
+
+```php
+'default' => [
+    'scheme' => 'tls',
+    'url' => env('REDIS_URL'),
+    'host' => env('REDIS_HOST', '127.0.0.1'),
+    'username' => env('REDIS_USERNAME'),
+    'password' => env('REDIS_PASSWORD'),
+    'port' => env('REDIS_PORT', '6379'),
+    'database' => env('REDIS_DB', '0'),
+],
+```
+
+### クラスタリング
+
+複数の Redis サーバーをクラスターとして使う場合は `clusters` キーを使います。
+
+```php
+'redis' => [
+
+    'client' => env('REDIS_CLIENT', 'phpredis'),
+
+    'options' => [
+        'cluster' => env('REDIS_CLUSTER', 'redis'),
+        'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+    ],
+
+    'clusters' => [
+        'default' => [
+            [
+                'url' => env('REDIS_URL'),
+                'host' => env('REDIS_HOST', '127.0.0.1'),
+                'username' => env('REDIS_USERNAME'),
+                'password' => env('REDIS_PASSWORD'),
+                'port' => env('REDIS_PORT', '6379'),
+                'database' => env('REDIS_DB', '0'),
+            ],
+        ],
+    ],
+
+],
+```
+
+デフォルトでは `options.cluster` が `redis` に設定されており、ネイティブ Redis クラスタリングが使われます。
+フェイルオーバーを自動で処理するため、本番環境での推奨設定です。
+
+Predis でクライアントサイドシャーディングを使う場合は `options.cluster` を削除します。
+ただしクライアントサイドシャーディングはフェイルオーバーを処理しないため、キャッシュなど一時的なデータにのみ適しています。
+
+### Predis の設定
+
+Predis を使うには `predis/predis` パッケージをインストールし、`REDIS_CLIENT` を `predis` に変更します。
+
+```shell
+composer require predis/predis
+```
+
+```ini
+REDIS_CLIENT=predis
+```
+
+Predis 固有の[接続パラメーター](https://github.com/nrk/predis/wiki/Connection-Parameters)を追加できます。
+
+```php
+'default' => [
+    'url' => env('REDIS_URL'),
+    'host' => env('REDIS_HOST', '127.0.0.1'),
+    'username' => env('REDIS_USERNAME'),
+    'password' => env('REDIS_PASSWORD'),
+    'port' => env('REDIS_PORT', '6379'),
+    'database' => env('REDIS_DB', '0'),
+    'read_write_timeout' => 60,
+],
+```
+
+#### Predis のリトライ設定
+
+Predis 3.4.0 以降では `Retry` クラスを使ったリトライ設定が利用できます。
+
+```php
+use Predis\Retry;
+use Predis\Retry\Strategy\ExponentialBackoff;
+
+'default' => [
+    'url' => env('REDIS_URL'),
+    // ...
+    'retry' => new Retry(
+        new ExponentialBackoff(
+            env('REDIS_BACKOFF_BASE', 100),
+            env('REDIS_BACKOFF_CAP', 1000),
+            true, // ジッターを有効化
+        ),
+        env('REDIS_MAX_RETRIES', 3)
+    )
+],
+```
+
+### PhpRedis の設定
+
+PhpRedis は PECL 経由でインストールします（Laravel Sail では導入済み）。
+PhpRedis は以下の追加オプションをサポートします:
+`name`, `persistent`, `persistent_id`, `prefix`, `read_timeout`, `retry_interval`,
+`max_retries`, `backoff_algorithm`, `backoff_base`, `backoff_cap`, `timeout`, `context`
+
+```php
+'default' => [
+    'url' => env('REDIS_URL'),
+    'host' => env('REDIS_HOST', '127.0.0.1'),
+    'username' => env('REDIS_USERNAME'),
+    'password' => env('REDIS_PASSWORD'),
+    'port' => env('REDIS_PORT', '6379'),
+    'database' => env('REDIS_DB', '0'),
+    'read_timeout' => 60,
+    'context' => [
+        // 'auth' => ['username', 'secret'],
+        // 'stream' => ['verify_peer' => false],
+    ],
+],
+```
+
+#### リトライとバックオフ設定
+
+接続失敗時のリトライ動作を設定します。
+サポートされるバックオフアルゴリズム: `default`, `decorrelated_jitter`, `equal_jitter`, `exponential`, `uniform`, `constant`
+
+```php
+'default' => [
+    'url' => env('REDIS_URL'),
+    'host' => env('REDIS_HOST', '127.0.0.1'),
+    'username' => env('REDIS_USERNAME'),
+    'password' => env('REDIS_PASSWORD'),
+    'port' => env('REDIS_PORT', '6379'),
+    'database' => env('REDIS_DB', '0'),
+    'max_retries' => env('REDIS_MAX_RETRIES', 3),
+    'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
+    'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+    'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+],
+```
+
+#### Unix ソケット接続
+
+同一サーバー上の Redis に接続する場合、Unix ソケットを使うと TCP オーバーヘッドを削減できます。
+
+```ini
+REDIS_HOST=/run/redis/redis.sock
+REDIS_PORT=0
+```
+
+#### シリアライズと圧縮
+
+PhpRedis では保存データのシリアライズと圧縮アルゴリズムを設定できます。
+
+```php
+'redis' => [
+
+    'client' => env('REDIS_CLIENT', 'phpredis'),
+
+    'options' => [
+        'cluster' => env('REDIS_CLUSTER', 'redis'),
+        'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+        'serializer' => Redis::SERIALIZER_MSGPACK,
+        'compression' => Redis::COMPRESSION_LZ4,
+    ],
+
+],
+```
+
+サポートされるシリアライザー:
+
+| 定数 | 説明 |
+|---|---|
+| `Redis::SERIALIZER_NONE` | シリアライズなし（デフォルト） |
+| `Redis::SERIALIZER_PHP` | PHP のシリアライズ |
+| `Redis::SERIALIZER_JSON` | JSON |
+| `Redis::SERIALIZER_IGBINARY` | igbinary |
+| `Redis::SERIALIZER_MSGPACK` | MessagePack |
+
+サポートされる圧縮アルゴリズム:
+
+| 定数 | 説明 |
+|---|---|
+| `Redis::COMPRESSION_NONE` | 圧縮なし（デフォルト） |
+| `Redis::COMPRESSION_LZF` | LZF |
+| `Redis::COMPRESSION_ZSTD` | Zstandard |
+| `Redis::COMPRESSION_LZ4` | LZ4 |
+
+## Redis との操作
+
+### Redis ファサード
+
+`Redis` ファサードを使ってあらゆる Redis コマンドを実行できます。
+ファサードはマジックメソッドでコマンドを Redis サーバーに転送します。
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Support\Facades\Redis;
+use Illuminate\View\View;
+
+class UserController extends Controller
+{
+    public function show(string $id): View
+    {
+        return view('user.profile', [
+            'user' => Redis::get('user:profile:'.$id)
+        ]);
+    }
+}
+```
+
+引数を受け取るコマンドは、そのままメソッドの引数として渡します。
+
+```php
+use Illuminate\Support\Facades\Redis;
+
+Redis::set('name', 'Taylor');
+
+$values = Redis::lrange('names', 5, 10);
+```
+
+`command` メソッドを使ってコマンド名と引数を明示的に指定することもできます。
+
+```php
+$values = Redis::command('lrange', ['name', 5, 10]);
+```
+
+### 複数接続の使い分け
+
+`config/database.php` で複数の Redis 接続を定義し、`connection()` メソッドで切り替えられます。
+
+```php
+// 名前付き接続を取得
+$redis = Redis::connection('connection-name');
+
+// デフォルト接続を取得
+$redis = Redis::connection();
+```
+
+### トランザクション
+
+`transaction()` メソッドは Redis の `MULTI`/`EXEC` コマンドをラップします。
+クロージャ内のすべてのコマンドがアトミックに実行されます。
+
+```php
+use Redis;
+use Illuminate\Support\Facades;
+
+Facades\Redis::transaction(function (Redis $redis) {
+    $redis->incr('user_visits', 1);
+    $redis->incr('total_visits', 1);
+});
+```
+
+<Warning>
+  トランザクション内では Redis から値を取得できません。
+  クロージャ全体が実行されてから `EXEC` でまとめて実行されるためです。
+</Warning>
+
+### Lua スクリプト
+
+`eval()` メソッドで Lua スクリプトをアトミックに実行できます。
+スクリプト内で Redis の値を参照・更新できる点でトランザクションより柔軟です。
+
+```php
+$value = Redis::eval(<<<'LUA'
+    local counter = redis.call("incr", KEYS[1])
+
+    if counter > 5 then
+        redis.call("incr", KEYS[2])
+    end
+
+    return counter
+LUA, 2, 'first-counter', 'second-counter');
+```
+
+引数の順序: Lua スクリプト → キー数 → キー名... → 追加引数...
+
+`KEYS[1]`, `KEYS[2]` がキー名、`ARGV[1]` 以降が追加引数として渡されます。
+
+### パイプライン
+
+大量のコマンドを一度に送信してネットワークのラウンドトリップを削減できます。
+
+```php
+use Redis;
+use Illuminate\Support\Facades;
+
+Facades\Redis::pipeline(function (Redis $pipe) {
+    for ($i = 0; $i < 1000; $i++) {
+        $pipe->set("key:$i", $i);
+    }
+});
+```
+
+```mermaid
+sequenceDiagram
+    participant App as Laravel<br>アプリ
+    participant Redis
+
+    Note over App,Redis: 通常（コマンドごとに往復）
+    App->>Redis: SET key:0 0
+    Redis-->>App: OK
+    App->>Redis: SET key:1 1
+    Redis-->>App: OK
+
+    Note over App,Redis: パイプライン（まとめて送信）
+    App->>Redis: SET key:0 0 / SET key:1 1 / ...
+    Redis-->>App: OK / OK / ...
+```
+
+<Tip>
+  パイプラインはコマンドをまとめて送信するだけで、アトミックではありません。
+  アトミックな操作が必要な場合はトランザクションまたは Lua スクリプトを使ってください。
+</Tip>
+
+## Pub / Sub
+
+Redis の `publish` / `subscribe` コマンドを使ってチャンネル経由でメッセージをやりとりできます。
+
+### サブスクライバー
+
+`subscribe()` は長時間動作するプロセスなので、Artisan コマンド内で呼び出します。
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Redis;
+
+class RedisSubscribe extends Command
+{
+    protected $signature = 'redis:subscribe';
+
+    protected $description = 'Subscribe to a Redis channel';
+
+    public function handle(): void
+    {
+        Redis::subscribe(['test-channel'], function (string $message) {
+            echo $message;
+        });
+    }
+}
+```
+
+### パブリッシャー
+
+別のリクエストやプロセスからメッセージを送信します。
+
+```php
+use Illuminate\Support\Facades\Redis;
+
+Route::get('/publish', function () {
+    Redis::publish('test-channel', json_encode([
+        'name' => 'Adam Wathan'
+    ]));
+});
+```
+
+### ワイルドカードサブスクリプション
+
+`psubscribe()` でパターンマッチングのサブスクリプションができます。
+
+```php
+// すべてのチャンネルを購読
+Redis::psubscribe(['*'], function (string $message, string $channel) {
+    echo $message;
+});
+
+// users.* パターンのチャンネルを購読
+Redis::psubscribe(['users.*'], function (string $message, string $channel) {
+    echo $message;
+});
+```
+
+## まとめ
+
+<AccordionGroup>
+  <Accordion title="クライアントの選択">
+    - **本番環境**: PhpRedis（PECL 拡張、高パフォーマンス）
+    - **開発環境・インストールが難しい場合**: Predis（Composer パッケージ）
+    - **Laravel Sail**: PhpRedis がデフォルトで導入済み
+  </Accordion>
+
+  <Accordion title="接続設定のポイント">
+    - 複数の Redis 接続は `config/database.php` で定義し、用途ごとに使い分ける（`default` / `cache` など）
+    - クラスター環境では `clusters` キーを使う
+    - 本番環境では TLS 接続と認証情報の設定を検討する
+  </Accordion>
+
+  <Accordion title="操作の使い分け">
+    | 操作 | 用途 |
+    |---|---|
+    | ファサードメソッド | 通常の Redis コマンド |
+    | `transaction()` | 複数コマンドのアトミック実行（値の読み取りは不可） |
+    | `eval()` | Lua スクリプト（読み取りを伴うアトミック操作） |
+    | `pipeline()` | 大量コマンドの高速送信（非アトミック） |
+    | `subscribe()` / `publish()` | チャンネルメッセージング（Pub/Sub） |
+  </Accordion>
+</AccordionGroup>
