@@ -90,6 +90,7 @@
           "group": "Async Processing",
           "pages": [
             "en/queues",
+            "en/horizon",
             "en/events",
             "en/concurrency",
             "en/scheduling"

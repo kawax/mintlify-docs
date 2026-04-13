@@ -116,6 +116,7 @@
           "group": "非同期処理",
           "pages": [
             "jp/queues",
+            "jp/horizon",
             "jp/concurrency"
           ]
         },
