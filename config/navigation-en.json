@@ -113,7 +113,8 @@
         {
           "group": "Eloquent",
           "pages": [
-            "en/eloquent-mutators"
+            "en/eloquent-mutators",
+            "en/scout"
           ]
         },
         {
