@@ -133,7 +133,8 @@
         {
           "group": "キャッシュと最適化",
           "pages": [
-            "jp/cache"
+            "jp/cache",
+            "jp/redis"
           ]
         },
         {
