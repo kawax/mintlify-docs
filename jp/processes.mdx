@@ -71,7 +71,7 @@ $result = Process::input('Hello World')->run('cat');
 
 ### タイムアウト
 
-デフォルトは60秒です。`timeout()` で変更できます。タイムアウトすると `ProcessTimedOutException` がスローされます。
+デフォルトは60秒です。`timeout()` で変更できます。タイムアウトするとプロセスが中断され、`ProcessTimedOutException` がスローされます。
 
 ```php
 $result = Process::timeout(120)->run('bash import.sh');
