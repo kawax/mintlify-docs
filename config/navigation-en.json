@@ -126,6 +126,8 @@
           "group": "Console & CLI",
           "pages": [
             "en/artisan",
+            "en/prompts",
+            "en/processes",
             "en/pint"
           ]
         },

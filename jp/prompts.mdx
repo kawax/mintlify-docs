@@ -1,0 +1,464 @@
+---
+title: "Laravel Prompts"
+description: "laravel/promptsパッケージを使ってArtisanコマンドに美しい対話型UIを追加する方法を解説します。テキスト入力・選択・検索・プログレスバーなど多彩な関数を紹介します。"
+---
+
+## はじめに
+
+[Laravel Prompts](https://github.com/laravel/prompts) は、コマンドラインアプリケーションに美しく使いやすい対話型フォームを追加するためのPHPパッケージです。
+プレースホルダーテキストやバリデーションといったブラウザのフォームに近い体験を提供します。
+
+Artisanコマンドのコード内で直接呼び出せるため、ユーザーへの問い合わせをシンプルかつ直感的に記述できます。
+
+<Info>
+  Laravel PromptsはmacOS・Linux・Windows(WSL)をサポートしています。
+  非対応環境では自動的にフォールバック動作に切り替わります。
+</Info>
+
+## インストール
+
+Laravel PromptsはLaravel本体に同梱されているため、追加インストールは不要です。
+
+他のPHPプロジェクトで使いたい場合はComposerでインストールします。
+
+```shell
+composer require laravel/prompts
+```
+
+## 基本的なプロンプト関数
+
+### text — テキスト入力
+
+`text()` でユーザーに文字列入力を求めます。
+
+```php
+use function Laravel\Prompts\text;
+
+$name = text('What is your name?');
+```
+
+プレースホルダー・デフォルト値・ヒントを設定できます。
+
+```php
+$name = text(
+    label: 'What is your name?',
+    placeholder: 'E.g. Taylor Otwell',
+    default: $user?->name,
+    hint: 'This will be displayed on your profile.'
+);
+```
+
+`required` を指定すると入力を必須にできます。バリデーションメッセージも変更可能です。
+
+```php
+$name = text(
+    label: 'What is your name?',
+    required: 'Your name is required.'
+);
+```
+
+`validate` クロージャで追加のバリデーションを行えます。エラーメッセージを返すか、合格時に `null` を返します。
+
+```php
+$name = text(
+    label: 'What is your name?',
+    validate: fn (string $value) => match (true) {
+        strlen($value) < 3 => 'The name must be at least 3 characters.',
+        strlen($value) > 255 => 'The name must not exceed 255 characters.',
+        default => null
+    }
+);
+```
+
+Laravelのバリデーションルールを配列で指定することもできます。
+
+```php
+$name = text(
+    label: 'What is your name?',
+    validate: ['name' => 'required|max:255|unique:users']
+);
+```
+
+### textarea — 複数行テキスト入力
+
+`textarea()` で複数行の入力を受け付けます。
+
+```php
+use function Laravel\Prompts\textarea;
+
+$story = textarea('Tell me a story.');
+```
+
+### number — 数値入力
+
+`number()` で数値を受け付けます。上下矢印キーで値を増減できます。
+
+```php
+use function Laravel\Prompts\number;
+
+$copies = number(
+    label: 'How many copies would you like?',
+    default: 1,
+    validate: ['copies' => 'required|integer|min:1|max:100']
+);
+```
+
+### password — パスワード入力
+
+`password()` はテキスト入力と同様ですが、入力内容がマスクされます。
+
+```php
+use function Laravel\Prompts\password;
+
+$password = password('What is your password?');
+```
+
+```php
+$password = password(
+    label: 'What is your password?',
+    placeholder: 'password',
+    hint: 'Minimum 8 characters.',
+    validate: fn (string $value) => strlen($value) < 8
+        ? 'The password must be at least 8 characters.'
+        : null
+);
+```
+
+### confirm — Yes/No確認
+
+`confirm()` でユーザーに二択の確認を求めます。`true` または `false` を返します。
+
+```php
+use function Laravel\Prompts\confirm;
+
+$confirmed = confirm('Do you accept the terms?');
+```
+
+デフォルト値やラベルテキストをカスタマイズできます。
+
+```php
+$confirmed = confirm(
+    label: 'Do you accept the terms?',
+    default: false,
+    yes: 'I accept',
+    no: 'I decline',
+    hint: 'The terms must be accepted to continue.'
+);
+```
+
+### select — 選択リスト
+
+`select()` でユーザーに一覧から1つ選ばせます。
+
+```php
+use function Laravel\Prompts\select;
+
+$role = select(
+    label: 'What role should the user have?',
+    options: ['Member', 'Contributor', 'Owner'],
+    default: 'Owner'
+);
+```
+
+連想配列を使うと、表示ラベルではなくキーを返り値にできます。
+
+```php
+$role = select(
+    label: 'What role should the user have?',
+    options: [
+        'member'      => 'Member',
+        'contributor' => 'Contributor',
+        'owner'       => 'Owner',
+    ],
+    default: 'owner'
+);
+```
+
+`scroll` でスクロール前に表示する選択肢数を変更できます(デフォルト5件)。
+
+```php
+$role = select(
+    label: 'Which category would you like to assign?',
+    options: Category::pluck('name', 'id'),
+    scroll: 10
+);
+```
+
+### multiselect — 複数選択
+
+`multiselect()` で複数の選択肢を同時に選ばせます。
+
+```php
+use function Laravel\Prompts\multiselect;
+
+$permissions = multiselect(
+    label: 'What permissions should be assigned?',
+    options: ['Read', 'Create', 'Update', 'Delete']
+);
+```
+
+`required` を指定すると少なくとも1つの選択を必須にできます。
+
+```php
+$permissions = multiselect(
+    label: 'What permissions should be assigned?',
+    options: ['Read', 'Create', 'Update', 'Delete'],
+    required: 'At least one permission must be selected.'
+);
+```
+
+### suggest — オートコンプリート付き入力
+
+`suggest()` は候補を提示しながら自由入力も受け付けます。
+
+```php
+use function Laravel\Prompts\suggest;
+
+$name = suggest(
+    label: 'What is your name?',
+    options: ['Taylor', 'Dayle']
+);
+```
+
+クロージャを渡すと、入力内容に応じて動的に候補を絞り込めます。
+
+```php
+$name = suggest(
+    label: 'What is your name?',
+    options: fn (string $value) => collect(['Taylor', 'Tobi', 'Dries'])
+        ->filter(fn ($name) => str_starts_with($name, $value))
+        ->values()
+        ->all()
+);
+```
+
+### search — 動的検索
+
+`search()` は入力するたびに候補リストを更新します。クロージャが返す配列が候補になります。
+
+```php
+use function Laravel\Prompts\search;
+
+$userId = search(
+    label: 'Search for the user that should receive the mail',
+    options: fn (string $value) => strlen($value) > 0
+        ? User::whereLike('name', "%{$value}%")->pluck('name', 'id')->all()
+        : []
+);
+```
+
+### multisearch — 動的複数選択
+
+`multisearch()` は動的検索で複数選択ができます。
+
+```php
+use function Laravel\Prompts\multisearch;
+
+$userIds = multisearch(
+    label: 'Search for the users that should receive the mail',
+    options: fn (string $value) => strlen($value) > 0
+        ? User::whereLike('name', "%{$value}%")->pluck('name', 'id')->all()
+        : []
+);
+```
+
+### pause — 一時停止
+
+`pause()` でユーザーにEnterキーの押下を促して処理を一時停止できます。
+
+```php
+use function Laravel\Prompts\pause;
+
+pause('Press ENTER to continue.');
+```
+
+## バリデーション
+
+すべてのプロンプト関数は `validate` 引数でバリデーションを設定できます。
+
+```php
+$name = text(
+    label: 'What is your name?',
+    validate: fn (string $value) => match (true) {
+        strlen($value) < 3  => 'The name must be at least 3 characters.',
+        strlen($value) > 255 => 'The name must not exceed 255 characters.',
+        default => null
+    }
+);
+```
+
+クロージャが文字列を返すとエラーとして表示し、再入力を促します。`null` を返すとバリデーション成功です。
+
+Laravelのバリデーションルールを配列形式で使うこともできます。
+
+```php
+$name = text(
+    label: 'What is your name?',
+    validate: ['name' => 'required|max:255|unique:users']
+);
+```
+
+入力をバリデーション前に変換するには `transform` 引数を使います。
+
+```php
+$name = text(
+    label: 'What is your name?',
+    transform: fn (string $value) => trim($value),
+    validate: fn (string $value) => match (true) {
+        strlen($value) === 0 => 'The name must not be empty.',
+        default => null
+    }
+);
+```
+
+## フォーム
+
+`form()` を使うと複数のプロンプトをひとまとめにして、完了前にまとめてキャンセルすることができます。
+
+```php
+use function Laravel\Prompts\form;
+
+$responses = form()
+    ->text('What is your name?', required: true, name: 'name')
+    ->password('What is your password?', validate: ['password' => 'min:8'], name: 'password')
+    ->confirm('Do you accept the terms?')
+    ->submit();
+
+$name     = $responses['name'];
+$password = $responses['password'];
+$confirmed = $responses[2];
+```
+
+## 情報出力
+
+テキストメッセージをスタイル付きで出力する関数が用意されています。
+
+```php
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\alert;
+use function Laravel\Prompts\note;
+
+note('Prepare for launch.');
+info('User created successfully.');
+warning('This action cannot be undone.');
+error('Something went wrong.');
+alert('Critical failure detected!');
+```
+
+## テーブル表示
+
+`table()` でデータをテーブル形式で表示できます。
+
+```php
+use function Laravel\Prompts\table;
+
+table(
+    headers: ['Name', 'Email'],
+    rows: User::all(['name', 'email'])->toArray()
+);
+```
+
+## スピン(ローディング表示)
+
+`spin()` はクロージャの実行中にローディングインジケーターを表示します。
+
+```php
+use function Laravel\Prompts\spin;
+
+$response = spin(
+    message: 'Fetching response...',
+    callback: fn () => Http::get('http://example.com')
+);
+```
+
+<Warning>
+  `spin()` を使うには `pcntl` PHP拡張が必要です。使用できない環境ではスピナーは表示されません。
+</Warning>
+
+## 進捗バー
+
+`progress()` で繰り返し処理の進捗を視覚的に表示できます。
+
+```php
+use function Laravel\Prompts\progress;
+
+$users = progress(
+    label: 'Updating users',
+    steps: User::all(),
+    callback: fn ($user) => $this->performTask($user),
+    hint: 'This may take some time.'
+);
+```
+
+手動で進捗バーを制御することもできます。
+
+```php
+$progress = progress(label: 'Uploading files', steps: count($files));
+
+$progress->start();
+
+foreach ($files as $file) {
+    $this->uploadFile($file);
+    $progress->advance();
+}
+
+$progress->finish();
+```
+
+## タスク
+
+`task()` でラベル付きのタスクを実行し、成功/失敗を視覚的に示せます。
+
+```php
+use function Laravel\Prompts\task;
+
+task('Installing dependencies', fn () => Process::run('composer install')->successful());
+```
+
+## ターミナル操作
+
+### ターミナルタイトルの設定
+
+```php
+use function Laravel\Prompts\title;
+
+title('My Application');
+```
+
+### ターミナルのクリア
+
+```php
+use function Laravel\Prompts\clear;
+
+clear();
+```
+
+## フォールバック
+
+非対応の環境(Windows non-WSLなど)では自動的にフォールバックします。
+デフォルトではLaravelの `$this->ask()` や `$this->choice()` などの組み込みメソッドが代わりに使われます。
+
+## テスト
+
+Laravel PromptsはPestやPHPUnitのテストと連携できます。
+
+```php
+use Laravel\Prompts\Prompt;
+
+Prompt::fake(['Taylor', true]);
+
+$name      = text('What is your name?');
+$confirmed = confirm('Do you accept the terms?');
+
+Prompt::assertOutputContains('What is your name?');
+```
+
+## 関連ページ
+
+<Columns cols={2}>
+  <Card title="Artisanコンソール" icon="terminal" href="/jp/artisan">
+    Artisanコマンド内でPromptsを活用する
+  </Card>
+</Columns>
