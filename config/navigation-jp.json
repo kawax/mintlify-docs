@@ -87,7 +87,8 @@
           "group": "Eloquent",
           "pages": [
             "jp/eloquent-resources",
-            "jp/eloquent-mutators"
+            "jp/eloquent-mutators",
+            "jp/scout"
           ]
         },
         {
