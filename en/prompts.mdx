@@ -1,0 +1,439 @@
+---
+title: "Laravel Prompts"
+description: "Add beautiful, interactive CLI forms to your Artisan commands using the laravel/prompts package. Covers text input, selection, search, validation, progress bars, and more."
+---
+
+## Introduction
+
+[Laravel Prompts](https://github.com/laravel/prompts) is a PHP package for adding beautiful and user-friendly forms to your command-line applications. It provides browser-like features such as placeholder text, validation, and styled output.
+
+Laravel Prompts is ideal for accepting user input inside [Artisan console commands](/en/artisan), but it can be used in any command-line PHP project.
+
+<Info>
+  Laravel Prompts supports macOS, Linux, and Windows with WSL. In unsupported environments it falls back automatically to simpler input methods.
+</Info>
+
+## Installation
+
+Laravel Prompts ships with Laravel and requires no additional installation.
+
+To use it in a standalone PHP project, install via Composer:
+
+```shell
+composer require laravel/prompts
+```
+
+## Available prompt functions
+
+### text — free text input
+
+`text()` prompts the user for a string and returns the value.
+
+```php
+use function Laravel\Prompts\text;
+
+$name = text('What is your name?');
+```
+
+Add a placeholder, default value, and hint:
+
+```php
+$name = text(
+    label: 'What is your name?',
+    placeholder: 'E.g. Taylor Otwell',
+    default: $user?->name,
+    hint: 'This will be displayed on your profile.'
+);
+```
+
+Make the field required and customize the error message:
+
+```php
+$name = text(
+    label: 'What is your name?',
+    required: 'Your name is required.'
+);
+```
+
+Add custom validation logic with a closure:
+
+```php
+$name = text(
+    label: 'What is your name?',
+    validate: fn (string $value) => match (true) {
+        strlen($value) < 3  => 'The name must be at least 3 characters.',
+        strlen($value) > 255 => 'The name must not exceed 255 characters.',
+        default => null
+    }
+);
+```
+
+You can also pass Laravel validation rules as an array:
+
+```php
+$name = text(
+    label: 'What is your name?',
+    validate: ['name' => 'required|max:255|unique:users']
+);
+```
+
+### textarea — multi-line input
+
+`textarea()` accepts multi-line input.
+
+```php
+use function Laravel\Prompts\textarea;
+
+$story = textarea('Tell me a story.');
+```
+
+### number — numeric input
+
+`number()` accepts a numeric value. The user can also use arrow keys to increase or decrease the number.
+
+```php
+use function Laravel\Prompts\number;
+
+$copies = number(
+    label: 'How many copies would you like?',
+    default: 1,
+    validate: ['copies' => 'required|integer|min:1|max:100']
+);
+```
+
+### password — masked input
+
+`password()` behaves like `text()` but masks the typed characters.
+
+```php
+use function Laravel\Prompts\password;
+
+$password = password(
+    label: 'What is your password?',
+    placeholder: 'password',
+    hint: 'Minimum 8 characters.',
+    validate: fn (string $value) => strlen($value) < 8
+        ? 'The password must be at least 8 characters.'
+        : null
+);
+```
+
+### confirm — yes/no confirmation
+
+`confirm()` asks a yes/no question and returns `true` or `false`.
+
+```php
+use function Laravel\Prompts\confirm;
+
+$confirmed = confirm('Do you accept the terms?');
+```
+
+Customize the default value and button labels:
+
+```php
+$confirmed = confirm(
+    label: 'Do you accept the terms?',
+    default: false,
+    yes: 'I accept',
+    no: 'I decline',
+    hint: 'The terms must be accepted to continue.'
+);
+```
+
+### select — single-choice list
+
+`select()` presents a list and returns the chosen value.
+
+```php
+use function Laravel\Prompts\select;
+
+$role = select(
+    label: 'What role should the user have?',
+    options: ['Member', 'Contributor', 'Owner'],
+    default: 'Owner'
+);
+```
+
+Use an associative array to return a key instead of a display label:
+
+```php
+$role = select(
+    label: 'What role should the user have?',
+    options: [
+        'member'      => 'Member',
+        'contributor' => 'Contributor',
+        'owner'       => 'Owner',
+    ],
+    default: 'owner'
+);
+```
+
+Control how many options are visible before scrolling with the `scroll` argument (default is 5).
+
+```php
+$role = select(
+    label: 'Which category would you like to assign?',
+    options: Category::pluck('name', 'id'),
+    scroll: 10
+);
+```
+
+### multiselect — multiple-choice list
+
+`multiselect()` lets the user select one or more options. It returns an array.
+
+```php
+use function Laravel\Prompts\multiselect;
+
+$permissions = multiselect(
+    label: 'What permissions should be assigned?',
+    options: ['Read', 'Create', 'Update', 'Delete'],
+    required: 'At least one permission must be selected.'
+);
+```
+
+### suggest — autocomplete input
+
+`suggest()` shows suggestions while still accepting any input.
+
+```php
+use function Laravel\Prompts\suggest;
+
+$name = suggest(
+    label: 'What is your name?',
+    options: ['Taylor', 'Dayle']
+);
+```
+
+Pass a closure to provide dynamic suggestions based on what the user has typed so far.
+
+```php
+$name = suggest(
+    label: 'What is your name?',
+    options: fn (string $value) => collect(['Taylor', 'Tobi', 'Dries'])
+        ->filter(fn ($name) => str_starts_with($name, $value))
+        ->values()
+        ->all()
+);
+```
+
+### search — dynamic search
+
+`search()` filters a list in real time as the user types.
+
+```php
+use function Laravel\Prompts\search;
+
+$userId = search(
+    label: 'Search for the user that should receive the mail',
+    options: fn (string $value) => strlen($value) > 0
+        ? User::whereLike('name', "%{$value}%")->pluck('name', 'id')->all()
+        : []
+);
+```
+
+### multisearch — dynamic multi-select
+
+`multisearch()` combines dynamic search with multiple selection.
+
+```php
+use function Laravel\Prompts\multisearch;
+
+$userIds = multisearch(
+    label: 'Search for the users that should receive the mail',
+    options: fn (string $value) => strlen($value) > 0
+        ? User::whereLike('name', "%{$value}%")->pluck('name', 'id')->all()
+        : []
+);
+```
+
+### pause — wait for keypress
+
+`pause()` displays a message and waits for the user to press Enter.
+
+```php
+use function Laravel\Prompts\pause;
+
+pause('Press ENTER to continue.');
+```
+
+## Validation
+
+Every prompt function accepts a `validate` argument for custom validation logic. Return an error message string on failure, or `null` on success.
+
+```php
+$name = text(
+    label: 'What is your name?',
+    validate: fn (string $value) => match (true) {
+        strlen($value) < 3  => 'The name must be at least 3 characters.',
+        strlen($value) > 255 => 'The name must not exceed 255 characters.',
+        default => null
+    }
+);
+```
+
+### Transforming input before validation
+
+Use the `transform` argument to modify the input before validation runs.
+
+```php
+$name = text(
+    label: 'What is your name?',
+    transform: fn (string $value) => trim($value),
+    validate: fn (string $value) => match (true) {
+        strlen($value) === 0 => 'The name must not be empty.',
+        default => null
+    }
+);
+```
+
+## Forms
+
+`form()` groups multiple prompts so the user can go back and edit answers before submitting. If the user cancels, all prompts exit together.
+
+```php
+use function Laravel\Prompts\form;
+
+$responses = form()
+    ->text('What is your name?', required: true, name: 'name')
+    ->password('What is your password?', validate: ['password' => 'min:8'], name: 'password')
+    ->confirm('Do you accept the terms?')
+    ->submit();
+
+$name      = $responses['name'];
+$password  = $responses['password'];
+$confirmed = $responses[2];
+```
+
+## Informational messages
+
+Display styled messages without prompting for input.
+
+```php
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\alert;
+
+note('Prepare for launch.');
+info('User created successfully.');
+warning('This action cannot be undone.');
+error('Something went wrong.');
+alert('Critical failure detected!');
+```
+
+## Tables
+
+Display rows of data in a formatted table.
+
+```php
+use function Laravel\Prompts\table;
+
+table(
+    headers: ['Name', 'Email'],
+    rows: User::all(['name', 'email'])->toArray()
+);
+```
+
+## Spin (loading indicator)
+
+`spin()` displays a spinner while a callback runs.
+
+```php
+use function Laravel\Prompts\spin;
+
+$response = spin(
+    message: 'Fetching response...',
+    callback: fn () => Http::get('http://example.com')
+);
+```
+
+<Warning>
+  `spin()` requires the `pcntl` PHP extension. Without it, no spinner is shown but the callback still runs.
+</Warning>
+
+## Progress bar
+
+`progress()` displays a progress bar while iterating over items.
+
+```php
+use function Laravel\Prompts\progress;
+
+$users = progress(
+    label: 'Updating users',
+    steps: User::all(),
+    callback: fn ($user) => $this->performTask($user),
+    hint: 'This may take some time.'
+);
+```
+
+For manual control, use the start/advance/finish API.
+
+```php
+$progress = progress(label: 'Uploading files', steps: count($files));
+
+$progress->start();
+
+foreach ($files as $file) {
+    $this->uploadFile($file);
+    $progress->advance();
+}
+
+$progress->finish();
+```
+
+## Task
+
+`task()` executes a callback and displays a success or failure indicator next to a label.
+
+```php
+use function Laravel\Prompts\task;
+
+task('Installing dependencies', fn () => Process::run('composer install')->successful());
+```
+
+## Terminal utilities
+
+### Terminal title
+
+```php
+use function Laravel\Prompts\title;
+
+title('My Application');
+```
+
+### Clear the terminal
+
+```php
+use function Laravel\Prompts\clear;
+
+clear();
+```
+
+## Unsupported environments and fallbacks
+
+In environments that don't support the advanced rendering (such as Windows without WSL), Laravel Prompts automatically falls back to simpler input methods compatible with the host terminal. No code changes are required.
+
+## Testing
+
+Fake prompt input in tests using `Prompt::fake()`.
+
+```php
+use Laravel\Prompts\Prompt;
+
+Prompt::fake(['Taylor', true]);
+
+$name      = text('What is your name?');
+$confirmed = confirm('Do you accept the terms?');
+
+Prompt::assertOutputContains('What is your name?');
+```
+
+## Related pages
+
+<Columns cols={2}>
+  <Card title="Artisan console" icon="terminal" href="/en/artisan">
+    Use Prompts inside Artisan commands
+  </Card>
+</Columns>

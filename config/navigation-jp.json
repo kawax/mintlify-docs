@@ -178,6 +178,8 @@
           "group": "コンソールとCLI",
           "pages": [
             "jp/artisan",
+            "jp/prompts",
+            "jp/processes",
             "jp/pint"
           ]
         },
