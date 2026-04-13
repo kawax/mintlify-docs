@@ -121,7 +121,8 @@
         {
           "group": "リアルタイム通信",
           "pages": [
-            "jp/broadcasting"
+            "jp/broadcasting",
+            "jp/reverb"
           ]
         },
         {

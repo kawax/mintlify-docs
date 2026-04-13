@@ -173,7 +173,8 @@
         {
           "group": "Real-time",
           "pages": [
-            "en/broadcasting"
+            "en/broadcasting",
+            "en/reverb"
           ]
         }
       ]
