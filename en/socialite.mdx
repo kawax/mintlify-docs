@@ -423,28 +423,120 @@ $fakeUser = (new User)->map([
 
 ---
 
-## Community Providers
+## Creating a Custom Provider
 
-For providers not built in (LINE, Discord, Apple, etc.), use [Socialite Providers](https://socialiteproviders.com/):
+When you need a provider that isn't built in, registering a custom driver via `Socialite::extend()` is the official, recommended approach. Because `SocialiteManager` extends `Illuminate\Support\Manager`, the extension mechanism works exactly like any other Laravel driver system.
 
-```shell
-composer require socialiteproviders/line
-```
+<Info>
+  For a deeper look at the Manager pattern and how `extend()` works under the hood, see the [Manager class guide](/en/advanced/manager).
+</Info>
 
-Register the service provider event listener and add credentials to `config/services.php`. After that, use the same Socialite API as any built-in provider.
+### 1. Create the provider class
+
+Extend `Laravel\Socialite\Two\AbstractProvider` and implement the four abstract methods:
 
 ```php
-// In App\Providers\EventServiceProvider — add to the protected $listen array
-\SocialiteProviders\Manager\SocialiteWasCalled::class => [
-    \SocialiteProviders\Line\LineExtendSocialite::class . '@handle',
-],
+// app/Socialite/ExampleProvider.php
+
+namespace App\Socialite;
+
+use Laravel\Socialite\Two\AbstractProvider;
+use Laravel\Socialite\Two\User;
+
+class ExampleProvider extends AbstractProvider
+{
+    // Authorization URL — where the user is redirected to log in
+    public function getAuthUrl($state): string
+    {
+        return $this->buildAuthUrlFromBase('https://example.com/oauth/authorize', $state);
+    }
+
+    // Token endpoint — exchanges the authorization code for an access token
+    protected function getTokenUrl(): string
+    {
+        return 'https://example.com/oauth/token';
+    }
+
+    // Fetch raw user data using the access token
+    protected function getUserByToken($token): array
+    {
+        $response = $this->getHttpClient()->get('https://example.com/api/user', [
+            'headers' => ['Authorization' => 'Bearer '.$token],
+        ]);
+
+        return json_decode($response->getBody(), true);
+    }
+
+    // Map the raw user array to a Socialite User object
+    protected function mapUserToObject(array $user): User
+    {
+        return (new User)->setRaw($user)->map([
+            'id'       => $user['id'],
+            'nickname' => $user['login'] ?? null,
+            'name'     => $user['name'],
+            'email'    => $user['email'],
+            'avatar'   => $user['avatar_url'] ?? null,
+        ]);
+    }
+}
 ```
+
+Here is what each method does:
+
+| Method | Purpose |
+| --- | --- |
+| `getAuthUrl($state)` | Returns the OAuth authorization URL to redirect the user to |
+| `getTokenUrl()` | The endpoint that exchanges the authorization code for an access token |
+| `getUserByToken($token)` | Calls the provider's user API with the token and returns a raw array |
+| `mapUserToObject(array $user)` | Converts the raw array into a Socialite `User` instance |
+
+### 2. Register the driver in a service provider
+
+Call `Socialite::extend()` inside the `boot()` method of `AppServiceProvider`:
+
+```php
+// app/Providers/AppServiceProvider.php
+
+use App\Socialite\ExampleProvider;
+use Laravel\Socialite\Facades\Socialite;
+
+public function boot(): void
+{
+    Socialite::extend('example', function ($app) {
+        $config = $app['config']['services.example'];
+
+        return Socialite::buildProvider(ExampleProvider::class, $config);
+    });
+}
+```
+
+### 3. Add the configuration
 
 ```php
 // config/services.php
-'line' => [
-    'client_id' => env('LINE_CLIENT_ID'),
-    'client_secret' => env('LINE_CLIENT_SECRET'),
-    'redirect' => env('LINE_REDIRECT_URI'),
+'example' => [
+    'client_id'     => env('EXAMPLE_CLIENT_ID'),
+    'client_secret' => env('EXAMPLE_CLIENT_SECRET'),
+    'redirect'      => env('EXAMPLE_REDIRECT_URI'),
 ],
 ```
+
+### 4. Use it like any built-in provider
+
+Once registered, the custom provider is available through the same Socialite API:
+
+```php
+// Redirect
+Route::get('/auth/example', function () {
+    return Socialite::driver('example')->redirect();
+});
+
+// Callback
+Route::get('/auth/example/callback', function () {
+    $user = Socialite::driver('example')->user();
+});
+```
+
+<Tip>
+  You can also use third-party packages that register their drivers via `Socialite::extend()` in a service provider. Packages that follow this pattern are easy to audit and behave predictably.
+</Tip>

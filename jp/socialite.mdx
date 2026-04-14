@@ -423,28 +423,120 @@ $fakeUser = (new User)->map([
 
 ---
 
-## コミュニティプロバイダー
+## カスタムプロバイダーの作り方
 
-組み込みプロバイダー以外(LINE、Discord、Apple など)を使う場合は [Socialite Providers](https://socialiteproviders.com/) を利用します。
+組み込みプロバイダー以外を使いたい場合、`Socialite::extend()` でカスタムドライバーを登録するのが公式の正規の方法です。`SocialiteManager` は `Illuminate\Support\Manager` を継承しているため、他の Laravel ドライバーシステムと同じ仕組みで拡張できます。
 
-```shell
-composer require socialiteproviders/line
-```
+<Info>
+  Manager パターンと `extend()` の仕組みについては [Manager クラスの解説](/jp/advanced/manager) も参照してください。
+</Info>
 
-`config/app.php` の `providers` にサービスプロバイダーを追加し、`config/services.php` にクレデンシャルを設定するだけで、Socialite と同じ API で使えるようになります。
+### 1. プロバイダークラスを作成する
+
+`Laravel\Socialite\Two\AbstractProvider` を継承し、4つの抽象メソッドを実装します。
 
 ```php
-// EventServiceProvider クラスの $listen 配列に追加
-\SocialiteProviders\Manager\SocialiteWasCalled::class => [
-    \SocialiteProviders\Line\LineExtendSocialite::class . '@handle',
-],
+// app/Socialite/ExampleProvider.php
+
+namespace App\Socialite;
+
+use Laravel\Socialite\Two\AbstractProvider;
+use Laravel\Socialite\Two\User;
+
+class ExampleProvider extends AbstractProvider
+{
+    // 認可 URL (ユーザーをリダイレクトする先)
+    public function getAuthUrl($state): string
+    {
+        return $this->buildAuthUrlFromBase('https://example.com/oauth/authorize', $state);
+    }
+
+    // アクセストークン取得 URL
+    protected function getTokenUrl(): string
+    {
+        return 'https://example.com/oauth/token';
+    }
+
+    // アクセストークンでユーザー情報を取得する
+    protected function getUserByToken($token): array
+    {
+        $response = $this->getHttpClient()->get('https://example.com/api/user', [
+            'headers' => ['Authorization' => 'Bearer '.$token],
+        ]);
+
+        return json_decode($response->getBody(), true);
+    }
+
+    // 取得した配列を Socialite の User オブジェクトにマッピング
+    protected function mapUserToObject(array $user): User
+    {
+        return (new User)->setRaw($user)->map([
+            'id'       => $user['id'],
+            'nickname' => $user['login'] ?? null,
+            'name'     => $user['name'],
+            'email'    => $user['email'],
+            'avatar'   => $user['avatar_url'] ?? null,
+        ]);
+    }
+}
 ```
+
+実装が必要な4つのメソッドの役割は以下のとおりです。
+
+| メソッド | 役割 |
+| --- | --- |
+| `getAuthUrl($state)` | ユーザーをリダイレクトする OAuth 認可 URL を返す |
+| `getTokenUrl()` | 認可コードをアクセストークンに交換するエンドポイント |
+| `getUserByToken($token)` | アクセストークンを使ってユーザー情報 API を叩き、配列で返す |
+| `mapUserToObject(array $user)` | 取得した配列を Socialite の `User` オブジェクトに変換する |
+
+### 2. サービスプロバイダーで登録する
+
+`AppServiceProvider` の `boot()` メソッドで `Socialite::extend()` を使ってドライバーを登録します。
+
+```php
+// app/Providers/AppServiceProvider.php
+
+use App\Socialite\ExampleProvider;
+use Laravel\Socialite\Facades\Socialite;
+
+public function boot(): void
+{
+    Socialite::extend('example', function ($app) {
+        $config = $app['config']['services.example'];
+
+        return Socialite::buildProvider(ExampleProvider::class, $config);
+    });
+}
+```
+
+### 3. 設定を追加する
 
 ```php
 // config/services.php
-'line' => [
-    'client_id' => env('LINE_CLIENT_ID'),
-    'client_secret' => env('LINE_CLIENT_SECRET'),
-    'redirect' => env('LINE_REDIRECT_URI'),
+'example' => [
+    'client_id'     => env('EXAMPLE_CLIENT_ID'),
+    'client_secret' => env('EXAMPLE_CLIENT_SECRET'),
+    'redirect'      => env('EXAMPLE_REDIRECT_URI'),
 ],
 ```
+
+### 4. 通常の Socialite と同じように使う
+
+登録後は組み込みプロバイダーとまったく同じ API で使えます。
+
+```php
+// リダイレクト
+Route::get('/auth/example', function () {
+    return Socialite::driver('example')->redirect();
+});
+
+// コールバック
+Route::get('/auth/example/callback', function () {
+    $user = Socialite::driver('example')->user();
+});
+```
+
+<Tip>
+  `extend()` を使って正規の方法で Socialite を拡張しているサードパーティパッケージを利用するのもおすすめです。そういったパッケージは `AppServiceProvider` 内で `Socialite::extend()` を呼ぶだけなので、動作が追いやすく安心して使えます。
+</Tip>
