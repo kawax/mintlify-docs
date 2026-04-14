@@ -540,3 +540,33 @@ Route::get('/auth/example/callback', function () {
 <Tip>
   You can also use third-party packages that register their drivers via `Socialite::extend()` in a service provider. Packages that follow this pattern are easy to audit and behave predictably.
 </Tip>
+
+---
+
+## Related packages
+
+The following Socialite extension packages are maintained by the owner of this site. All of them use `Socialite::extend()` under the hood — adding credentials to `config/services.php` is all you need to get started.
+
+<CardGroup cols={2}>
+  <Card title="LINE" icon="comment" href="https://github.com/invokable/laravel-line-sdk">
+    LINE SDK for Laravel. Includes Socialite OAuth login and Messaging API integration.
+  </Card>
+  <Card title="Bluesky" icon="cloud" href="https://github.com/invokable/laravel-bluesky">
+    AT Protocol (Bluesky) integration. Supports OAuth authentication and posting.
+  </Card>
+  <Card title="Discord" icon="discord" href="https://github.com/invokable/socialite-discord">
+    Discord OAuth2 login.
+  </Card>
+  <Card title="Threads" icon="instagram" href="https://github.com/invokable/laravel-threads">
+    Meta Threads integration. Supports OAuth authentication and the Threads API.
+  </Card>
+  <Card title="Amazon" icon="amazon" href="https://github.com/invokable/socialite-amazon">
+    Login with Amazon OAuth authentication.
+  </Card>
+  <Card title="Mastodon" icon="mastodon" href="https://github.com/invokable/socialite-mastodon">
+    OAuth login for Mastodon instances.
+  </Card>
+  <Card title="WordPress" icon="wordpress" href="https://github.com/invokable/socialite-wordpress">
+    OAuth login for WordPress.com and self-hosted WordPress.
+  </Card>
+</CardGroup>
