@@ -19,7 +19,7 @@ In 2026, Laravel released three packages centered around code analysis. While ea
 graph TD
     A["laravel/roster<br>Package Detection"] --> B["laravel/ranger<br>High-level Introspection"]
     B --> C["laravel/surveyor<br>Low-level Static Analysis Engine"]
-    D["Maestro<br>Starter Kit Generator"] --> A
+    D["Boost<br>AI Development Tool"] --> A
     E["Tool and Package Developers"] --> A
     E --> B
     E --> C
@@ -285,22 +285,19 @@ $packageManager = $roster->nodePackageManager(); // 'npm', 'yarn', 'bun', etc.
 
 ## Real-world use cases
 
-### Starter kit generation (Maestro)
+### AI guideline generation (Boost)
 
-[Laravel Maestro](https://github.com/laravel/maestro) uses Roster internally to understand a project's package configuration before generating a starter kit. It checks questions like "Is this project using Inertia?" and "What JavaScript package manager is in use?" to select the appropriate starter kit variant.
+[Laravel Boost](https://github.com/laravel/boost) uses Roster internally to understand a project's installed package configuration and automatically tailor the AI guidelines and skills it generates for agents like GitHub Copilot and Claude. It checks questions like "Is this project using Inertia?" and "Is Livewire installed?" to select the appropriate guideline files and provide them to the AI agent.
 
 ```mermaid
 sequenceDiagram
-    participant Maestro as Maestro
+    participant Boost as Laravel Boost
     participant Roster as laravel/roster
-    participant Ranger as laravel/ranger
-    participant Surveyor as laravel/surveyor
-    Maestro->>Roster: Roster::scan($directory)
-    Roster->>Maestro: uses(Packages::INERTIA)
-    Maestro->>Ranger: $ranger->walk()
-    Ranger->>Surveyor: Analyzer::analyzeClass(...)
-    Surveyor->>Ranger: ClassResult
-    Ranger->>Maestro: Components\Route, Components\Model, ...
+    participant AI as AI Agent
+    Boost->>Roster: Roster::scan(base_path())
+    Roster->>Boost: packages() [Inertia, Livewire, Pint...]
+    Boost->>Boost: select guidelines per package
+    Boost->>AI: Inertia guidelines, Livewire guidelines...
 ```
 
 ### Building a package compatibility checker
@@ -370,7 +367,7 @@ graph LR
     B --> C["roster<br>Detects installed packages<br>Checks versions and types"]
 ```
 
-These packages are primarily aimed at **package developers and tool authors** rather than end users. However, they are already being used internally by official Laravel tools like Maestro, and broader adoption across the ecosystem is expected as they mature toward v1.0.0.
+These packages are primarily aimed at **package developers and tool authors** rather than end users. However, they are already being used internally by official Laravel tools like Boost, and broader adoption across the ecosystem is expected as they mature toward v1.0.0.
 
 <Columns cols={3}>
   <Card title="laravel/surveyor" icon="github" href="https://github.com/laravel/surveyor">
