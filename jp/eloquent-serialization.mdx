@@ -1,0 +1,252 @@
+---
+title: "Eloquentシリアライゼーション"
+description: "EloquentモデルをJSON・配列に変換する方法、属性の表示・非表示制御、追加属性の設定、日付フォーマットのカスタマイズを解説します。"
+---
+
+## はじめに
+
+LaravelでAPIを構築する際、モデルとそのリレーションを配列やJSONに変換する必要がよくあります。
+Eloquentにはこれらの変換を行うための便利なメソッドと、シリアライズされたモデルの表現にどの属性を含めるかを制御する機能が含まれています。
+
+<Info>
+Eloquentモデルとコレクションのより堅牢なJSONシリアライゼーションの方法については、[Eloquent APIリソース](/docs/eloquent-resources)のドキュメントを参照してください。
+</Info>
+
+## モデルと配列
+
+### 配列へのシリアライゼーション
+
+モデルと読み込まれた[リレーション](/docs/eloquent-relationships)を配列に変換するには `toArray` メソッドを使います。
+このメソッドは再帰的に動作し、すべての属性とすべてのリレーション（リレーションのリレーションも含む）が配列に変換されます。
+
+```php
+use App\Models\User;
+
+$user = User::with('roles')->first();
+
+return $user->toArray();
+```
+
+`attributesToArray` メソッドを使うと、リレーションを除いたモデルの属性だけを配列に変換できます。
+
+```php
+$user = User::first();
+
+return $user->attributesToArray();
+```
+
+モデルの[コレクション](/docs/eloquent-collections)全体を配列に変換するには、コレクションインスタンスの `toArray` メソッドを呼び出します。
+
+```php
+$users = User::all();
+
+return $users->toArray();
+```
+
+### JSONへのシリアライゼーション
+
+モデルをJSONに変換するには `toJson` メソッドを使います。
+`toArray` と同様に `toJson` メソッドも再帰的なので、すべての属性とリレーションがJSONに変換されます。
+[PHPがサポートするJSONエンコードオプション](https://secure.php.net/manual/en/function.json-encode.php)を指定することもできます。
+
+```php
+use App\Models\User;
+
+$user = User::find(1);
+
+return $user->toJson();
+
+return $user->toJson(JSON_PRETTY_PRINT);
+```
+
+モデルまたはコレクションを文字列にキャストすることもでき、その場合はモデルまたはコレクションの `toJson` メソッドが自動的に呼び出されます。
+
+```php
+return (string) User::find(1);
+```
+
+モデルとコレクションは文字列にキャストされるとJSONに変換されるので、アプリケーションのルートやコントローラーからEloquentオブジェクトを直接返せます。
+Laravelはルートやコントローラーから返されるEloquentモデルとコレクションを自動的にJSONにシリアライズします。
+
+```php
+Route::get('/users', function () {
+    return User::all();
+});
+```
+
+#### リレーション
+
+EloquentモデルがJSONに変換される際、読み込まれたリレーションはJSONオブジェクトの属性として自動的に含まれます。
+また、Eloquentのリレーションメソッドは「キャメルケース」のメソッド名で定義されますが、リレーションのJSON属性は「スネークケース」になります。
+
+## 属性の表示制御
+
+### 属性の非表示
+
+モデルの配列またはJSON表現に含まれるパスワードなどの属性を制限したい場合があります。
+そのためにはモデルに `Hidden` 属性を使います。
+`Hidden` 属性にリストされた属性はモデルのシリアライズされた表現に含まれません。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Model;
+
+#[Hidden(['password'])]
+class User extends Model
+{
+    // ...
+}
+```
+
+<Info>
+リレーションを非表示にするには、EloquentモデルのHidden属性にリレーションのメソッド名を追加します。
+</Info>
+
+### 属性の公開
+
+`Visible` 属性を使って、モデルの配列およびJSON表現に含まれるべき属性の「許可リスト」を定義することもできます。
+`Visible` 属性に存在しないすべての属性は、モデルが配列やJSONに変換される際に非表示になります。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Visible;
+use Illuminate\Database\Eloquent\Model;
+
+#[Visible(['first_name', 'last_name'])]
+class User extends Model
+{
+    // ...
+}
+```
+
+### 属性の一時的な表示・非表示
+
+通常は非表示になっている属性を特定のモデルインスタンスで表示させるには、`makeVisible` または `mergeVisible` メソッドを使います。
+`makeVisible` メソッドはモデルインスタンスを返します。
+
+```php
+return $user->makeVisible('attribute')->toArray();
+
+return $user->mergeVisible(['name', 'email'])->toArray();
+```
+
+逆に、通常は表示される属性を非表示にするには、`makeHidden` または `mergeHidden` メソッドを使います。
+
+```php
+return $user->makeHidden('attribute')->toArray();
+
+return $user->mergeHidden(['name', 'email'])->toArray();
+```
+
+表示または非表示の属性をすべて一時的にオーバーライドするには、`setVisible` および `setHidden` メソッドをそれぞれ使います。
+
+```php
+return $user->setVisible(['id', 'name'])->toArray();
+
+return $user->setHidden(['email', 'password', 'remember_token'])->toArray();
+```
+
+## 追加属性
+
+モデルを配列やJSONに変換する際、データベースに対応するカラムを持たない属性を追加したい場合があります。
+そのためにはまず値の[アクセサ](/docs/eloquent-mutators)を定義します。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    /**
+     * ユーザーが管理者かどうかを判定する。
+     */
+    protected function isAdmin(): Attribute
+    {
+        return new Attribute(
+            get: fn () => 'yes',
+        );
+    }
+}
+```
+
+アクセサをモデルの配列およびJSON表現に常に追加したい場合は、モデルに `Appends` 属性を使います。
+アクセサのPHPメソッドは「キャメルケース」で定義されていますが、属性名は通常「スネークケース」でのシリアライズ表現を使います。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Appends;
+use Illuminate\Database\Eloquent\Model;
+
+#[Appends(['is_admin'])]
+class User extends Model
+{
+    // ...
+}
+```
+
+属性が `appends` リストに追加されると、モデルの配列とJSON表現の両方に含まれます。
+`appends` 配列の属性もモデルに設定された `visible` と `hidden` の設定を尊重します。
+
+### 実行時の追加
+
+実行時に `append` または `mergeAppends` メソッドを使ってモデルインスタンスに追加の属性を追加するよう指示できます。
+また `setAppends` メソッドを使って、特定のモデルインスタンスの追加プロパティの配列全体をオーバーライドできます。
+
+```php
+return $user->append('is_admin')->toArray();
+
+return $user->mergeAppends(['is_admin', 'status'])->toArray();
+
+return $user->setAppends(['is_admin'])->toArray();
+```
+
+追加されたすべてのプロパティをモデルから削除するには `withoutAppends` メソッドを使います。
+
+```php
+return $user->withoutAppends()->toArray();
+```
+
+## 日付のシリアライゼーション
+
+### デフォルトの日付フォーマットのカスタマイズ
+
+`serializeDate` メソッドをオーバーライドすることで、デフォルトのシリアライゼーションフォーマットをカスタマイズできます。
+このメソッドはデータベースへの保存のための日付フォーマットには影響しません。
+
+```php
+/**
+ * 配列・JSONシリアライゼーションのために日付を準備する。
+ */
+protected function serializeDate(DateTimeInterface $date): string
+{
+    return $date->format('Y-m-d');
+}
+```
+
+### 属性ごとの日付フォーマットのカスタマイズ
+
+モデルの[キャスト宣言](/docs/eloquent-mutators#attribute-casting)で日付フォーマットを指定することで、個々のEloquent日付属性のシリアライゼーションフォーマットをカスタマイズできます。
+
+```php
+protected function casts(): array
+{
+    return [
+        'birthday' => 'date:Y-m-d',
+        'joined_at' => 'datetime:Y-m-d H:00',
+    ];
+}
+```

@@ -18,6 +18,7 @@
             "en/routing",
             "en/views",
             "en/blade",
+            "en/urls",
             "en/controllers",
             "en/middleware",
             "en/requests",
@@ -115,7 +116,8 @@
           "group": "Eloquent",
           "pages": [
             "en/eloquent-mutators",
-            "en/scout"
+            "en/scout",
+            "en/eloquent-serialization"
           ]
         },
         {
