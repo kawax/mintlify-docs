@@ -1,0 +1,331 @@
+---
+title: "パッケージのバージョン互換性管理"
+description: "LaravelとPHPのメジャーバージョンアップに伴うパッケージメンテナンス戦略を、composer.jsonの更新からGitHub Actionsのテストマトリクス設定まで実践的に解説します。"
+---
+
+Laravelは毎年2〜3月頃にメジャーバージョンアップします。パッケージ開発者にとって、新バージョンへの対応を素早く完了させることはエコシステム全体への貢献であり、自パッケージの信頼性を高める重要な活動です。
+
+<Info>
+  このページは[パッケージ開発の基礎](/jp/advanced/package-development)の姉妹ページです。パッケージ開発の基本的な知識（サービスプロバイダー、`composer.json` の構成など）を前提としています。
+</Info>
+
+## Laravelのメジャーバージョンアップへの対応
+
+### 対応の流れ
+
+<Steps>
+  <Step title="composer.json の require を更新する">
+    新バージョンを依存範囲に追加します。古いバージョンのサポートを続ける場合は `||` で並記します。
+
+    ```json
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^12.0||^13.0"
+    }
+    ```
+
+    新バージョンへの対応が完了し、古いバージョンのサポートを終了する場合は古い制約を削除します。
+
+    ```json
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^13.0||^14.0"
+    }
+    ```
+
+    <Tip>
+      `illuminate/framework` 全体ではなく `illuminate/support` など必要なコンポーネントだけに依存することで、依存ツリーを小さく保てます。
+    </Tip>
+  </Step>
+  <Step title="テストを新バージョンで実行する">
+    ローカルまたはCI環境で新しいLaravelバージョンを使ってテストを実行します。
+
+    ```shell
+    composer update
+    vendor/bin/pest
+    ```
+
+    テストが通れば基本的な互換性は確認できています。通らない場合は、変更されたAPIや削除されたメソッドを修正します。
+  </Step>
+  <Step title="GitHub Actionsのテストマトリクスに新バージョンを追加する">
+    CIのテストマトリクスにLaravelの新バージョンを追加して、継続的に互換性を確認します。詳細は[テストマトリクスの設定例](#テストマトリクスの設定例)を参照してください。
+  </Step>
+  <Step title="新バージョン対応をリリースする">
+    `composer.json` の変更を含む新しいバージョンをタグ付けしてリリースします。ユーザーは `composer update` だけで新しいLaravelバージョンにインストールできるようになります。
+  </Step>
+</Steps>
+
+### 公式パッケージを参考にする
+
+対応方法に迷ったときは、Laravelの公式パッケージの `composer.json` を参照するのが最も確実です。
+
+- [laravel/socialite](https://github.com/laravel/socialite/blob/master/composer.json)
+- [laravel/horizon](https://github.com/laravel/horizon/blob/master/composer.json)
+- [laravel/telescope](https://github.com/laravel/telescope/blob/master/composer.json)
+
+これらのパッケージはLaravelチームが管理しており、新バージョンへの対応が最も早く、`illuminate/*` の依存バージョンの書き方も参考になります。
+
+## PHPバージョン要件の更新
+
+LaravelのバージョンアップはPHPの最低要件も引き上げることがあります。パッケージの `composer.json` でPHP要件もあわせて更新します。
+
+| Laravel | 最低PHP要件 |
+|---------|------------|
+| Laravel 11 | PHP 8.2 |
+| Laravel 12 | PHP 8.2 |
+| Laravel 13 | PHP 8.2 |
+
+```json
+"require": {
+    "php": "^8.2",
+    "illuminate/support": "^11.0||^12.0||^13.0"
+}
+```
+
+### 新しいPHP機能を積極的に使う場合
+
+PHP 8.3以降の機能（型付き定数、新しいランダム関数など）を使いたい場合は、最低要件を引き上げる判断が必要です。最低要件の引き上げはセマンティックバージョニング上は破壊的変更なので、メジャーバージョンアップ時に行うのが適切です。
+
+```json
+"require": {
+    "php": "^8.3",
+    "illuminate/support": "^12.0||^13.0"
+}
+```
+
+<Warning>
+  PHPの最低要件を引き上げると、古いPHPを使っているユーザーがパッケージを更新できなくなります。READMEやCHANGELOGに明記して事前に周知することが重要です。
+</Warning>
+
+## 旧バージョンサポートの終了戦略
+
+旧バージョンをいつまでも維持することは、長期的にはメンテナンスコストを増大させます。明確なサポートポリシーを定めて、定期的に古いバージョンのサポートを終了することが健全なパッケージ運営につながります。
+
+### サポート終了のタイミング
+
+一般的なアプローチは、**Laravelのサポート期間に合わせる**ことです。Laravelは各バージョンに対してバグ修正18ヶ月、セキュリティ修正2年のサポートを提供しています。パッケージも同様のポリシーを採用するとユーザーに分かりやすくなります。
+
+| 判断基準 | 説明 |
+|---------|------|
+| Laravelの公式サポート終了 | そのLaravelバージョンのサポートが終了したタイミングで対応をやめる |
+| 利用状況 | Packagistのダウンロード統計で旧バージョン利用者が少なくなったタイミング |
+| 機能追加の障壁 | 旧バージョン対応のために新機能の実装が複雑になってきたタイミング |
+
+### サポートポリシーをREADMEに明記する
+
+ユーザーが期待値を正しく持てるよう、サポートポリシーを `README.md` に記載します。
+
+```markdown
+## Version Compatibility
+
+| Package | Laravel | PHP  |
+|---------|---------|------|
+| 3.x     | 13.x    | ^8.2 |
+| 2.x     | 11.x, 12.x | ^8.2 |
+| 1.x     | 10.x    | ^8.1 |
+
+Only the latest major version receives new features.
+Security fixes are backported to the previous major version for 12 months.
+```
+
+### 旧バージョン維持のコスト
+
+旧バージョンサポートを続けると次のコストが発生します。
+
+- **バグ修正の二重対応** — 同じバグを複数ブランチで修正する必要がある
+- **分岐コードの増加** — バージョンごとに異なる実装を条件分岐で吸収する複雑さ
+- **テストマトリクスの肥大化** — CI実行時間が長くなる
+- **セキュリティパッチの複雑化** — 古いバージョンにも安全にバックポートする必要がある
+
+エコシステム全体がバージョンアップしていく中で、旧バージョンのサポートを適切に終了することは、ユーザーに最新環境への移行を促す効果もあります。
+
+## 早期対応のメリット
+
+Laravelのリリースと同時に対応が完了していると、ユーザーはすぐに新バージョンへ移行できます。これはパッケージの信頼性を示す重要なシグナルです。
+
+### RC/betaで事前検証する
+
+Laravelはメジャーリリースの数週間前からRC（リリース候補）やbetaを公開します。本番リリース前に動作確認することで、ゼロデイ対応が可能になります。
+
+```shell
+# RCバージョンでのテスト
+composer require laravel/framework:^13.0@rc --no-update
+composer update
+vendor/bin/pest
+```
+
+`minimum-stability` を `RC` に設定することで、RC版との依存関係を解決できます。
+
+```json
+{
+    "minimum-stability": "RC",
+    "prefer-stable": true
+}
+```
+
+<Tip>
+  `prefer-stable: true` を指定すると、安定版が存在する場合は安定版が優先されます。テスト目的でRCを使いながらも、安定版への自動切り替えが保証されます。
+</Tip>
+
+### 最初のステップは composer.json の変更だけでよい
+
+完全な互換性確認の前でも、`composer.json` の依存範囲を更新してリリースするだけで、ユーザーはパッケージをインストールできるようになります。
+
+```json
+"illuminate/support": "^12.0||^13.0"
+```
+
+小さな不具合はリリース後でもパッチバージョンで修正できます。完璧な対応を待つより、インストール可能な状態にすることを優先しましょう。
+
+### リリース情報の追いかけ方
+
+新バージョンのリリース情報をタイムリーに把握するための方法です。
+
+| 情報源 | 内容 |
+|--------|------|
+| [laravel/framework CHANGELOG](https://github.com/laravel/framework/blob/master/CHANGELOG.md) | 詳細な変更履歴 |
+| [Laravel公式ブログ](https://laravel.com/blog) | メジャーリリースの発表と新機能解説 |
+| [laravel/framework リリース](https://github.com/laravel/framework/releases) | タグとリリースノート |
+| [Laravel公式ドキュメント アップグレードガイド](https://laravel.com/docs/upgrade) | 破壊的変更の一覧 |
+
+## テストマトリクスの設定例
+
+GitHub Actionsで複数のLaravelバージョンとPHPバージョンの組み合わせを自動テストするワークフロー例です。
+
+```yaml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [8.2, 8.3, 8.4]
+        laravel: ["^12.0", "^13.0"]
+        include:
+          - laravel: "^13.0"
+            testbench: "^10.0"
+          - laravel: "^12.0"
+            testbench: "^9.0"
+
+    name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "laravel/framework:${{ matrix.laravel }}" \
+                           "orchestra/testbench:${{ matrix.testbench }}" \
+                           --no-interaction --no-update
+          composer update --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/pest
+```
+
+### fail-fast: false の重要性
+
+`fail-fast: false` を設定することで、一つの組み合わせが失敗しても他の組み合わせのテストを継続します。どのバージョンの組み合わせで問題が発生しているかを一度のCI実行で把握できます。
+
+### テストマトリクスの段階的な更新
+
+新しいLaravelバージョンが出たら、マトリクスに追加します。古いバージョンのサポートを終了したら、マトリクスから削除します。
+
+```yaml
+# Laravel 14がリリースされたら追加
+matrix:
+  laravel: ["^13.0", "^14.0"]
+  include:
+    - laravel: "^14.0"
+      testbench: "^11.0"
+    - laravel: "^13.0"
+      testbench: "^10.0"
+```
+
+## composer.json のサンプル
+
+複数バージョン対応の `composer.json` の完全な例です。
+
+```json
+{
+    "name": "acme/courier",
+    "description": "A Laravel courier package",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^12.0||^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0||^10.0",
+        "pestphp/pest": "^3.0",
+        "pestphp/pest-plugin-laravel": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Acme\\Courier\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Acme\\Courier\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Acme\\Courier\\CourierServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
+```
+
+## バージョンアップ対応チェックリスト
+
+<AccordionGroup>
+  <Accordion title="Laravelの新バージョンリリース前">
+    - [ ] RC/betaで動作確認を実施する
+    - [ ] 公式アップグレードガイドで破壊的変更を確認する
+    - [ ] テスト環境で新バージョンへの対応を実装する
+    - [ ] テストマトリクスに新バージョンを追加してCIで確認する
+  </Accordion>
+  <Accordion title="リリース直後の初期対応">
+    - [ ] `composer.json` の `illuminate/*` 要件に新バージョンを追加する
+    - [ ] 必要に応じてPHP要件を更新する
+    - [ ] `require-dev` の `orchestra/testbench` も対応バージョンに更新する
+    - [ ] 新バージョンをタグ付けしてPackagistに反映する
+    - [ ] READMEのバージョン互換性表を更新する
+  </Accordion>
+  <Accordion title="旧バージョンサポート終了時">
+    - [ ] CHANGELOG/READMEにサポート終了を明記する
+    - [ ] `composer.json` から旧バージョンの制約を削除する
+    - [ ] テストマトリクスから旧バージョンを削除する
+    - [ ] 旧バージョン用の条件分岐コードを整理する
+  </Accordion>
+</AccordionGroup>
+
+## 関連ページ
+
+<Columns cols={2}>
+  <Card title="パッケージ開発の基礎" icon="box" href="/jp/advanced/package-development">
+    サービスプロバイダーを核としたLaravelパッケージの開発方法を解説します。
+  </Card>
+  <Card title="Pestを使った高度なテスト" icon="flask-conical" href="/jp/advanced/testing-pest">
+    PestのExpectation APIやデータセットを使ったパッケージテストの書き方を解説します。
+  </Card>
+</Columns>

@@ -266,7 +266,8 @@
         {
           "group": "パッケージ開発",
           "pages": [
-            "jp/advanced/package-development"
+            "jp/advanced/package-development",
+            "jp/advanced/package-versioning"
           ]
         },
         {

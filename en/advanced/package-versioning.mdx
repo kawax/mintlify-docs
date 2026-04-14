@@ -1,0 +1,329 @@
+---
+title: "Package Version Compatibility Management"
+description: "A practical guide to maintaining Laravel package compatibility through major Laravel and PHP version upgrades, covering composer.json updates, GitHub Actions test matrices, and end-of-life strategies."
+---
+
+Laravel releases a new major version every year, typically in February or March. For package authors, completing support for new versions quickly is a meaningful contribution to the ecosystem and a strong signal of package quality.
+
+<Info>
+  This page is a companion to [Laravel Package Development](/en/advanced/package-development). It assumes familiarity with package basics such as service providers and `composer.json` configuration.
+</Info>
+
+## Responding to a Laravel major version upgrade
+
+### Step-by-step process
+
+<Steps>
+  <Step title="Update the require constraint in composer.json">
+    Add the new version to your dependency range. Use `||` to support multiple versions simultaneously.
+
+    ```json
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^12.0||^13.0"
+    }
+    ```
+
+    When you are ready to drop support for an older version, remove the old constraint.
+
+    ```json
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^13.0||^14.0"
+    }
+    ```
+
+    <Tip>
+      Depending on `illuminate/support` rather than `illuminate/framework` keeps the dependency tree small by pulling in only the Laravel components you actually need.
+    </Tip>
+  </Step>
+  <Step title="Run your tests against the new version">
+    Update dependencies and run your test suite locally or in CI.
+
+    ```shell
+    composer update
+    vendor/bin/pest
+    ```
+
+    If tests pass, basic compatibility is confirmed. If not, check the official upgrade guide for removed or changed APIs and fix your package accordingly.
+  </Step>
+  <Step title="Add the new version to your GitHub Actions test matrix">
+    Add the new Laravel version to your CI matrix so compatibility is verified continuously. See [Test matrix configuration example](#test-matrix-configuration-example) below.
+  </Step>
+  <Step title="Release the update">
+    Tag a new release containing the `composer.json` changes. Users will be able to install the package on the new Laravel version with a simple `composer update`.
+  </Step>
+</Steps>
+
+### Learn from official packages
+
+When in doubt, check how official Laravel packages handle version constraints.
+
+- [laravel/socialite](https://github.com/laravel/socialite/blob/master/composer.json)
+- [laravel/horizon](https://github.com/laravel/horizon/blob/master/composer.json)
+- [laravel/telescope](https://github.com/laravel/telescope/blob/master/composer.json)
+
+These packages are maintained by the Laravel team and are updated first. Their `illuminate/*` constraint syntax is the most reliable reference.
+
+## Updating PHP version requirements
+
+A Laravel major version upgrade sometimes raises the minimum PHP requirement as well. Update the PHP constraint in your `composer.json` accordingly.
+
+| Laravel | Minimum PHP |
+|---------|-------------|
+| Laravel 11 | PHP 8.2 |
+| Laravel 12 | PHP 8.2 |
+| Laravel 13 | PHP 8.2 |
+
+```json
+"require": {
+    "php": "^8.2",
+    "illuminate/support": "^11.0||^12.0||^13.0"
+}
+```
+
+### Raising the minimum PHP version to use new language features
+
+If you want to use features introduced in PHP 8.3 or later (typed constants, new random functions, etc.), you need to raise the minimum PHP requirement. Because raising the minimum PHP version is a breaking change under semantic versioning, it is best done alongside a package major version bump.
+
+```json
+"require": {
+    "php": "^8.3",
+    "illuminate/support": "^12.0||^13.0"
+}
+```
+
+<Warning>
+  Raising the PHP minimum requirement prevents users on older PHP versions from updating the package. Announce the change clearly in your README and CHANGELOG well in advance.
+</Warning>
+
+## Strategy for ending support for old versions
+
+Maintaining old versions indefinitely increases maintenance costs over time. Defining a clear support policy and regularly dropping old versions leads to a healthier package.
+
+### When to drop support
+
+A common approach is to **align with Laravel's support lifecycle**. Laravel provides bug fix support for 18 months and security fix support for 2 years per release. Adopting the same policy gives users clear expectations.
+
+| Criterion | Description |
+|-----------|-------------|
+| Laravel's official end of life | Drop support when Laravel itself stops receiving bug fixes |
+| Usage statistics | Drop support when downloads for the old version drop significantly on Packagist |
+| Feature development friction | Drop support when maintaining old compatibility makes adding new features significantly harder |
+
+### Document your support policy in README
+
+Include a compatibility table in your `README.md` so users know which versions are supported.
+
+```markdown
+## Version Compatibility
+
+| Package | Laravel   | PHP  |
+|---------|-----------|------|
+| 3.x     | 13.x      | ^8.2 |
+| 2.x     | 11.x, 12.x | ^8.2 |
+| 1.x     | 10.x      | ^8.1 |
+
+Only the latest major version receives new features.
+Security fixes are backported to the previous major version for 12 months.
+```
+
+### The cost of maintaining old versions
+
+Continuing to support old versions introduces the following costs.
+
+- **Duplicate bug fixes** — the same bug must be fixed across multiple branches
+- **Branching code complexity** — version-specific implementation differences accumulate in conditional logic
+- **Bloated test matrices** — CI run times grow with every additional version combination
+- **Backporting security patches** — applying fixes safely to old branches requires additional care
+
+Encouraging users to move to the latest Laravel version benefits the entire ecosystem and reduces the maintenance burden on package authors.
+
+## The benefits of acting early
+
+When your package supports a new Laravel version on release day, users can upgrade immediately. This is a strong trust signal for the package.
+
+### Validate against RC and beta releases
+
+Laravel publishes release candidates and beta versions several weeks before the final release. Testing against these lets you deliver zero-day compatibility.
+
+```shell
+# Test against an RC release
+composer require laravel/framework:^13.0@rc --no-update
+composer update
+vendor/bin/pest
+```
+
+Set `minimum-stability` to `RC` to resolve RC dependencies.
+
+```json
+{
+    "minimum-stability": "RC",
+    "prefer-stable": true
+}
+```
+
+<Tip>
+  With `prefer-stable: true`, Composer prefers stable releases when they are available. You can test against RC versions without risking non-stable dependencies in production.
+</Tip>
+
+### The first step is just a composer.json change
+
+You do not need a fully verified implementation before releasing. Simply updating the version constraint in `composer.json` lets users install the package on the new Laravel version.
+
+```json
+"illuminate/support": "^12.0||^13.0"
+```
+
+Small issues can be addressed in patch releases after the initial update. Prioritize making the package installable over delivering a perfect implementation.
+
+### Where to track release information
+
+| Source | Content |
+|--------|---------|
+| [laravel/framework CHANGELOG](https://github.com/laravel/framework/blob/master/CHANGELOG.md) | Detailed change history |
+| [Laravel official blog](https://laravel.com/blog) | Major release announcements and feature overviews |
+| [laravel/framework releases](https://github.com/laravel/framework/releases) | Tags and release notes |
+| [Laravel upgrade guide](https://laravel.com/docs/upgrade) | Breaking changes summary |
+
+## Test matrix configuration example
+
+The following GitHub Actions workflow runs your test suite against multiple Laravel and PHP version combinations.
+
+```yaml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [8.2, 8.3, 8.4]
+        laravel: ["^12.0", "^13.0"]
+        include:
+          - laravel: "^13.0"
+            testbench: "^10.0"
+          - laravel: "^12.0"
+            testbench: "^9.0"
+
+    name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "laravel/framework:${{ matrix.laravel }}" \
+                           "orchestra/testbench:${{ matrix.testbench }}" \
+                           --no-interaction --no-update
+          composer update --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/pest
+```
+
+### Why fail-fast: false matters
+
+Setting `fail-fast: false` allows all matrix combinations to run even if one fails. You get a complete picture of which version combinations have problems in a single CI run.
+
+### Updating the matrix over time
+
+Add new Laravel versions to the matrix when they are released. Remove old versions when you drop support.
+
+```yaml
+# Add Laravel 14 when it is released
+matrix:
+  laravel: ["^13.0", "^14.0"]
+  include:
+    - laravel: "^14.0"
+      testbench: "^11.0"
+    - laravel: "^13.0"
+      testbench: "^10.0"
+```
+
+## Sample composer.json
+
+A complete example of a `composer.json` configured for multi-version support.
+
+```json
+{
+    "name": "acme/courier",
+    "description": "A Laravel courier package",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^12.0||^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0||^10.0",
+        "pestphp/pest": "^3.0",
+        "pestphp/pest-plugin-laravel": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Acme\\Courier\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Acme\\Courier\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Acme\\Courier\\CourierServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
+```
+
+## Version upgrade checklist
+
+<AccordionGroup>
+  <Accordion title="Before a new Laravel release">
+    - [ ] Test against the RC or beta release
+    - [ ] Review the official upgrade guide for breaking changes
+    - [ ] Implement any required fixes in a development branch
+    - [ ] Add the new version to your test matrix and verify CI passes
+  </Accordion>
+  <Accordion title="Initial response after release">
+    - [ ] Add the new version to the `illuminate/*` constraint in `composer.json`
+    - [ ] Update the PHP requirement if needed
+    - [ ] Update `orchestra/testbench` in `require-dev` to match
+    - [ ] Tag a new release and verify it appears on Packagist
+    - [ ] Update the version compatibility table in README
+  </Accordion>
+  <Accordion title="Dropping support for an old version">
+    - [ ] Announce end of support in the CHANGELOG and README
+    - [ ] Remove the old constraint from `composer.json`
+    - [ ] Remove the old version from the test matrix
+    - [ ] Clean up any version-specific conditional code
+  </Accordion>
+</AccordionGroup>
+
+## Related pages
+
+<Columns cols={2}>
+  <Card title="Laravel Package Development" icon="box" href="/en/advanced/package-development">
+    Learn the fundamentals of Laravel package development, including service providers and publishing resources.
+  </Card>
+  <Card title="Advanced Testing with Pest" icon="flask-conical" href="/en/advanced/testing-pest">
+    Write expressive package tests using Pest's Expectation API, datasets, and fakes.
+  </Card>
+</Columns>
