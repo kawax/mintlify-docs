@@ -59,9 +59,9 @@ Laravel releases a new major version every year, typically in February or March.
 
 When in doubt, check how official Laravel packages handle version constraints.
 
-- [laravel/socialite](https://github.com/laravel/socialite/blob/master/composer.json)
-- [laravel/horizon](https://github.com/laravel/horizon/blob/master/composer.json)
-- [laravel/telescope](https://github.com/laravel/telescope/blob/master/composer.json)
+- [laravel/socialite](https://github.com/laravel/socialite)
+- [laravel/horizon](https://github.com/laravel/horizon)
+- [laravel/telescope](https://github.com/laravel/telescope)
 
 These packages are maintained by the Laravel team and are updated first. Their `illuminate/*` constraint syntax is the most reliable reference.
 
@@ -73,7 +73,8 @@ A Laravel major version upgrade sometimes raises the minimum PHP requirement as 
 |---------|-------------|
 | Laravel 11 | PHP 8.2 |
 | Laravel 12 | PHP 8.2 |
-| Laravel 13 | PHP 8.2 |
+| Laravel 13 | PHP 8.3 |
+| Laravel 14 | PHP 8.4 |
 
 ```json
 "require": {
@@ -143,28 +144,36 @@ Encouraging users to move to the latest Laravel version benefits the entire ecos
 
 When your package supports a new Laravel version on release day, users can upgrade immediately. This is a strong trust signal for the package.
 
-### Validate against RC and beta releases
+### Validate against the development version
 
-Laravel publishes release candidates and beta versions several weeks before the final release. Testing against these lets you deliver zero-day compatibility.
+Laravel does not publish beta or RC releases. Instead, you can install the next version in development using `dev-master` or the `@dev` constraint. Testing before the final release allows for zero-day compatibility.
 
 ```shell
-# Test against an RC release
-composer require laravel/framework:^13.0@rc --no-update
+# Install the next version using dev-master
+composer require laravel/framework:dev-master --no-update
 composer update
 vendor/bin/pest
 ```
 
-Set `minimum-stability` to `RC` to resolve RC dependencies.
+You can also use the `@dev` constraint.
+
+```shell
+composer require laravel/framework:^14.0@dev --no-update
+composer update
+vendor/bin/pest
+```
+
+Set `minimum-stability` to `dev` to resolve development version dependencies.
 
 ```json
 {
-    "minimum-stability": "RC",
+    "minimum-stability": "dev",
     "prefer-stable": true
 }
 ```
 
 <Tip>
-  With `prefer-stable: true`, Composer prefers stable releases when they are available. You can test against RC versions without risking non-stable dependencies in production.
+  With `prefer-stable: true`, Composer prefers stable releases when they are available. You can test against development versions without risking non-stable dependencies in production.
 </Tip>
 
 ### The first step is just a composer.json change
@@ -181,10 +190,10 @@ Small issues can be addressed in patch releases after the initial update. Priori
 
 | Source | Content |
 |--------|---------|
-| [laravel/framework CHANGELOG](https://github.com/laravel/framework/blob/master/CHANGELOG.md) | Detailed change history |
+| GitHub Watch | Enable "Watch → Custom → Releases" on the repository to receive email notifications. Set this up for framework and other key packages |
 | [Laravel official blog](https://laravel.com/blog) | Major release announcements and feature overviews |
-| [laravel/framework releases](https://github.com/laravel/framework/releases) | Tags and release notes |
 | [Laravel upgrade guide](https://laravel.com/docs/upgrade) | Breaking changes summary |
+| [laravel/framework commit log](https://github.com/laravel/framework/commits/master) | Track changes to the next version early by following commits directly |
 
 ## Test matrix configuration example
 
@@ -297,7 +306,7 @@ A complete example of a `composer.json` configured for multi-version support.
 
 <AccordionGroup>
   <Accordion title="Before a new Laravel release">
-    - [ ] Test against the RC or beta release
+    - [ ] Test against the development version (`dev-master` or `@dev`)
     - [ ] Review the official upgrade guide for breaking changes
     - [ ] Implement any required fixes in a development branch
     - [ ] Add the new version to your test matrix and verify CI passes
