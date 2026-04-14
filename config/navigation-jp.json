@@ -96,7 +96,8 @@
           "pages": [
             "jp/authorization",
             "jp/sanctum",
-            "jp/hashing"
+            "jp/hashing",
+            "jp/encryption"
           ]
         },
         {
@@ -171,7 +172,8 @@
           "pages": [
             "jp/context",
             "jp/error-handling",
-            "jp/logging"
+            "jp/logging",
+            "jp/pulse"
           ]
         },
         {
