@@ -296,7 +296,8 @@
           "group": "New Repository Reports",
           "pages": [
             "en/blog/maestro-introduction",
-            "en/blog/agent-skills-introduction"
+            "en/blog/agent-skills-introduction",
+            "en/blog/laravel-ecosystem-analysis"
           ]
         },
         {
