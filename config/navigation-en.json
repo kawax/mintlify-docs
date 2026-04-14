@@ -77,7 +77,8 @@
           "pages": [
             "en/authorization",
             "en/hashing",
-            "en/sanctum"
+            "en/sanctum",
+            "en/encryption"
           ]
         },
         {
@@ -152,7 +153,8 @@
           "pages": [
             "en/context",
             "en/error-handling",
-            "en/logging"
+            "en/logging",
+            "en/pulse"
           ]
         },
         {
