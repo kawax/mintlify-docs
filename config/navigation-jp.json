@@ -17,7 +17,8 @@
           "pages": [
             "jp/routing",
             "jp/views",
-            "jp/blade"
+            "jp/blade",
+            "jp/urls"
           ]
         },
         {
@@ -88,7 +89,8 @@
           "pages": [
             "jp/eloquent-resources",
             "jp/eloquent-mutators",
-            "jp/scout"
+            "jp/scout",
+            "jp/eloquent-serialization"
           ]
         },
         {
