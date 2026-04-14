@@ -1,0 +1,572 @@
+---
+title: "Laravel Socialite(ソーシャル認証)"
+description: "OAuth 2.0を使ったソーシャルログイン(GitHub、Google、Facebook など)をLaravel Socialiteでシンプルに実装する方法を解説します。"
+---
+
+## Laravel Socialite とは
+
+Laravel Socialite は、OAuth 2.0 を使ったソーシャルログインをシンプルに実装できる公式パッケージです。GitHub、Google、Facebook、X(Twitter)、LinkedIn など主要なプロバイダーに対応しており、複雑な OAuth の実装を数行のコードで済ませることができます。
+
+組み込みでサポートされているプロバイダーは以下のとおりです。
+
+| プロバイダー | キー名 |
+| --- | --- |
+| Bitbucket | `bitbucket` |
+| Facebook | `facebook` |
+| GitHub | `github` |
+| GitLab | `gitlab` |
+| Google | `google` |
+| LinkedIn (OpenID) | `linkedin-openid` |
+| Slack | `slack` / `slack-openid` |
+| Spotify | `spotify` |
+| Twitch | `twitch` |
+| X (Twitter) | `x` |
+
+<Info>
+  上記以外のプロバイダーは、コミュニティが提供する [Socialite Providers](https://socialiteproviders.com/) で追加できます。
+</Info>
+
+### ソーシャルログインのフロー
+
+```mermaid
+sequenceDiagram
+    participant User as ユーザー
+    participant App as Laravel アプリ
+    participant OAuth as GitHub (OAuth)
+    participant DB as データベース
+
+    User->>App: ログインボタンをクリック
+    App->>OAuth: リダイレクト (Socialite::driver('github')->redirect())
+    OAuth->>User: 認証・権限確認画面
+    User->>OAuth: 承認
+    OAuth->>App: コールバック (code パラメータ付き)
+    App->>OAuth: アクセストークン取得
+    OAuth-->>App: ユーザー情報を返却
+    App->>DB: ユーザーを登録 / 更新 (updateOrCreate)
+    DB-->>App: ユーザーレコード
+    App->>User: ログイン完了・ダッシュボードへリダイレクト
+```
+
+---
+
+## インストール
+
+Composer でパッケージを追加します。
+
+```shell
+composer require laravel/socialite
+```
+
+<Info>
+  Socialite をメジャーバージョンアップする際は、必ず [アップグレードガイド](https://github.com/laravel/socialite/blob/master/UPGRADE.md) を確認してください。
+</Info>
+
+---
+
+## 設定
+
+### config/services.php
+
+各プロバイダーのクライアント ID・シークレット・コールバック URL を `config/services.php` に追加します。
+
+```php
+// config/services.php
+
+'github' => [
+    'client_id' => env('GITHUB_CLIENT_ID'),
+    'client_secret' => env('GITHUB_CLIENT_SECRET'),
+    'redirect' => env('GITHUB_REDIRECT_URI'),
+],
+
+'google' => [
+    'client_id' => env('GOOGLE_CLIENT_ID'),
+    'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+    'redirect' => env('GOOGLE_REDIRECT_URI'),
+],
+
+'facebook' => [
+    'client_id' => env('FACEBOOK_CLIENT_ID'),
+    'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+    'redirect' => env('FACEBOOK_REDIRECT_URI'),
+],
+```
+
+<Info>
+  `redirect` オプションに相対パスを指定すると、自動的に完全な URL に解決されます。
+</Info>
+
+### .env
+
+環境変数でクレデンシャルを管理します。GitHub を例に示します。
+
+```ini
+GITHUB_CLIENT_ID=your-client-id
+GITHUB_CLIENT_SECRET=your-client-secret
+GITHUB_REDIRECT_URI=https://example.com/auth/github/callback
+```
+
+GitHub の場合、[GitHub Developer Settings](https://github.com/settings/developers) で OAuth App を作成するとクライアント ID とシークレットを取得できます。
+
+---
+
+## 認証フロー
+
+### ルーティング
+
+OAuth 認証には2つのルートが必要です。リダイレクト用とコールバック用です。
+
+```php
+use Laravel\Socialite\Facades\Socialite;
+
+// ユーザーを GitHub にリダイレクト
+Route::get('/auth/github', function () {
+    return Socialite::driver('github')->redirect();
+});
+
+// GitHub からのコールバックを処理
+Route::get('/auth/github/callback', function () {
+    $user = Socialite::driver('github')->user();
+
+    // $user->token でアクセストークンを取得
+});
+```
+
+### ユーザーの保存とログイン
+
+コールバックルートでユーザー情報を取得し、データベースに保存してからログインします。
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Laravel\Socialite\Facades\Socialite;
+
+Route::get('/auth/github/callback', function () {
+    $githubUser = Socialite::driver('github')->user();
+
+    $user = User::updateOrCreate(
+        ['github_id' => $githubUser->id],
+        [
+            'name' => $githubUser->name,
+            'email' => $githubUser->email,
+            'github_token' => $githubUser->token,
+            'github_refresh_token' => $githubUser->refreshToken,
+        ]
+    );
+
+    Auth::login($user);
+
+    return redirect('/dashboard');
+});
+```
+
+<Warning>
+  `updateOrCreate` を使う場合、`github_id` カラムが `users` テーブルに存在している必要があります。後述のマイグレーション例を参考にしてください。
+</Warning>
+
+---
+
+## ユーザー情報の取得
+
+`user()` メソッドが返すオブジェクトから、以下のプロパティ・メソッドでユーザー情報を取得できます。
+
+```php
+Route::get('/auth/github/callback', function () {
+    $user = Socialite::driver('github')->user();
+
+    // OAuth 2.0 プロバイダー
+    $token = $user->token;
+    $refreshToken = $user->refreshToken;
+    $expiresIn = $user->expiresIn;
+
+    // OAuth 1.0 プロバイダー (X など)
+    $token = $user->token;
+    $tokenSecret = $user->tokenSecret;
+
+    // 全プロバイダー共通
+    $user->getId();
+    $user->getNickname();
+    $user->getName();
+    $user->getEmail();
+    $user->getAvatar();
+});
+```
+
+### アクセストークンからユーザーを取得
+
+既存のアクセストークンからユーザー情報を取得する場合は `userFromToken()` を使います。
+
+```php
+$user = Socialite::driver('github')->userFromToken($token);
+```
+
+### ステートレスモード
+
+Cookie セッションを使わない API では `stateless()` メソッドでセッション状態の検証を無効化できます。
+
+```php
+return Socialite::driver('google')->stateless()->user();
+```
+
+---
+
+## データベース連携
+
+### マイグレーション
+
+`users` テーブルにソーシャルログイン用のカラムを追加します。
+
+```php
+// database/migrations/xxxx_xx_xx_add_github_columns_to_users_table.php
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('github_id')->nullable()->unique()->after('id');
+            $table->string('github_token')->nullable()->after('github_id');
+            $table->string('github_refresh_token')->nullable()->after('github_token');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn(['github_id', 'github_token', 'github_refresh_token']);
+        });
+    }
+};
+```
+
+### provider カラムで複数プロバイダーに対応
+
+複数のプロバイダーをまとめて管理する場合は `provider` / `provider_id` の2カラム構成が一般的です。
+
+```php
+Schema::table('users', function (Blueprint $table) {
+    $table->string('provider')->nullable()->after('id');
+    $table->string('provider_id')->nullable()->after('provider');
+    $table->string('provider_token')->nullable()->after('provider_id');
+
+    $table->unique(['provider', 'provider_id']);
+});
+```
+
+コールバック処理はプロバイダー名を動的に渡すようにします。
+
+```php
+Route::get('/auth/{provider}/callback', function (string $provider) {
+    $socialUser = Socialite::driver($provider)->user();
+
+    $user = User::updateOrCreate(
+        [
+            'provider' => $provider,
+            'provider_id' => $socialUser->getId(),
+        ],
+        [
+            'name' => $socialUser->getName(),
+            'email' => $socialUser->getEmail(),
+            'provider_token' => $socialUser->token,
+        ]
+    );
+
+    Auth::login($user);
+
+    return redirect('/dashboard');
+});
+```
+
+### 既存ユーザーとの紐付け
+
+同じメールアドレスを持つ既存ユーザーとアカウントを紐付ける場合は、メールアドレスで検索してからカラムを更新します。
+
+```php
+$socialUser = Socialite::driver('github')->user();
+
+$user = User::where('email', $socialUser->getEmail())->first();
+
+if ($user) {
+    // 既存ユーザーに GitHub 情報を紐付け
+    $user->update([
+        'github_id' => $socialUser->getId(),
+        'github_token' => $socialUser->token,
+    ]);
+} else {
+    // 新規ユーザーとして作成
+    $user = User::create([
+        'name' => $socialUser->getName(),
+        'email' => $socialUser->getEmail(),
+        'github_id' => $socialUser->getId(),
+        'github_token' => $socialUser->token,
+    ]);
+}
+
+Auth::login($user);
+```
+
+---
+
+## スコープとオプション
+
+### スコープの追加
+
+`scopes()` メソッドで追加のスコープを指定できます。
+
+```php
+return Socialite::driver('github')
+    ->scopes(['read:user', 'public_repo'])
+    ->redirect();
+```
+
+`setScopes()` メソッドを使うと、既存のスコープをすべて上書きします。
+
+```php
+return Socialite::driver('github')
+    ->setScopes(['read:user', 'public_repo'])
+    ->redirect();
+```
+
+### オプションパラメータ
+
+`with()` メソッドで追加パラメータをリダイレクトリクエストに含めます。
+
+```php
+// Google でホスト制限を指定
+return Socialite::driver('google')
+    ->with(['hd' => 'example.com'])
+    ->redirect();
+
+// Google で毎回同意画面を表示
+return Socialite::driver('google')
+    ->with(['prompt' => 'consent'])
+    ->redirect();
+```
+
+<Warning>
+  `with()` メソッドで `state` や `response_type` などの予約済みキーワードを渡さないように注意してください。
+</Warning>
+
+### Slack Bot トークン
+
+Slack Bot トークンを生成する場合は `asBotUser()` を使います。
+
+```php
+// リダイレクト時
+return Socialite::driver('slack')
+    ->asBotUser()
+    ->setScopes(['chat:write', 'chat:write.public', 'chat:write.customize'])
+    ->redirect();
+
+// コールバック時
+$user = Socialite::driver('slack')->asBotUser()->user();
+```
+
+---
+
+## テスト
+
+Socialite はテスト用のモック機能を提供しています。実際のプロバイダーへのリクエストなしに OAuth フローをテストできます。
+
+### リダイレクトのテスト
+
+```php
+use Laravel\Socialite\Facades\Socialite;
+
+test('ユーザーがGitHubにリダイレクトされる', function () {
+    Socialite::fake('github');
+
+    $response = $this->get('/auth/github');
+
+    $response->assertRedirect();
+});
+```
+
+### コールバックのテスト
+
+`fake()` メソッドにユーザーインスタンスを渡して、プロバイダーから返ってくるユーザー情報をモックします。
+
+```php
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User;
+
+test('GitHubでログインできる', function () {
+    Socialite::fake('github', (new User)->map([
+        'id' => 'github-123',
+        'name' => 'Jane Doe',
+        'email' => 'jane@example.com',
+    ]));
+
+    $response = $this->get('/auth/github/callback');
+
+    $response->assertRedirect('/dashboard');
+
+    $this->assertDatabaseHas('users', [
+        'name' => 'Jane Doe',
+        'email' => 'jane@example.com',
+        'github_id' => 'github-123',
+    ]);
+});
+```
+
+トークンなど追加のプロパティを設定することもできます。
+
+```php
+$fakeUser = (new User)->map([
+    'id' => 'github-123',
+    'name' => 'Jane Doe',
+    'email' => 'jane@example.com',
+])->setToken('fake-token')
+  ->setRefreshToken('fake-refresh-token')
+  ->setExpiresIn(3600)
+  ->setApprovedScopes(['read:user', 'public_repo']);
+```
+
+---
+
+## カスタムプロバイダーの作り方
+
+組み込みプロバイダー以外を使いたい場合、`Socialite::extend()` でカスタムドライバーを登録するのが公式の正規の方法です。`SocialiteManager` は `Illuminate\Support\Manager` を継承しているため、他の Laravel ドライバーシステムと同じ仕組みで拡張できます。
+
+<Info>
+  Manager パターンと `extend()` の仕組みについては [Manager クラスの解説](/jp/advanced/manager) も参照してください。
+</Info>
+
+### 1. プロバイダークラスを作成する
+
+`Laravel\Socialite\Two\AbstractProvider` を継承し、4つの抽象メソッドを実装します。
+
+```php
+// app/Socialite/ExampleProvider.php
+
+namespace App\Socialite;
+
+use Laravel\Socialite\Two\AbstractProvider;
+use Laravel\Socialite\Two\User;
+
+class ExampleProvider extends AbstractProvider
+{
+    // 認可 URL (ユーザーをリダイレクトする先)
+    public function getAuthUrl($state): string
+    {
+        return $this->buildAuthUrlFromBase('https://example.com/oauth/authorize', $state);
+    }
+
+    // アクセストークン取得 URL
+    protected function getTokenUrl(): string
+    {
+        return 'https://example.com/oauth/token';
+    }
+
+    // アクセストークンでユーザー情報を取得する
+    protected function getUserByToken($token): array
+    {
+        $response = $this->getHttpClient()->get('https://example.com/api/user', [
+            'headers' => ['Authorization' => 'Bearer '.$token],
+        ]);
+
+        return json_decode($response->getBody(), true);
+    }
+
+    // 取得した配列を Socialite の User オブジェクトにマッピング
+    protected function mapUserToObject(array $user): User
+    {
+        return (new User)->setRaw($user)->map([
+            'id'       => $user['id'],
+            'nickname' => $user['login'] ?? null,
+            'name'     => $user['name'],
+            'email'    => $user['email'],
+            'avatar'   => $user['avatar_url'] ?? null,
+        ]);
+    }
+}
+```
+
+実装が必要な4つのメソッドの役割は以下のとおりです。
+
+| メソッド | 役割 |
+| --- | --- |
+| `getAuthUrl($state)` | ユーザーをリダイレクトする OAuth 認可 URL を返す |
+| `getTokenUrl()` | 認可コードをアクセストークンに交換するエンドポイント |
+| `getUserByToken($token)` | アクセストークンを使ってユーザー情報 API を叩き、配列で返す |
+| `mapUserToObject(array $user)` | 取得した配列を Socialite の `User` オブジェクトに変換する |
+
+### 2. サービスプロバイダーで登録する
+
+`AppServiceProvider` の `boot()` メソッドで `Socialite::extend()` を使ってドライバーを登録します。
+
+```php
+// app/Providers/AppServiceProvider.php
+
+use App\Socialite\ExampleProvider;
+use Laravel\Socialite\Facades\Socialite;
+
+public function boot(): void
+{
+    Socialite::extend('example', function ($app) {
+        $config = $app['config']['services.example'];
+
+        return Socialite::buildProvider(ExampleProvider::class, $config);
+    });
+}
+```
+
+### 3. 設定を追加する
+
+```php
+// config/services.php
+'example' => [
+    'client_id'     => env('EXAMPLE_CLIENT_ID'),
+    'client_secret' => env('EXAMPLE_CLIENT_SECRET'),
+    'redirect'      => env('EXAMPLE_REDIRECT_URI'),
+],
+```
+
+### 4. 通常の Socialite と同じように使う
+
+登録後は組み込みプロバイダーとまったく同じ API で使えます。
+
+```php
+// リダイレクト
+Route::get('/auth/example', function () {
+    return Socialite::driver('example')->redirect();
+});
+
+// コールバック
+Route::get('/auth/example/callback', function () {
+    $user = Socialite::driver('example')->user();
+});
+```
+
+<Tip>
+  `extend()` を使って正規の方法で Socialite を拡張しているサードパーティパッケージを利用するのもおすすめです。そういったパッケージは `AppServiceProvider` 内で `Socialite::extend()` を呼ぶだけなので、動作が追いやすく安心して使えます。
+</Tip>
+
+---
+
+## 関連パッケージ
+
+当サイトのオーナーが公開している Socialite 拡張パッケージです。いずれも `Socialite::extend()` を使った正規の方法で実装されており、`config/services.php` に設定を追加するだけで使えます。
+
+<CardGroup cols={2}>
+  <Card title="LINE" icon="comment" href="https://github.com/invokable/laravel-line-sdk">
+    LINE SDK for Laravel。Socialite による OAuth ログインに加え、Messaging API も統合。
+  </Card>
+  <Card title="Bluesky" icon="cloud" href="https://github.com/invokable/laravel-bluesky">
+    AT Protocol (Bluesky) との連携。OAuth 認証とポスト送信をサポート。
+  </Card>
+  <Card title="Discord" icon="discord" href="https://github.com/invokable/socialite-discord">
+    Discord OAuth2 ログイン。
+  </Card>
+  <Card title="Threads" icon="instagram" href="https://github.com/invokable/laravel-threads">
+    Meta Threads との連携。OAuth 認証と投稿 API をサポート。
+  </Card>
+  <Card title="Amazon" icon="amazon" href="https://github.com/invokable/socialite-amazon">
+    Login with Amazon による OAuth ログイン。
+  </Card>
+  <Card title="Mastodon" icon="mastodon" href="https://github.com/invokable/socialite-mastodon">
+    Mastodon インスタンスへの OAuth ログイン。
+  </Card>
+  <Card title="WordPress" icon="wordpress" href="https://github.com/invokable/socialite-wordpress">
+    WordPress.com およびセルフホスト WordPress への OAuth ログイン。
+  </Card>
+</CardGroup>

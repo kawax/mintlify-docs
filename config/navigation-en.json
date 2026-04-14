@@ -41,7 +41,8 @@
           "group": "Authentication",
           "pages": [
             "en/authentication",
-            "en/starter-kits"
+            "en/starter-kits",
+            "en/socialite"
           ]
         },
         {

@@ -46,7 +46,8 @@
           "group": "認証",
           "pages": [
             "jp/authentication",
-            "jp/starter-kits"
+            "jp/starter-kits",
+            "jp/socialite"
           ]
         },
         {

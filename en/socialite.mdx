@@ -1,0 +1,572 @@
+---
+title: "Laravel Socialite (Social Authentication)"
+description: "Implement social login with OAuth 2.0 (GitHub, Google, Facebook, and more) using Laravel Socialite. This guide covers installation, configuration, the authentication flow, and database integration."
+---
+
+## What is Laravel Socialite?
+
+Laravel Socialite is an official package that makes it simple to implement social login via OAuth 2.0. It supports major providers such as GitHub, Google, Facebook, X (Twitter), LinkedIn, and more — turning what would otherwise be complex OAuth flows into just a few lines of code.
+
+The following providers are supported out of the box:
+
+| Provider | Key |
+| --- | --- |
+| Bitbucket | `bitbucket` |
+| Facebook | `facebook` |
+| GitHub | `github` |
+| GitLab | `gitlab` |
+| Google | `google` |
+| LinkedIn (OpenID) | `linkedin-openid` |
+| Slack | `slack` / `slack-openid` |
+| Spotify | `spotify` |
+| Twitch | `twitch` |
+| X (Twitter) | `x` |
+
+<Info>
+  Adapters for other platforms are available via the community-driven [Socialite Providers](https://socialiteproviders.com/) website.
+</Info>
+
+### Social login flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant App as Laravel App
+    participant OAuth as GitHub (OAuth)
+    participant DB as Database
+
+    User->>App: Click login button
+    App->>OAuth: Redirect (Socialite::driver('github')->redirect())
+    OAuth->>User: Authentication & permission screen
+    User->>OAuth: Approve
+    OAuth->>App: Callback (with code parameter)
+    App->>OAuth: Exchange code for access token
+    OAuth-->>App: Return user details
+    App->>DB: Register / update user (updateOrCreate)
+    DB-->>App: User record
+    App->>User: Login complete — redirect to dashboard
+```
+
+---
+
+## Installation
+
+Add the package via Composer:
+
+```shell
+composer require laravel/socialite
+```
+
+<Info>
+  When upgrading Socialite to a new major version, be sure to review the [upgrade guide](https://github.com/laravel/socialite/blob/master/UPGRADE.md).
+</Info>
+
+---
+
+## Configuration
+
+### config/services.php
+
+Add credentials for each provider to `config/services.php`:
+
+```php
+// config/services.php
+
+'github' => [
+    'client_id' => env('GITHUB_CLIENT_ID'),
+    'client_secret' => env('GITHUB_CLIENT_SECRET'),
+    'redirect' => env('GITHUB_REDIRECT_URI'),
+],
+
+'google' => [
+    'client_id' => env('GOOGLE_CLIENT_ID'),
+    'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+    'redirect' => env('GOOGLE_REDIRECT_URI'),
+],
+
+'facebook' => [
+    'client_id' => env('FACEBOOK_CLIENT_ID'),
+    'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+    'redirect' => env('FACEBOOK_REDIRECT_URI'),
+],
+```
+
+<Info>
+  If the `redirect` option contains a relative path, it will automatically be resolved to a fully qualified URL.
+</Info>
+
+### .env
+
+Manage your credentials via environment variables. Using GitHub as an example:
+
+```ini
+GITHUB_CLIENT_ID=your-client-id
+GITHUB_CLIENT_SECRET=your-client-secret
+GITHUB_REDIRECT_URI=https://example.com/auth/github/callback
+```
+
+For GitHub, create an OAuth App in [GitHub Developer Settings](https://github.com/settings/developers) to obtain your client ID and secret.
+
+---
+
+## Authentication Flow
+
+### Routing
+
+OAuth authentication requires two routes: one to redirect the user to the provider, and one to handle the callback.
+
+```php
+use Laravel\Socialite\Facades\Socialite;
+
+// Redirect the user to GitHub
+Route::get('/auth/github', function () {
+    return Socialite::driver('github')->redirect();
+});
+
+// Handle the GitHub callback
+Route::get('/auth/github/callback', function () {
+    $user = Socialite::driver('github')->user();
+
+    // $user->token contains the access token
+});
+```
+
+### Storing the user and logging in
+
+Retrieve the user in the callback route, persist them to the database, then log them in:
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Laravel\Socialite\Facades\Socialite;
+
+Route::get('/auth/github/callback', function () {
+    $githubUser = Socialite::driver('github')->user();
+
+    $user = User::updateOrCreate(
+        ['github_id' => $githubUser->id],
+        [
+            'name' => $githubUser->name,
+            'email' => $githubUser->email,
+            'github_token' => $githubUser->token,
+            'github_refresh_token' => $githubUser->refreshToken,
+        ]
+    );
+
+    Auth::login($user);
+
+    return redirect('/dashboard');
+});
+```
+
+<Warning>
+  When using `updateOrCreate`, the `github_id` column must exist in your `users` table. See the migration example below.
+</Warning>
+
+---
+
+## Retrieving User Details
+
+The object returned by `user()` exposes the following properties and methods:
+
+```php
+Route::get('/auth/github/callback', function () {
+    $user = Socialite::driver('github')->user();
+
+    // OAuth 2.0 providers
+    $token = $user->token;
+    $refreshToken = $user->refreshToken;
+    $expiresIn = $user->expiresIn;
+
+    // OAuth 1.0 providers (e.g. X)
+    $token = $user->token;
+    $tokenSecret = $user->tokenSecret;
+
+    // All providers
+    $user->getId();
+    $user->getNickname();
+    $user->getName();
+    $user->getEmail();
+    $user->getAvatar();
+});
+```
+
+### Retrieve a user from an existing token
+
+If you already have a valid access token, retrieve the user with `userFromToken()`:
+
+```php
+$user = Socialite::driver('github')->userFromToken($token);
+```
+
+### Stateless authentication
+
+For stateless APIs that do not use cookie-based sessions, disable session state verification with `stateless()`:
+
+```php
+return Socialite::driver('google')->stateless()->user();
+```
+
+---
+
+## Database Integration
+
+### Migration
+
+Add social login columns to the `users` table:
+
+```php
+// database/migrations/xxxx_xx_xx_add_github_columns_to_users_table.php
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('github_id')->nullable()->unique()->after('id');
+            $table->string('github_token')->nullable()->after('github_id');
+            $table->string('github_refresh_token')->nullable()->after('github_token');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn(['github_id', 'github_token', 'github_refresh_token']);
+        });
+    }
+};
+```
+
+### Supporting multiple providers with `provider` columns
+
+A common approach for handling multiple providers is to use `provider` and `provider_id` columns:
+
+```php
+Schema::table('users', function (Blueprint $table) {
+    $table->string('provider')->nullable()->after('id');
+    $table->string('provider_id')->nullable()->after('provider');
+    $table->string('provider_token')->nullable()->after('provider_id');
+
+    $table->unique(['provider', 'provider_id']);
+});
+```
+
+Handle callbacks dynamically by accepting the provider name as a route parameter:
+
+```php
+Route::get('/auth/{provider}/callback', function (string $provider) {
+    $socialUser = Socialite::driver($provider)->user();
+
+    $user = User::updateOrCreate(
+        [
+            'provider' => $provider,
+            'provider_id' => $socialUser->getId(),
+        ],
+        [
+            'name' => $socialUser->getName(),
+            'email' => $socialUser->getEmail(),
+            'provider_token' => $socialUser->token,
+        ]
+    );
+
+    Auth::login($user);
+
+    return redirect('/dashboard');
+});
+```
+
+### Linking to an existing account by email
+
+To link a social login to an existing account that shares the same email address:
+
+```php
+$socialUser = Socialite::driver('github')->user();
+
+$user = User::where('email', $socialUser->getEmail())->first();
+
+if ($user) {
+    // Link GitHub details to the existing user
+    $user->update([
+        'github_id' => $socialUser->getId(),
+        'github_token' => $socialUser->token,
+    ]);
+} else {
+    // Create a new user
+    $user = User::create([
+        'name' => $socialUser->getName(),
+        'email' => $socialUser->getEmail(),
+        'github_id' => $socialUser->getId(),
+        'github_token' => $socialUser->token,
+    ]);
+}
+
+Auth::login($user);
+```
+
+---
+
+## Scopes and Options
+
+### Adding scopes
+
+Use the `scopes()` method to append additional scopes to the authentication request:
+
+```php
+return Socialite::driver('github')
+    ->scopes(['read:user', 'public_repo'])
+    ->redirect();
+```
+
+Use `setScopes()` to replace all existing scopes:
+
+```php
+return Socialite::driver('github')
+    ->setScopes(['read:user', 'public_repo'])
+    ->redirect();
+```
+
+### Optional parameters
+
+Use the `with()` method to include additional parameters in the redirect request:
+
+```php
+// Restrict to a specific Google Workspace domain
+return Socialite::driver('google')
+    ->with(['hd' => 'example.com'])
+    ->redirect();
+
+// Always show the Google consent screen
+return Socialite::driver('google')
+    ->with(['prompt' => 'consent'])
+    ->redirect();
+```
+
+<Warning>
+  When using `with()`, be careful not to pass reserved keywords such as `state` or `response_type`.
+</Warning>
+
+### Slack bot tokens
+
+To generate a Slack bot token instead of a user token, use `asBotUser()`:
+
+```php
+// When redirecting
+return Socialite::driver('slack')
+    ->asBotUser()
+    ->setScopes(['chat:write', 'chat:write.public', 'chat:write.customize'])
+    ->redirect();
+
+// When handling the callback
+$user = Socialite::driver('slack')->asBotUser()->user();
+```
+
+---
+
+## Testing
+
+Socialite provides built-in support for mocking OAuth flows in tests — no real provider requests needed.
+
+### Faking the redirect
+
+```php
+use Laravel\Socialite\Facades\Socialite;
+
+test('user is redirected to GitHub', function () {
+    Socialite::fake('github');
+
+    $response = $this->get('/auth/github');
+
+    $response->assertRedirect();
+});
+```
+
+### Faking the callback
+
+Pass a `User` instance to `fake()` to mock the user data returned from the provider:
+
+```php
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User;
+
+test('user can log in with GitHub', function () {
+    Socialite::fake('github', (new User)->map([
+        'id' => 'github-123',
+        'name' => 'Jane Doe',
+        'email' => 'jane@example.com',
+    ]));
+
+    $response = $this->get('/auth/github/callback');
+
+    $response->assertRedirect('/dashboard');
+
+    $this->assertDatabaseHas('users', [
+        'name' => 'Jane Doe',
+        'email' => 'jane@example.com',
+        'github_id' => 'github-123',
+    ]);
+});
+```
+
+You can also set additional properties on the fake user:
+
+```php
+$fakeUser = (new User)->map([
+    'id' => 'github-123',
+    'name' => 'Jane Doe',
+    'email' => 'jane@example.com',
+])->setToken('fake-token')
+  ->setRefreshToken('fake-refresh-token')
+  ->setExpiresIn(3600)
+  ->setApprovedScopes(['read:user', 'public_repo']);
+```
+
+---
+
+## Creating a Custom Provider
+
+When you need a provider that isn't built in, registering a custom driver via `Socialite::extend()` is the official, recommended approach. Because `SocialiteManager` extends `Illuminate\Support\Manager`, the extension mechanism works exactly like any other Laravel driver system.
+
+<Info>
+  For a deeper look at the Manager pattern and how `extend()` works under the hood, see the [Manager class guide](/en/advanced/manager).
+</Info>
+
+### 1. Create the provider class
+
+Extend `Laravel\Socialite\Two\AbstractProvider` and implement the four abstract methods:
+
+```php
+// app/Socialite/ExampleProvider.php
+
+namespace App\Socialite;
+
+use Laravel\Socialite\Two\AbstractProvider;
+use Laravel\Socialite\Two\User;
+
+class ExampleProvider extends AbstractProvider
+{
+    // Authorization URL — where the user is redirected to log in
+    public function getAuthUrl($state): string
+    {
+        return $this->buildAuthUrlFromBase('https://example.com/oauth/authorize', $state);
+    }
+
+    // Token endpoint — exchanges the authorization code for an access token
+    protected function getTokenUrl(): string
+    {
+        return 'https://example.com/oauth/token';
+    }
+
+    // Fetch raw user data using the access token
+    protected function getUserByToken($token): array
+    {
+        $response = $this->getHttpClient()->get('https://example.com/api/user', [
+            'headers' => ['Authorization' => 'Bearer '.$token],
+        ]);
+
+        return json_decode($response->getBody(), true);
+    }
+
+    // Map the raw user array to a Socialite User object
+    protected function mapUserToObject(array $user): User
+    {
+        return (new User)->setRaw($user)->map([
+            'id'       => $user['id'],
+            'nickname' => $user['login'] ?? null,
+            'name'     => $user['name'],
+            'email'    => $user['email'],
+            'avatar'   => $user['avatar_url'] ?? null,
+        ]);
+    }
+}
+```
+
+Here is what each method does:
+
+| Method | Purpose |
+| --- | --- |
+| `getAuthUrl($state)` | Returns the OAuth authorization URL to redirect the user to |
+| `getTokenUrl()` | The endpoint that exchanges the authorization code for an access token |
+| `getUserByToken($token)` | Calls the provider's user API with the token and returns a raw array |
+| `mapUserToObject(array $user)` | Converts the raw array into a Socialite `User` instance |
+
+### 2. Register the driver in a service provider
+
+Call `Socialite::extend()` inside the `boot()` method of `AppServiceProvider`:
+
+```php
+// app/Providers/AppServiceProvider.php
+
+use App\Socialite\ExampleProvider;
+use Laravel\Socialite\Facades\Socialite;
+
+public function boot(): void
+{
+    Socialite::extend('example', function ($app) {
+        $config = $app['config']['services.example'];
+
+        return Socialite::buildProvider(ExampleProvider::class, $config);
+    });
+}
+```
+
+### 3. Add the configuration
+
+```php
+// config/services.php
+'example' => [
+    'client_id'     => env('EXAMPLE_CLIENT_ID'),
+    'client_secret' => env('EXAMPLE_CLIENT_SECRET'),
+    'redirect'      => env('EXAMPLE_REDIRECT_URI'),
+],
+```
+
+### 4. Use it like any built-in provider
+
+Once registered, the custom provider is available through the same Socialite API:
+
+```php
+// Redirect
+Route::get('/auth/example', function () {
+    return Socialite::driver('example')->redirect();
+});
+
+// Callback
+Route::get('/auth/example/callback', function () {
+    $user = Socialite::driver('example')->user();
+});
+```
+
+<Tip>
+  You can also use third-party packages that register their drivers via `Socialite::extend()` in a service provider. Packages that follow this pattern are easy to audit and behave predictably.
+</Tip>
+
+---
+
+## Related packages
+
+The following Socialite extension packages are maintained by the owner of this site. All of them use `Socialite::extend()` under the hood — adding credentials to `config/services.php` is all you need to get started.
+
+<CardGroup cols={2}>
+  <Card title="LINE" icon="comment" href="https://github.com/invokable/laravel-line-sdk">
+    LINE SDK for Laravel. Includes Socialite OAuth login and Messaging API integration.
+  </Card>
+  <Card title="Bluesky" icon="cloud" href="https://github.com/invokable/laravel-bluesky">
+    AT Protocol (Bluesky) integration. Supports OAuth authentication and posting.
+  </Card>
+  <Card title="Discord" icon="discord" href="https://github.com/invokable/socialite-discord">
+    Discord OAuth2 login.
+  </Card>
+  <Card title="Threads" icon="instagram" href="https://github.com/invokable/laravel-threads">
+    Meta Threads integration. Supports OAuth authentication and the Threads API.
+  </Card>
+  <Card title="Amazon" icon="amazon" href="https://github.com/invokable/socialite-amazon">
+    Login with Amazon OAuth authentication.
+  </Card>
+  <Card title="Mastodon" icon="mastodon" href="https://github.com/invokable/socialite-mastodon">
+    OAuth login for Mastodon instances.
+  </Card>
+  <Card title="WordPress" icon="wordpress" href="https://github.com/invokable/socialite-wordpress">
+    OAuth login for WordPress.com and self-hosted WordPress.
+  </Card>
+</CardGroup>
