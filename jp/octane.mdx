@@ -420,9 +420,22 @@ OCTANE_HTTPS=true
 
 ### Laravel Cloud との連携
 
-<Info>
-  [Laravel Cloud](https://cloud.laravel.com) は FrankenPHP を使った Octane をフルマネージドでサポートしています。サーバー設定や Supervisor の管理が不要で、すぐに Octane の恩恵を受けられます。
-</Info>
+[Laravel Cloud](https://cloud.laravel.com) では FrankenPHP を使った Octane をフルマネージドでサポートしています。Nginx や Supervisor の設定は不要で、たった 2 ステップで Octane を有効化できます。
+
+<Steps>
+  <Step title="パッケージのインストール">
+    Octane をインストールします。`octane:install` コマンドは実行してもかまいませんが必須ではありません。
+
+    ```bash
+    composer require laravel/octane
+    ```
+  </Step>
+  <Step title="Laravel Cloud で Octane を有効化">
+    環境の App コンピュートクラスタの設定を開き、**「Use Octane as runtime」** をオンにして保存・デプロイします。Laravel Cloud が自動的に FrankenPHP + Octane でアプリケーションをビルド・起動します。
+  </Step>
+</Steps>
+
+詳細は [Laravel Cloud のドキュメント](https://cloud.laravel.com/docs/compute#laravel-octane) を参照してください。
 
 ### デプロイ後のワーカーリロード
 
