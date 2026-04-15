@@ -47,6 +47,7 @@
           "pages": [
             "jp/authentication",
             "jp/starter-kits",
+            "jp/passwords",
             "jp/socialite"
           ]
         },
