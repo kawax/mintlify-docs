@@ -1,7 +1,7 @@
 # Steering
 
 このファイルは人間が編集し、「今後はこういうページを増やす」や「このページが間違ってるので修正」の細かい指示を出すためのものです。
-対応が終わったら`[x]`で完了にしてください。
+対応が終わったら`[x]`で完了。
 
 - [x] チュートリアルを複数ページ構成で作成していく。
 - [x] Laravelの現在のバージョンは13。初回の実行から12と誤認。毎年3月頃にバージョンアップするのでモデルの知識だけではどうしても遅れてしまう。copilot-instructions.md にGitHub MCPで調べる方法を書いた。影響は`jp/tutorial/installation.mdx`で`PHP 8.2以上`と書いてたくらいなので8.3に修正した。他は将来的な既存ページの更新時に対応。
@@ -25,6 +25,12 @@
 - [x] blogにMac用の「HomebrewでPHPとcomposerとnode.jsをインストールする方法」とWindows用の「WSLでPHPとcomposerとnode.jsをインストールする方法」のページを追加。node.jsは今のCLIでのAIエージェント環境を想定してnvmを使う（rootでのインストールはたまに困ることがある）。
 - [x] 既存ページにMermaidによる図解を追加。数ページずつ追加してるので継続。→細かいページまで追加するようになってきたので十分。今後は既存ページの改修時に必要に応じて追加していく。
 - [x] advanced デザインパターングループに`Illuminate\Support\Manager`の解説ページ。Laravel4.0の頃からあるLaravelのドライバーシステムを支えるクラス、だけどフレームワーク内部では〇〇Managerの名前だけど`Illuminate\Support\Manager`は使ってないことが徐々に増えた。CacheManagerやQueueManagerは使ってない、SessionManagerやSocialiteは使っている。継承して使ってなくても`extend()`で拡張などの基本機能は同じなのでフレームワーク内部動作の理解には大事。`Illuminate\Support\MultipleInstanceManager`はLaravel10で追加されたけど情報が少ない。自作パッケージで複数のドライバーに対応したい時に使える。
+- マイパッケージの解説ページ。今のところは計画だけなので下のblog ページ案に追加するまでは対応不要。
+- [ ] Laravelを使い始める前に必要な知識をまとめた真チュートリアルページ。`true-tutorial.mdx`。公式ドキュメントはあくまでLaravelのドキュメントなので「Laravelを使うならここまでの知識は当然持ってるだろう」という前提で書かれている。Laravelのドキュメントだけ読んでも膨大な前提知識が抜けてる状態になる。細かく解説はせずざっくりこの辺りの知識が必要という紹介にする。
+ - PHPの基礎。半端にPHPの知識があってもLaravelを使う際には逆に邪魔になることもあるけど必須。一番大事なのはPHPのバージョンアップ情報まで追うこと。Laravelは遠慮なく旧バージョンを切っていくし本番環境では常に最新バージョンが前提。ベテラン勢は [RFC](https://wiki.php.net/rfc) まで追っている。
+ - フロントエンドの知識。現代のWeb開発ではフロントも必須。Laravelを「バックエンドのフレームワーク」としか認識してない人が一番躓くポイント。「LaravelはAPIだけ、フロントは別チームで分業」なんて体制は世間で思われてるほどLaravelでは主流ではない。フロントエンドが発達した2010年頃からの歴史を知らないと分かりにくいけど今から追うのは難しい。
+ - PHPフレームワークの歴史的経緯。「他のフレームワークの流儀をLaravelに持ち込んで同じ使い方する」は一番最悪な事態になるので絶対にやってはいけないこと。他のフレームワークの経験がある人は一旦全部忘れてLaravelの使い方を覚え直す必要がある。
+ - インフラの知識。Laravel Cloudなどがあるとはいえ、VPSやAWS EC2で手動で本番ウェブサーバーの構築ができるくらいの知識は必要。ベテラン勢は最初から便利なサービスを使ってるわけではなく手動で構築してきた経験の上で無駄な手間を減らすためにサービスを使っている。
 
 ## 継続対応
 
@@ -52,4 +58,4 @@
 - [x] Maestro https://github.com/laravel/maestro スターターキット開発のオーケストレーター。一番新しく公開された。ユーザー向けパッケージではない。
 - [x] https://github.com/laravel/agent-skills AI用のエージェントスキル。最初はClaude Code用のスキルを置いてるリポジトリだったけどリポジトリ名を変えてリニューアル。「Laravel公式のmarketplace」としてこれから整備されていくんだろう。
 - [x] Wayfinder https://github.com/laravel/wayfinder v0.1だけど既にInertiaを使うスターターキットでは導入されている。元々使っていたZiggyからの置き換え。mainブランチが0.1、nextブランチの次期バージョンで色々変わることも確定しているので0.1でページを作ってもすぐに古くなってしまう。
-- [x] https://github.com/laravel/roster https://github.com/laravel/ranger https://github.com/laravel/surveyor https://github.com/laravel/sentinel この辺りになるとほとんど分からなくなる。rosterはboostで使われている。→sentinel以外は完了。sentinelはファイル数も少なく調査しても分からないので後で再調査。
+- [x] https://github.com/laravel/roster https://github.com/laravel/ranger https://github.com/laravel/surveyor https://github.com/laravel/sentinel この辺りになるとほとんど分からなくなる。rosterはboostで使われている。
