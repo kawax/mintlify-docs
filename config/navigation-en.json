@@ -186,6 +186,12 @@
             "en/broadcasting",
             "en/reverb"
           ]
+        },
+        {
+          "group": "Performance",
+          "pages": [
+            "en/octane"
+          ]
         }
       ]
     },
