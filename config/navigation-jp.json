@@ -189,6 +189,12 @@
           ]
         },
         {
+          "group": "パフォーマンス",
+          "pages": [
+            "jp/octane"
+          ]
+        },
+        {
           "group": "フロントエンド",
           "pages": [
             "jp/vite"
