@@ -199,7 +199,8 @@
         {
           "group": "フロントエンド",
           "pages": [
-            "jp/vite"
+            "jp/vite",
+            "jp/folio"
           ]
         },
         {
