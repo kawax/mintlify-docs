@@ -1,0 +1,114 @@
+---
+title: "Laravel Cloud — Laravel専用PaaSの全貌"
+description: "2025年に登場したLaravel Cloud。Forgeとの違い、得意なこと・苦手なこと、実際に使うメリットを解説する。"
+---
+
+## Laravel Cloudとは
+
+[Laravel Cloud](https://cloud.laravel.com/docs/intro) は、Laravel公式の**フルマネージドPaaS**です。  
+アプリのデプロイ、スケーリング、データベース、キャッシュ、WebSocket基盤まで、Laravel向けに統合されています。
+
+Cloudの[Changelog](https://cloud.laravel.com/docs/changelog)では、`February 24, 2025` に **Launched Laravel Cloud!** と記録されています。2025年に一般提供が始まった比較的新しいサービスです。
+
+---
+
+## Forgeとの違い
+
+Laravel CloudとLaravel Forgeは、どちらもLaravel開発者向けですが、レイヤーが違います。
+
+| 観点 | Laravel Cloud | Laravel Forge |
+|---|---|---|
+| 立ち位置 | フルマネージドPaaS | サーバー管理ツール |
+| 主な操作 | 環境・リソースを選んでデプロイ | VPS / EC2 などをプロビジョニングして運用 |
+| インフラ管理 | 最小限（Cloud側が管理） | OS・ミドルウェア運用の責任はユーザー側 |
+| root権限 | なし（OSレベルの直接操作は想定しない） | あり（サーバー運用を柔軟に制御可能） |
+
+「インフラを意識せずLaravelアプリを早く出す」ならCloud、  
+「サーバーを細かく制御したい」ならForgeが向いています。
+
+---
+
+## Laravel Cloudが得意なこと
+
+Laravel Cloudは、Laravelの実運用で使う機能をダッシュボード中心で有効化しやすい点が強みです。
+
+### Task Scheduler
+
+[Scheduled Tasks](https://cloud.laravel.com/docs/scheduled-tasks) で、AppクラスタまたはWorkerクラスタに **Scheduler** を有効化するだけで `schedule:run` が毎分実行されます。
+
+### バックグラウンドプロセス（Queue Worker）
+
+[Queues](https://cloud.laravel.com/docs/queues) にある通り、Cloudでは `queue:work` やカスタムワーカーをクラスタ設定から管理できます。デプロイ時の再起動管理もCloud側で扱われます。
+
+### Laravel Octane
+
+[Compute](https://cloud.laravel.com/docs/compute#laravel-octane) の **Use Octane as runtime** を有効化すると、CloudがOctane + FrankenPHP構成で実行します。サーバー設定を手で組み立てる必要がありません。
+
+### Inertia SSR
+
+[Compute](https://cloud.laravel.com/docs/compute#inertia-ssr) の **Use Inertia SSR** を有効化して使えます。スターターキットを使う場合は `npm run build:ssr` が推奨されています。
+
+### WebSocketサーバー（Reverb）
+
+[Laravel Cloud WebSockets](https://cloud.laravel.com/docs/resources/websockets) で、ReverbベースのWebSocketクラスタを作成できます。環境にアタッチすると `REVERB_*` と `VITE_REVERB_*` が自動注入されます。
+
+### Laravel Nightwatch連携
+
+[Environments](https://cloud.laravel.com/docs/environments#nightwatch-integration) にはワンクリック連携があり、Cloudの[Changelog](https://cloud.laravel.com/docs/changelog)でも `July 1, 2025` に **One-Click Nightwatch Integration** が記録されています。  
+手動構成が必要な場合も [nightwatch-on-cloud](https://cloud.laravel.com/docs/knowledge-base/nightwatch-on-cloud) に手順があります。
+
+---
+
+## 料金と無料プラン
+
+Laravel Cloudの料金は、基本的に**プラン料金 + 使用量課金**です。  
+詳細は常に [Pricing](https://cloud.laravel.com/docs/pricing) を確認してください。
+
+- **Starter**: 月額ベース料金 `$0`（Pay per usage）
+- **Growth**: `$20/mo + usage`
+- **Business**: `$200/mo + usage`
+
+また、[Free trial](https://cloud.laravel.com/docs/free-trial) では**クレジットカード不要で \$5 クレジット**が提供され、実際のインフラで試せます。
+
+---
+
+## 実際に使う際の注意点
+
+### root権限前提の運用はできない
+
+CloudはPaaSなので、OSレベルの自由度より運用の簡便さを優先します。  
+カーネル設定や独自デーモンの常駐など、root権限前提の作業が必要ならForgeなどの選択肢を検討します。
+
+### Nightwatchのイベント量は最初に制御する
+
+無料枠や小規模構成でNightwatchを使う場合、イベント量が増えやすいため最初にサンプリング調整を入れるのが安全です。
+
+```ini
+NIGHTWATCH_REQUEST_SAMPLE_RATE=0.1
+NIGHTWATCH_IGNORE_QUERIES=true
+```
+
+---
+
+## 向いているプロジェクト・向いていないプロジェクト
+
+### 向いている
+
+- Laravelアプリを最短で本番投入したい
+- Scheduler / Queue / Octane / Inertia SSR / Reverb をまとめて運用したい
+- アプリ開発に集中し、サーバー運用コストを下げたい
+
+### 向いていない
+
+- root権限でOSレベルまで強くチューニングしたい
+- 既存の特殊インフラ要件（独自ミドルウェアや特殊ネットワーク制約）が強い
+
+---
+
+## まとめ
+
+Laravel Cloudは「Laravelの高度な機能を、インフラ構築の負担を下げて運用したい」チームに強く向いています。  
+特に Scheduler / Queue / Octane / Inertia SSR / Reverb / Nightwatch を組み合わせるプロジェクトでは、立ち上げと運用の初速が大きく上がります。
+
+一方で、root権限が必要な運用を前提にする場合はForgeのほうが適しています。  
+まずは無料トライアルで実際のワークロードを流し、運用要件に合うかを確認するのが確実です。
