@@ -22,6 +22,7 @@ php artisan folio:install
 
 `folio:install` はFolioのサービスプロバイダーを登録します。
 デフォルトでは `resources/views/pages/` がページディレクトリになります。
+複数のページディレクトリやベースURIを使い分ける場合は、サービスプロバイダーの `boot` で `Folio::path()` と `uri()` を設定します。
 
 ```php
 use Laravel\Folio\Folio;
@@ -133,6 +134,8 @@ middleware(['auth', 'verified']);
 複数ページへ一括適用する場合は、`Folio::path(...)->middleware()` を使います。
 
 ```php
+<?php
+
 use Laravel\Folio\Folio;
 
 Folio::path(resource_path('views/pages'))->middleware([
@@ -151,6 +154,10 @@ use function Laravel\Folio\name;
 
 name('users.index');
 ```
+
+<Info>
+  `users/[User].blade.php` のような個別ページ側で `name('users.show')` を定義すると、パラメーター付きURLを `route('users.show', ['user' => $user])` で生成できます。
+</Info>
 
 付与したルート名は `route()` ヘルパーでURL生成できます。
 
