@@ -7,6 +7,7 @@
           "group": "はじめに",
           "pages": [
             "jp/introduction",
+            "jp/true-tutorial",
             "jp/installation",
             "jp/directory-structure",
             "jp/configuration"
