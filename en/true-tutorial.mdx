@@ -1,0 +1,48 @@
+---
+title: "Knowledge you need before starting Laravel"
+description: "Understand the four prerequisite areas for learning Laravel, and identify what to study first."
+---
+
+Laravel's official documentation is designed to teach Laravel itself.  
+This page briefly organizes what you should understand first before diving into Laravel.
+
+<Info>
+  This page is not a deep dive. If you find weak areas, study them first and return to Laravel once you are ready.
+</Info>
+
+## PHP basics
+
+If you want to use Laravel, PHP fundamentals are required.
+If you only rely on an old procedural mindset, you will likely struggle with concepts like the service container and Eloquent.  
+What matters most is continuously tracking PHP version updates.
+Laravel actively drops support for older PHP versions.  
+In practice, you should be able to read PHP 8.x features naturally, including named arguments, `match`, attributes, and fibers.
+Laravel 13 requires PHP 8.3 or later.
+Experienced developers even follow PHP RFCs.
+
+## Frontend knowledge
+
+In modern web development, frontend knowledge is essential even when using Laravel.
+The setup where "Laravel handles only APIs and the UI is fully owned by another team" is not the default Laravel development model.  
+Your architecture and implementation change depending on whether you choose Blade (server-rendered), Livewire (reactive UI with minimal JavaScript), or Inertia + React/Vue (SPA-like experience).  
+It also helps to understand the historical shift from jQuery-centric apps to SPAs, and then to SSR/hybrid approaches.
+You should learn the basics of npm and Vite early.
+
+## PHP framework history
+
+If you bring another framework's conventions directly into Laravel, your learning speed drops significantly.  
+The more experience you have with frameworks like CodeIgniter or Symfony, the more important it is to "reset" and learn Laravel on Laravel's terms.  
+Laravel uses Symfony components, but it designs the developer experience around its own philosophy, including facades and Eloquent.
+Its rapid adoption after 2011 came from this consistent philosophy and high productivity.
+
+## Infrastructure knowledge
+
+Even with convenient platforms like Laravel Cloud, you still need infrastructure fundamentals.  
+If you understand how to provision environments manually on VPS or AWS EC2, troubleshooting is much faster.  
+You should not skip the basics of Nginx/Apache, PHP-FPM, MySQL or PostgreSQL, environment variables and `.env` management, and Docker basics.
+Even when you use Laravel Sail, operations are more stable when you understand what runs under the hood.
+
+<Tip>
+  Start by strengthening whichever of these four areas you feel least confident in.
+  The stronger your prerequisites, the faster and deeper you can understand the official Laravel documentation.
+</Tip>
