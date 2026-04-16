@@ -3,8 +3,8 @@ description: Daily commander that reviews the documentation project, decides wha
 on:
   workflow_dispatch:
   schedule: 
-    - cron: daily around 4:00 utc+9
-    - cron: daily around 16:00 utc+9
+    - cron: daily around 5:00 utc+9
+    - cron: daily around 17:00 utc+9
 
 engine:
   id: copilot
