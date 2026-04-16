@@ -34,12 +34,14 @@ npm install laravel-precognition-alpine
 
 <Info>
   Inertiaは2.3以降でPrecognitionサポートが組み込みです。Inertia 3でもそのまま利用できます。
+  Inertiaフォームを使う場合は、通常 `laravel-precognition-vue` / `laravel-precognition-react` の追加導入は不要です。
 </Info>
 
 ## バックエンド設定
 
 ルートに `HandlePrecognitiveRequests` ミドルウェアを追加します。
 バリデーションルールはフォームリクエストに集約するのが実践的です。
+フォームリクエストにまとめると、ルールの再利用と責務分離がしやすくなります。
 
 ```php
 use App\Http\Requests\StoreUserRequest;
@@ -173,6 +175,8 @@ const submit = () => form.submit()
 
 ## 通常リクエストとPrecognitionリクエストの比較
 
+以下の図は、通常リクエストとPrecognitionリクエストの処理の違いを示しています。
+
 ```mermaid
 sequenceDiagram
     participant User as ユーザー
@@ -181,7 +185,7 @@ sequenceDiagram
 
     User->>Frontend: フォーム入力
     Frontend->>Server: Precognitionリクエスト(Precognition: trueヘッダー)
-    Server->>Server: バリデーション実行(DBや副作用なし)
+    Server->>Server: バリデーション実行(コントローラーロジック未実行)
     Server-->>Frontend: バリデーション結果
     Frontend-->>User: リアルタイムエラー表示
     User->>Frontend: フォーム送信
