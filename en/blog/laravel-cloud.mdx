@@ -1,0 +1,116 @@
+---
+title: "Laravel Cloud — A practical guide to Laravel's dedicated PaaS"
+description: "Understand what Laravel Cloud is, how it differs from Forge, where it excels, and what limitations to consider before adopting it in production."
+---
+
+## What is Laravel Cloud
+
+[Laravel Cloud](https://cloud.laravel.com/docs/intro) is Laravel's official **fully managed PaaS**.  
+It integrates deployment, scaling, databases, cache, and WebSocket infrastructure for Laravel applications.
+
+The Cloud [changelog](https://cloud.laravel.com/docs/changelog) records **Launched Laravel Cloud!** on `February 24, 2025`, so it is a relatively new GA service.
+
+---
+
+## How it differs from Forge
+
+Laravel Cloud and Laravel Forge both target Laravel developers, but they solve different layers of operations.
+
+| Perspective | Laravel Cloud | Laravel Forge |
+|---|---|---|
+| Positioning | Fully managed PaaS | Server management tool |
+| Primary workflow | Choose environment/resources and deploy | Provision and manage VPS / EC2 and operate servers |
+| Infrastructure responsibility | Minimal (managed by Cloud) | OS and middleware operations are your responsibility |
+| Root access | Not provided | Provided |
+
+Choose Cloud when you want to ship Laravel apps fast without managing infrastructure internals.  
+Choose Forge when you need detailed server-level control.
+
+---
+
+## Where Laravel Cloud is strong
+
+Laravel Cloud makes common Laravel production features easy to enable from the dashboard.
+
+### Task scheduler
+
+With [Scheduled Tasks](https://cloud.laravel.com/docs/scheduled-tasks), enabling **Scheduler** on an app or worker cluster runs `schedule:run` every minute.
+
+### Background workers (queues)
+
+As documented in [Queues](https://cloud.laravel.com/docs/queues), Cloud lets you manage `queue:work` and custom workers from cluster settings, including restart behavior during deploys.
+
+### Laravel Octane
+
+In [Compute](https://cloud.laravel.com/docs/compute#laravel-octane), enabling **Use Octane as runtime** runs your app with Octane + FrankenPHP without manual server setup.
+
+### Inertia SSR
+
+In [Compute](https://cloud.laravel.com/docs/compute#inertia-ssr), enabling **Use Inertia SSR** makes SSR setup straightforward.  
+When using starter kits, `npm run build:ssr` is recommended.
+
+### WebSockets (Reverb)
+
+With [Laravel Cloud WebSockets](https://cloud.laravel.com/docs/resources/websockets), you can create a Reverb-based WebSocket cluster.  
+After attaching it to an environment, `REVERB_*` and `VITE_REVERB_*` variables are injected automatically.
+
+### Laravel Nightwatch integration
+
+[Environments](https://cloud.laravel.com/docs/environments#nightwatch-integration) provides one-click integration, and the Cloud [changelog](https://cloud.laravel.com/docs/changelog) records **One-Click Nightwatch Integration** on `July 1, 2025`.  
+If you need manual setup, see [nightwatch-on-cloud](https://cloud.laravel.com/docs/knowledge-base/nightwatch-on-cloud).
+
+---
+
+## Pricing and free trial
+
+Laravel Cloud pricing is generally **plan fee + usage**.  
+Always verify current details in [Pricing](https://cloud.laravel.com/docs/pricing).
+
+- **Starter**: `$0` base (pay-per-usage)
+- **Growth**: `$20/mo + usage`
+- **Business**: `$200/mo + usage`
+
+[Free trial](https://cloud.laravel.com/docs/free-trial) includes **$5 in credits with no credit card required**, so you can test on real infrastructure.
+
+---
+
+## Important limitations
+
+### No root-level server operations
+
+Because Cloud is a PaaS, it prioritizes operational simplicity over OS-level control.  
+If your workload requires kernel tuning, custom daemons, or other root-based operations, Forge or another server-centric option is usually a better fit.
+
+### Control Nightwatch event volume early
+
+If you use Nightwatch on smaller plans, event volume can grow quickly. Start with sampling and filtering settings.
+
+```ini
+NIGHTWATCH_REQUEST_SAMPLE_RATE=0.1
+NIGHTWATCH_IGNORE_QUERIES=true
+```
+
+---
+
+## Good fit vs. poor fit
+
+### Good fit
+
+- You want to launch Laravel apps quickly.
+- You want to operate Scheduler / Queue / Octane / Inertia SSR / Reverb together.
+- You want to reduce infrastructure operations overhead and focus on application delivery.
+
+### Poor fit
+
+- You need heavy OS-level tuning with root access.
+- You have strict custom infrastructure constraints (special middleware, network restrictions, or similar).
+
+---
+
+## Summary
+
+Laravel Cloud is a strong option when your team wants to run advanced Laravel workloads with less infrastructure burden.  
+It is especially effective when your project combines Scheduler, Queue workers, Octane, Inertia SSR, Reverb, and Nightwatch.
+
+If root-level control is a hard requirement, Forge remains the better option.  
+The safest path is to validate your actual workload with the free trial and decide based on operational requirements.
