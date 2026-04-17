@@ -284,6 +284,13 @@
           ]
         },
         {
+          "group": "Products",
+          "pages": [
+            "en/blog/laravel-cloud",
+            "en/blog/nightwatch-introduction"
+          ]
+        },
+        {
           "group": "Package Introduction",
           "pages": [
             "en/blog/livewire-introduction",
@@ -291,9 +298,7 @@
             "en/blog/pest-introduction",
             "en/blog/laravel-pennant",
             "en/blog/telescope-introduction",
-            "en/blog/wayfinder-introduction",
-            "en/blog/nightwatch-introduction",
-            "en/blog/laravel-cloud"
+            "en/blog/wayfinder-introduction"
           ]
         },
         {

@@ -299,6 +299,13 @@
           ]
         },
         {
+          "group": "プロダクト",
+          "pages": [
+            "jp/blog/laravel-cloud",
+            "jp/blog/nightwatch-introduction"
+          ]
+        },
+        {
           "group": "パッケージ紹介",
           "pages": [
             "jp/blog/livewire-introduction",
@@ -306,9 +313,7 @@
             "jp/blog/pest-introduction",
             "jp/blog/laravel-pennant",
             "jp/blog/telescope-introduction",
-            "jp/blog/wayfinder-introduction",
-            "jp/blog/nightwatch-introduction",
-            "jp/blog/laravel-cloud"
+            "jp/blog/wayfinder-introduction"
           ]
         },
         {
