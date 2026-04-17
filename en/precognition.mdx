@@ -33,7 +33,7 @@ npm install laravel-precognition-alpine
 ```
 
 <Info>
-  As of Inertia 2.3, Precognition support is built in. This works in Inertia 3 as well. When you use Inertia forms, you usually do not need to add `laravel-precognition-vue` or `laravel-precognition-react`.
+  Current Inertia versions include built-in Precognition support. When you use Inertia forms, you usually do not need to add `laravel-precognition-vue` or `laravel-precognition-react`.
 </Info>
 
 ## Backend setup
@@ -180,7 +180,7 @@ const submit = () => form.submit()
 
 ## Compare normal and precognitive requests
 
-The diagram below shows the difference between a normal submit flow and a precognitive validation flow.
+The diagram below shows the difference between a normal submission flow and a precognitive validation flow.
 
 ```mermaid
 sequenceDiagram
@@ -189,7 +189,7 @@ sequenceDiagram
     participant Server as Laravel server
 
     User->>Frontend: Type in form
-    Frontend->>Server: Precognition request<br>(Precognition: true header)
+    Frontend->>Server: Precognition request<br>with precognitive request header
     Server->>Server: Run validation only<br>(skip controller action)
     Server-->>Frontend: Validation result
     Frontend-->>User: Show real-time errors
