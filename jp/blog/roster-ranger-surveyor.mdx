@@ -16,7 +16,9 @@ description: "Laravel公式の新規公開リポジトリ `roster`・`ranger`・
 ```mermaid
 graph LR
     A["laravel/surveyor<br>静的解析エンジン"] --> B["laravel/ranger<br>アプリイントロスペクション"]
-    C["laravel/roster<br>依存パッケージ検出"] --> D["laravel/boost などのツール"]
+    B --> D["ドキュメント生成や解析ツール"]
+    C["laravel/roster<br>依存パッケージ検出"] --> D
+    C --> E["laravel/boost"]
 ```
 
 ## laravel/roster
@@ -27,7 +29,10 @@ graph LR
 use Laravel\Roster\Roster;
 use Laravel\Roster\Packages;
 
-$roster = Roster::scan(base_path());
+$roster = Roster::scan('/path/to/project');
+
+$packages = $roster->packages();
+$packageManager = $roster->nodePackageManager();
 
 $roster->uses(Packages::INERTIA);
 $roster->usesVersion(Packages::LIVEWIRE, '4.0.0', '>=');
@@ -44,9 +49,11 @@ use Laravel\Ranger\Ranger;
 use Laravel\Ranger\Components;
 
 $ranger = app(Ranger::class);
+$routes = [];
+$modelAttributes = [];
 
-$ranger->onRoute(fn (Components\Route $route) => dump($route->uri()));
-$ranger->onModel(fn (Components\Model $model) => dump($model->getAttributes()));
+$ranger->onRoute(fn (Components\Route $route) => $routes[] = $route->uri());
+$ranger->onModel(fn (Components\Model $model) => $modelAttributes[] = $model->getAttributes());
 
 $ranger->walk();
 ```
