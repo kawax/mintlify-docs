@@ -65,6 +65,9 @@ php artisan passport:keys
 Add the `HasApiTokens` trait and `OAuthenticatable` interface to your `User` model.
 
 ```php
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Laravel\Passport\HasApiTokens;
 

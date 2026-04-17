@@ -65,6 +65,9 @@ php artisan passport:keys
 `User` モデルに `HasApiTokens` トレイトと `OAuthenticatable` インターフェースを追加します。
 
 ```php
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Laravel\Passport\HasApiTokens;
 
