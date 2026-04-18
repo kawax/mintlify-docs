@@ -1,0 +1,305 @@
+---
+title: "Amazon Bedrock driver for Laravel AI SDK"
+description: "Laravel AI SDK 用の Amazon Bedrock ドライバー。テキスト生成、ストリーミング、ツール使用、構造化出力、埋め込み、画像生成、音声、文字起こし、リランキングをサポートします。"
+---
+
+## 概要
+
+`revolution/laravel-amazon-bedrock` は、[Laravel AI SDK](https://laravel.com/docs/13.x/ai-sdk) で Amazon Bedrock を使うためのドライバーです。Bedrock の複数モデルを Laravel AI SDK の統一 API で扱えます。
+
+README で公開されている主な対応機能は次のとおりです。
+
+| 機能 | Bedrock API キー | 対応モデル / サービス |
+| --- | --- | --- |
+| テキスト生成 / ストリーミング | ✅ | Anthropic Claude, Amazon Nova, Meta Llama, Mistral, Cohere Command R, DeepSeek, AI21 Jamba |
+| ツール使用（Function Calling） | ✅ | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R |
+| 構造化出力 | ✅ | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R |
+| 画像生成 | ✅ | Amazon Nova Canvas（既定）, Stability AI |
+| 音声（TTS） | ❌ | Amazon Polly |
+| 文字起こし（STT） | ❌ | Amazon Nova 2 Lite（Converse API AudioBlock） |
+| 埋め込み | ✅ | Amazon Titan Embeddings V2（既定）, Cohere Embed V3 / V4 |
+| リランキング | ❌ | Cohere Rerank 3.5, Amazon Rerank 1.0 |
+
+<Info>
+  認証方式は 3 つです。Bedrock API キー、AWS IAM クレデンシャル（SigV4）、デフォルト AWS クレデンシャルチェーン（IAM ロール等）を選べます。
+</Info>
+
+## インストール
+
+<Steps>
+  <Step title="パッケージをインストールする">
+    ```bash
+    composer require revolution/laravel-amazon-bedrock
+    ```
+  </Step>
+  <Step title="AI SDK の設定を公開する">
+    ```bash
+    php artisan vendor:publish --provider="Laravel\Ai\AiServiceProvider"
+    ```
+  </Step>
+</Steps>
+
+## 設定
+
+`config/ai.php` に `bedrock` プロバイダーを追加します。必要に応じて既定プロバイダーも Bedrock に切り替えます。
+
+```php
+'default' => 'bedrock',
+'default_for_images' => 'bedrock',
+'default_for_audio' => 'bedrock',
+'default_for_embeddings' => 'bedrock',
+'default_for_reranking' => 'bedrock',
+'default_for_transcription' => 'bedrock',
+```
+
+### Option 1: Bedrock API キー
+
+```php
+'providers' => [
+    'bedrock' => [
+        'driver' => 'bedrock',
+        'key' => env('AWS_BEDROCK_API_KEY', ''),
+        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    ],
+],
+```
+
+```dotenv
+AWS_BEDROCK_API_KEY=your_api_key
+AWS_DEFAULT_REGION=us-east-1
+```
+
+<Warning>
+  Bedrock API キーは Bedrock Runtime API 専用です。`bedrock-agent-runtime` を使うリランキングや Amazon Polly（TTS）では使えません。これらは SigV4 またはデフォルト AWS クレデンシャルチェーンを使ってください。
+</Warning>
+
+### Option 2: AWS IAM クレデンシャル（SigV4）
+
+```php
+'providers' => [
+    'bedrock' => [
+        'driver' => 'bedrock',
+        'key' => env('AWS_ACCESS_KEY_ID'),
+        'secret' => env('AWS_SECRET_ACCESS_KEY'),
+        'token' => env('AWS_SESSION_TOKEN'), // 任意
+        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    ],
+],
+```
+
+```dotenv
+AWS_ACCESS_KEY_ID=AKIA...
+AWS_SECRET_ACCESS_KEY=...
+AWS_SESSION_TOKEN= # 任意
+AWS_DEFAULT_REGION=us-east-1
+```
+
+### Option 3: デフォルト AWS クレデンシャルチェーン（IAM ロール）
+
+```php
+'providers' => [
+    'bedrock' => [
+        'driver' => 'bedrock',
+        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    ],
+],
+```
+
+```dotenv
+AWS_DEFAULT_REGION=us-east-1
+```
+
+EC2 / ECS / Lambda など IAM ロールがある環境では、この方法が安全です。
+
+## 基本的な使い方
+
+```php
+use App\Ai\Agents\BedrockAgent;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Promptable;
+
+class BedrockAgent implements Agent
+{
+    use Promptable;
+
+    public function instructions(): string
+    {
+        return 'あなたはソフトウェア開発の専門家です。';
+    }
+}
+
+$response = (new BedrockAgent)->prompt('Laravel 13 の新機能を要約してください。');
+
+echo $response->text;
+```
+
+## ストリーミング
+
+Bedrock のストリーミングを Laravel AI SDK 経由で使えます。
+
+```php
+use App\Ai\Agents\BedrockAgent;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/stream', function () {
+    return (new BedrockAgent)->stream('Laravel 13 について教えてください。');
+});
+```
+
+<Tip>
+  `.github/STEERING.md` の方針どおり、Bedrock のストリーミングは AWS 公式 PHP SDK や Prism では未対応で、このパッケージが PHP / Laravel で実用できる実装です。
+</Tip>
+
+## ツール使用（Function Calling）
+
+```php
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
+
+class GetWeather implements Tool
+{
+    public function description(): string
+    {
+        return '都市の現在の天気を返します。';
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'city' => $schema->string()->required(),
+        ];
+    }
+
+    public function handle(Request $request): string
+    {
+        return json_encode(['city' => $request['city'], 'condition' => 'sunny']);
+    }
+}
+```
+
+```php
+use Laravel\Ai\Attributes\MaxSteps;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Promptable;
+
+#[MaxSteps(5)]
+class WeatherAgent implements Agent
+{
+    use Promptable;
+
+    public function tools(): array
+    {
+        return [new GetWeather];
+    }
+
+    public function instructions(): string
+    {
+        return 'あなたは天気アシスタントです。';
+    }
+}
+
+$response = (new WeatherAgent)->prompt('東京の天気は？');
+echo $response->text;
+```
+
+## 構造化出力
+
+```php
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasStructuredOutput;
+use Laravel\Ai\Promptable;
+
+class ExtractPerson implements Agent, HasStructuredOutput
+{
+    use Promptable;
+
+    public function instructions(): string
+    {
+        return '文章から人物情報を抽出してください。';
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'name' => $schema->string(),
+            'age' => $schema->integer(),
+        ];
+    }
+}
+
+$response = (new ExtractPerson)->prompt('Alice is 25 years old.');
+echo $response['name'];
+```
+
+## 画像生成
+
+Nova Canvas を使った画像生成例です。
+
+```php
+use Laravel\Ai\Image;
+
+$response = Image::of('桜の下を歩く猫')
+    ->size('3:2')
+    ->quality('high')
+    ->generate(provider: 'bedrock');
+
+$response->store('images', 's3');
+```
+
+## 音声（TTS）
+
+Polly を使った音声生成例です。
+
+```php
+use Laravel\Ai\Audio;
+
+$response = Audio::of('Laravel で音声を生成します。')
+    ->voice('Joanna')
+    ->generate(provider: 'bedrock');
+
+$path = $response->storeAs('voice.mp3');
+```
+
+## 文字起こし（STT）
+
+Nova 2 Lite を使った文字起こし例です。
+
+```php
+use Laravel\Ai\Transcription;
+
+$response = Transcription::fromPath('/path/to/audio.mp3')
+    ->generate(provider: 'bedrock');
+
+echo $response->text;
+```
+
+## 埋め込み
+
+```php
+use Laravel\Ai\Embeddings;
+
+$response = Embeddings::for(['Laravel', 'Bedrock'])
+    ->dimensions(1024)
+    ->generate(provider: 'bedrock', model: 'amazon.titan-embed-text-v2:0');
+
+$vector = $response->first();
+```
+
+## リランキング
+
+```php
+use Laravel\Ai\Reranking;
+
+$response = Reranking::of([
+    'Laravel is a PHP framework.',
+    'Bedrock provides foundation models.',
+    'Laravel AI SDK gives a unified API.',
+])->limit(2)->rerank(
+    query: 'Laravel と AI の説明',
+    provider: 'bedrock'
+);
+
+echo $response->first()->document;
+```

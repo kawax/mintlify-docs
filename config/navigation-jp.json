@@ -343,6 +343,17 @@
           ]
         }
       ]
+    },
+    {
+      "tab": "マイパッケージ",
+      "groups": [
+        {
+          "group": "AI SDK",
+          "pages": [
+            "jp/packages/laravel-amazon-bedrock"
+          ]
+        }
+      ]
     }
   ]
 }
