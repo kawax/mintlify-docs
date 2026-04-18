@@ -34,7 +34,7 @@ $payload = request()->except(['_token']);
 `Request::get()` は Symfony 互換のために `Request` クラス本体で提供される別経路のメソッドです。新規コードでは `input()` の利用が推奨です。
 
 ```php
-$legacy = request()->get('search'); // 互換目的のメソッド（推奨は input()）
+$legacy = request()->get('search');  // 互換目的のメソッド（推奨は input()）
 ```
 
 ## Laravelコアでの主な実装例
@@ -59,7 +59,7 @@ $legacy = request()->get('search'); // 互換目的のメソッド（推奨は i
 ```mermaid
 flowchart TD
     IWD["InteractsWithData<br>共通データアクセスAPI"] --> IWI["InteractsWithInput"]
-    IWI --> REQ["Request<br>request()/input()/has()/only()/except()"]
+    IWI --> REQ["Request<br>input()/has()/only()/except()"]
     IWD --> VIN["ValidatedInput<br>safe()/validated()"]
     IWD --> FLU["Fluent"]
     IWD --> UQS["UriQueryString"]
