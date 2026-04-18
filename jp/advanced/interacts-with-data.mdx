@@ -31,7 +31,7 @@ if (request()->has('search')) {
 $payload = request()->except(['_token']);
 ```
 
-`Request::get()` は `Request` クラス本体にある Symfony 互換メソッドです。Laravel 13 のソースコード上でも `@deprecated use ->input() instead` と明記されています。
+`Request::get()` は `Request` クラス本体にある Symfony 互換メソッドです。Laravel 13 のソースコード上でも `@deprecated use ->input() instead` と明記され、推奨は `input()` です。
 
 ```php
 $legacy = request()->get('search');  // 互換目的のメソッド（推奨は input()）
@@ -84,6 +84,9 @@ flowchart TD
     {
         use InteractsWithData;
 
+        /**
+         * @param  array<string, mixed>  $items
+         */
         public function __construct(
             protected array $items = [],
         ) {}
