@@ -19,7 +19,7 @@
 - [x] Laravel Cloudも2025年からなので実際に使った人しか知らない情報が多い。一般的なLaravel専用PaaSって部分以上だと、Task SchedulerやバックグラウンドプロセスやNightwatch連携はForge同様に簡単、Octaneの使用が簡単、Inertia SSRの使用が簡単、WebSocketサーバーが簡単に導入可能。Laravelの高度な機能まで使い込んでる人が欲しい機能が全部揃っている。Forgeと比べて足りないのはroot権限がない。
  - 使っていくうちに新しい情報が入ったら後で追加。
 - [ ] `Illuminate\Support\Traits\InteractsWithData`トレイトの解説。プロジェクトで直接使うことは少ないのでパッケージ開発者向け。
-- [ ] `tap()`ヘルパー、`Illuminate\Support\Traits\Tappable`トレイトの解説。存在は知ってるけど使い所が分からないと言われることが多い機能第一位。これもトレイトはパッケージ開発者向け。すでにページのあるMacroableやConditionableと合わせてLaravel風の使い方を提供できる。
+- [x] `tap()`ヘルパー、`Illuminate\Support\Traits\Tappable`トレイトの解説。存在は知ってるけど使い所が分からないと言われることが多い機能第一位。これもトレイトはパッケージ開発者向け。すでにページのあるMacroableやConditionableと合わせてLaravel風の使い方を提供できる。
 - [ ] Collection Deep Dive。使うだけならドキュメントで十分だけど実装コードまで理解しようとすると複雑。
 
 ## blog ページ案
@@ -31,7 +31,7 @@
  - [x] sentinel-introduction
 
 ## packages ページ案
-- [ ] Amazon Bedrock driver for Laravel AI SDK。https://github.com/invokable/laravel-amazon-bedrock
+- [x] Amazon Bedrock driver for Laravel AI SDK。https://github.com/invokable/laravel-amazon-bedrock
  - AI SDK公式ドキュメントには全く情報がないのに`ai-sdk-custom-provider`のページを作れたのは実際にカスタムプロバイダーを作っていたから。
  - 実装できるAI SDKの機能はほぼ実装し終わったのでドキュメントページを作る。
  - README.mdの情報でページは作れるはず。他のページのスタイルと合わせる。
