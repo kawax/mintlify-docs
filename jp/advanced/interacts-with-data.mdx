@@ -105,7 +105,6 @@ flowchart TD
             return $result;
         }
 
-        // InteractsWithData が要求するメソッド。
         protected function data($key = null, $default = null): mixed
         {
             return data_get($this->items, $key, $default);
