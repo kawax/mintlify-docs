@@ -230,6 +230,7 @@
             "en/advanced/pipeline",
             "en/advanced/macroable",
             "en/advanced/conditionable",
+            "en/advanced/tap",
             "en/advanced/higher-order-messages",
             "en/advanced/manager"
           ]
