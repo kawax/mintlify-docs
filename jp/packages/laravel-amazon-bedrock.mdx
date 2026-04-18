@@ -98,7 +98,9 @@ AWS_SESSION_TOKEN= # 任意
 AWS_DEFAULT_REGION=us-east-1
 ```
 
-`AWS_SESSION_TOKEN` は一時クレデンシャル（STS）を使う場合のみ設定します。
+<Info>
+  `AWS_SESSION_TOKEN` は一時クレデンシャル（STS）を使う場合のみ設定します。
+</Info>
 
 ### Option 3: デフォルト AWS クレデンシャルチェーン（IAM ロール）
 
@@ -115,7 +117,9 @@ AWS_DEFAULT_REGION=us-east-1
 AWS_DEFAULT_REGION=us-east-1
 ```
 
-EC2 / ECS / Lambda など IAM ロールがある環境では、この方法が安全です。
+<Info>
+  EC2 / ECS / Lambda など IAM ロールがある環境では、この方法が安全です。
+</Info>
 
 ## 基本的な使い方
 
