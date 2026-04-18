@@ -3,7 +3,7 @@
 このファイルは人間が編集し、「今後はこういうページを増やす」や「このページが間違ってるので修正」の細かい指示を出すためのものです。
 対応が終わったら`[x]`で完了。
 
-- マイパッケージの解説ページ。今のところは計画だけなので下のblog ページ案に追加するまでは対応不要。
+- マイパッケージの解説ページ。下のpackages ページ案に追加されたら対応。
 - [x] 重複ページを作り出してるのでここまでの完了したタスクを削除。公式ドキュメントを元にしたページは揃ってきた感じなので独自コンテンツを増やしていける段階。
 
 ## 継続対応
@@ -29,3 +29,11 @@
  - [x] agent-skills-introduction
  - [x] laravel-ecosystem-analysis: surveyor, ranger, roster
  - [x] sentinel-introduction
+
+## packages ページ案
+- [ ] Amazon Bedrock driver for Laravel AI SDK。https://github.com/invokable/laravel-amazon-bedrock
+ - AI SDK公式ドキュメントには全く情報がないのに`ai-sdk-custom-provider`のページを作れたのは実際にカスタムプロバイダーを作っていたから。
+ - 実装できるAI SDKの機能はほぼ実装し終わったのでドキュメントページを作る。
+ - README.mdの情報でページは作れるはず。他のページのスタイルと合わせる。
+ - 他のカスタムプロバイダーの事例は知らないので初かも。
+ - BedrockでストリーミングはAWS公式のPHP用SDKでもPrismでも対応できてない。このパッケージが唯一。
