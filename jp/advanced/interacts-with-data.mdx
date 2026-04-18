@@ -96,13 +96,16 @@ flowchart TD
 
             $result = [];
 
-            foreach (is_array($keys) ? $keys : func_get_args() as $key) {
+            $keyList = is_array($keys) ? $keys : [$keys];
+
+            foreach ($keyList as $key) {
                 Arr::set($result, $key, Arr::get($this->items, $key));
             }
 
             return $result;
         }
 
+        // InteractsWithData が要求する抽象メソッド。
         protected function data($key = null, $default = null): mixed
         {
             return data_get($this->items, $key, $default);
