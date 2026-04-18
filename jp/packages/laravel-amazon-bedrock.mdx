@@ -85,7 +85,7 @@ AWS_DEFAULT_REGION=us-east-1
         'driver' => 'bedrock',
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        'token' => env('AWS_SESSION_TOKEN'), // 任意
+        'token' => env('AWS_SESSION_TOKEN'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 ],
@@ -97,6 +97,8 @@ AWS_SECRET_ACCESS_KEY=...
 AWS_SESSION_TOKEN= # 任意
 AWS_DEFAULT_REGION=us-east-1
 ```
+
+`AWS_SESSION_TOKEN` は一時クレデンシャル（STS）を使う場合のみ設定します。
 
 ### Option 3: デフォルト AWS クレデンシャルチェーン（IAM ロール）
 
