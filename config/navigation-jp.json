@@ -233,6 +233,7 @@
             "jp/advanced/pipeline",
             "jp/advanced/macroable",
             "jp/advanced/conditionable",
+            "jp/advanced/tap",
             "jp/advanced/higher-order-messages",
             "jp/advanced/manager"
           ]
