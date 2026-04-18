@@ -64,8 +64,8 @@ flowchart TD
     IWD --> FLU["Fluent"]
     IWD --> UQS["UriQueryString"]
     IWD --> CAB["ComponentAttributeBag"]
-    REQ -.関連API.-> SES["Session Store<br>has()/get()/only()/except() を独自実装"]
-    REQ -.関連領域.-> VAL["ValidatesAttributes<br>バリデーション判定ロジック"]
+    REQ -.類似APIパターン.-> SES["Session Store<br>has()/get()/only()/except() を独自実装"]
+    REQ -.関連領域（直接依存ではない）.-> VAL["ValidatesAttributes<br>バリデーション判定ロジック"]
 ```
 
 ## パッケージ開発で自前クラスに組み込む
@@ -105,7 +105,7 @@ flowchart TD
             return $result;
         }
 
-        // InteractsWithData が要求する抽象メソッド。
+        // InteractsWithData が要求するメソッド。
         protected function data($key = null, $default = null): mixed
         {
             return data_get($this->items, $key, $default);
