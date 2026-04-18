@@ -41,23 +41,22 @@ flowchart TD
 ```php
 use App\Models\User;
 
-$user = tap(User::first(), function (User $user) {
-    $user->name = 'Taylor';
-    $user->save();
+$user = tap(User::query()->latest()->firstOrFail(), function (User $model) {
+    $model->update(['last_seen_at' => now()]);
 });
 
-// $user は User インスタンスのまま
+// update() の戻り値に関係なく $user が返る
 ```
 
 コールバックを省略すると `HigherOrderTapProxy` が返るので、メソッド呼び出しをそのままつなげられます。
 
 ```php
-$user = tap($user)->update([
+$updatedUser = tap($user)->update([
     'name' => $name,
     'email' => $email,
 ]);
 
-// update() の戻り値ではなく $user が返る
+// update() の戻り値ではなく元の User インスタンスが返る
 ```
 
 ## よくある使い所
@@ -83,7 +82,7 @@ $order = tap(Order::create($payload), function (Order $order) {
 
 ```php
 $response = tap($service->handle($request), function ($response) {
-    metrics()->increment('service.handle.success');
+    \Illuminate\Support\Facades\Cache::increment('service_handle_success_total');
 });
 ```
 
@@ -115,7 +114,9 @@ class ReportBuilder
     use Tappable;
 }
 
-$builder = (new ReportBuilder)->tap(function (ReportBuilder $builder) {
+$builder = new ReportBuilder();
+
+$builder = $builder->tap(function (ReportBuilder $instance) {
     logger()->debug('builder initialized');
 });
 ```
@@ -162,8 +163,8 @@ $builder = (new ReportBuilder)->tap(function (ReportBuilder $builder) {
 
     $filters = (new QueryPresetBuilder)
         ->forActiveUsers()
-        ->when($request->filled('role'), fn ($b) => $b->where('role', $request->role))
-        ->tap(fn ($b) => logger()->debug('current filters', $b->toArray()))
+        ->when($request->filled('role'), fn ($builder) => $builder->where('role', $request->role))
+        ->tap(fn ($builder) => logger()->debug('current filters', $builder->toArray()))
         ->toArray();
     ```
   </Step>
@@ -179,7 +180,7 @@ $builder = (new ReportBuilder)->tap(function (ReportBuilder $builder) {
 Laravel本体でも `tap()` / `Tappable` は実際に使われています。
 
 - `Illuminate\Routing\Router` は `Macroable` と `Tappable` を併用しています
-- `Router::respondWithRoute()` では `tap($route)->bind(...)` で値を返しながら副作用を実行しています
+- `Router::respondWithRoute()` ではコールバックなしの `tap($route)->bind(...)` を使い、`bind()` 実行後も元の `$route` を返しています
 - `Router::prepareResponse()` ではレスポンス変換後に `tap(..., fn (...) => event(...))` でイベントを発火しています
 - `Illuminate\Testing\Fluent\Concerns\Has` では `->tap(...)->first(...)->etc()` というチェーンでアサーション補助を実装しています
 
