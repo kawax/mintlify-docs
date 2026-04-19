@@ -16,6 +16,58 @@ This package adds Laravel-native ergonomics on top of an SDK-compatible layer:
 - Integration points for Laravel Prompts, queues, and console UX
 - Testing utilities such as `Copilot::fake()` and prompt assertions
 
+## Usage examples
+
+The following examples mirror the `README.md` usage patterns.
+
+### Run single prompt
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$response = Copilot::run(prompt: 'Tell me something about Laravel.');
+dump($response->content());
+```
+
+### Multiple prompts in a single session
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+
+$content = Copilot::start(function (CopilotSession $session) {
+    dump('Starting Copilot session: '.$session->id());
+
+    $response = $session->sendAndWait(prompt: 'Tell me something about PHP.');
+    dump($response->content());
+
+    $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+    dump($response->content());
+
+    return $response->content();
+});
+
+dump($content);
+```
+
+### `copilot()` helper
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use function Revolution\Copilot\copilot;
+
+// If you specify a prompt as a string, it is the same as Copilot::run().
+$response = copilot('Tell me something about Laravel.');
+
+// If you pass a closure, it is the same as Copilot::start().
+copilot(function (CopilotSession $session) {
+    $response = $session->sendAndWait(prompt: 'Tell me something about PHP.');
+});
+
+// If you don't pass anything, it's the same as Facade.
+dump(copilot()->client()->ping());
+```
+
 ## Start here
 
 <Columns cols={2}>
