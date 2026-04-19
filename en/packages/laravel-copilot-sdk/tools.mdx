@@ -45,7 +45,7 @@ Artisan::command('copilot:tools', function () {
                 name: 'lookup_fact',
                 description: 'Returns a fun fact about a given topic.',
                 parameters: $parameters,
-                handler: function (array $params, array $invocation) use ($facts): array {
+                handler: function (array $params, array $invocation) use ($facts): ToolResultObject {
                     $topic = $params['topic'] ?? '';
 
                     $fact = $facts[$topic] ?? null;
@@ -98,7 +98,12 @@ Tool::define(
     name: 'read_only_lookup',
     description: 'Read-only data lookup.',
     parameters: $parameters,
-    handler: fn ($params) => ['result' => 'data'],
+    handler: fn ($params) => new ToolResultObject(
+        textResultForLlm: 'data',
+        resultType: 'success',
+        sessionLog: 'read_only_lookup',
+        toolTelemetry: [],
+    ),
     skipPermission: true,
 ),
 ```

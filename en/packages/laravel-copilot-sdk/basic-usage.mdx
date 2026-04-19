@@ -33,8 +33,8 @@ $done = $session->on(function (SessionEvent $event) {
     }
 });
 
-$session->send(prompt: 'PHPではasync-awaitがまだ綺麗に書きにくい。');
-$session->wait(timeout: 60.0);// True Asyncが正式に実装されるまではwaitで強制的に待ち。
+$session->send(prompt: 'Tell me something about Laravel.');
+$session->wait(timeout: 60.0); // Force waiting with wait() until true async support is officially implemented.
 
 $done();
 

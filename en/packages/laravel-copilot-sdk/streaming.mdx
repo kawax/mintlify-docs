@@ -22,10 +22,10 @@ Copilot::start(function (CopilotSession $session) {
         if ($event->isAssistantMessageDelta()) {
             // Delta events arrive in chunks. Use them for progressive output.
             echo $event->deltaContent();
-        } elseif($event->isAssistantMessage()) {
+        } elseif ($event->isAssistantMessage()) {
             // After all delta chunks are sent, one full ASSISTANT_MESSAGE arrives.
             // If there is another message, delta events repeat.
-        } elseif($event->isAssistantReasoningDelta()) {
+        } elseif ($event->isAssistantReasoningDelta()) {
             // Reasoning delta events are also chunked.
             echo $event->deltaContent();
         }
@@ -179,7 +179,7 @@ new class extends Component
                     content: $event->deltaContent(),
                     to: 'answer',
                 );
-                $this->answer = $event->deltaContent();
+                $this->answer .= $event->deltaContent();
             });
 
             $response = $session->sendAndWait(prompt: $this->question);
