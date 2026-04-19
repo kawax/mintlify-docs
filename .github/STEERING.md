@@ -47,5 +47,6 @@
  - `docs/jp/steering.md`はステアリングとキューイング機能の説明なので追加対象。実際に使うことはないけど「Laravelでは使わなくていい」という情報は必要。
  - SDK側のgetting-started.mdを上で作った英語ドキュメントにリンクするように変更するのでその後に`getting-started.mdx`を作成。
  - `index.mdx` 基本的な説明とLaravel版特有機能の説明。ここまで作った各ページへのリンク。
- - 最後に日本語ページを作成。日本語はSDK側が最新なのでページの最後にGitHubへのリンクを入れる。
+ - 英語版は完成。
+ - 最後に日本語ページを作成。日本語版は急がないので`index.mdx`と`getting-started.mdx`の日本語版だけ作って残りは後から。
  - docs.jsonのnavigationはネストしてindex以外の各ページを配置。
