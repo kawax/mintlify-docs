@@ -8,7 +8,7 @@ description: "Configure Laravel Copilot SDK sessions with SessionConfig, includi
 You can configure many behaviors with the `SessionConfig` class.
 
 Use it with `Copilot::run(prompt: '...', config: $config)` or `Copilot::start(function (CopilotSession $session) { ... }, config: $config)`.
-If you only need simple options like a model ID, you can pass an array instead of using `SessionConfig`: `Copilot::run(prompt: '...', config: ['model' => 'claude-opus-4.7'])`.
+If you only need simple options like a model ID, you can pass an array instead of using `SessionConfig`: `Copilot::run(prompt: '...', config: ['model' => 'auto'])`.
 
 ```php
 use Revolution\Copilot\Enums\ReasoningEffort;
@@ -25,7 +25,7 @@ use Revolution\Copilot\Types\UserInputRequest;
 
 $config = new SessionConfig(
     // Model to use
-    model: 'claude-opus-4.7',
+    model: 'auto',
 
     // Fixed session ID when creating a new session
     sessionId: 'session-123',
