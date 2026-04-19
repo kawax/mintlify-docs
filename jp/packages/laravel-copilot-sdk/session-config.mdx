@@ -1,72 +1,69 @@
 ---
-title: "セッション設定"
+title: "SessionConfig"
 description: "Laravel Copilot SDK の SessionConfig で、ツール・MCP・フック・エージェント・ライフサイクルイベントを設定します。"
 ---
 
 ## SessionConfig
 
-`SessionConfig` クラスを使うと多くの動作を設定できます。
+`SessionConfig`クラスで様々な設定が可能です。
 
-`Copilot::run(prompt: '...', config: $config)` または `Copilot::start(function (CopilotSession $session) { ... }, config: $config)` で利用します。  
-モデル ID のようなシンプルなオプションだけでよい場合は、`SessionConfig` の代わりに配列を渡せます: `Copilot::run(prompt: '...', config: ['model' => 'claude-opus-4.7'])`。
+`Copilot::run(prompt: '...', config: $config)`や`Copilot::start(function (CopilotSession $session) { ... }, config: $config)`のように使用します。
+単純にモデルを指定したいだけのような`SessionConfig`クラスを使うまでもない時は配列での指定も可能です。`Copilot::run(prompt: '...', config: ['model' => 'claude-opus-4.7'])`
 
 ```php
-use Revolution\Copilot\Enums\ReasoningEffort;
 use Revolution\Copilot\Facades\Copilot;
-use Revolution\Copilot\Types\ElicitationContext;
-use Revolution\Copilot\Types\InfiniteSessionConfig;
-use Revolution\Copilot\Types\Rpc\ModelCapabilitiesOverride;
-use Revolution\Copilot\Types\Rpc\ModelCapabilitiesOverrideLimits;
-use Revolution\Copilot\Types\Rpc\ModelCapabilitiesOverrideSupports;
 use Revolution\Copilot\Types\SessionConfig;
-use Revolution\Copilot\Types\SessionEvent;
 use Revolution\Copilot\Types\SystemMessageConfig;
+use Revolution\Copilot\Types\InfiniteSessionConfig;
 use Revolution\Copilot\Types\UserInputRequest;
+use Revolution\Copilot\Types\Rpc\ModelCapabilitiesOverride;
+use Revolution\Copilot\Types\Rpc\ModelCapabilitiesOverrideSupports;
+use Revolution\Copilot\Types\Rpc\ModelCapabilitiesOverrideLimits;
+use Revolution\Copilot\Enums\ReasoningEffort;
 
 $config = new SessionConfig(
-    // Model to use
+    // 使用するモデルの指定
     model: 'claude-opus-4.7',
 
-    // Fixed session ID when creating a new session
+    // 新規セッション作成時に固定のセッションIDを指定
     sessionId: 'session-123',
 
     clientName: 'my-app',
 
-    // Reasoning level (only for supported models)
+    // 推論レベル。対応しているモデルでのみ設定可能。
     reasoningEffort: ReasoningEffort::HIGH,
 
-    // Override model capabilities. Deep-merged with runtime defaults.
+    // モデルのcapabilitiesをオーバーライド。ランタイムのデフォルトにdeep-mergeされる。
     // modelCapabilities: new ModelCapabilitiesOverride(
     //     supports: new ModelCapabilitiesOverrideSupports(vision: true, reasoningEffort: true),
     //     limits: new ModelCapabilitiesOverrideLimits(max_prompt_tokens: 200000),
     // ),
-    // Array format is also supported
+    // 配列での指定も可能
     // modelCapabilities: ['supports' => ['vision' => true]],
 
-    // Override config directory
+    // configディレクトリを上書き設定
     configDir: '',
 
-    // Enable auto-discovery of MCP settings and skill directories
-    // Auto-detects .mcp.json and .vscode/mcp.json from the working directory,
-    // then merges them with explicitly provided mcpServers and skillDirectories.
-    // Explicit values win on name conflicts.
+    // MCP設定やスキルディレクトリの自動検出を有効化
+    // .mcp.json や .vscode/mcp.json をワーキングディレクトリから自動検出し、
+    // 明示的に指定した mcpServers や skillDirectories とマージする（名前衝突時は明示指定が優先）
     enableConfigDiscovery: true,
 
-    // Custom tools
+    // カスタムツール
     tools: [...],
 
-    // System message
+    // システムメッセージ
     systemMessage: new SystemMessageConfig(
         content: 'You are a helpful assistant for Laravel developers.',
     ),
 
-    // Replace mode (fully replace the system prompt)
+    // システムメッセージ: replaceモード（システムプロンプトを完全に置き換え）
     // systemMessage: new SystemMessageConfig(
     //     mode: 'replace',
-    //     content: 'Entire custom system prompt',
+    //     content: 'カスタムシステムプロンプト全体',
     // ),
 
-    // Customize mode (override by section)
+    // システムメッセージ: customizeモード（セクション単位でオーバーライド）
     // systemMessage: new SystemMessageConfig(
     //     mode: 'customize',
     //     sections: [
@@ -74,43 +71,43 @@ $config = new SessionConfig(
     //         'safety' => new SectionOverride(action: SectionOverrideAction::REMOVE),
     //         'custom_instructions' => new SectionOverride(action: SectionOverrideAction::APPEND, content: 'Additional instructions here.'),
     //     ],
-    //     content: 'Optional extra content like append mode',
+    //     content: 'appendモード同様の追加コンテンツ（オプション）',
     // ),
 
-    // Custom provider
+    // カスタムプロバイダー
     provider: new ProviderConfig(),
 
     onPermissionRequest: function (array $request) {
-        // Handle permission requests
+        // 権限リクエストを処理
     },
 
     onUserInputRequest: function (UserInputRequest $request) {
-        // Handle user input requests (ask_user)
+        // ユーザーインプットリクエストを処理。ask_user
     },
 
-    // Elicitation request handler
-    // Lets you receive form-based UI dialog requests from the agent
+    // エリシテーションリクエストのハンドラー
+    // 設定するとエージェントからのフォームベースUIダイアログリクエストを受け取れる
     onElicitationRequest: function (ElicitationContext $context) {
-        // Handle elicitation request
+        // エリシテーションリクエストを処理
         return ['action' => 'accept', 'content' => ['field' => 'value']];
     },
 
-    // Session hooks
+    // セッションフック
     hooks: [],
 
-    // Working directory
+    // ワーキングディレクトリ
     workingDirectory: '',
 
-    // Enable streaming
+    // ストリーミングを有効化
     streaming: true,
 
-    // Allowed built-in tools
+    // 使用可能なビルトインツール
     availableTools: ['read_file', 'write_file'],
 
-    // Or excluded tools
+    // もしくは除外するツール
     excludedTools: ['shell'],
 
-    // MCP server configuration
+    // MCPサーバー設定
     mcpServers: [
         'github' => [
             'type' => 'http',
@@ -118,7 +115,7 @@ $config = new SessionConfig(
         ],
     ],
 
-    // Custom agents
+    // カスタムエージェント
     customAgents: [
         [
             'name' => 'reviewer',
@@ -128,40 +125,37 @@ $config = new SessionConfig(
         ],
     ],
 
-    // Agent activated at session start. Must match customAgents.name.
+    // セッション開始時にアクティブにするエージェントを指定。customAgentsのnameと一致する必要がある。
     agent: 'reviewer',
 
-    // Skill directories
+    // スキルディレクトリ
     skillDirectories: [],
 
-    // Disabled skills
+    // 無効なスキル
     disabledSkills: [],
 
-    // Infinite session configuration (enabled by default)
+    // 無限セッション設定。デフォルトは有効。
     infiniteSessions: new InfiniteSessionConfig(
         enabled: true,
-        backgroundCompactionThreshold: 0.80, // Start compaction at 80% context usage
-        bufferExhaustionThreshold: 0.95,     // Block at 95% until compaction finishes
+        backgroundCompactionThreshold: 0.80, // コンテキスト使用率が80%になったら圧縮を開始する
+        bufferExhaustionThreshold: 0.95,     // 圧縮が完了するまで95%でブロックする
     ),
 
-    // Disable infinite sessions
+    // 無限セッションを無効化
     // infiniteSessions: new InfiniteSessionConfig(enabled: false),
 
-    // Register event handlers before the session creation RPC.
-    // Use this to avoid missing early events such as session.start.
-    // Equivalent to calling $session->on($handler) later, but earlier in the lifecycle.
+    // セッション作成RPCより前にイベントハンドラを登録する。
+    // session.start などの早期イベントを取りこぼさないようにするために使用する。
+    // $session->on($handler) を後から呼ぶのと同等だが、ライフサイクルのより早い段階で登録される。
     onEvent: function (SessionEvent $event) {
-        // Receive all session events
+        // すべてのセッションイベントを受け取る
     },
 );
 
 $response = Copilot::run('...', config: $config);
 ```
 
-セッションを再開する場合は `ResumeSessionConfig` を使います。  
-`SessionConfig` とほぼ同じですが、いくつか小さな違いがあります。  
-`ResumeSessionConfig` では変更したいオプションだけを指定します。  
-それ以外の設定は、元のセッション開始時の設定を引き継ぎます。
+セッション再開時には`ResumeSessionConfig`クラスを使用します。`SessionConfig`とほとんど同じですが少しだけ違います。ResumeSessionConfigは設定を変えたい項目のみ指定します。他は新規セッション開始時の設定が引き継がれます。
 
 <Info>
 最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。

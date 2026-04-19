@@ -5,8 +5,8 @@ description: "Laravel Copilot SDK のストリーミング応答を CLI、SSE、
 
 ## ストリーミング
 
-`SessionConfig` で `streaming: true` を設定すると、Copilot の応答をストリームとして受け取れます。  
-Stdio モードと TCP モードもすでにストリーミングに近い挙動ですが、違いとして `ASSISTANT_MESSAGE_DELTA` も受け取れます。
+SessionConfigで `streaming: true`を指定すると、Copilotからの応答をストリーミングで受け取れます。
+元からstdioモードでもTCPモードでもストリーミングのような動作です。違いは`ASSISTANT_MESSAGE_DELTA`を受信するようになることです。
 
 ```php
 use Revolution\Copilot\Contracts\CopilotSession;
@@ -20,13 +20,14 @@ $config = new SessionConfig(
 Copilot::start(function (CopilotSession $session) {
     $session->on(function (SessionEvent $event): void {
         if ($event->isAssistantMessageDelta()) {
-            // Delta events arrive in chunks. Use them for progressive output.
+            // deltaではメッセージが小分けで届く。途中経過の表示などに使う。もしくはこれだけで完結させることも可能。流暢な表示を実現できる。
             echo $event->deltaContent();
         } elseif ($event->isAssistantMessage()) {
-            // After all delta chunks are sent, one full ASSISTANT_MESSAGE arrives.
-            // If there is another message, delta events repeat.
+            // 小分けにされてたdeltaの送信が終わったらASSISTANT_MESSAGEとして全文を含む一つ分のメッセージが送信される。
+            // 次のメッセージがあれば再度deltaで届く。
+            // 一つのプロンプトに対して複数のメッセージが届くこともあるのでstreamingの場合は複数のdeltaと全文1回が繰り返される。
         } elseif ($event->isAssistantReasoningDelta()) {
-            // Reasoning delta events are also chunked.
+            // reasoning deltaも同様に小分けで届く。
             echo $event->deltaContent();
         }
     });
@@ -35,20 +36,20 @@ Copilot::start(function (CopilotSession $session) {
 }, config: $config);
 ```
 
-- 出力を滑らかにするには、チャンクを改行追加なしでそのまま出力してください。
-- Laravel Prompts の `spin()` と組み合わせると表示が崩れることがあるため避けてください。
+- 流暢な表示のためには改行を追加せずそのまま表示します。
+- Laravel Promptsの`spin()`は表示が崩れるので一緒に使いません。
 
-## 実践的な利用パターン
+## 具体的な使用パターン
 
-### Artisan コマンド
+### Artisanコマンド
 
-上記のように `echo` または `$this->output->write()` で直接出力します。Copilot CLI を直接実行した表示に近く、理解しやすい方法です。
+上記のように`echo`もしくは`$this->output->write()`で直接出力します。Copilot CLIを直接使った場合と同じ表示なので理解しやすいです。
 
-### Web ページで SSE として配信する
+### WebページでServer-Sent Events (SSE)として配信
 
-#### `response()->eventStream()` を使う
+#### `response()->eventStream()`を使う書き方
 
-`response()->eventStream()` は Laravel 12 のリリース時期あたりで追加されました。このパッケージは Laravel 12+ をサポートしているため利用できます。
+`response()->eventStream()`が追加されたのはLaravel12リリース直前くらいの時期です。このパッケージはLaravel12以上のみ対応なので使用可能です。
 
 ```php
 Route::get('/copilot/sse', function () {
@@ -68,7 +69,7 @@ Route::get('/copilot', function () {
 });
 ```
 
-#### `response()->stream()` を使う
+#### `response()->stream()`を使う書き方
 
 ```php
 Route::get('/copilot/sse', function () {
@@ -103,9 +104,9 @@ Route::get('/copilot', function () {
 });
 ```
 
-#### フロントエンド例
+#### フロントエンド側のコード例
 
-以下の `copilot.blade.php` は素早い動作確認用です。本番環境で React / Vue を使う場合は Laravel 公式 npm パッケージ `@laravel/stream-react` または `@laravel/stream-vue` を使ってください。
+`copilot.blade.php`は簡易的な表示確認用です。本番用にはReactかVueを使っているならLaravel公式のnpmパッケージを使うのが推奨です。`@laravel/stream-react`や`@laravel/stream-vue`
 
 ```html
 <html>
@@ -132,13 +133,13 @@ Route::get('/copilot', function () {
 </html>
 ```
 
-## WebSocket 配信
+## WebSocketでの配信
 
-Laravel の通知、ブロードキャスト、Reverb を組み合わせることで、`delta` 更新を WebSocket 経由でも配信できます。
+Laravelの通知機能、ブロードキャスト機能、Reverbを組み合わせて`delta`をWebSocketで配信することも可能です。
 
-## Livewire `wire:stream`
+## Livewireの`wire:stream`
 
-Livewire の `wire:stream` ディレクティブでも出力をストリーミングできます。
+Livewireでも`wire:stream`ディレクティブを使ってストリーミング表示が可能です。
 
 ```php
 <?php
