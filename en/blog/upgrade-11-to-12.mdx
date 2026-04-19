@@ -82,18 +82,24 @@ composer global update laravel/installer
 
 If you installed it with `php.new`, re-run the install command for your OS:
 
-```shell tab=macOS
-/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.4)"
-```
-
-```shell tab=Windows PowerShell
-# Run as administrator
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.4'))
-```
-
-```shell tab=Linux
-/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.4)"
-```
+<Tabs>
+  <Tab title="macOS">
+    ```shell
+    /bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.4)"
+    ```
+  </Tab>
+  <Tab title="Windows PowerShell">
+    ```shell
+    # Run as administrator
+    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.4'))
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```shell
+    /bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.4)"
+    ```
+  </Tab>
+</Tabs>
 
 If you use the version bundled with [Laravel Herd](https://herd.laravel.com), update Herd itself to the latest release.
 

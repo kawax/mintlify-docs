@@ -96,34 +96,39 @@ Route::get('/cache', function () {
 
 Write a test that verifies `Cache::get` is called with the right argument:
 
-```php tab=Pest
-use Illuminate\Support\Facades\Cache;
+<Tabs>
+  <Tab title="Pest">
+    ```php
+    use Illuminate\Support\Facades\Cache;
 
-test('basic example', function () {
-    Cache::shouldReceive('get')
-        ->with('key')
-        ->andReturn('value');
+    test('basic example', function () {
+        Cache::shouldReceive('get')
+            ->with('key')
+            ->andReturn('value');
 
-    $response = $this->get('/cache');
+        $response = $this->get('/cache');
 
-    $response->assertSee('value');
-});
-```
+        $response->assertSee('value');
+    });
+    ```
+  </Tab>
+  <Tab title="PHPUnit">
+    ```php
+    use Illuminate\Support\Facades\Cache;
 
-```php tab=PHPUnit
-use Illuminate\Support\Facades\Cache;
+    public function test_basic_example(): void
+    {
+        Cache::shouldReceive('get')
+            ->with('key')
+            ->andReturn('value');
 
-public function test_basic_example(): void
-{
-    Cache::shouldReceive('get')
-        ->with('key')
-        ->andReturn('value');
+        $response = $this->get('/cache');
 
-    $response = $this->get('/cache');
-
-    $response->assertSee('value');
-}
-```
+        $response->assertSee('value');
+    }
+    ```
+  </Tab>
+</Tabs>
 
 ## Facades vs. helper functions
 
@@ -199,42 +204,47 @@ class Podcast extends Model
 
 Laravel resolves the publisher from the container using the portion of the class name after `Facades\`. Testing remains straightforward:
 
-```php tab=Pest
-use App\Models\Podcast;
-use Facades\App\Contracts\Publisher;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+<Tabs>
+  <Tab title="Pest">
+    ```php
+    use App\Models\Podcast;
+    use Facades\App\Contracts\Publisher;
+    use Illuminate\Foundation\Testing\RefreshDatabase;
 
-pest()->use(RefreshDatabase::class);
+    pest()->use(RefreshDatabase::class);
 
-test('podcast can be published', function () {
-    $podcast = Podcast::factory()->create();
-
-    Publisher::shouldReceive('publish')->once()->with($podcast);
-
-    $podcast->publish();
-});
-```
-
-```php tab=PHPUnit
-use App\Models\Podcast;
-use Facades\App\Contracts\Publisher;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
-
-class PodcastTest extends TestCase
-{
-    use RefreshDatabase;
-
-    public function test_podcast_can_be_published(): void
-    {
+    test('podcast can be published', function () {
         $podcast = Podcast::factory()->create();
 
         Publisher::shouldReceive('publish')->once()->with($podcast);
 
         $podcast->publish();
+    });
+    ```
+  </Tab>
+  <Tab title="PHPUnit">
+    ```php
+    use App\Models\Podcast;
+    use Facades\App\Contracts\Publisher;
+    use Illuminate\Foundation\Testing\RefreshDatabase;
+    use Tests\TestCase;
+
+    class PodcastTest extends TestCase
+    {
+        use RefreshDatabase;
+
+        public function test_podcast_can_be_published(): void
+        {
+            $podcast = Podcast::factory()->create();
+
+            Publisher::shouldReceive('publish')->once()->with($podcast);
+
+            $podcast->publish();
+        }
     }
-}
-```
+    ```
+  </Tab>
+</Tabs>
 
 <Tip>
   Real-time facades are ideal when you want to eliminate a constructor parameter while keeping the class easy to mock in tests.

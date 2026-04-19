@@ -400,47 +400,52 @@ Then set `PENNANT_STORE=redis` in your environment.
 
 The simplest way to control feature flags in tests is to redefine them inline:
 
-```php tab=Pest
-use Laravel\Pennant\Feature;
+<Tabs>
+  <Tab title="Pest">
+    ```php
+    use Laravel\Pennant\Feature;
 
-test('new dashboard is shown when feature is active', function () {
-    Feature::define('new-dashboard', true);
+    test('new dashboard is shown when feature is active', function () {
+        Feature::define('new-dashboard', true);
 
-    $response = $this->actingAs($this->user)->get('/dashboard');
+        $response = $this->actingAs($this->user)->get('/dashboard');
 
-    $response->assertViewIs('dashboard.new');
-});
+        $response->assertViewIs('dashboard.new');
+    });
 
-test('legacy dashboard is shown when feature is inactive', function () {
-    Feature::define('new-dashboard', false);
+    test('legacy dashboard is shown when feature is inactive', function () {
+        Feature::define('new-dashboard', false);
 
-    $response = $this->actingAs($this->user)->get('/dashboard');
+        $response = $this->actingAs($this->user)->get('/dashboard');
 
-    $response->assertViewIs('dashboard.legacy');
-});
-```
+        $response->assertViewIs('dashboard.legacy');
+    });
+    ```
+  </Tab>
+  <Tab title="PHPUnit">
+    ```php
+    use Laravel\Pennant\Feature;
 
-```php tab=PHPUnit
-use Laravel\Pennant\Feature;
+    public function test_shows_new_dashboard()
+    {
+        Feature::define('new-dashboard', true);
 
-public function test_shows_new_dashboard()
-{
-    Feature::define('new-dashboard', true);
+        $response = $this->actingAs($this->user)->get('/dashboard');
 
-    $response = $this->actingAs($this->user)->get('/dashboard');
+        $response->assertViewIs('dashboard.new');
+    }
 
-    $response->assertViewIs('dashboard.new');
-}
+    public function test_shows_legacy_dashboard()
+    {
+        Feature::define('new-dashboard', false);
 
-public function test_shows_legacy_dashboard()
-{
-    Feature::define('new-dashboard', false);
+        $response = $this->actingAs($this->user)->get('/dashboard');
 
-    $response = $this->actingAs($this->user)->get('/dashboard');
-
-    $response->assertViewIs('dashboard.legacy');
-}
-```
+        $response->assertViewIs('dashboard.legacy');
+    }
+    ```
+  </Tab>
+</Tabs>
 
 For lottery-based features, use Laravel's `Lottery::fix()` helper:
 

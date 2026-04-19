@@ -21,24 +21,10 @@ Laravel 11より、`laravel new` でプロジェクトを作成する際に **Pe
 
 最もわかりやすい違いはテストの書き方です。
 
-```php tab=Pest
-test('ユーザーがログインできる', function () {
-    $user = User::factory()->create();
-
-    $response = $this->post('/login', [
-        'email' => $user->email,
-        'password' => 'password',
-    ]);
-
-    $response->assertRedirect('/dashboard');
-});
-```
-
-```php tab=PHPUnit
-class AuthTest extends TestCase
-{
-    public function test_user_can_login(): void
-    {
+<Tabs>
+  <Tab title="Pest">
+    ```php
+    test('ユーザーがログインできる', function () {
         $user = User::factory()->create();
 
         $response = $this->post('/login', [
@@ -47,9 +33,28 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertRedirect('/dashboard');
+    });
+    ```
+  </Tab>
+  <Tab title="PHPUnit">
+    ```php
+    class AuthTest extends TestCase
+    {
+        public function test_user_can_login(): void
+        {
+            $user = User::factory()->create();
+
+            $response = $this->post('/login', [
+                'email' => $user->email,
+                'password' => 'password',
+            ]);
+
+            $response->assertRedirect('/dashboard');
+        }
     }
-}
-```
+    ```
+  </Tab>
+</Tabs>
 
 Pest の `test()` 関数はクロージャを受け取ります。クラスやメソッドの定義が不要なため、テストの意図が一行目から明確です。`it()` も同様に使えます。英語で書く場合は `it('can login', ...)` という自然な文として読めます。
 

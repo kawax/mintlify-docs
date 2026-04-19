@@ -358,40 +358,45 @@ Event::subscribe(OrderEventSubscriber::class);
 
 Fake all events to assert they were dispatched without triggering listeners:
 
-```php tab=Pest
-use App\Events\OrderShipped;
-use Illuminate\Support\Facades\Event;
+<Tabs>
+  <Tab title="Pest">
+    ```php
+    use App\Events\OrderShipped;
+    use Illuminate\Support\Facades\Event;
 
-test('order can be shipped', function () {
-    Event::fake();
+    test('order can be shipped', function () {
+        Event::fake();
 
-    $order = Order::factory()->create();
+        $order = Order::factory()->create();
 
-    $this->post("/orders/{$order->id}/ship");
+        $this->post("/orders/{$order->id}/ship");
 
-    Event::assertDispatched(OrderShipped::class, function ($event) use ($order) {
-        return $event->order->id === $order->id;
+        Event::assertDispatched(OrderShipped::class, function ($event) use ($order) {
+            return $event->order->id === $order->id;
+        });
     });
-});
-```
+    ```
+  </Tab>
+  <Tab title="PHPUnit">
+    ```php
+    use App\Events\OrderShipped;
+    use Illuminate\Support\Facades\Event;
 
-```php tab=PHPUnit
-use App\Events\OrderShipped;
-use Illuminate\Support\Facades\Event;
+    public function test_order_can_be_shipped(): void
+    {
+        Event::fake();
 
-public function test_order_can_be_shipped(): void
-{
-    Event::fake();
+        $order = Order::factory()->create();
 
-    $order = Order::factory()->create();
+        $this->post("/orders/{$order->id}/ship");
 
-    $this->post("/orders/{$order->id}/ship");
-
-    Event::assertDispatched(OrderShipped::class, function ($event) use ($order) {
-        return $event->order->id === $order->id;
-    });
-}
-```
+        Event::assertDispatched(OrderShipped::class, function ($event) use ($order) {
+            return $event->order->id === $order->id;
+        });
+    }
+    ```
+  </Tab>
+</Tabs>
 
 <Card title="Queues" icon="list-check" href="/en/queues">
   Learn how to run queued listeners and background jobs at scale.

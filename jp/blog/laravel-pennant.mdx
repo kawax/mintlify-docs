@@ -403,51 +403,56 @@ foreach ($users as $user) {
 
 テストでは、フィーチャーフラグを再定義してコントロールするのが最も簡単な方法です。
 
-```php tab=Pest
-use Laravel\Pennant\Feature;
+<Tabs>
+  <Tab title="Pest">
+    ```php
+    use Laravel\Pennant\Feature;
 
-test('新しいダッシュボードが表示される', function () {
-    Feature::define('new-dashboard', true);
+    test('新しいダッシュボードが表示される', function () {
+        Feature::define('new-dashboard', true);
 
-    $response = $this->actingAs($this->user)->get('/dashboard');
+        $response = $this->actingAs($this->user)->get('/dashboard');
 
-    $response->assertViewIs('dashboard.new');
-});
+        $response->assertViewIs('dashboard.new');
+    });
 
-test('旧ダッシュボードが表示される', function () {
-    Feature::define('new-dashboard', false);
+    test('旧ダッシュボードが表示される', function () {
+        Feature::define('new-dashboard', false);
 
-    $response = $this->actingAs($this->user)->get('/dashboard');
+        $response = $this->actingAs($this->user)->get('/dashboard');
 
-    $response->assertViewIs('dashboard.legacy');
-});
-```
+        $response->assertViewIs('dashboard.legacy');
+    });
+    ```
+  </Tab>
+  <Tab title="PHPUnit">
+    ```php
+    use Laravel\Pennant\Feature;
 
-```php tab=PHPUnit
-use Laravel\Pennant\Feature;
+    public function test_shows_new_dashboard()
+    {
+        Feature::define('new-dashboard', true);
 
-public function test_shows_new_dashboard()
-{
-    Feature::define('new-dashboard', true);
+        $response = $this->actingAs($this->user)->get('/dashboard');
 
-    $response = $this->actingAs($this->user)->get('/dashboard');
+        $response->assertViewIs('dashboard.new');
+    }
 
-    $response->assertViewIs('dashboard.new');
-}
+    public function test_shows_legacy_dashboard()
+    {
+        Feature::define('new-dashboard', false);
 
-public function test_shows_legacy_dashboard()
-{
-    Feature::define('new-dashboard', false);
+        $response = $this->actingAs($this->user)->get('/dashboard');
 
-    $response = $this->actingAs($this->user)->get('/dashboard');
-
-    $response->assertViewIs('dashboard.legacy');
-}
-```
+        $response->assertViewIs('dashboard.legacy');
+    }
+    ```
+  </Tab>
+</Tabs>
 
 クラスベースのフィーチャーも同様に再定義できます。
 
-```php tab=Pest
+```php
 use App\Features\NewDashboard;
 use Laravel\Pennant\Feature;
 
