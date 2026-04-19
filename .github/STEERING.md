@@ -32,7 +32,7 @@
 - [ ] パッケージ紹介。Blaze https://github.com/livewire/blaze
  - LivewireだけでなくBladeコンポーネントの高速化
  - 普通に使うだけでも制限事項があるので注意が必要。
- - 高速化を実現している仕組みまで理解しようとすると難しい。
+ - 高速化を実現している仕組みまで理解しようとすると難しい。`compile`, `memo`, `fold`のどれを選ぶかを判断できるための解説を追加。
 
 ## packages ページ案
 - [x] Amazon Bedrock driver for Laravel AI SDK。https://github.com/invokable/laravel-amazon-bedrock
