@@ -364,7 +364,12 @@
               "root": "jp/packages/laravel-copilot-sdk/index",
               "expanded": false,
               "pages": [
-                "jp/packages/laravel-copilot-sdk/getting-started"
+                "jp/packages/laravel-copilot-sdk/getting-started",
+                "jp/packages/laravel-copilot-sdk/auth",
+                "jp/packages/laravel-copilot-sdk/session-config",
+                "jp/packages/laravel-copilot-sdk/tools",
+                "jp/packages/laravel-copilot-sdk/streaming",
+                "jp/packages/laravel-copilot-sdk/mcp"
               ]
             }
           ]
