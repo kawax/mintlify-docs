@@ -1,0 +1,181 @@
+---
+title: "はじめに"
+description: "Copilot を使う最初の Laravel コマンドを作り、Laravel Copilot SDK の基本ワークフローを学びます。"
+---
+
+## Copilot 対応の Laravel アプリを最初に作る
+
+このガイドでは、Laravel Copilot SDK を使ってコマンドラインアシスタントを作ります。
+1 つのプロンプト送信から始めて、セッション、イベント、ツールへ進みます。
+
+## 前提条件
+
+開始前に次を確認してください。
+
+- GitHub Copilot CLI をインストールし、認証済みであること
+- PHP `8.4+`
+- Laravel `13.x`
+
+CLI が利用可能か確認します。
+
+```bash
+copilot --version
+```
+
+## SDK をインストールする
+
+Composer でパッケージをインストールします。
+
+```bash
+composer require revolution/laravel-copilot-sdk
+```
+
+必要に応じて設定を公開します。
+
+```bash
+php artisan vendor:publish --tag=copilot-config
+```
+
+必要なら `.env` で CLI のパスを設定します。
+
+```dotenv
+COPILOT_CLI_PATH=copilot
+```
+
+## 最初のメッセージを送る
+
+コマンドを作成し、`Copilot::run()` を呼び出します。
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Revolution\Copilot\Facades\Copilot;
+
+class CopilotDemo extends Command
+{
+    protected $signature = 'copilot:demo';
+    protected $description = 'Demo Copilot SDK';
+
+    public function handle()
+    {
+        $response = Copilot::run(prompt: 'What is 2 + 2?');
+
+        $this->info($response->content());
+    }
+}
+```
+
+コマンドを実行します。
+
+```bash
+php artisan copilot:demo
+```
+
+## セッションでコンテキストを維持する
+
+1 つの会話で複数のプロンプトを使う場合は `Copilot::start()` を使います。
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(prompt: 'What is 2 + 2?');
+    $this->info('Answer: '.$response->content());
+
+    $response = $session->sendAndWait(prompt: 'Now multiply that by 3');
+    $this->info('Answer: '.$response->content());
+});
+```
+
+## セッションイベントを処理する
+
+`on()` でイベントハンドラーを登録し、アシスタントのメッセージや失敗を確認します。
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionEvent;
+
+Copilot::start(function (CopilotSession $session) {
+    $session->on(function (SessionEvent $event): void {
+        if ($event->isAssistantMessage()) {
+            $this->info($event->content());
+        } elseif ($event->failed()) {
+            $this->error($event->errorMessage() ?? 'Unknown error');
+        }
+    });
+
+    $session->sendAndWait(prompt: 'Tell me a short Laravel joke');
+});
+```
+
+## カスタムツールを追加する
+
+JSON スキーマとハンドラーを使ってツールを定義します。
+
+```php
+use Illuminate\JsonSchema\JsonSchema;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\Tool;
+
+$parameters = JsonSchema::object([
+    'topic' => JsonSchema::string()
+        ->description('Topic to look up')
+        ->required(),
+])->toArray();
+
+$config = new SessionConfig(
+    tools: [
+        Tool::define(
+            name: 'lookup_fact',
+            description: 'Returns a fact for a topic.',
+            parameters: $parameters,
+            handler: function (array $params): array {
+                $topic = $params['topic'] ?? '';
+
+                return [
+                    'textResultForLlm' => "Fact for {$topic}",
+                    'resultType' => 'success',
+                    'sessionLog' => "lookup_fact: {$topic}",
+                    'toolTelemetry' => [],
+                ];
+            },
+        ),
+    ],
+);
+
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(
+        prompt: 'Use lookup_fact to tell me something about Laravel.'
+    );
+
+    $this->info($response->content());
+}, config: $config);
+```
+
+## 次のステップ
+
+<Columns cols={2}>
+  <Card title="基本的な使い方" href="/en/packages/laravel-copilot-sdk/basic-usage">
+    Laravel で公式 SDK スタイルのフローを学びます。
+  </Card>
+  <Card title="認証" href="/en/packages/laravel-copilot-sdk/auth">
+    ローカル環境と CI に適した認証方式を選びます。
+  </Card>
+  <Card title="ツール" href="/en/packages/laravel-copilot-sdk/tools">
+    Copilot からアプリケーションコードを呼び出します。
+  </Card>
+  <Card title="セッション設定" href="/en/packages/laravel-copilot-sdk/session-config">
+    モデル、フック、MCP サーバー、実行時の挙動を設定します。
+  </Card>
+</Columns>
+
+<Info>
+参考: [Laravel Copilot SDK README](https://github.com/invokable/laravel-copilot-sdk/blob/main/README.md)、[Laravel Copilot SDK Getting Started](https://github.com/invokable/laravel-copilot-sdk/blob/main/docs/getting-started.md)、[GitHub Copilot SDK](https://github.com/github/copilot-sdk)
+</Info>

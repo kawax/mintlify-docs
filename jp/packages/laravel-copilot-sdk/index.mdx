@@ -1,0 +1,57 @@
+---
+title: "GitHub Copilot SDK for Laravel"
+description: "Laravel Copilot SDK が提供する内容を理解し、セットアップ・セッション・ツール・実行時設定の主要ガイドへ移動します。"
+---
+
+GitHub Copilot SDK for Laravel は、公式の [GitHub Copilot SDK](https://github.com/github/copilot-sdk) のワークフローを Laravel アプリケーションで使えるようにするコミュニティ SDK です。
+
+Artisan コマンド、コントローラー、ジョブなど、Laravel のさまざまな実行コンテキストから Copilot を呼び出せます。
+
+## Laravel 固有のポイント
+
+このパッケージは、SDK 互換レイヤーの上に Laravel ネイティブな使い勝手を追加します。
+
+- `Copilot::run()` と `Copilot::start()` を中心にした Facade ベースの API
+- `config/copilot.php` と `.env` を使う Laravel スタイルの設定
+- Laravel Prompts、キュー、コンソール UX への統合ポイント
+- `Copilot::fake()` やプロンプトアサーションなどのテストユーティリティ
+
+## ここから始める
+
+<Columns cols={2}>
+  <Card title="はじめに" href="/jp/packages/laravel-copilot-sdk/getting-started">
+    Copilot を使う Laravel アプリの最初の一歩を進めます。
+  </Card>
+  <Card title="認証" href="/en/packages/laravel-copilot-sdk/auth">
+    GitHub ログイン、トークン認証、BYOK ワークフローを設定します。
+  </Card>
+  <Card title="セッション設定" href="/en/packages/laravel-copilot-sdk/session-config">
+    ツール、モデル、MCP サーバー、セッション動作を制御します。
+  </Card>
+  <Card title="SessionEvent" href="/en/packages/laravel-copilot-sdk/session-event">
+    Laravel 固有のイベントヘルパーとライフサイクル処理を理解します。
+  </Card>
+  <Card title="権限リクエスト" href="/en/packages/laravel-copilot-sdk/permission-request">
+    明示的な承認でツールを実行する権限フローを確認します。
+  </Card>
+  <Card title="ツール" href="/en/packages/laravel-copilot-sdk/tools">
+    Copilot から呼び出せるカスタムツールを定義します。
+  </Card>
+  <Card title="ストリーミング" href="/en/packages/laravel-copilot-sdk/streaming">
+    逐次出力とライブ応答の扱い方を学びます。
+  </Card>
+  <Card title="MCP" href="/en/packages/laravel-copilot-sdk/mcp">
+    MCP サーバーを接続して機能を拡張します。
+  </Card>
+  <Card title="Laravel Cloud" href="/en/packages/laravel-copilot-sdk/laravel-cloud">
+    Laravel Cloud 環境で SDK を動かします。
+  </Card>
+  <Card title="基本的な使い方" href="/en/packages/laravel-copilot-sdk/basic-usage">
+    公式 SDK スタイルのフローを Laravel らしい形で使います。
+  </Card>
+</Columns>
+
+## 公式リポジトリ
+
+- Laravel パッケージ: [invokable/laravel-copilot-sdk](https://github.com/invokable/laravel-copilot-sdk)
+- 公式 SDK: [github/copilot-sdk](https://github.com/github/copilot-sdk)
