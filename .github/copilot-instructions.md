@@ -72,6 +72,8 @@ Mintlifyの対応言語：https://www.mintlify.com/docs/organize/navigation#lang
 - `mint validate` — validate MDX syntax and docs.json configuration
 - `mint update` — update the CLI to latest version
 
+`mint broken-links`での`/llms.txt`エラーは無視していい。
+
 Playwright MCPでスクリーンショットを撮ってプルリクに添付。
 
 ## Architecture
