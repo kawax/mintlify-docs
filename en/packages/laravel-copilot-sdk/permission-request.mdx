@@ -1,0 +1,58 @@
+---
+title: "Permission request"
+description: "Control and audit tool execution in Laravel Copilot SDK by handling permission requests explicitly."
+---
+
+## Permission request
+
+Permission requests let you decide whether a tool call should run.
+Use this flow when you need stricter control for security-sensitive actions.
+
+## Handle permission requests in `SessionConfig`
+
+Register `onPermissionRequest` and return your decision from the callback:
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    onPermissionRequest: function (array $request) {
+        // Inspect the requested action and return allow / deny.
+    },
+);
+```
+
+## Skip permission for trusted tools
+
+For trusted read-only or low-risk tools, you can bypass the permission prompt:
+
+```php
+use Revolution\Copilot\Types\Tool;
+
+Tool::define(
+    name: 'lookup_fact',
+    description: 'Returns a fact for a topic.',
+    parameters: $parameters,
+    handler: $handler,
+    skipPermission: true,
+);
+```
+
+Use `skipPermission: true` only when you are confident the tool cannot perform unsafe operations.
+
+## Security guidance
+
+- Prefer explicit approval for tools that can write files, execute commands, or access external systems.
+- Keep permission logic centralized in `onPermissionRequest`.
+- Log denied and approved actions for auditing.
+- Start with restrictive defaults, then allow only the tool actions you trust.
+
+## Related pages
+
+- [SessionConfig](/en/packages/laravel-copilot-sdk/session-config)
+- [Tools](/en/packages/laravel-copilot-sdk/tools)
+- [SessionEvent](/en/packages/laravel-copilot-sdk/session-event)
+
+<Info>
+Source references: [Laravel Copilot SDK repository](https://github.com/invokable/laravel-copilot-sdk) and [permission-request Japanese document](https://github.com/invokable/laravel-copilot-sdk/blob/main/docs/jp/permission-request.md).
+</Info>
