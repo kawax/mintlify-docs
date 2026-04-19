@@ -1,0 +1,56 @@
+---
+title: "GitHub token"
+description: "Switch GitHub tokens at runtime in Laravel Copilot SDK when executing stdio mode sessions per authenticated user."
+---
+
+## Runtime switching of GitHub tokens
+
+Use this when you want to run Copilot CLI with a per-user GitHub token from Socialite or a similar authentication flow.
+
+<Note>
+Personal Access Tokens need the `Copilot Requests` permission. The same requirement likely applies to Socialite-based user tokens.
+If you cannot get a usable Socialite token, ask users to provide a PAT directly.
+</Note>
+
+This approach is available only in stdio mode.
+You cannot switch this in TCP mode because the Copilot CLI process stays running.
+If you set `github_token` or `use_logged_in_user` in TCP mode (`cli_url`), an error is raised.
+
+## `github_token` option
+
+This is an official SDK option.
+The SDK passes the token to CLI through `COPILOT_SDK_AUTH_TOKEN`.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$config = array_merge(
+    config('copilot'),
+    [
+        'github_token' => $user->github_token,
+    ]
+);
+
+$response = Copilot::useStdio($config)->run(prompt: '...');
+Copilot::stop(); // Dispose of the client carrying the user token
+```
+
+## `use_logged_in_user` option
+
+When you set `github_token`, `use_logged_in_user` is automatically set to `false`.
+This makes CLI ignore stored OAuth and `gh` CLI credentials and use only the explicit token.
+
+You can also set `use_logged_in_user` to `true` explicitly:
+
+```php
+$config = [
+    'github_token' => $user->github_token,
+    'use_logged_in_user' => true, // Explicitly enabled
+];
+```
+
+If you set `use_logged_in_user` to `false` without `github_token`, the SDK adds `--no-auto-login`, so CLI does not auto-login.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

@@ -1,0 +1,113 @@
+---
+title: "Testing"
+description: "Test Laravel Copilot SDK integration with Copilot::fake(), prompt assertions, and stray request prevention."
+---
+
+Laravel lets you write tests like this.
+
+## Copilot::fake()
+
+`Copilot::fake()` mocks behavior exposed through the Copilot facade. It does not mock every internal component.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+Copilot::fake('2'); // Mock that always returns "2"
+
+$response = Copilot::run(prompt: '1 + 1'); // Copilot CLI is not called
+
+// Pest
+expect($response->content())->toBe('2');
+// PHPUnit
+$this->assertEquals('2', $response->content());
+```
+
+For multiple calls in `Copilot::start()`:
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Contracts\CopilotSession;
+
+Copilot::fake([
+    '*' => Copilot::sequence()
+            ->push(Copilot::response('2'))
+            ->push(Copilot::response('4')),
+]);
+
+Copilot::start(function (CopilotSession $session) use (&$response1, &$response2) {
+    $response1 = $session->sendAndWait(prompt: '1 + 1'); // Returns "2"
+    $response2 = $session->sendAndWait(prompt: '2 + 2'); // Returns "4"
+});
+
+expect($response1->content())->toBe('2');
+```
+
+## Assertions
+
+Verify a specific prompt was called:
+
+```php
+Copilot::assertPrompt('1 + *');
+```
+
+Verify a prompt was not called:
+
+```php
+Copilot::assertNotPrompt('1 + *');
+```
+
+Verify call count:
+
+```php
+Copilot::assertPromptCount(3);
+```
+
+Verify nothing was sent:
+
+```php
+Copilot::assertNothingSent();
+```
+
+## Prevent stray requests
+
+Block all JSON-RPC requests. If a request is sent, `Revolution\Copilot\Exceptions\StrayRequestException` is thrown.
+
+```php
+Copilot::preventStrayRequests();
+```
+
+Allow only specific commands:
+
+```php
+Copilot::preventStrayRequests(allow: ['ping']);
+```
+
+Disable prevention:
+
+```php
+Copilot::preventStrayRequests(false);
+```
+
+Only JSON-RPC requests are blocked. `Client::start()` is not blocked.
+
+## Cases that may not work as expected
+
+When you use Copilot inside an Artisan command, `fake()` works, but assertions such as `assertPrompt()` may not always behave as expected.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+Copilot::fake('Hello');
+
+$this->artisan('copilot:hi');
+
+Copilot::assertPrompt('Hi');
+```
+
+## shouldReceive() / expects()
+
+You can also use familiar Mockery-style methods such as `shouldReceive()` and `expects()` via the facade.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
