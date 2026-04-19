@@ -107,14 +107,14 @@ use Revolution\Copilot\Types\Rpc\PlanReadResult;
 Copilot::start(function (CopilotSession $session) {
     $session->rpc()->mode()->set(new ModeSetRequest(mode: 'plan'));
 
-    $response = $session->sendAndWait(prompt: '〇〇のプランを作成');
+    $response = $session->sendAndWait(prompt: 'Create a plan for XX');
 
     $result = $session->rpc()->plan()->read();
     dump($result->content);
 
     $session->rpc()->mode()->set(new ModeSetRequest(mode: 'autopilot'));
 
-    $response = $session->sendAndWait(prompt: 'プランに従って実装');
+    $response = $session->sendAndWait(prompt: 'Implement according to the plan');
     dump($response->content());
 });
 ```
@@ -200,7 +200,7 @@ $session->rpc()->history()->truncate(new HistoryTruncateRequest(
 // tools (protocol v3+: respond to external_tool.requested events)
 $session->rpc()->tools()->handlePendingToolCall(new ToolsHandlePendingToolCallRequest(
     requestId: '...',
-    result: 'ツールの実行結果',
+    result: 'Tool execution result',
 ));
 
 // permissions (protocol v3+: respond to permission.requested events)
@@ -216,7 +216,7 @@ $session->rpc()->commands()->handlePendingCommand(new CommandsHandlePendingComma
 
 // ui: respond to UI elicitation request
 $session->rpc()->ui()->elicitation(new UIElicitationRequest(
-    message: 'ユーザーへの質問',
+    message: 'Question for user',
     requestedSchema: ['type' => 'object', 'properties' => [...]],
 ));
 
@@ -227,10 +227,10 @@ $session->rpc()->ui()->handlePendingElicitation(new UIHandlePendingElicitationRe
 ));
 
 // log: record messages to the session timeline
-$session->rpc()->log()->log(new LogRequest(message: '処理を開始しました'));
-$session->rpc()->log()->log(new LogRequest(message: 'ディスク使用量が多い', level: LogLevel::WARNING));
-$session->rpc()->log()->log(new LogRequest(message: 'エラーが発生しました', level: LogLevel::ERROR));
-$session->rpc()->log()->log(new LogRequest(message: 'デバッグ情報', ephemeral: true));
+$session->rpc()->log()->log(new LogRequest(message: 'Processing started'));
+$session->rpc()->log()->log(new LogRequest(message: 'High disk usage', level: LogLevel::WARNING));
+$session->rpc()->log()->log(new LogRequest(message: 'An error occurred', level: LogLevel::ERROR));
+$session->rpc()->log()->log(new LogRequest(message: 'Debug information', ephemeral: true));
 
 // shell: run shell commands in session
 $result = $session->rpc()->shell()->exec(new ShellExecRequest(command: 'ls -la'));
