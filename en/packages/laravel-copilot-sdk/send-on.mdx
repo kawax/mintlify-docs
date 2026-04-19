@@ -1,0 +1,66 @@
+---
+title: "Laravel AI SDK integration"
+description: "Enable the experimental Laravel AI SDK integration in Laravel Copilot SDK for text generation and streaming."
+---
+
+## Laravel AI SDK integration
+
+- Experimental implementation
+- Supports only text generation. Other features are not supported yet.
+
+This is an opt-in feature that is enabled only when Laravel AI SDK is installed.
+
+```shell
+composer require laravel/ai
+php artisan vendor:publish --provider="Laravel\Ai\AiServiceProvider"
+```
+
+Add configuration to `config/ai.php`.
+
+```php
+// config/ai.php
+    'default' => 'copilot',
+
+    'providers' => [
+        'copilot' => [
+            'driver' => 'copilot',
+            'key' => '',
+        ],
+    ],
+```
+
+Usage with the `agent()` helper:
+
+```php
+use function Laravel\Ai\agent;
+
+$response = agent(
+    instructions: 'You are an expert at software development.',
+)->prompt('Tell me about Laravel');
+
+echo $response->text;
+```
+
+Streaming is also supported. Only `TextDelta` is implemented.
+
+```php
+use Laravel\Ai\Streaming\Events\TextDelta;
+
+use function Laravel\Ai\agent;
+
+$stream = agent(
+    instructions: 'You are an expert at software development.',
+)->stream('Tell me about Laravel');
+
+foreach ($stream as $event) {
+    if ($event instanceof TextDelta) {
+        echo $event->delta;
+    }
+}
+```
+
+You can also use the standard Laravel AI SDK approach with Agent classes, but only part of the features are supported.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

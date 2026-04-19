@@ -1,0 +1,93 @@
+---
+title: "Resume session"
+description: "Resume previous Laravel Copilot SDK sessions with listSessions(), fixed session IDs, and ResumeSessionConfig."
+---
+
+## Resume session
+
+How to resume a previous session.
+
+## When using interactive chat in an Artisan command
+
+```php
+// Get previous sessions with listSessions
+$sessions = Copilot::client()->listSessions();
+
+// Choose a session ID to resume with Laravel\Prompts\select
+$sessions = collect(Copilot::client()->listSessions())
+    ->mapWithKeys(function (SessionMetadata $session) {
+        return [$session->sessionId => $session->summary ?? ''];
+    })
+    ->toArray();
+
+$session_id = select(
+    label: 'What session do you want to resume?',
+    options: $sessions,
+);
+
+// Resume the session with the selected ID
+$session = Copilot::client()->resumeSession($session_id);
+
+// Get previous messages
+$messages = $session->getMessages();
+```
+
+## When using a fixed session ID
+
+If your flow is not interactive, you cannot ask users to choose a session, so specify a fixed ID from the start.  
+Prepare IDs based on user IDs or other context.
+For example, in a multi-user web service, this approach is better because you prepare IDs in advance.
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+
+$config = new SessionConfig(
+    sessionId: 'user-123-conversation',
+);
+
+Copilot::start(function (CopilotSession $session) {
+    dump('Starting Copilot session: '.$session->id());
+
+    $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+}, config: $config);
+```
+
+When resuming, `Copilot::start` can also use the `resume` argument.
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\ResumeSessionConfig;
+
+// ResumeSessionConfig does not allow setting sessionId
+$config = new ResumeSessionConfig();
+
+Copilot::start(function (CopilotSession $session) {
+    dump('Starting Copilot session: '.$session->id());
+
+    $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+}, config: $config, resume: 'user-123-conversation');
+```
+
+You can also discard the current session inside the `Copilot::start` closure and resume a new one.
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+
+Copilot::start(function (CopilotSession $session) {
+    dump('Starting Copilot session: '.$session->id());
+
+    $session->disconnect();
+
+    $session = Copilot::client()->resumeSession(sessionId: 'user-123-conversation');
+
+    $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+});
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

@@ -1,0 +1,79 @@
+---
+title: "Bundle Copilot CLI"
+description: "Bundle Copilot CLI as an npm dependency in your Laravel project when you need strict CLI version control."
+---
+
+## Include Copilot CLI in your project
+
+If you need strict Copilot CLI version control, you can include it in your project as an npm package.
+
+Usually, installing Copilot CLI separately during deployment is enough.  
+See [Laravel Cloud usage](/en/packages/laravel-copilot-sdk/laravel-cloud) and [GitHub Actions usage](/en/packages/laravel-copilot-sdk/github-actions).
+
+## Prerequisites
+
+Your Laravel project has `package.json`, and your production server has a Node.js runtime, so npm package installation is available.
+
+## Setup
+
+### 1. Install the npm package
+
+Install `@github/copilot` in `dependencies`.
+
+```shell
+npm install @github/copilot
+```
+
+After installation, you can run Copilot CLI directly at this path.
+
+```shell
+node node_modules/@github/copilot/index.js --version
+```
+
+### 2. Configure `.env`
+
+Set `COPILOT_CLI_PATH` to the full path to `index.js`.
+
+```dotenv
+COPILOT_CLI_PATH=/path/to/project/node_modules/@github/copilot/index.js
+```
+
+If you want to set the path dynamically with `base_path()`, edit `config/copilot.php` directly.
+
+```php
+'cli_path' => base_path('node_modules/@github/copilot/index.js'),
+```
+
+## Deployment
+
+During production deployment, reinstall dependencies without `devDependencies` after building assets. `@github/copilot` remains because it is in `dependencies`.
+
+```shell
+npm install
+npm run build
+npm install --omit=dev
+```
+
+With `npm install --omit=dev`, packages in `devDependencies` are removed, and only `dependencies` packages (including `@github/copilot`) remain in `node_modules`.
+
+## Benefits and cautions
+
+| Benefits | Cautions |
+| --- | --- |
+| You can manage CLI versions strictly | `node_modules` size increases |
+| You can pin versions in `package.json` | CLI updates must be done manually |
+| Everyone on the team uses the same version | A Node.js runtime is required |
+
+## Authentication
+
+Authentication is the same regardless of installation method. Set `COPILOT_GITHUB_TOKEN` in `.env`.
+
+```dotenv
+COPILOT_GITHUB_TOKEN=your-token
+```
+
+For details, see [Authentication](/en/packages/laravel-copilot-sdk/auth).
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
