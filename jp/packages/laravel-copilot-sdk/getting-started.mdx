@@ -159,6 +159,216 @@ Copilot::start(function (CopilotSession $session) {
 }, config: $config);
 ```
 
+## 対話型アシスタントを作る
+
+セッション、イベント、ツールをまとめると、対話型の Artisan コマンドを作成できます。
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\JsonSchema\JsonSchema;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SessionEvent;
+use Revolution\Copilot\Types\Tool;
+use Revolution\Copilot\Types\ToolResultObject;
+
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\spin;
+use function Laravel\Prompts\text;
+
+class CopilotAssistant extends Command
+{
+    protected $signature = 'copilot:assistant';
+    protected $description = 'Interactive Copilot assistant';
+
+    public function handle()
+    {
+        $facts = [
+            'PHP' => 'A popular general-purpose scripting language for web development.',
+            'Laravel' => 'A web application framework with expressive, elegant syntax.',
+            'Composer' => 'Dependency manager for PHP.',
+        ];
+
+        $parameters = JsonSchema::object([
+            'topic' => JsonSchema::string()
+                ->description('Topic to look up')
+                ->required(),
+        ])->toArray();
+
+        $config = new SessionConfig(
+            tools: [
+                Tool::define(
+                    name: 'lookup_fact',
+                    description: 'Returns a fun fact about a given topic.',
+                    parameters: $parameters,
+                    handler: function (array $params) use ($facts) {
+                        $topic = $params['topic'] ?? '';
+                        $fact = $facts[$topic] ?? "No fact available for {$topic}.";
+
+                        return new ToolResultObject(
+                            textResultForLlm: $fact,
+                            resultType: 'success',
+                            sessionLog: "lookup_fact: {$topic}",
+                            toolTelemetry: [],
+                        );
+                    },
+                ),
+            ],
+        );
+
+        Copilot::start(function (CopilotSession $session) {
+            info('Copilot assistant');
+            info("Session: {$session->id()}");
+            info("Try: Use lookup_fact to tell me about Laravel");
+
+            $session->on(function (SessionEvent $event): void {
+                if ($event->isAssistantMessage()) {
+                    note($event->content());
+                } elseif ($event->failed()) {
+                    error($event->errorMessage() ?? 'Unknown error');
+                }
+            });
+
+            while (true) {
+                $prompt = text(
+                    label: 'You',
+                    placeholder: 'Ask me anything...',
+                    required: true,
+                    hint: 'Ctrl+C to exit',
+                );
+
+                spin(
+                    callback: fn () => $session->sendAndWait($prompt),
+                    message: 'Thinking...',
+                );
+
+                echo "\n";
+            }
+        }, config: $config);
+    }
+}
+```
+
+コマンドを実行します。
+
+```bash
+php artisan copilot:assistant
+```
+
+## ツールの仕組み
+
+ツールを定義するときは次の 3 点を指定します。
+
+1. ツールが何をするか。
+2. どのパラメーターを受け取るか。
+3. どのハンドラーコードを実行するか。
+
+Copilot はユーザー入力に応じてツール呼び出しを判断し、SDK がハンドラーを実行して結果を返します。
+
+## 次に試す機能
+
+### MCP サーバーを接続する
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    mcpServers: [
+        'github' => [
+            'type' => 'http',
+            'url' => 'https://api.githubcopilot.com/mcp/',
+        ],
+    ],
+);
+```
+
+### カスタムエージェントを作る
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    customAgents: [
+        [
+            'name' => 'pr-reviewer',
+            'displayName' => 'PR Reviewer',
+            'description' => 'Reviews pull requests for best practices',
+            'prompt' => 'You are an expert code reviewer. Focus on security, performance, and maintainability.',
+        ],
+    ],
+);
+```
+
+### システムメッセージをカスタマイズする
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SystemMessageConfig;
+
+$config = new SessionConfig(
+    systemMessage: new SystemMessageConfig(
+        content: 'You are a helpful assistant for our engineering team. Always be concise.',
+    ),
+);
+```
+
+## 外部 CLI サーバーに接続する
+
+Copilot CLI をサーバーモードで起動します。
+
+```bash
+copilot --headless --port 4321
+```
+
+次に `.env` で接続先 URL を設定します。
+
+```dotenv
+COPILOT_URL=tcp://127.0.0.1:4321
+```
+
+`COPILOT_URL` を設定すると、SDK は新しい CLI プロセスを起動せず、既存のサーバーに接続します。
+
+## テレメトリーと可観測性
+
+`config/copilot.php` でテレメトリーを設定します。
+
+```php
+'telemetry' => [
+    'otlpEndpoint' => 'http://localhost:4318',
+],
+```
+
+または直接設定します。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\TelemetryConfig;
+
+Copilot::useStdio([
+    'telemetry' => new TelemetryConfig(
+        otlpEndpoint: 'http://localhost:4318',
+    ),
+]);
+```
+
+## さらに学ぶ
+
+- [認証](/en/packages/laravel-copilot-sdk/auth)
+- [MCP](/en/packages/laravel-copilot-sdk/mcp)
+- [カスタムプロバイダー](/en/packages/laravel-copilot-sdk/custom-providers)
+- [テレメトリー](/en/packages/laravel-copilot-sdk/telemetry)
+- [セッション設定](/en/packages/laravel-copilot-sdk/session-config)
+- [SessionEvent](/en/packages/laravel-copilot-sdk/session-event)
+- [Laravel Copilot SDK 概要](/jp/packages/laravel-copilot-sdk)
+- [公式 SDK リポジトリ](https://github.com/github/copilot-sdk)
+
 ## 次のステップ
 
 <Columns cols={2}>
@@ -174,7 +384,18 @@ Copilot::start(function (CopilotSession $session) {
   <Card title="セッション設定" href="/en/packages/laravel-copilot-sdk/session-config">
     モデル、フック、MCP サーバー、実行時の挙動を設定します。
   </Card>
+  <Card title="MCP" href="/en/packages/laravel-copilot-sdk/mcp">
+    MCP サーバーの既成ツールを接続します。
+  </Card>
+  <Card title="カスタムプロバイダー" href="/en/packages/laravel-copilot-sdk/custom-providers">
+    追加のプロバイダーやモデル戦略を組み込みます。
+  </Card>
+  <Card title="テレメトリー" href="/en/packages/laravel-copilot-sdk/telemetry">
+    トレースを出力して実行状況を観測します。
+  </Card>
 </Columns>
+
+ここまでで、単発プロンプトからツール連携セッションまでの Laravel Copilot SDK の中核フローを一通り確認できました。
 
 <Info>
 参考: [Laravel Copilot SDK README](https://github.com/invokable/laravel-copilot-sdk/blob/main/README.md)、[Laravel Copilot SDK Getting Started](https://github.com/invokable/laravel-copilot-sdk/blob/main/docs/getting-started.md)、[GitHub Copilot SDK](https://github.com/github/copilot-sdk)

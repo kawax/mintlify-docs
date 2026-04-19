@@ -159,6 +159,216 @@ Copilot::start(function (CopilotSession $session) {
 }, config: $config);
 ```
 
+## Build an interactive assistant
+
+Combine sessions, events, and tools into an interactive Artisan command:
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\JsonSchema\JsonSchema;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SessionEvent;
+use Revolution\Copilot\Types\Tool;
+use Revolution\Copilot\Types\ToolResultObject;
+
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\spin;
+use function Laravel\Prompts\text;
+
+class CopilotAssistant extends Command
+{
+    protected $signature = 'copilot:assistant';
+    protected $description = 'Interactive Copilot assistant';
+
+    public function handle()
+    {
+        $facts = [
+            'PHP' => 'A popular general-purpose scripting language for web development.',
+            'Laravel' => 'A web application framework with expressive, elegant syntax.',
+            'Composer' => 'Dependency manager for PHP.',
+        ];
+
+        $parameters = JsonSchema::object([
+            'topic' => JsonSchema::string()
+                ->description('Topic to look up')
+                ->required(),
+        ])->toArray();
+
+        $config = new SessionConfig(
+            tools: [
+                Tool::define(
+                    name: 'lookup_fact',
+                    description: 'Returns a fun fact about a given topic.',
+                    parameters: $parameters,
+                    handler: function (array $params) use ($facts) {
+                        $topic = $params['topic'] ?? '';
+                        $fact = $facts[$topic] ?? "No fact available for {$topic}.";
+
+                        return new ToolResultObject(
+                            textResultForLlm: $fact,
+                            resultType: 'success',
+                            sessionLog: "lookup_fact: {$topic}",
+                            toolTelemetry: [],
+                        );
+                    },
+                ),
+            ],
+        );
+
+        Copilot::start(function (CopilotSession $session) {
+            info('Copilot assistant');
+            info("Session: {$session->id()}");
+            info("Try: Use lookup_fact to tell me about Laravel");
+
+            $session->on(function (SessionEvent $event): void {
+                if ($event->isAssistantMessage()) {
+                    note($event->content());
+                } elseif ($event->failed()) {
+                    error($event->errorMessage() ?? 'Unknown error');
+                }
+            });
+
+            while (true) {
+                $prompt = text(
+                    label: 'You',
+                    placeholder: 'Ask me anything...',
+                    required: true,
+                    hint: 'Ctrl+C to exit',
+                );
+
+                spin(
+                    callback: fn () => $session->sendAndWait($prompt),
+                    message: 'Thinking...',
+                );
+
+                echo "\n";
+            }
+        }, config: $config);
+    }
+}
+```
+
+Run the command:
+
+```bash
+php artisan copilot:assistant
+```
+
+## How tools work
+
+When you define a tool, you provide:
+
+1. What the tool does.
+2. Which parameters it accepts.
+3. Which handler code should run.
+
+Copilot decides when to call the tool based on user input. The SDK executes your handler and returns the result back to Copilot.
+
+## Explore more features
+
+### Connect to MCP servers
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    mcpServers: [
+        'github' => [
+            'type' => 'http',
+            'url' => 'https://api.githubcopilot.com/mcp/',
+        ],
+    ],
+);
+```
+
+### Create custom agents
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    customAgents: [
+        [
+            'name' => 'pr-reviewer',
+            'displayName' => 'PR Reviewer',
+            'description' => 'Reviews pull requests for best practices',
+            'prompt' => 'You are an expert code reviewer. Focus on security, performance, and maintainability.',
+        ],
+    ],
+);
+```
+
+### Customize the system message
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SystemMessageConfig;
+
+$config = new SessionConfig(
+    systemMessage: new SystemMessageConfig(
+        content: 'You are a helpful assistant for our engineering team. Always be concise.',
+    ),
+);
+```
+
+## Connect to an external CLI server
+
+Run the Copilot CLI in server mode:
+
+```bash
+copilot --headless --port 4321
+```
+
+Then set the URL in `.env`:
+
+```dotenv
+COPILOT_URL=tcp://127.0.0.1:4321
+```
+
+When `COPILOT_URL` is set, the SDK connects to that server instead of starting a new CLI process.
+
+## Telemetry and observability
+
+Configure telemetry in `config/copilot.php`:
+
+```php
+'telemetry' => [
+    'otlpEndpoint' => 'http://localhost:4318',
+],
+```
+
+Or configure it directly:
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\TelemetryConfig;
+
+Copilot::useStdio([
+    'telemetry' => new TelemetryConfig(
+        otlpEndpoint: 'http://localhost:4318',
+    ),
+]);
+```
+
+## Learn more
+
+- [Authentication](/en/packages/laravel-copilot-sdk/auth)
+- [MCP](/en/packages/laravel-copilot-sdk/mcp)
+- [Custom providers](/en/packages/laravel-copilot-sdk/custom-providers)
+- [Telemetry](/en/packages/laravel-copilot-sdk/telemetry)
+- [Session config](/en/packages/laravel-copilot-sdk/session-config)
+- [SessionEvent](/en/packages/laravel-copilot-sdk/session-event)
+- [Laravel Copilot SDK overview](/en/packages/laravel-copilot-sdk)
+- [Official SDK repository](https://github.com/github/copilot-sdk)
+
 ## Next steps
 
 <Columns cols={2}>
@@ -174,7 +384,18 @@ Copilot::start(function (CopilotSession $session) {
   <Card title="Session config" href="/en/packages/laravel-copilot-sdk/session-config">
     Configure models, hooks, MCP servers, and runtime behavior.
   </Card>
+  <Card title="MCP" href="/en/packages/laravel-copilot-sdk/mcp">
+    Connect pre-built tools from MCP servers.
+  </Card>
+  <Card title="Custom providers" href="/en/packages/laravel-copilot-sdk/custom-providers">
+    Integrate additional provider and model strategies.
+  </Card>
+  <Card title="Telemetry" href="/en/packages/laravel-copilot-sdk/telemetry">
+    Export traces for debugging and observability.
+  </Card>
 </Columns>
+
+You now covered the core Laravel Copilot SDK flow from single prompts to tool-enabled sessions.
 
 <Info>
 Source references: [Laravel Copilot SDK README](https://github.com/invokable/laravel-copilot-sdk/blob/main/README.md), [Laravel Copilot SDK Getting Started](https://github.com/invokable/laravel-copilot-sdk/blob/main/docs/getting-started.md), and [GitHub Copilot SDK](https://github.com/github/copilot-sdk).
