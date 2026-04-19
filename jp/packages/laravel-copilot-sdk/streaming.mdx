@@ -180,7 +180,7 @@ new class extends Component
                     content: $event->deltaContent(),
                     to: 'answer',
                 );
-                $this->answer = $event->deltaContent();
+                $this->answer .= $event->deltaContent();
             });
 
             $response = $session->sendAndWait(prompt: $this->question);
