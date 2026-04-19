@@ -22,11 +22,11 @@ Copilot::start(function (CopilotSession $session) {
         if ($event->isAssistantMessageDelta()) {
             // deltaではメッセージが小分けで届く。途中経過の表示などに使う。もしくはこれだけで完結させることも可能。流暢な表示を実現できる。
             echo $event->deltaContent();
-        } elseif($event->isAssistantMessage()) {
+        } elseif ($event->isAssistantMessage()) {
             // 小分けにされてたdeltaの送信が終わったらASSISTANT_MESSAGEとして全文を含む一つ分のメッセージが送信される。
             // 次のメッセージがあれば再度deltaで届く。
             // 一つのプロンプトに対して複数のメッセージが届くこともあるのでstreamingの場合は複数のdeltaと全文1回が繰り返される。
-        } elseif($event->isAssistantReasoningDelta()) {
+        } elseif ($event->isAssistantReasoningDelta()) {
             // reasoning deltaも同様に小分けで届く。
             echo $event->deltaContent();
         }
