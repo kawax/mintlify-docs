@@ -355,6 +355,13 @@
           "pages": [
             "jp/packages/laravel-amazon-bedrock"
           ]
+        },
+        {
+          "group": "GitHub Copilot SDK for Laravel",
+          "root": "jp/packages/laravel-copilot-sdk/index",
+          "pages": [
+            "jp/packages/laravel-copilot-sdk/getting-started"
+          ]
         }
       ]
     }
