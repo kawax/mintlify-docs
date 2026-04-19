@@ -1,58 +1,269 @@
 ---
 title: "Permission request"
-description: "Control and audit tool execution in Laravel Copilot SDK by handling permission requests explicitly."
+description: "Control how Laravel Copilot SDK handles permission requests with defaults, built-in handlers, and custom approval callbacks."
 ---
 
 ## Permission request
 
-Permission requests let you decide whether a tool call should run.
-Use this flow when you need stricter control for security-sensitive actions.
+## Default behavior (`deny-all`)
 
-## Handle permission requests in `SessionConfig`
+If `permission_approve` is set to `"deny-all"` (default) in `config/copilot.php`, all permission requests are automatically **denied** when you use `Copilot::run()` or `Copilot::start()`.
 
-Register `onPermissionRequest` and return your decision from the callback:
+This is a safe default when your main use case is text generation, where permissions are usually unnecessary.
 
 ```php
+// config/copilot.php
+'permission_approve' => env('COPILOT_PERMISSION_APPROVE', 'deny-all'),
+```
+
+## Configurable values
+
+| Value | Behavior |
+|---|---|
+| `"deny-all"` | Auto-deny everything (**default**) |
+| `"approve-safety"` | Deny only `shell` and `write`; auto-approve others |
+| `"approve-all"` | Auto-approve everything |
+| `false` | No handler → `onPermissionRequest` is required (same as official SDK) |
+
+```php
+// .env
+COPILOT_PERMISSION_APPROVE="approve-safety"
+```
+
+<Warning>
+If you allow user prompt input, `"approve-safety"` and `"approve-all"` are dangerous.
+Always use `false` or `"deny-all"`.
+Even read-only access can be risky because it can expose your Laravel project code.
+</Warning>
+
+## PermissionHandler::approveAll()
+
+Use `PermissionHandler::approveAll()` to auto-approve all requests.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Support\PermissionHandler;
 use Revolution\Copilot\Types\SessionConfig;
 
 $config = new SessionConfig(
-    onPermissionRequest: function (array $request) {
-        // Inspect the requested action and return allow / deny.
-    },
+    onPermissionRequest: PermissionHandler::approveAll(),
 );
+
+$response = Copilot::run(prompt: 'Hello', config: $config);
 ```
 
-## Skip permission for trusted tools
+## PermissionHandler::approveSafety()
 
-For trusted read-only or low-risk tools, you can bypass the permission prompt:
+Use `PermissionHandler::approveSafety()` to deny only high-risk permissions (`shell`, `write`) and auto-approve others.
 
 ```php
-use Revolution\Copilot\Types\Tool;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Support\PermissionHandler;
+use Revolution\Copilot\Types\SessionConfig;
 
-Tool::define(
-    name: 'lookup_fact',
-    description: 'Returns a fact for a topic.',
-    parameters: $parameters,
-    handler: $handler,
-    skipPermission: true,
+$config = new SessionConfig(
+    onPermissionRequest: PermissionHandler::approveSafety(),
+);
+
+$response = Copilot::run(prompt: 'Hello', config: $config);
+```
+
+This still may not be fully safe.
+If you need precise control, write a custom handler and decide based on `$request['kind']`.
+
+## PermissionHandler::denyAll()
+
+Use `PermissionHandler::denyAll()` to deny everything.
+
+```php
+use Revolution\Copilot\Support\PermissionHandler;
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    onPermissionRequest: PermissionHandler::denyAll(),
 );
 ```
 
-Use `skipPermission: true` only when you are confident the tool cannot perform unsafe operations.
+## Direct client usage
 
-## Security guidance
+When you use `CopilotClient` directly, specifying `onPermissionRequest` is **required**, just like the official SDK.
 
-- Prefer explicit approval for tools that can write files, execute commands, or access external systems.
-- Keep permission logic centralized in `onPermissionRequest`.
-- Log denied and approved actions for auditing.
-- Start with restrictive defaults, then allow only the tool actions you trust.
+```php
+use Revolution\Copilot\Client;
+use Revolution\Copilot\Support\PermissionHandler;
 
-## Related pages
+$client = new Client([
+    'cli_path' => 'copilot',
+    'cli_args' => [],
+    'cwd' => base_path(),
+    'log_level' => 'info',
+    'env' => null,
+]);
+$client->start();
 
-- [SessionConfig](/en/packages/laravel-copilot-sdk/session-config)
-- [Tools](/en/packages/laravel-copilot-sdk/tools)
-- [SessionEvent](/en/packages/laravel-copilot-sdk/session-event)
+// onPermissionRequest is required
+$session = $client->createSession([
+    'onPermissionRequest' => PermissionHandler::approveSafety(),
+]);
+
+// If omitted, InvalidArgumentException is thrown
+// $session = $client->createSession([]); // Error!
+```
+
+## Custom handler
+
+To control approval or rejection per request type, pass a closure.
+`$request` and `$invocation` are arrays like the examples below.
+
+```php
+use Illuminate\Support\Facades\Artisan;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+
+use function Laravel\Prompts\{confirm, note, spin, text};
+
+Artisan::command('copilot:chat', function () {
+    $config = new SessionConfig(
+        onPermissionRequest: function (array $request, array $invocation) {
+            $confirm = confirm(
+                label: 'Do you accept the requested permissions?',
+            );
+            if ($confirm) {
+                return ['kind' => 'approved'];
+            } else {
+                return ['kind' => 'denied-interactively-by-user'];
+            }
+        },
+    );
+
+    Copilot::start(function (CopilotSession $session) use ($config) {
+        while (true) {
+            $prompt = text(
+                label: 'Enter your prompt',
+                placeholder: 'Ask me anything...',
+                required: true,
+                hint: 'Ctrl+C to exit',
+            );
+
+            $response = spin(
+                callback: fn () => $session->sendAndWait($prompt),
+                message: 'Waiting for Copilot response...',
+            );
+
+            note($response->content());
+        }
+    }, config: $config);
+});
+```
+
+### `$request`
+
+Other than `kind` and `toolCallId`, fields vary by `kind`.
+
+```text
+kind: "shell" | "write" | "mcp" | "read" | "url" | "custom-tool"
+```
+
+```php
+[
+  "kind" => "shell",
+  "toolCallId" => "toolu_...",
+  "fullCommandText" => "...",
+  "intention" => "Run copilot:ping to test permission request",
+  "commands" => [
+    [
+      "identifier" => "bash",
+      "readOnly" => false,
+    ]
+  ]
+  "possiblePaths" => [],
+  "possibleUrls" => [],
+  "hasWriteFileRedirection" => false,
+  "canOfferSessionApproval" => false,
+]
+```
+
+### `$invocation`
+
+```php
+[
+  "sessionId" => "...",
+]
+```
+
+## Response
+
+Return an array for the permission decision.
+Using the `PermissionRequestResultKind` class is convenient.
+
+```php
+return PermissionRequestResultKind::approved();
+return PermissionRequestResultKind::deniedInteractivelyByUser();
+```
+
+## Protocol details
+
+In Protocol v3 (current default), permission requests are broadcast as session events (`permission.requested`) instead of JSON-RPC requests.
+The SDK handles this internally and responds through the `session.permissions.handlePendingPermissionRequest` RPC.
+
+**How you use `SessionConfig` does not change.**
+You only need to pass a handler to `onPermissionRequest`, and the SDK absorbs protocol differences.
+
+## PermissionRequestResultKind
+
+You can return the `['kind' => 'approved']` format directly, but it is easier to read with `PermissionRequestResultKind`.
+
+```php
+use Revolution\Copilot\Support\PermissionRequestResultKind;
+
+$confirm = confirm(
+    label: 'Do you accept the requested permissions?',
+);
+
+if ($confirm) {
+    return PermissionRequestResultKind::approved();
+} else {
+    return PermissionRequestResultKind::deniedInteractivelyByUser();
+}
+```
+
+If you prefer `Laravel\Prompts\select` over `Laravel\Prompts\confirm`, use `PermissionRequestResultKind::select()` for options.
+
+```php
+use Revolution\Copilot\Support\PermissionRequestResultKind;
+use function Laravel\Prompts\select;
+
+$select = select(
+    label: 'Do you accept the requested permissions?',
+    options: PermissionRequestResultKind::select(),
+);
+
+return ['kind' => $select];
+```
+
+### no-result
+
+If a handler cannot return a result (for example, in a non-interactive environment), you can return `no-result`.
+When `no-result` is returned, the RPC call is skipped and Copilot CLI applies its default deny behavior.
+
+```php
+return PermissionRequestResultKind::noResult();
+// or ['kind' => 'no-result']
+```
+
+### denied-by-permission-request-hook
+
+For permission requests that are already resolved by the `permissionRequest` hook, the SDK automatically detects the `resolvedByHook` flag and skips calling the `onPermissionRequest` handler.
+
+If you need to return this manually, use `deniedByPermissionRequestHook()`.
+You can optionally specify `message` and `interrupt`.
+
+```php
+return PermissionRequestResultKind::deniedByPermissionRequestHook();
+return PermissionRequestResultKind::deniedByPermissionRequestHook(message: 'Blocked by hook', interrupt: true);
+```
 
 <Info>
-Source references: [Laravel Copilot SDK repository](https://github.com/invokable/laravel-copilot-sdk) and [permission-request Japanese document](https://github.com/invokable/laravel-copilot-sdk/blob/main/docs/jp/permission-request.md).
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
 </Info>
