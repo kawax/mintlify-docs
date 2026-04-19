@@ -1,0 +1,250 @@
+---
+title: "Session context and filtering"
+description: "Use SessionContext and SessionListFilter in Laravel Copilot SDK to inspect and filter sessions by workspace and Git metadata."
+---
+
+## Session context and filtering
+
+Since GitHub Copilot SDK v0.1.24, sessions include context with working directory and Git metadata.
+You can also filter session lists by this context.
+
+## SessionContext
+
+`SessionContext` stores working directory and Git repository information from when a session was created.
+
+### Properties
+
+- `cwd` (`string`): Absolute path of the working directory
+- `gitRoot` (`?string`): Git repository root directory (`null` outside a Git repository)
+- `repository` (`?string`): GitHub repository in `owner/repo` format (for example `invokable/laravel-copilot-sdk`)
+- `branch` (`?string`): Current Git branch name
+
+### Example
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+// Get session list
+$sessions = Copilot::client()->listSessions();
+
+foreach ($sessions as $metadata) {
+    echo "Session: {$metadata->sessionId}\n";
+
+    if ($metadata->context !== null) {
+        echo "  Working directory: {$metadata->context->cwd}\n";
+
+        if ($metadata->context->repository !== null) {
+            echo "  Repository: {$metadata->context->repository}\n";
+            echo "  Branch: {$metadata->context->branch}\n";
+        }
+    }
+}
+```
+
+## SessionListFilter
+
+Use `SessionListFilter` to fetch only sessions from a specific working directory or repository.
+
+### Properties
+
+- `cwd` (`?string`): Exact-match filter by working directory
+- `gitRoot` (`?string`): Filter by Git root directory
+- `repository` (`?string`): Filter by repository in `owner/repo` format
+- `branch` (`?string`): Filter by branch name
+
+### Examples
+
+#### Pass filters as an array
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+// Get only sessions for a specific repository
+$sessions = Copilot::client()->listSessions([
+    'repository' => 'invokable/laravel-copilot-sdk',
+]);
+
+// Get sessions on a specific branch
+$sessions = Copilot::client()->listSessions([
+    'repository' => 'owner/repo',
+    'branch' => 'feature/new-feature',
+]);
+
+// Get sessions for a specific working directory
+$sessions = Copilot::client()->listSessions([
+    'cwd' => '/home/user/projects/my-app',
+]);
+```
+
+#### Use the SessionListFilter class
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionListFilter;
+
+$filter = new SessionListFilter(
+    repository: 'owner/repo',
+    branch: 'main',
+);
+
+$sessions = Copilot::client()->listSessions($filter);
+```
+
+## `session.context_changed` event
+
+When the working directory changes during a session, a `session.context_changed` event is emitted.
+
+### Event type
+
+```php
+use Revolution\Copilot\Enums\SessionEventType;
+
+SessionEventType::SESSION_CONTEXT_CHANGED; // 'session.context_changed'
+```
+
+### Event data
+
+The event data includes updated context details:
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+Copilot::start(function ($session) {
+    $session->on(function ($event) {
+        if ($event->type === 'session.context_changed') {
+            $data = $event->data;
+
+            echo "Working directory changed\n";
+            echo "  cwd: {$data['cwd']}\n";
+            echo "  repository: {$data['repository']}\n";
+            echo "  branch: {$data['branch']}\n";
+        }
+    });
+
+    $response = $session->sendAndWait(
+        prompt: 'Change to a different directory and list files',
+    );
+});
+```
+
+## SessionMetadata
+
+`SessionMetadata` now includes a `context` property.
+
+### New property
+
+- `context` (`?SessionContext`): Working directory and Git metadata for the session
+
+### Example
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$sessions = Copilot::client()->listSessions();
+
+foreach ($sessions as $metadata) {
+    echo "Session ID: {$metadata->sessionId}\n";
+    echo "Start time: {$metadata->startTime}\n";
+
+    // context is optional, so null-check it
+    if ($metadata->context !== null) {
+        echo "Context:\n";
+        echo "  Working directory: {$metadata->context->cwd}\n";
+
+        if ($metadata->context->repository !== null) {
+            echo "  Repository: {$metadata->context->repository}\n";
+        }
+
+        if ($metadata->context->branch !== null) {
+            echo "  Branch: {$metadata->context->branch}\n";
+        }
+    }
+
+    echo "\n";
+}
+```
+
+## Practical examples
+
+### Get sessions for a specific project
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+// Get only sessions in the Laravel Copilot SDK project
+$sessions = Copilot::client()->listSessions([
+    'repository' => 'invokable/laravel-copilot-sdk',
+]);
+
+// Show active sessions
+foreach ($sessions as $metadata) {
+    echo "{$metadata->sessionId}: {$metadata->summary}\n";
+    echo "  Branch: {$metadata->context->branch}\n";
+}
+```
+
+### Manage sessions on feature branches
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$sessions = Copilot::client()->listSessions();
+
+$featureSessions = array_filter($sessions, function ($metadata) {
+    return $metadata->context !== null
+        && str_starts_with($metadata->context->branch ?? '', 'feature/');
+});
+
+// Group sessions by feature branch
+$byBranch = [];
+foreach ($featureSessions as $metadata) {
+    $branch = $metadata->context->branch;
+    $byBranch[$branch][] = $metadata;
+}
+
+foreach ($byBranch as $branch => $sessions) {
+    echo "{$branch}: " . count($sessions) . " sessions\n";
+}
+```
+
+### Organize sessions by working directory
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$sessions = Copilot::client()->listSessions();
+
+// Group by working directory
+$byCwd = [];
+foreach ($sessions as $metadata) {
+    if ($metadata->context !== null) {
+        $cwd = $metadata->context->cwd;
+        $byCwd[$cwd][] = $metadata;
+    }
+}
+
+// Show count per directory
+foreach ($byCwd as $cwd => $sessions) {
+    echo "{$cwd}: " . count($sessions) . " sessions\n";
+}
+```
+
+## Notes
+
+- `context` includes Git fields (`gitRoot`, `repository`, `branch`) only if the session was created inside a Git repository.
+- The `context` field is available with Copilot CLI v0.0.409 or later. Older versions return `null`.
+- Filtering is exact match only. Partial match and wildcards are not supported.
+- All `SessionListFilter` fields are optional. If you pass no filters, all sessions are returned.
+
+## Compatibility with official SDKs
+
+This matches the feature added in GitHub Copilot SDK PR #427:
+
+- Node.js SDK
+- Python SDK
+- Go SDK
+- .NET SDK
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
