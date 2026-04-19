@@ -1,0 +1,168 @@
+---
+title: "セッション設定"
+description: "Laravel Copilot SDK の SessionConfig で、ツール・MCP・フック・エージェント・ライフサイクルイベントを設定します。"
+---
+
+## SessionConfig
+
+`SessionConfig` クラスを使うと多くの動作を設定できます。
+
+`Copilot::run(prompt: '...', config: $config)` または `Copilot::start(function (CopilotSession $session) { ... }, config: $config)` で利用します。  
+モデル ID のようなシンプルなオプションだけでよい場合は、`SessionConfig` の代わりに配列を渡せます: `Copilot::run(prompt: '...', config: ['model' => 'claude-opus-4.7'])`。
+
+```php
+use Revolution\Copilot\Enums\ReasoningEffort;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\ElicitationContext;
+use Revolution\Copilot\Types\InfiniteSessionConfig;
+use Revolution\Copilot\Types\Rpc\ModelCapabilitiesOverride;
+use Revolution\Copilot\Types\Rpc\ModelCapabilitiesOverrideLimits;
+use Revolution\Copilot\Types\Rpc\ModelCapabilitiesOverrideSupports;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SessionEvent;
+use Revolution\Copilot\Types\SystemMessageConfig;
+use Revolution\Copilot\Types\UserInputRequest;
+
+$config = new SessionConfig(
+    // Model to use
+    model: 'claude-opus-4.7',
+
+    // Fixed session ID when creating a new session
+    sessionId: 'session-123',
+
+    clientName: 'my-app',
+
+    // Reasoning level (only for supported models)
+    reasoningEffort: ReasoningEffort::HIGH,
+
+    // Override model capabilities. Deep-merged with runtime defaults.
+    // modelCapabilities: new ModelCapabilitiesOverride(
+    //     supports: new ModelCapabilitiesOverrideSupports(vision: true, reasoningEffort: true),
+    //     limits: new ModelCapabilitiesOverrideLimits(max_prompt_tokens: 200000),
+    // ),
+    // Array format is also supported
+    // modelCapabilities: ['supports' => ['vision' => true]],
+
+    // Override config directory
+    configDir: '',
+
+    // Enable auto-discovery of MCP settings and skill directories
+    // Auto-detects .mcp.json and .vscode/mcp.json from the working directory,
+    // then merges them with explicitly provided mcpServers and skillDirectories.
+    // Explicit values win on name conflicts.
+    enableConfigDiscovery: true,
+
+    // Custom tools
+    tools: [...],
+
+    // System message
+    systemMessage: new SystemMessageConfig(
+        content: 'You are a helpful assistant for Laravel developers.',
+    ),
+
+    // Replace mode (fully replace the system prompt)
+    // systemMessage: new SystemMessageConfig(
+    //     mode: 'replace',
+    //     content: 'Entire custom system prompt',
+    // ),
+
+    // Customize mode (override by section)
+    // systemMessage: new SystemMessageConfig(
+    //     mode: 'customize',
+    //     sections: [
+    //         'tone' => new SectionOverride(action: SectionOverrideAction::REPLACE, content: 'Always respond in Japanese.'),
+    //         'safety' => new SectionOverride(action: SectionOverrideAction::REMOVE),
+    //         'custom_instructions' => new SectionOverride(action: SectionOverrideAction::APPEND, content: 'Additional instructions here.'),
+    //     ],
+    //     content: 'Optional extra content like append mode',
+    // ),
+
+    // Custom provider
+    provider: new ProviderConfig(),
+
+    onPermissionRequest: function (array $request) {
+        // Handle permission requests
+    },
+
+    onUserInputRequest: function (UserInputRequest $request) {
+        // Handle user input requests (ask_user)
+    },
+
+    // Elicitation request handler
+    // Lets you receive form-based UI dialog requests from the agent
+    onElicitationRequest: function (ElicitationContext $context) {
+        // Handle elicitation request
+        return ['action' => 'accept', 'content' => ['field' => 'value']];
+    },
+
+    // Session hooks
+    hooks: [],
+
+    // Working directory
+    workingDirectory: '',
+
+    // Enable streaming
+    streaming: true,
+
+    // Allowed built-in tools
+    availableTools: ['read_file', 'write_file'],
+
+    // Or excluded tools
+    excludedTools: ['shell'],
+
+    // MCP server configuration
+    mcpServers: [
+        'github' => [
+            'type' => 'http',
+            'url' => 'https://api.githubcopilot.com/mcp/',
+        ],
+    ],
+
+    // Custom agents
+    customAgents: [
+        [
+            'name' => 'reviewer',
+            'displayName' => 'Code Reviewer',
+            'description' => 'Reviews code for best practices',
+            'prompt' => 'You are an expert code reviewer.',
+        ],
+    ],
+
+    // Agent activated at session start. Must match customAgents.name.
+    agent: 'reviewer',
+
+    // Skill directories
+    skillDirectories: [],
+
+    // Disabled skills
+    disabledSkills: [],
+
+    // Infinite session configuration (enabled by default)
+    infiniteSessions: new InfiniteSessionConfig(
+        enabled: true,
+        backgroundCompactionThreshold: 0.80, // Start compaction at 80% context usage
+        bufferExhaustionThreshold: 0.95,     // Block at 95% until compaction finishes
+    ),
+
+    // Disable infinite sessions
+    // infiniteSessions: new InfiniteSessionConfig(enabled: false),
+
+    // Register event handlers before the session creation RPC.
+    // Use this to avoid missing early events such as session.start.
+    // Equivalent to calling $session->on($handler) later, but earlier in the lifecycle.
+    onEvent: function (SessionEvent $event) {
+        // Receive all session events
+    },
+);
+
+$response = Copilot::run('...', config: $config);
+```
+
+セッションを再開する場合は `ResumeSessionConfig` を使います。  
+`SessionConfig` とほぼ同じですが、いくつか小さな違いがあります。  
+`ResumeSessionConfig` では変更したいオプションだけを指定します。  
+それ以外の設定は、元のセッション開始時の設定を引き継ぎます。
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>

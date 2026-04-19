@@ -1,0 +1,210 @@
+---
+title: "ストリーミング"
+description: "Laravel Copilot SDK のストリーミング応答を CLI、SSE、WebSocket、Livewire で扱う方法を説明します。"
+---
+
+## ストリーミング
+
+`SessionConfig` で `streaming: true` を設定すると、Copilot の応答をストリームとして受け取れます。  
+Stdio モードと TCP モードもすでにストリーミングに近い挙動ですが、違いとして `ASSISTANT_MESSAGE_DELTA` も受け取れます。
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionEvent;
+
+$config = new SessionConfig(
+    streaming: true,
+);
+
+Copilot::start(function (CopilotSession $session) {
+    $session->on(function (SessionEvent $event): void {
+        if ($event->isAssistantMessageDelta()) {
+            // Delta events arrive in chunks. Use them for progressive output.
+            echo $event->deltaContent();
+        } elseif ($event->isAssistantMessage()) {
+            // After all delta chunks are sent, one full ASSISTANT_MESSAGE arrives.
+            // If there is another message, delta events repeat.
+        } elseif ($event->isAssistantReasoningDelta()) {
+            // Reasoning delta events are also chunked.
+            echo $event->deltaContent();
+        }
+    });
+
+    $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+}, config: $config);
+```
+
+- 出力を滑らかにするには、チャンクを改行追加なしでそのまま出力してください。
+- Laravel Prompts の `spin()` と組み合わせると表示が崩れることがあるため避けてください。
+
+## 実践的な利用パターン
+
+### Artisan コマンド
+
+上記のように `echo` または `$this->output->write()` で直接出力します。Copilot CLI を直接実行した表示に近く、理解しやすい方法です。
+
+### Web ページで SSE として配信する
+
+#### `response()->eventStream()` を使う
+
+`response()->eventStream()` は Laravel 12 のリリース時期あたりで追加されました。このパッケージは Laravel 12+ をサポートしているため利用できます。
+
+```php
+Route::get('/copilot/sse', function () {
+    return response()->eventStream(function () {
+        yield from Copilot::stream(function (CopilotSession $session) {
+            foreach ($session->sendAndStream('Tell me something about Laravel.') as $event) {
+                if ($event->isAssistantMessageDelta()) {
+                    yield $event->deltaContent();
+                }
+            }
+        }, config: new SessionConfig(streaming: true));
+    });
+});
+
+Route::get('/copilot', function () {
+    return view('copilot');
+});
+```
+
+#### `response()->stream()` を使う
+
+```php
+Route::get('/copilot/sse', function () {
+    return response()->stream(function () {
+        Copilot::start(function (CopilotSession $session) {
+            $session->on(function (SessionEvent $event) {
+                if ($event->isAssistantMessageDelta()) {
+                    echo "event: update\n";
+                    echo 'data: '.$event->deltaContent()."\n\n";
+                    ob_flush();
+                    flush();
+                }
+            });
+
+            $session->sendAndWait('Tell me something about Laravel.');
+        }, config: new SessionConfig(streaming: true));
+
+        echo "event: update\n";
+        echo "data: </stream>\n\n";
+        ob_flush();
+        flush();
+    }, 200, [
+        'Content-Type' => 'text/event-stream',
+        'Cache-Control' => 'no-cache',
+        'Connection' => 'keep-alive',
+        'X-Accel-Buffering' => 'no',
+    ]);
+});
+
+Route::get('/copilot', function () {
+    return view('copilot');
+});
+```
+
+#### フロントエンド例
+
+以下の `copilot.blade.php` は素早い動作確認用です。本番環境で React / Vue を使う場合は Laravel 公式 npm パッケージ `@laravel/stream-react` または `@laravel/stream-vue` を使ってください。
+
+```html
+<html>
+<body>
+
+<script>
+    const source = new EventSource('/copilot/sse');
+
+    source.addEventListener('update', (event) => {
+        if (event.data === '</stream>') {
+            source.close();
+
+            return;
+        }
+
+        console.log(event.data);
+        document.getElementById("output").innerHTML += event.data;
+    });
+</script>
+
+<h1>Copilot SSE Test</h1>
+<div id="output"></div>
+</body>
+</html>
+```
+
+## WebSocket 配信
+
+Laravel の通知、ブロードキャスト、Reverb を組み合わせることで、`delta` 更新を WebSocket 経由でも配信できます。
+
+## Livewire `wire:stream`
+
+Livewire の `wire:stream` ディレクティブでも出力をストリーミングできます。
+
+```php
+<?php
+
+use Livewire\Attributes\Layout;
+use Livewire\Component;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Enums\SessionEventType;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionEvent;
+
+new class extends Component
+{
+    public string $prompt = 'Tell me about Laravel Livewire.';
+    public string $question = '';
+    public string $answer = '';
+    public ?string $sessionId = null;
+
+    function submitPrompt(): void
+    {
+        $this->question = $this->prompt;
+
+        $this->prompt = '';
+
+        $this->answer = '';
+
+        $this->js('$wire.copilot()');
+    }
+
+    public function copilot(): void
+    {
+        Copilot::start(function (CopilotSession $session) {
+            $this->sessionId = $session->id();
+
+            $session->on(SessionEventType::ASSISTANT_MESSAGE_DELTA, function (SessionEvent $event): void {
+
+                $this->stream(
+                    content: $event->deltaContent(),
+                    to: 'answer',
+                );
+                $this->answer .= $event->deltaContent();
+            });
+
+            $response = $session->sendAndWait(prompt: $this->question);
+            $this->answer = $response->content();
+        }, config: ['streaming' => true], resume: $this->sessionId);
+    }
+};
+?>
+
+<div>
+    <div class="border border-gray-200 rounded-lg p-4 mb-6">
+        @if ($question)
+            <h3 class="font-extrabold mb-3">{{ $question }}</h3>
+
+            <div wire:stream="answer">{{ $answer }}</div>
+        @endif
+    </div>
+
+    <flux:input.group>
+        <flux:input wire:model="prompt" placeholder="Ask Copilot"/>
+        <flux:button wire:click="submitPrompt" icon="paper-airplane" icon:variant="outline"></flux:button>
+    </flux:input.group>
+</div>
+```
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>

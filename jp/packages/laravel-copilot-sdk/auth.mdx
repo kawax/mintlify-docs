@@ -1,0 +1,120 @@
+---
+title: "認証"
+description: "Laravel Copilot SDK の認証方式を理解し、ローカル開発・CI・サーバー実行・BYOKに適した方法を選択します。"
+---
+
+## 認証
+
+Copilot SDK は複数の認証方式をサポートしています。用途に応じて選択してください。
+
+## 認証方式
+
+| 方式 | 主な用途 | Copilot サブスクリプション | 補足 |
+| --- | --- | --- | --- |
+| GitHub ログイン（CLI） | 開発・手動実行 | 必須 | `copilot` CLI のログインセッションを利用 |
+| OAuth GitHub App / PAT | ユーザー単位トークン | 必須 | `github_token` で設定 |
+| 環境変数 | CI/CD・サーバー実行環境 | 必須 | `COPILOT_GITHUB_TOKEN` など |
+| BYOK（Bring Your Own Key） | 独自のモデルプロバイダー | 不要 | カスタムプロバイダーを設定 |
+
+BYOK については `custom-providers.md` を参照してください。
+
+## GitHub ログイン（CLI）
+
+`copilot` CLI または `gh` CLI でログイン済みであれば、SDK は既定で保存済み資格情報を利用します。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$response = Copilot::run(prompt: 'Hello');
+```
+
+## OAuth GitHub App / PAT
+
+OAuth のユーザーアクセストークン、または fine-grained PAT を `github_token` に渡します。
+
+- 想定トークン接頭辞: `gho_`, `ghu_`, `github_pat_`
+- `ghp_`（classic PAT）は非推奨
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$config = array_merge(config('copilot'), [
+    'github_token' => $user->github_token,
+]);
+
+$response = Copilot::useStdio($config)->run(prompt: '...');
+Copilot::stop();
+```
+
+`github_token` を設定すると、`use_logged_in_user` は自動的に `false` になります。明示的に上書きする場合:
+
+```php
+$config = [
+    'github_token' => $user->github_token,
+    'use_logged_in_user' => true,
+];
+```
+
+詳細は `github-token.md` を参照してください。  
+`github_token` と `use_logged_in_user` は stdio モードでのみ利用できます。TCP モードでは Copilot CLI 側で事前認証が必要です。
+
+## 環境変数
+
+環境変数でトークンを渡す場合、CLI は以下の優先順位で自動検出します。
+
+1. `COPILOT_GITHUB_TOKEN`
+2. `GH_TOKEN`
+3. `GITHUB_TOKEN`
+
+```dotenv
+COPILOT_GITHUB_TOKEN=github_pat_xxx
+```
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$response = Copilot::run(prompt: 'Hello');
+```
+
+TCP モードでは、CLI サーバー側に環境変数を設定してください。
+
+## 認証の優先順位
+
+SDK は次の順で資格情報を解決します。
+
+1. `github_token`（明示指定）
+2. 環境変数トークン（`COPILOT_GITHUB_TOKEN` → `GH_TOKEN` → `GITHUB_TOKEN`）
+3. CLI に保存された OAuth 資格情報
+4. `gh` CLI の資格情報
+
+## 自動ログインを無効化する
+
+保存済み資格情報を使いたくない場合は、`use_logged_in_user` を `false` に設定します。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$response = Copilot::useStdio([
+    'use_logged_in_user' => false,
+])->run(prompt: 'Hello');
+```
+
+`github_token` と同様に、これは stdio モードのみ対応です。TCP モードでは Copilot CLI 側で事前認証が必要です。
+
+## 認証状態を確認する
+
+`auth.getStatus` の結果を読み取れます。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$status = Copilot::client()->getAuthStatus();
+
+if (! $status->isAuthenticated) {
+    // Not authenticated
+}
+```
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>
