@@ -1,0 +1,57 @@
+---
+title: "Laravel Cloud"
+description: "Run Laravel Copilot SDK on Laravel Cloud with Copilot CLI installation, environment variables, and stdio or TCP mode guidance."
+---
+
+## Usage in Laravel Cloud
+
+## Installation
+
+Add the following to **Settings > Deployments > Build commands** and deploy.
+
+```shell
+export PATH="$PATH:/var/www/.local/bin"
+curl -fsSL https://gh.io/copilot-install | bash
+/var/www/.local/bin/copilot --version
+```
+
+The path is `/var/www/.local/bin/copilot`, so add the following in **Custom environment variables**.
+
+```dotenv
+COPILOT_CLI_PATH=/var/www/.local/bin/copilot
+COPILOT_GITHUB_TOKEN=
+```
+
+For `COPILOT_GITHUB_TOKEN`, you can use any authentication method supported by Copilot CLI, such as `GH_TOKEN` or `GITHUB_TOKEN`.
+
+If you use the default stdio mode, this installation is enough.
+
+## Operating in TCP mode
+
+In **App cluster > Background processes > Custom worker**, set `/var/www/.local/bin/copilot --headless --port 12345`.  
+It keeps running as a background process and automatically restarts on deployment.
+
+You can choose any port.
+
+Set `COPILOT_URL` in **Custom environment variables**.
+
+```dotenv
+COPILOT_URL=tcp://127.0.0.1:12345
+# COPILOT_CLI_PATH is unnecessary in TCP mode. If both are set, TCP mode takes priority.
+```
+
+Because it keeps running continuously, memory usage is high, so you may need a server with at least 2 GiB RAM.  
+If you use it inside HTTP requests, it often fails because it does not finish within 60 seconds, so use queues instead.
+
+TCP mode on Laravel Cloud is not very practical, so stdio mode is recommended.
+
+It should also work in a Worker cluster available in higher plans. If the App cluster runs out of memory, using a Worker cluster can help.
+
+## Cautions
+
+- Low-cost servers can run out of memory easily.
+- The default HTTP timeout is 20 seconds, so if requests fail often, increase it up to the maximum 60 seconds.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
