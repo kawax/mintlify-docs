@@ -23,24 +23,10 @@ The goal is to lower the barrier to writing tests. When tests are fast to write,
 
 The most visible difference is how you write tests.
 
-```php tab=Pest
-test('user can log in', function () {
-    $user = User::factory()->create();
-
-    $response = $this->post('/login', [
-        'email'    => $user->email,
-        'password' => 'password',
-    ]);
-
-    $response->assertRedirect('/dashboard');
-});
-```
-
-```php tab=PHPUnit
-class AuthTest extends TestCase
-{
-    public function test_user_can_log_in(): void
-    {
+<Tabs>
+  <Tab title="Pest">
+    ```php
+    test('user can log in', function () {
         $user = User::factory()->create();
 
         $response = $this->post('/login', [
@@ -49,9 +35,28 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertRedirect('/dashboard');
+    });
+    ```
+  </Tab>
+  <Tab title="PHPUnit">
+    ```php
+    class AuthTest extends TestCase
+    {
+        public function test_user_can_log_in(): void
+        {
+            $user = User::factory()->create();
+
+            $response = $this->post('/login', [
+                'email'    => $user->email,
+                'password' => 'password',
+            ]);
+
+            $response->assertRedirect('/dashboard');
+        }
     }
-}
-```
+    ```
+  </Tab>
+</Tabs>
 
 The Pest `test()` function takes a description and a closure. No class, no method naming convention. You can also use `it()`, which reads as a natural sentence: `it('redirects to dashboard after login', ...)`.
 

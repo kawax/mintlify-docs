@@ -358,42 +358,47 @@ public function toSlack(object $notifiable): SlackMessage
 
 Use `Notification::fake()` to assert notifications are sent without actually delivering them:
 
-```php tab=Pest
-use App\Notifications\InvoicePaid;
-use Illuminate\Support\Facades\Notification;
+<Tabs>
+  <Tab title="Pest">
+    ```php
+    use App\Notifications\InvoicePaid;
+    use Illuminate\Support\Facades\Notification;
 
-test('user is notified when invoice is paid', function () {
-    Notification::fake();
+    test('user is notified when invoice is paid', function () {
+        Notification::fake();
 
-    $user = User::factory()->create();
-    $invoice = Invoice::factory()->for($user)->create();
+        $user = User::factory()->create();
+        $invoice = Invoice::factory()->for($user)->create();
 
-    $this->post("/invoices/{$invoice->id}/pay");
+        $this->post("/invoices/{$invoice->id}/pay");
 
-    Notification::assertSentTo($user, InvoicePaid::class, function ($notification) use ($invoice) {
-        return $notification->invoice->id === $invoice->id;
+        Notification::assertSentTo($user, InvoicePaid::class, function ($notification) use ($invoice) {
+            return $notification->invoice->id === $invoice->id;
+        });
     });
-});
-```
+    ```
+  </Tab>
+  <Tab title="PHPUnit">
+    ```php
+    use App\Notifications\InvoicePaid;
+    use Illuminate\Support\Facades\Notification;
 
-```php tab=PHPUnit
-use App\Notifications\InvoicePaid;
-use Illuminate\Support\Facades\Notification;
+    public function test_user_is_notified_when_invoice_is_paid(): void
+    {
+        Notification::fake();
 
-public function test_user_is_notified_when_invoice_is_paid(): void
-{
-    Notification::fake();
+        $user = User::factory()->create();
+        $invoice = Invoice::factory()->for($user)->create();
 
-    $user = User::factory()->create();
-    $invoice = Invoice::factory()->for($user)->create();
+        $this->post("/invoices/{$invoice->id}/pay");
 
-    $this->post("/invoices/{$invoice->id}/pay");
-
-    Notification::assertSentTo($user, InvoicePaid::class, function ($notification) use ($invoice) {
-        return $notification->invoice->id === $invoice->id;
-    });
-}
-```
+        Notification::assertSentTo($user, InvoicePaid::class, function ($notification) use ($invoice) {
+            return $notification->invoice->id === $invoice->id;
+        });
+    }
+    ```
+  </Tab>
+</Tabs>
 
 <Card title="Mail" icon="envelope" href="/en/mail">
   Learn how to build rich HTML email templates with mailable classes and Markdown components.

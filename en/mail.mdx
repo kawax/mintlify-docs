@@ -257,40 +257,45 @@ Route::get('/mailable', function () {
 
 Assert a mailable was sent without actually sending email:
 
-```php tab=Pest
-use App\Mail\OrderShipped;
-use Illuminate\Support\Facades\Mail;
+<Tabs>
+  <Tab title="Pest">
+    ```php
+    use App\Mail\OrderShipped;
+    use Illuminate\Support\Facades\Mail;
 
-test('order confirmation is emailed', function () {
-    Mail::fake();
+    test('order confirmation is emailed', function () {
+        Mail::fake();
 
-    $order = Order::factory()->create();
+        $order = Order::factory()->create();
 
-    $this->post("/orders/{$order->id}/ship");
+        $this->post("/orders/{$order->id}/ship");
 
-    Mail::assertSent(OrderShipped::class, function ($mail) use ($order) {
-        return $mail->order->id === $order->id;
+        Mail::assertSent(OrderShipped::class, function ($mail) use ($order) {
+            return $mail->order->id === $order->id;
+        });
     });
-});
-```
+    ```
+  </Tab>
+  <Tab title="PHPUnit">
+    ```php
+    use App\Mail\OrderShipped;
+    use Illuminate\Support\Facades\Mail;
 
-```php tab=PHPUnit
-use App\Mail\OrderShipped;
-use Illuminate\Support\Facades\Mail;
+    public function test_order_confirmation_is_emailed(): void
+    {
+        Mail::fake();
 
-public function test_order_confirmation_is_emailed(): void
-{
-    Mail::fake();
+        $order = Order::factory()->create();
 
-    $order = Order::factory()->create();
+        $this->post("/orders/{$order->id}/ship");
 
-    $this->post("/orders/{$order->id}/ship");
-
-    Mail::assertSent(OrderShipped::class, function ($mail) use ($order) {
-        return $mail->order->id === $order->id;
-    });
-}
-```
+        Mail::assertSent(OrderShipped::class, function ($mail) use ($order) {
+            return $mail->order->id === $order->id;
+        });
+    }
+    ```
+  </Tab>
+</Tabs>
 
 ## Local development
 
