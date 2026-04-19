@@ -1,0 +1,178 @@
+---
+title: "TCP mode"
+description: "Use a pre-started Copilot CLI server from Laravel Copilot SDK for lower overhead and shared process management."
+---
+
+## TCP mode
+
+By default, the SDK starts a new Copilot CLI process for each request (stdio mode).
+When you use TCP mode, the SDK connects to a pre-started Copilot CLI server instead.
+
+## Benefits of TCP mode
+
+- **Better performance**: No process startup overhead
+- **Shared resources**: Multiple Laravel processes can share one CLI server
+- **Process management**: Run as a background process in Laravel Forge or Laravel Cloud
+- **Deployment-friendly**: Supports automatic restarts during deployments
+
+## Usage
+
+### 1. Start the Copilot CLI server
+
+```shell
+copilot --headless --port 12345
+```
+
+### 2. Set an environment variable
+
+```dotenv
+COPILOT_URL=tcp://127.0.0.1:12345
+# COPILOT_URL=http://127.0.0.1:12345
+# COPILOT_URL=127.0.0.1:12345        The tcp:// prefix is not actually required, so HTTP or no scheme also works
+# COPILOT_URL=12345                  Port-only is supported. Host is automatically set to 127.0.0.1
+# COPILOT_URL=127.0.0.1 or localhost Host-only supports only 127.0.0.1 or localhost. Port defaults to 12345
+```
+
+That is all you need. The SDK switches from stdio mode to TCP mode automatically.
+
+## Configuration file
+
+You can configure the TCP connection in `config/copilot.php`.
+
+```php
+return [
+    // TCP target URL (setting this enables TCP mode)
+    'url' => env('COPILOT_URL'),
+
+    // The options below are used only in stdio mode
+    'cli_path' => env('COPILOT_CLI_PATH', 'copilot'),
+    'cli_args' => [],
+    'cwd' => null,
+    'log_level' => env('COPILOT_LOG_LEVEL', 'info'),
+
+    // Shared by both modes
+    'timeout' => env('COPILOT_TIMEOUT', 60),
+    'model' => env('COPILOT_MODEL'),
+];
+```
+
+If both `COPILOT_URL` and `COPILOT_CLI_PATH` are set, TCP mode takes priority.
+
+## Switch modes at runtime
+
+Usually, mode selection follows the configuration file automatically.
+You can also switch explicitly in code.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+// Switch to TCP mode
+$response = Copilot::useTcp(url: 'tcp://127.0.0.1:12345')->run(prompt: 'Hello, TCP mode!');
+// If omitted, values from the config file are used.
+$response = Copilot::useTcp()->run(prompt: 'Hello, TCP mode!');
+
+// Switch to stdio mode
+$stdio_config = [
+    'cli_path' => 'copilot',
+    'cli_args' => [],
+    'cwd' => base_path(),
+    'log_level' => 'info',
+];
+$response = Copilot::useStdio($stdio_config)->run(prompt: 'Hello, stdio mode!');
+
+// If omitted, values from the config file are used.
+// If both modes are configured, TCP takes priority, so this is useful for temporary override.
+$response = Copilot::useStdio()->run(prompt: 'Hello, stdio mode!');
+```
+
+Some servers may not behave correctly in TCP mode.
+You can split usage, for example using TCP mode for queued jobs and stdio mode only for HTTP request processing.
+
+## Run in Laravel Forge or Laravel Cloud
+
+### Laravel Forge
+
+1. **Create a daemon** in the Forge dashboard
+
+   ```
+   Command: copilot --headless --port 12345
+   User: forge
+   Directory: /home/forge/your-app
+   ```
+
+2. **Set environment variables** by adding `COPILOT_URL` to `.env`
+3. **Restart daemon on deploy** in your deployment script
+
+Currently, this may not be necessary in the latest Forge environments.
+
+```shell
+sudo supervisorctl restart daemon-123456:*
+```
+
+### Laravel Cloud
+
+You can run the process as a background worker in Laravel Cloud.
+
+<Info>
+For details, see the Laravel Cloud documentation: [Introduction](https://cloud.laravel.com/docs/intro).
+</Info>
+
+## Notes
+
+### Security
+
+<Warning>
+Use local binding (`127.0.0.1`) for the TCP server whenever possible.
+If you expose the server externally, configure firewall rules appropriately.
+</Warning>
+
+### Reconnection
+
+There is currently no automatic reconnection.
+If the connection is dropped, the SDK throws an exception.
+
+### Check current mode
+
+You can check which mode the client is using in your code.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$client = Copilot::client();
+
+if ($client->isTcpMode()) {
+    // TCP mode
+} else {
+    // stdio mode
+}
+```
+
+## Troubleshooting
+
+### Cannot connect
+
+1. Check whether the Copilot CLI server is running
+
+```shell
+ps aux | grep "copilot --server"
+```
+
+2. Check whether the port is correct
+
+```shell
+netstat -an | grep 12345
+```
+
+3. Check firewall settings
+
+### Timeout errors
+
+Increase the `timeout` value in `config/copilot.php`.
+
+```php
+'timeout' => 120, // 2 minutes
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

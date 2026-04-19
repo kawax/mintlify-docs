@@ -1,0 +1,150 @@
+---
+title: "Custom providers"
+description: "Configure custom BYOK providers in Laravel Copilot SDK, including OpenAI-compatible endpoints, Ollama, and Azure OpenAI."
+---
+
+## Custom providers
+
+Custom providers (BYOK: Bring Your Own Key) let you connect to OpenAI-compatible API endpoints using your own API key.
+Local providers such as Ollama are also supported.
+
+## ProviderConfig
+
+The `ProviderConfig` class has the following properties.
+
+| Property | Type | Description |
+|---|---|---|
+| `baseUrl` | `string` | **Required.** URL of the API endpoint |
+| `type` | `string\|null` | Provider type: `openai` (default), `azure`, or `anthropic` |
+| `wireApi` | `string\|null` | API format (openai/azure only): `completions` (default) or `responses` |
+| `apiKey` | `string\|null` | API key. Not required for local providers such as Ollama |
+| `bearerToken` | `string\|null` | For Bearer token authentication. Takes priority over `apiKey` |
+| `azure` | `array\|null` | Azure-specific options, for example `['apiVersion' => '2024-10-21']` |
+
+## Basic usage
+
+When using a custom provider, the `model` parameter is **required**.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\ProviderConfig;
+use Revolution\Copilot\Types\SessionConfig;
+
+$response = Copilot::run(
+    prompt: 'Hello!',
+    config: new SessionConfig(
+        model: 'gpt-4', // Required when using a custom provider
+        provider: new ProviderConfig(
+            baseUrl: 'https://my-api.example.com/v1',
+            apiKey: config('services.openai.key'),
+        ),
+    ),
+);
+```
+
+You can also use array format.
+
+```php
+$response = Copilot::run(
+    prompt: 'Hello!',
+    config: [
+        'model' => 'gpt-4',
+        'provider' => [
+            'baseUrl' => 'https://my-api.example.com/v1',
+            'apiKey' => config('services.openai.key'),
+        ],
+    ],
+);
+```
+
+## Ollama (local provider)
+
+For local providers such as Ollama, `apiKey` is not required.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\ProviderConfig;
+use Revolution\Copilot\Types\SessionConfig;
+
+$response = Copilot::run(
+    prompt: 'Hello!',
+    config: new SessionConfig(
+        model: 'deepseek-coder-v2:16b',
+        provider: new ProviderConfig(
+            type: 'openai',
+            baseUrl: 'http://localhost:11434/v1',
+        ),
+    ),
+);
+```
+
+## Azure OpenAI
+
+When using Azure OpenAI, keep these points in mind:
+
+- Always set `type` to `azure` (not `openai`)
+- Set `baseUrl` to host only (do not include path like `/openai/v1`)
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\ProviderConfig;
+use Revolution\Copilot\Types\SessionConfig;
+
+$response = Copilot::run(
+    prompt: 'Hello!',
+    config: new SessionConfig(
+        model: 'gpt-4',
+        provider: new ProviderConfig(
+            type: 'azure', // Always use 'azure' for Azure endpoints
+            baseUrl: 'https://my-resource.openai.azure.com', // Host only
+            apiKey: config('services.azure.openai_key'),
+            azure: [
+                'apiVersion' => '2024-10-21',
+            ],
+        ),
+    ),
+);
+```
+
+## Important notes
+
+<Warning>
+When you use a custom provider, `model` is required.
+If you omit it, the SDK returns an error.
+</Warning>
+
+- For Azure endpoints (`*.openai.azure.com`), always use `type: 'azure'`.
+- Set `baseUrl` to host only. The SDK builds request paths automatically.
+
+## onListModels handler
+
+In BYOK mode with a custom provider, you can make `client->listModels()` call a custom handler instead of the CLI server.
+
+Configure it with `listModelsUsing()`.
+Because the client may be re-initialized, always set `listModelsUsing()` before calling `listModels()`.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\ModelInfo;
+
+$models = Copilot::client()->listModelsUsing(function (): array {
+    // Return models available from your custom provider
+    return [
+        ['id' => 'my-model-1', 'name' => 'My Model 1', 'version' => '1.0'],
+        ['id' => 'my-model-2', 'name' => 'My Model 2', 'version' => '2.0'],
+    ];
+})->listModels();
+```
+
+Pass `null` to remove the handler and return to default CLI server behavior.
+
+```php
+// Remove the handler and return to default behavior (query CLI server)
+$models = Copilot::client()->listModelsUsing(null)->listModels();
+```
+
+When `listModelsUsing()` is set, `listModels()` does not require a CLI server connection and does not use cache.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

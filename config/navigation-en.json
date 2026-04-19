@@ -349,13 +349,16 @@
               "en/packages/laravel-copilot-sdk/github-actions",
               "en/packages/laravel-copilot-sdk/github-token",
               "en/packages/laravel-copilot-sdk/session-event",
-              "en/packages/laravel-copilot-sdk/session-config",
-              "en/packages/laravel-copilot-sdk/session-context",
-              "en/packages/laravel-copilot-sdk/session-lifecycle",
-              "en/packages/laravel-copilot-sdk/mcp"
-            ]
-          }
-        ]
+               "en/packages/laravel-copilot-sdk/session-config",
+               "en/packages/laravel-copilot-sdk/session-context",
+               "en/packages/laravel-copilot-sdk/session-lifecycle",
+               "en/packages/laravel-copilot-sdk/mcp",
+               "en/packages/laravel-copilot-sdk/tcp-mode",
+               "en/packages/laravel-copilot-sdk/telemetry",
+               "en/packages/laravel-copilot-sdk/custom-providers"
+             ]
+           }
+         ]
       }
   ]
 }
