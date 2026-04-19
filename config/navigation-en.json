@@ -329,6 +329,22 @@
           ]
         }
       ]
+    },
+    {
+      "tab": "My Packages",
+      "groups": [
+        {
+          "group": "Laravel Copilot SDK",
+          "pages": [
+            "en/packages/laravel-copilot-sdk/basic-usage",
+            "en/packages/laravel-copilot-sdk/auth",
+            "en/packages/laravel-copilot-sdk/models",
+            "en/packages/laravel-copilot-sdk/tools",
+            "en/packages/laravel-copilot-sdk/events",
+            "en/packages/laravel-copilot-sdk/streaming"
+          ]
+        }
+      ]
     }
   ]
 }

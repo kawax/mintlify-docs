@@ -1,0 +1,23 @@
+---
+title: "Models"
+description: "List supported Copilot CLI models and select model IDs in Laravel Copilot SDK session configuration."
+---
+
+## Model list
+
+Use `Copilot::client()->listModels()` to get the list of models supported by Copilot CLI.
+
+Available models can change based on Copilot CLI updates and your organization policy.
+Treat the model list document as a reference.
+
+## Specifying a model ID
+
+Set the model `ID` in `SessionConfig.model`.
+
+```php
+Copilot::run($prompt, config: ['model' => 'auto']);
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
