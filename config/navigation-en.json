@@ -350,17 +350,17 @@
               "en/packages/laravel-copilot-sdk/github-token",
               "en/packages/laravel-copilot-sdk/session-event",
               "en/packages/laravel-copilot-sdk/session-config",
-               "en/packages/laravel-copilot-sdk/session-context",
-               "en/packages/laravel-copilot-sdk/session-lifecycle",
-               "en/packages/laravel-copilot-sdk/mcp",
-               "en/packages/laravel-copilot-sdk/ai-sdk",
-               "en/packages/laravel-copilot-sdk/bundle-cli",
-               "en/packages/laravel-copilot-sdk/laravel-cloud",
-               "en/packages/laravel-copilot-sdk/send-on",
-               "en/packages/laravel-copilot-sdk/resume"
-             ]
-           }
-         ]
-       }
+              "en/packages/laravel-copilot-sdk/session-context",
+              "en/packages/laravel-copilot-sdk/session-lifecycle",
+              "en/packages/laravel-copilot-sdk/mcp",
+              "en/packages/laravel-copilot-sdk/ai-sdk",
+              "en/packages/laravel-copilot-sdk/bundle-cli",
+              "en/packages/laravel-copilot-sdk/laravel-cloud",
+              "en/packages/laravel-copilot-sdk/send-on",
+              "en/packages/laravel-copilot-sdk/resume"
+            ]
+          }
+        ]
+      }
   ]
 }

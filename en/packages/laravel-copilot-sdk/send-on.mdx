@@ -1,65 +1,107 @@
 ---
-title: "Laravel AI SDK integration"
-description: "Enable the experimental Laravel AI SDK integration in Laravel Copilot SDK for text generation and streaming."
+title: "send() and on()"
+description: "Use send(), sendAndWait(), and on() together in Laravel Copilot SDK to receive both intermediate and final assistant messages."
 ---
 
-## Laravel AI SDK integration
+## Session `send()` and `on()`
 
-- Experimental implementation
-- Supports only text generation. Other features are not supported yet.
-
-This is an opt-in feature that is enabled only when Laravel AI SDK is installed.
-
-```shell
-composer require laravel/ai
-php artisan vendor:publish --provider="Laravel\Ai\AiServiceProvider"
-```
-
-Add configuration to `config/ai.php`.
+`sendAndWait()` is easy to understand because it returns quickly, but you only receive the **final assistant message**.
 
 ```php
-// config/ai.php
-    'default' => 'copilot',
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
 
-    'providers' => [
-        'copilot' => [
-            'driver' => 'copilot',
-            'key' => '',
-        ],
-    ],
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+    dump($response->content());
+});
 ```
 
-Usage with the `agent()` helper:
+If you also want intermediate messages, register an event listener with `on()`.
 
 ```php
-use function Laravel\Ai\agent;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
 
-$response = agent(
-    instructions: 'You are an expert at software development.',
-)->prompt('Tell me about Laravel');
+Copilot::start(function (CopilotSession $session) {
+    $session->on(function (SessionEvent $event): void {
+        if ($event->isAssistantMessage()) {
+            dump($event->content());
+        } else {
+            dump($event);
+        }
+    });
 
-echo $response->text;
+    $message_id = $session->send(prompt: 'Tell me something about Laravel.');
+
+    // Wait for incoming messages in a loop
+    $session->wait(timeout: 60.0);
+});
 ```
 
-Streaming is also supported. Only `TextDelta` is implemented.
+In PHP, this can be hard to read, so combining `on()` with `sendAndWait()` is recommended.
 
 ```php
-use Laravel\Ai\Streaming\Events\TextDelta;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
 
-use function Laravel\Ai\agent;
+Copilot::start(function (CopilotSession $session) {
+    $session->on(function (SessionEvent $event): void {
+        if ($event->isAssistantMessage()) {
+            dump($event->content());
+        } else {
+            dump($event);
+        }
+    });
 
-$stream = agent(
-    instructions: 'You are an expert at software development.',
-)->stream('Tell me about Laravel');
+    $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
 
-foreach ($stream as $event) {
-    if ($event instanceof TextDelta) {
-        echo $event->delta;
-    }
-}
+    // The wait loop is handled inside sendAndWait(), so by this point
+    // you have already received messages up to the final one.
+    // Intermediate messages are handled by on() above.
+
+    // The final message from sendAndWait() is unnecessary here.
+    // dump($response->content());
+});
 ```
 
-You can also use the standard Laravel AI SDK approach with Agent classes, but only part of the features are supported.
+## Subscribe to a specific event type with `on()`
+
+You can subscribe to only one event by passing a `SessionEventType` enum value or a string.
+
+```php
+use Revolution\Copilot\Enums\SessionEventType;
+use Revolution\Copilot\Types\SessionEvent;
+
+$session->on(SessionEventType::ASSISTANT_MESSAGE, function (SessionEvent $event): void {
+    dump($event->content());
+});
+
+$session->on('assistant.message', function (SessionEvent $event): void {
+    dump($event->content());
+});
+```
+
+## Subscribe to all event types
+
+If you do not specify an event type, it subscribes to all events.
+
+```php
+use Revolution\Copilot\Enums\SessionEventType;
+use Revolution\Copilot\Types\SessionEvent;
+
+$session->on(function (SessionEvent $event): void {
+});
+
+// You can also use named arguments
+$session->on(handler: function (SessionEvent $event): void {
+});
+
+// Dynamic type assignment that allows null is also possible.
+$type = null;
+$session->on(type: $type, handler: function (SessionEvent $event): void {
+});
+```
 
 <Info>
 For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
