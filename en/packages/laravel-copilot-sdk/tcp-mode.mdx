@@ -28,12 +28,17 @@ copilot --headless --port 12345
 ```dotenv
 COPILOT_URL=tcp://127.0.0.1:12345
 # COPILOT_URL=http://127.0.0.1:12345
-# COPILOT_URL=127.0.0.1:12345        The tcp:// prefix is not actually required, so HTTP or no scheme also works
-# COPILOT_URL=12345                  Port-only is supported. Host is automatically set to 127.0.0.1
-# COPILOT_URL=127.0.0.1 or localhost Host-only supports only 127.0.0.1 or localhost. Port defaults to 12345
+# COPILOT_URL=127.0.0.1:12345
+# COPILOT_URL=12345
+# COPILOT_URL=127.0.0.1
+# COPILOT_URL=localhost
 ```
 
 That is all you need. The SDK switches from stdio mode to TCP mode automatically.
+
+- The `tcp://` scheme is optional. `http://` or no scheme also works.
+- Port-only format is supported. In that case, host defaults to `127.0.0.1`.
+- Host-only format supports `127.0.0.1` and `localhost`. In that case, port defaults to `12345`.
 
 ## Configuration file
 
