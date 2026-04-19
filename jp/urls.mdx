@@ -67,7 +67,7 @@ echo url()->current();
 echo url()->full();
 ```
 
-これらのメソッドは `URL` [ファサード](/docs/facades)からもアクセスできます。
+これらのメソッドは `URL` [ファサード](./facades)からもアクセスできます。
 
 ```php
 use Illuminate\Support\Facades\URL;
@@ -107,7 +107,7 @@ $previousRoute = $request->session()->previousRoute();
 
 ## 名前付きルートのURL
 
-`route` ヘルパーは[名前付きルート](/docs/routing#named-routes)へのURLを生成するために使えます。
+`route` ヘルパーは[名前付きルート](./routing#named-routes)へのURLを生成するために使えます。
 名前付きルートを使うと、ルートに定義された実際のURLに依存せずにURLを生成できます。
 そのため、ルートのURLが変更されても、`route` 関数の呼び出しを変更する必要がありません。
 
@@ -229,7 +229,7 @@ if (! $request->hasValidSignatureWhileIgnoring(['page', 'order'])) {
 }
 ```
 
-受信リクエストインスタンスを使う代わりに、`signed`（`Illuminate\Routing\Middleware\ValidateSignature`）[ミドルウェア](/docs/middleware)をルートに割り当てることもできます。
+受信リクエストインスタンスを使う代わりに、`signed`（`Illuminate\Routing\Middleware\ValidateSignature`）[ミドルウェア](./middleware)をルートに割り当てることもできます。
 受信リクエストに有効な署名がない場合、ミドルウェアは自動的に `403` HTTPレスポンスを返します。
 
 ```php
@@ -324,7 +324,7 @@ Route::get('/{locale}/posts', function () {
 
 `route` ヘルパーを呼び出すたびに `locale` を渡すのは面倒です。
 そこで `URL::defaults` メソッドを使って、現在のリクエスト中に常に適用されるこのパラメータのデフォルト値を定義できます。
-このメソッドは[ルートミドルウェア](/docs/middleware#assigning-middleware-to-routes)から呼び出すと、現在のリクエストにアクセスできます。
+このメソッドは[ルートミドルウェア](./middleware#assigning-middleware-to-routes)から呼び出すと、現在のリクエストにアクセスできます。
 
 ```php
 <?php
@@ -356,7 +356,7 @@ class SetDefaultLocaleForUrls
 
 <Info>
 URLデフォルト値の設定はLaravelの暗黙的なモデルバインディングの処理を妨げる場合があります。
-URLデフォルト値を設定するミドルウェアをLaravel自身の `SubstituteBindings` ミドルウェアより前に実行されるよう[ミドルウェアの優先度設定](/docs/middleware#sorting-middleware)を行ってください。
+URLデフォルト値を設定するミドルウェアをLaravel自身の `SubstituteBindings` ミドルウェアより前に実行されるよう[ミドルウェアの優先度設定](./middleware#sorting-middleware)を行ってください。
 アプリケーションの `bootstrap/app.php` ファイルで `priority` ミドルウェアメソッドを使って設定できます。
 
 ```php
