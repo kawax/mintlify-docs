@@ -1,0 +1,119 @@
+---
+title: "Steering and queuing"
+description: "Understand steering and queuing modes in Laravel Copilot SDK and when each mode is practical in Laravel applications."
+---
+
+## Steering and queuing
+
+<Info>
+In normal Laravel application flows, you usually do not use steering directly.
+This is mainly an internal SDK-level capability and is harder to benefit from in synchronous Laravel patterns.
+</Info>
+
+There are two patterns for sending messages while an agent is processing: **steering** and **queuing**.
+
+## Overview
+
+All of `send()`, `sendAndWait()`, `sendAndStream()`, and `Copilot::run()` have a `$mode` parameter.
+
+| Mode | Behavior |
+|---|---|
+| `"enqueue"` (default) | Processed as queued work after the current turn completes |
+| `"immediate"` (steering) | Injected immediately into the turn currently in progress |
+
+## Steering (`"immediate"`)
+
+This injects a message directly into the turn the agent is currently processing.
+The agent receives it in real time and adjusts the response.
+Use this when you want to correct direction without interrupting ongoing work.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Contracts\CopilotSession;
+
+Copilot::start(function (CopilotSession $session) {
+    // Start a long-running task
+    $messageId = $session->send(prompt: 'Refactor the authentication module to use sessions');
+
+    // Correct direction while the agent is processing
+    $session->send(
+        prompt: 'Actually, use JWT tokens instead of sessions',
+        mode: 'immediate',
+    );
+
+    // Wait until idle
+    $response = $session->sendAndWait(prompt: 'Summarize what you did');
+});
+```
+
+<Warning>
+Steering is best-effort.
+If the agent already committed a tool call, steering is applied after that tool call completes, but still within the same turn.
+If the steering message arrives after the turn is already complete, it is automatically moved to the queue.
+</Warning>
+
+## Queuing (`"enqueue"`)
+
+This adds messages to a queue and processes them in order after the current turn completes.
+Each queued message runs as an independent turn.
+This is the default behavior when `$mode` is omitted.
+
+```php
+Copilot::start(function (CopilotSession $session) {
+    // Start the first task
+    $session->send(prompt: 'Set up the project structure');
+
+    // Add follow-up tasks to queue while the agent is processing
+    $session->send(prompt: 'Add unit tests for the auth module', mode: 'enqueue');
+    $session->send(prompt: 'Update the README with setup instructions', mode: 'enqueue');
+
+    // Wait until the queue is empty
+});
+```
+
+## Practical perspective in Laravel
+
+In Laravel, synchronous patterns with `Copilot::run()` and `sendAndWait()` are common.
+These send a message and wait until idle, so there is **no practical chance to interrupt while the agent is processing, and `$mode` is effectively irrelevant**.
+
+```php
+// Copilot::run() internally calls sendAndWait(),
+// so specifying mode has no practical effect
+
+$response = Copilot::run(prompt: 'Tell me something about Laravel.');
+
+// Also unnecessary when you only call sendAndWait() in sequence inside a session
+Copilot::start(function (CopilotSession $session) {
+    $r1 = $session->sendAndWait(prompt: 'First task');
+    $r2 = $session->sendAndWait(prompt: 'Second task');
+});
+```
+
+Steering (`"immediate"`) is useful when you send messages asynchronously with `send()` and can intervene in an in-progress turn using another message.
+In Laravel's synchronous flow, creating that opportunity is difficult, so **it is usually best to keep the default mode and avoid specifying `$mode`**.
+
+## Which should you use?
+
+| Situation | Pattern |
+|---|---|
+| The agent is going in the wrong direction | Steering (`"immediate"`) |
+| You thought of the next task | Queuing (`"enqueue"`) |
+| You want to run multiple tasks in order | Queuing (`"enqueue"`) |
+| Typical Laravel app | Default (`$mode` not needed) |
+
+## Best practices
+
+- **Default to queuing** — Omitting `$mode` (or using `"enqueue"`) is appropriate in most cases. It gives predictable behavior.
+- **Use steering for correction** — Use `"immediate"` only when the agent is clearly doing the wrong thing.
+- **Keep steering messages concise** — Use short messages understandable in the current context. Long and complex steering messages can cause confusion.
+- **Avoid repeated steering bursts** — Sending multiple steering messages in a short time can degrade turn quality. For major direction changes, it may be better to stop the turn and restart.
+
+## See also
+
+- [Basic usage](/en/packages/laravel-copilot-sdk/basic-usage)
+- [Streaming](/en/packages/laravel-copilot-sdk/streaming)
+- [send-on](/en/packages/laravel-copilot-sdk/send-on)
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

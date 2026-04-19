@@ -1,0 +1,294 @@
+---
+title: "RPC (Remote Procedure Call)"
+description: "Use ServerRpc and SessionRpc in Laravel Copilot SDK to call generated protocol methods for models, tools, permissions, and more."
+---
+
+## RPC (Remote Procedure Call)
+
+In the official SDK, recent new features are supported through auto-generated code from `api.schema.json`.
+In the Laravel version, the same features are implemented by following generated SDKs for other languages.
+
+## ServerRpc
+
+An RPC class bound to the Client.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\Rpc\ModelList;
+
+// Get model list
+// Return value is ModelList
+$result = Copilot::client()->rpc()->models()->list();
+// models is an array of ModelInfo
+$models = $result->models;
+
+// Almost the same as the existing listModels()
+// Return value is an array of ModelInfo
+Copilot::client()->listModels();
+```
+
+Functions that were already included in the SDK are also added again in the auto-generated version.
+
+### Method list
+
+```php
+Copilot::client()->rpc()->ping();
+
+// models
+Copilot::client()->rpc()->models()->list();
+
+// tools
+Copilot::client()->rpc()->tools()->list();
+
+// account
+Copilot::client()->rpc()->account()->getQuota();
+
+// mcp config (manage MCP server settings)
+Copilot::client()->rpc()->mcp()->list();
+Copilot::client()->rpc()->mcp()->add(new McpConfigAddRequest(
+    name: 'my-server',
+    config: new McpServerValue(type: 'local', command: 'php', args: ['artisan', 'mcp']),
+));
+Copilot::client()->rpc()->mcp()->update(new McpConfigUpdateRequest(
+    name: 'my-server',
+    config: new McpServerValue(type: 'http', url: 'https://mcp.example.com'),
+));
+Copilot::client()->rpc()->mcp()->remove(new McpConfigRemoveRequest(name: 'my-server'));
+
+// mcp discover (auto-discover MCP servers)
+Copilot::client()->rpc()->mcp()->discover(new McpDiscoverRequest(
+    workingDirectory: '/path/to/project',
+));
+// Can run without arguments
+$result = Copilot::client()->rpc()->mcp()->discover();
+// $result->servers is an array of DiscoveredMcpServer
+
+// sessionFs (register session filesystem provider)
+Copilot::client()->rpc()->sessionFs()->setProvider(new SessionFsSetProviderRequest(
+    initialCwd: '/path/to/project',
+    sessionStatePath: '.copilot/sessions',
+    conventions: 'posix',
+));
+
+// sessions (experimental: fork sessions)
+Copilot::client()->rpc()->sessions()->fork(new SessionsForkRequest(
+    sessionId: 'source-session-id',
+    toEventId: 'evt-boundary', // Optional: include only events before this ID
+));
+
+// skills (manage server-level skills)
+// Discover skills
+$result = Copilot::client()->rpc()->skills()->discover();
+// $result->skills is an array of ServerSkill
+// Optionally specify project paths
+$result = Copilot::client()->rpc()->skills()->discover(new SkillsDiscoverRequest(
+    projectPaths: ['/path/to/project'],
+    skillDirectories: ['/custom/skills'],
+));
+
+// Configure disabled skills
+Copilot::client()->rpc()->skills()->config()->setDisabledSkills(
+    new SkillsConfigSetDisabledSkillsRequest(disabledSkills: ['skill-name'])
+);
+```
+
+## SessionRpc
+
+An RPC class bound to a Session.
+
+This also enables features that were not available in older SDK versions, such as plan mode.
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\Rpc\ModeSetRequest;
+use Revolution\Copilot\Types\Rpc\PlanReadResult;
+
+Copilot::start(function (CopilotSession $session) {
+    $session->rpc()->mode()->set(new ModeSetRequest(mode: 'plan'));
+
+    $response = $session->sendAndWait(prompt: '〇〇のプランを作成');
+
+    $result = $session->rpc()->plan()->read();
+    dump($result->content);
+
+    $session->rpc()->mode()->set(new ModeSetRequest(mode: 'autopilot'));
+
+    $response = $session->sendAndWait(prompt: 'プランに従って実装');
+    dump($response->content());
+});
+```
+
+### Method list
+
+```php
+// model
+$session->rpc()->model()->getCurrent();
+$session->rpc()->model()->switchTo(new ModelSwitchToRequest(modelId: 'gpt-4'));
+// When specifying reasoningEffort (supported models only)
+$session->rpc()->model()->switchTo(new ModelSwitchToRequest(modelId: 'claude-opus-4.7', reasoningEffort: ReasoningEffort::HIGH));
+// When overriding modelCapabilities
+$session->rpc()->model()->switchTo(new ModelSwitchToRequest(
+    modelId: 'gpt-4',
+    modelCapabilities: new ModelCapabilitiesOverride(
+        supports: new ModelCapabilitiesOverrideSupports(vision: true),
+    ),
+));
+
+// You can also specify reasoningEffort and modelCapabilities with the setModel() helper
+$session->setModel('claude-opus-4.7', ReasoningEffort::HIGH);
+$session->setModel('claude-opus-4.7', 'high'); // String is also supported
+$session->setModel('gpt-4', modelCapabilities: ['supports' => ['vision' => true]]); // Array is also supported
+
+// mode
+$session->rpc()->mode()->get();
+$session->rpc()->mode()->set(new ModeSetRequest(mode: 'plan'));
+
+// name
+$session->rpc()->name()->get();
+$session->rpc()->name()->set(new NameSetRequest(name: 'My Session'));
+
+// plan
+$session->rpc()->plan()->read();
+$session->rpc()->plan()->update(new PlanUpdateRequest(content: '...'));
+$session->rpc()->plan()->delete();
+
+// workspaces
+$session->rpc()->workspaces()->getWorkspace();
+$session->rpc()->workspaces()->listFiles();
+$session->rpc()->workspaces()->readFile(new WorkspacesReadFileRequest(path: 'file.txt'));
+$session->rpc()->workspaces()->createFile(new WorkspacesCreateFileRequest(path: 'file.txt', content: '...'));
+
+// fleet
+$session->rpc()->fleet()->start(new FleetStartRequest(prompt: '...'));
+
+// agent
+$session->rpc()->agent()->list();
+$session->rpc()->agent()->getCurrent();
+$session->rpc()->agent()->select(new AgentSelectRequest(agentId: '...'));
+$session->rpc()->agent()->deselect();
+$session->rpc()->agent()->reload();
+
+// skills (experimental: manage skills)
+$session->rpc()->skills()->list();
+$session->rpc()->skills()->enable(new SkillsEnableRequest(name: 'skill-name'));
+$session->rpc()->skills()->disable(new SkillsDisableRequest(name: 'skill-name'));
+$session->rpc()->skills()->reload();
+
+// mcp (experimental: manage MCP servers)
+$session->rpc()->mcp()->list();
+$session->rpc()->mcp()->enable(new McpEnableRequest(serverName: 'server-name'));
+$session->rpc()->mcp()->disable(new McpDisableRequest(serverName: 'server-name'));
+$session->rpc()->mcp()->reload();
+
+// plugins (experimental: list plugins)
+$session->rpc()->plugins()->list();
+
+// extensions (experimental: manage extensions)
+$session->rpc()->extensions()->list();
+$session->rpc()->extensions()->enable(new ExtensionsEnableRequest(id: 'project:my-ext'));
+$session->rpc()->extensions()->disable(new ExtensionsDisableRequest(id: 'project:my-ext'));
+$session->rpc()->extensions()->reload();
+
+// compaction was renamed to history
+$session->rpc()->history()->compact();
+// Truncate history from a specific event onward
+$session->rpc()->history()->truncate(new HistoryTruncateRequest(
+    eventId: 'evt-123', // This event and all later events are removed
+));
+
+// tools (protocol v3+: respond to external_tool.requested events)
+$session->rpc()->tools()->handlePendingToolCall(new ToolsHandlePendingToolCallRequest(
+    requestId: '...',
+    result: 'ツールの実行結果',
+));
+
+// permissions (protocol v3+: respond to permission.requested events)
+$session->rpc()->permissions()->handlePendingPermissionRequest(new PermissionDecisionRequest(
+    requestId: '...',
+    result: PermissionRequestResultKind::approved(),
+));
+
+// commands: respond to command invocation events
+$session->rpc()->commands()->handlePendingCommand(new CommandsHandlePendingCommandRequest(
+    requestId: '...',
+));
+
+// ui: respond to UI elicitation request
+$session->rpc()->ui()->elicitation(new UIElicitationRequest(
+    message: 'ユーザーへの質問',
+    requestedSchema: ['type' => 'object', 'properties' => [...]],
+));
+
+// ui: respond to pending elicitation request (via elicitation.requested event)
+$session->rpc()->ui()->handlePendingElicitation(new UIHandlePendingElicitationRequest(
+    requestId: '...',
+    result: ['action' => 'accept', 'content' => ['name' => 'John']],
+));
+
+// log: record messages to the session timeline
+$session->rpc()->log()->log(new LogRequest(message: '処理を開始しました'));
+$session->rpc()->log()->log(new LogRequest(message: 'ディスク使用量が多い', level: LogLevel::WARNING));
+$session->rpc()->log()->log(new LogRequest(message: 'エラーが発生しました', level: LogLevel::ERROR));
+$session->rpc()->log()->log(new LogRequest(message: 'デバッグ情報', ephemeral: true));
+
+// shell: run shell commands in session
+$result = $session->rpc()->shell()->exec(new ShellExecRequest(command: 'ls -la'));
+// Get process ID from $result->processId for stop or output tracking
+
+$session->rpc()->shell()->exec(new ShellExecRequest(
+    command: 'npm test',
+    cwd: '/path/to/project',
+    timeout: 60000, // Milliseconds
+));
+
+// Stop a running shell process
+$session->rpc()->shell()->kill(new ShellKillRequest(
+    processId: $result->processId,
+    signal: 'SIGTERM', // SIGTERM (default), SIGKILL, SIGINT
+));
+
+// usage (experimental: session usage metrics)
+$metrics = $session->rpc()->usage()->getMetrics();
+// $metrics->totalPremiumRequestCost - total premium request cost
+// $metrics->totalUserRequests - total number of user requests
+// $metrics->codeChanges - code change metrics (added lines, deleted lines, changed files)
+// $metrics->modelMetrics - per-model token usage and request count
+// $metrics->currentModel - current model identifier
+```
+
+## SessionFS callback types
+
+Callback types (Request/Result) are defined for session-scoped filesystem operations.
+These are request/response types used when Copilot CLI calls back to the client.
+
+| Type class | Usage |
+|---|---|
+| `SessionFsReadFileRequest` / `SessionFsReadFileResult` | Read file |
+| `SessionFsWriteFileRequest` | Write file |
+| `SessionFsAppendFileRequest` | Append file |
+| `SessionFsExistsRequest` / `SessionFsExistsResult` | Check file exists |
+| `SessionFsStatRequest` / `SessionFsStatResult` | Get file metadata |
+| `SessionFsMkdirRequest` | Create directory |
+| `SessionFsReaddirRequest` / `SessionFsReaddirResult` | List directory |
+| `SessionFsReaddirWithTypesRequest` / `SessionFsReaddirWithTypesResult` | List directory with types |
+| `SessionFsRmRequest` | Delete file/directory |
+| `SessionFsRenameRequest` | Rename file/directory |
+
+These type classes are in `src/Types/Rpc/`.
+
+## Using arrays for arguments
+
+Dedicated classes are used for both arguments and return values, but you can also pass arguments as arrays.
+
+```php
+$session->rpc()->mode()->set(['mode' => 'plan']);
+```
+
+## Testing
+
+`Copilot::fake()` mocks are not available, so mock with `Copilot::expects('client')` or `Copilot::expects('start')`.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

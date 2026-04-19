@@ -360,10 +360,14 @@
                "en/packages/laravel-copilot-sdk/resume",
                "en/packages/laravel-copilot-sdk/tcp-mode",
                "en/packages/laravel-copilot-sdk/telemetry",
-               "en/packages/laravel-copilot-sdk/custom-providers"
-             ]
-           }
-         ]
+               "en/packages/laravel-copilot-sdk/custom-providers",
+               "en/packages/laravel-copilot-sdk/rpc",
+               "en/packages/laravel-copilot-sdk/permission-request",
+               "en/packages/laravel-copilot-sdk/hooks",
+               "en/packages/laravel-copilot-sdk/steering"
+              ]
+            }
+          ]
       }
   ]
 }
