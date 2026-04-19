@@ -1,0 +1,146 @@
+---
+title: "Telemetry"
+description: "Enable OpenTelemetry tracing in Laravel Copilot SDK and propagate W3C Trace Context between your app and Copilot CLI."
+---
+
+## OpenTelemetry
+
+Copilot CLI includes built-in OpenTelemetry tracing.
+By configuring it in the SDK, you can collect trace data from the CLI process.
+
+## Basic usage
+
+### Enable tracing for the CLI process
+
+Add telemetry settings to `config/copilot.php`, or pass options directly.
+
+```php
+// config/copilot.php
+'telemetry' => [
+    'otlpEndpoint' => 'http://localhost:4318',
+],
+```
+
+Or set it directly:
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\TelemetryConfig;
+
+Copilot::useStdio([
+    'telemetry' => new TelemetryConfig(
+        otlpEndpoint: 'http://localhost:4318',
+    )
+]);
+
+$response = Copilot::run(prompt: 'Hello');
+```
+
+When using the client directly:
+
+```php
+use Revolution\Copilot\Client;
+use Revolution\Copilot\Types\TelemetryConfig;
+
+$client = new Client([
+    'telemetry' => new TelemetryConfig(
+        otlpEndpoint: 'http://localhost:4318',
+    ),
+]);
+```
+
+### TelemetryConfig options
+
+| Option | Description |
+|---|---|
+| `otlpEndpoint` | OTLP HTTP endpoint URL |
+| `filePath` | File path for JSON-lines trace output |
+| `exporterType` | `"otlp-http"` or `"file"` |
+| `sourceName` | Instrumentation scope name |
+| `captureContent` | Whether to capture message content (prompts, responses) |
+
+## W3C Trace Context propagation
+
+<Info>
+Most users do not need this feature.
+`TelemetryConfig` is enough to collect CLI traces.
+Use the advanced flow below only when you want to create custom OpenTelemetry spans in your app and display them in the same distributed trace as CLI spans.
+</Info>
+
+The SDK automatically injects W3C Trace Context (`traceparent` and `tracestate`) into JSON-RPC requests for `session.create`, `session.resume`, and `session.send`.
+
+### Automatic propagation (recommended)
+
+Install `open-telemetry/api`.
+Trace context then propagates automatically.
+
+```shell
+composer require open-telemetry/api open-telemetry/sdk
+```
+
+After installation, no extra setup is required.
+Your application spans and CLI spans are linked in one distributed trace.
+
+### Custom provider
+
+Use this if you want custom trace context acquisition logic.
+
+```php
+use Revolution\Copilot\Support\TraceContext;
+
+TraceContext::useProvider(function (): array {
+    return [
+        'traceparent' => '00-traceid-spanid-01',
+        'tracestate' => 'vendor=value',
+    ];
+});
+```
+
+### SDK → CLI (outbound)
+
+The SDK automatically injects `traceparent` and `tracestate` into these RPC calls:
+
+- `session.create` — when creating a session
+- `session.resume` — when resuming a session
+- `session.send` — when sending a message
+
+### CLI → SDK (inbound)
+
+When the CLI invokes a tool, trace context is included in the tool handler `$invocation` array:
+
+```php
+$session->registerTools([
+    [
+        'name' => 'my-tool',
+        'description' => 'My custom tool',
+        'handler' => function (array $args, array $invocation) {
+            // Trace context from a CLI span
+            $traceparent = $invocation['traceparent'] ?? null;
+            $tracestate = $invocation['tracestate'] ?? null;
+
+            // If open-telemetry/api is installed,
+            // context is restored automatically and
+            // spans created here become child spans of the CLI span.
+
+            return 'result';
+        },
+    ],
+]);
+```
+
+If `open-telemetry/api` is installed, OpenTelemetry context during tool execution links automatically to CLI spans.
+You do not need to use `traceparent` explicitly.
+
+## Dependencies
+
+| Package | Purpose |
+|---|---|
+| `open-telemetry/api` | Automatic Trace Context propagation (suggested, optional) |
+| `open-telemetry/sdk` | Trace data export |
+
+`open-telemetry/api` is listed in `composer.json` as `suggest`.
+The SDK itself works normally even if it is not installed.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
