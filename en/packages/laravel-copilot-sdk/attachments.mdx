@@ -1,0 +1,81 @@
+---
+title: "Attachments"
+description: "Attach files, directories, selections, and blobs when sending prompts with the Laravel Copilot SDK."
+---
+
+## File attachments
+
+Pass files or directories as an array:
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$attachments = [
+    [
+        'type' => 'file',
+        'path' => '/path/to/file.php',
+        'displayName' => 'My File', // optional
+    ],
+    [
+        'type' => 'directory',
+        'path' => '/path/to/dir/',
+        'displayName' => 'dir', // optional
+    ],
+    [
+        'type' => 'selection',
+        'filePath' => '/path/to/file.php',
+        'displayName' => 'My File', // required for selection
+        'selection' => [
+            'start' => ['line' => 1, 'character' => 10],
+            'end' => ['line' => 5, 'character' => 10],
+        ],
+        'text' => '...',
+    ],
+    [
+        'type' => 'blob',
+        'data' => base64_encode(file_get_contents('/path/to/image.png')),
+        'mimeType' => 'image/png',
+        'displayName' => 'screenshot.png', // optional
+    ],
+];
+
+$response = Copilot::run(prompt: '...', attachments: $attachments);
+```
+
+Use helpers when you want a simpler API:
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Support\Attachment;
+
+$attachments = [
+    Attachment::file(path: '/path/to/file.php', displayName: 'My File'),
+    Attachment::directory(path: '/path/to/dir/', displayName: 'dir'),
+    Attachment::selection(filePath: '/path/to/file.php', displayName: 'My File', selection: ['start' => ['line' => 1, 'character' => 10], 'end' => ['line' => 5, 'character' => 10]], text: '...'),
+    Attachment::blob(data: base64_encode(file_get_contents('/path/to/image.png')), mimeType: 'image/png', displayName: 'screenshot.png'),
+];
+
+$response = Copilot::run(prompt: '...', attachments: $attachments);
+```
+
+## Blob attachments
+
+Use the `blob` type to attach Base64-encoded data inline. This lets you send binary payloads such as images without writing temp files.
+
+```php
+use Revolution\Copilot\Support\Attachment;
+
+$attachment = Attachment::blob(
+    data: base64_encode(file_get_contents('/path/to/image.png')),
+    mimeType: 'image/png',
+    displayName: 'screenshot.png',
+);
+```
+
+<Info>
+`selection` and `github_reference` currently have limited official SDK documentation. Details may change.
+</Info>
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

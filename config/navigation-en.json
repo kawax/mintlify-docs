@@ -335,21 +335,27 @@
       "groups": [
         {
           "group": "Laravel Copilot SDK",
-          "pages": [
-            "en/packages/laravel-copilot-sdk/basic-usage",
-            "en/packages/laravel-copilot-sdk/auth",
-            "en/packages/laravel-copilot-sdk/models",
-            "en/packages/laravel-copilot-sdk/tools",
-            "en/packages/laravel-copilot-sdk/events",
-            "en/packages/laravel-copilot-sdk/streaming",
-            "en/packages/laravel-copilot-sdk/session-event",
-            "en/packages/laravel-copilot-sdk/session-config",
-            "en/packages/laravel-copilot-sdk/session-context",
-            "en/packages/laravel-copilot-sdk/session-lifecycle",
-            "en/packages/laravel-copilot-sdk/mcp"
-          ]
-        }
-      ]
-    }
+            "pages": [
+              "en/packages/laravel-copilot-sdk/basic-usage",
+              "en/packages/laravel-copilot-sdk/auth",
+              "en/packages/laravel-copilot-sdk/models",
+              "en/packages/laravel-copilot-sdk/tools",
+              "en/packages/laravel-copilot-sdk/events",
+              "en/packages/laravel-copilot-sdk/streaming",
+              "en/packages/laravel-copilot-sdk/ask-user",
+              "en/packages/laravel-copilot-sdk/attachments",
+              "en/packages/laravel-copilot-sdk/concurrency",
+              "en/packages/laravel-copilot-sdk/fake",
+              "en/packages/laravel-copilot-sdk/github-actions",
+              "en/packages/laravel-copilot-sdk/github-token",
+              "en/packages/laravel-copilot-sdk/session-event",
+              "en/packages/laravel-copilot-sdk/session-config",
+              "en/packages/laravel-copilot-sdk/session-context",
+              "en/packages/laravel-copilot-sdk/session-lifecycle",
+              "en/packages/laravel-copilot-sdk/mcp"
+            ]
+          }
+        ]
+      }
   ]
 }

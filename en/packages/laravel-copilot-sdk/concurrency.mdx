@@ -1,0 +1,41 @@
+---
+title: "Concurrency"
+description: "Run Laravel Copilot SDK requests concurrently with Laravel Concurrency in stdio and TCP modes."
+---
+
+## Parallel execution with Laravel Concurrency
+
+## Stdio mode
+
+Starting a process per task is not efficient, but this pattern works reliably.
+
+Because Concurrency serializes internal values, return a plain `content()` string instead of returning `SessionEvent`.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Illuminate\Support\Facades\Concurrency;
+
+$prompt = 'Tell me something about Copilot.';
+
+[$gpt5_response, $sonnet_response] = Concurrency::run([
+    fn () => Copilot::run($prompt, config: ['model' => 'gpt-5.2'])->content(),
+    fn () => Copilot::run($prompt, config: ['model' => 'claude-sonnet-4.5'])->content(),
+]);
+
+echo 'GPT-5 Response: '.$gpt5_response;
+echo 'Claude Sonnet Response: '.$sonnet_response;
+```
+
+## TCP mode
+
+Since there is no process boot per request, TCP mode can look faster, but observed latency may still be similar.
+
+With the process driver, timeouts around 60 seconds are common in either mode.
+With the CLI-only `fork` driver, one request may succeed while another fails.
+In observed tests, switching from `gpt-5` to `gpt-5.2` allowed both requests to complete.
+
+Concurrency exists as a feature, but queue-based processing is still the safer default for long-running workloads.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
