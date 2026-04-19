@@ -1,0 +1,102 @@
+---
+title: "MCP"
+description: "Configure and manage MCP servers in Laravel Copilot SDK sessions and server RPC APIs."
+---
+
+## MCP
+
+You can use MCP servers by setting them in `SessionConfig.mcpServers`.
+
+If you use Laravel Boost with Copilot CLI, also use [laravel-boost-copilot-cli](https://github.com/invokable/laravel-boost-copilot-cli).
+It is known that `'type' => 'stdio'` (or `'local'`) and `'tools' => ['*']` are required.
+Without these values, the server is not recognized as an MCP server.
+
+```php
+Artisan::command('copilot:mcp', function () {
+    $config = new SessionConfig(
+        mcpServers: [
+            'laravel-boost' => [
+                'type' => 'stdio',
+                'command' => 'php',
+                'args' => ['artisan', 'boost:mcp'],
+                'tools' => ['*'],
+            ],
+        ],
+    );
+
+    Copilot::start(function (CopilotSession $session) {
+        info('Starting Copilot with Laravel Boost MCP: '.$session->id());
+
+        $prompt = 'Which MCPs are loaded? If laravel-boost is available, use application-info to fetch app details.';
+
+        warning($prompt);
+
+        $response = spin(
+            callback: fn () => $session->sendAndWait($prompt),
+            message: 'Thinking...',
+        );
+
+        note($response->content());
+    }, config: $config);
+});
+```
+
+## MCP server status
+
+MCP server status in a session can be one of the following:
+
+| Status | Description |
+| --- | --- |
+| `connected` | Connected |
+| `failed` | Connection failed |
+| `needs-auth` | Authentication required |
+| `pending` | Waiting for connection |
+| `disabled` | Disabled |
+| `not_configured` | Not configured |
+
+## Manage MCP server settings (Server RPC)
+
+You can manage MCP server settings at server level, separately from sessions.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\Rpc\McpConfigAddRequest;
+use Revolution\Copilot\Types\Rpc\McpConfigRemoveRequest;
+use Revolution\Copilot\Types\Rpc\McpConfigUpdateRequest;
+use Revolution\Copilot\Types\Rpc\McpServerValue;
+
+// Get configured MCP servers
+$result = Copilot::client()->rpc()->mcp()->list();
+foreach ($result->servers as $name => $config) {
+    dump($name, $config->type, $config->command);
+}
+
+// Add MCP server
+Copilot::client()->rpc()->mcp()->add(new McpConfigAddRequest(
+    name: 'laravel-boost',
+    config: new McpServerValue(
+        type: 'stdio',
+        command: 'php',
+        args: ['artisan', 'boost:mcp'],
+        tools: ['*'],
+    ),
+));
+
+// Update MCP server
+Copilot::client()->rpc()->mcp()->update(new McpConfigUpdateRequest(
+    name: 'laravel-boost',
+    config: new McpServerValue(
+        type: 'stdio',
+        command: 'php',
+        args: ['artisan', 'boost:mcp', '--verbose'],
+        tools: ['*'],
+    ),
+));
+
+// Remove MCP server
+Copilot::client()->rpc()->mcp()->remove(new McpConfigRemoveRequest(name: 'laravel-boost'));
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

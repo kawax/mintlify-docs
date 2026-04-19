@@ -341,7 +341,12 @@
             "en/packages/laravel-copilot-sdk/models",
             "en/packages/laravel-copilot-sdk/tools",
             "en/packages/laravel-copilot-sdk/events",
-            "en/packages/laravel-copilot-sdk/streaming"
+            "en/packages/laravel-copilot-sdk/streaming",
+            "en/packages/laravel-copilot-sdk/session-event",
+            "en/packages/laravel-copilot-sdk/session-config",
+            "en/packages/laravel-copilot-sdk/session-context",
+            "en/packages/laravel-copilot-sdk/session-lifecycle",
+            "en/packages/laravel-copilot-sdk/mcp"
           ]
         }
       ]

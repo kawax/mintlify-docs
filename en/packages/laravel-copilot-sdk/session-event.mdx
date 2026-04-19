@@ -1,0 +1,172 @@
+---
+title: "SessionEvent"
+description: "Handle SessionEvent responses in Laravel Copilot SDK with Laravel-style helpers, type checks, and broadcasting."
+---
+
+## SessionEvent
+
+All messages from Copilot are represented by `Revolution\Copilot\Types\SessionEvent`.
+This is the class you will use most often, so it includes Laravel-style conveniences.
+
+## `content()`
+
+Get the most important response message from the AI.
+
+```php
+$response = Copilot::run('1 + 1');
+echo $response->content(); // '2'
+// content() can be null
+```
+
+If `__toString()` triggers implicit casting, it also returns the message content.
+
+```php
+echo (string) $response; // '2'
+// This never becomes null.
+```
+
+## Event type checks
+
+`isAssistantMessage()`, `isUserMessage()`, `isIdle()`, and `isAssistantMessageDelta()` are available.
+More helpers can be added for commonly used event types.
+
+You can check any `EventType` with `is()`.
+
+```php
+use Revolution\Copilot\Enums\SessionEventType;
+
+if ($response->is(SessionEventType::HOOK_START)) {
+    // Handle hook start events
+}
+```
+
+`type()` returns the string value of the `SessionEventType` enum.
+
+```php
+echo $response->type(); // 'assistant.message'
+```
+
+## `failed()` / `successful()`
+
+If the event type is `SESSION_ERROR`, `failed()` returns true.
+`successful()` is the opposite.
+
+This was renamed from `isError()` to follow Laravel conventions.
+
+## `throw()`
+
+Like Laravel HTTP and Process APIs, errors are held and then thrown with `throw()`.
+When there is no error, `throw()` does nothing, so you can write code like this:
+
+```php
+$content = $response->throw()->content();
+```
+
+If the event type is `SESSION_ERROR`, it throws `Revolution\Copilot\Exceptions\SessionErrorException`.
+On timeout, it throws `Revolution\Copilot\Exceptions\SessionTimeoutException`.
+
+For JSON-RPC errors, it throws `Revolution\Copilot\Exceptions\JsonRpcException`.
+
+## Conditionable
+
+You can use `when()` and `unless()`.
+
+```php
+$response->when($response->isAssistantMessage(), function (SessionEvent $event) {
+    // Handle assistant messages
+});
+```
+
+## Dumpable
+
+You can use `dump()` and `dd()`.
+
+```php
+$response->dump();
+```
+
+## Tappable
+
+You can use `tap()`.
+
+```php
+return $response->tap(function (SessionEvent $event) {
+    // Process something
+    info($event->content());
+});
+```
+
+## InteractsWithData
+
+This feature applies to the SessionEvent `$data` property only.
+
+You get familiar helpers such as `all()`, `has()`, `only()`, and `collect()`.
+For details, see [InteractsWithData](/jp/advanced/interacts-with-data).
+
+Because SessionEvent `$data` differs by `EventType`, these helpers are useful when accessing event-specific fields.
+
+`content()` also uses InteractsWithData internally.
+
+```php
+return $this->data('content', $default);
+
+// So if you pass a default, content() never returns null.
+echo $response->content('');
+```
+
+## `toArray()` / `toJson()`
+
+Convert the full SessionEvent to an array or JSON.
+
+```php
+$array = $response->toArray();
+$json = $response->toJson();
+```
+
+There is no whole-event `collect()` method because InteractsWithData already provides one for `$data`.
+If you need collection operations for the whole event, use Laravel's `collect()` helper.
+
+```php
+$collect = collect($response->toArray());
+```
+
+## `broadcast()` / `broadcastNow()`
+
+You can broadcast with the same interface as Laravel AI SDK `StreamEvent`.
+AI SDK uses this during streaming, but with SessionEvent you can use it for any `EventType`.
+
+```php
+use Illuminate\Broadcasting\Channel;
+
+$event->broadcast(new Channel('channel-name'));
+```
+
+`broadcastNow()` broadcasts immediately without going through a queue.
+
+```php
+$event->broadcastNow(new Channel('channel-name'));
+```
+
+Streaming example:
+
+```php
+use Illuminate\Broadcasting\Channel;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SessionEvent;
+
+Copilot::start(function (CopilotSession $session) {
+    $session->on(function (SessionEvent $event): void {
+        if ($event->isAssistantMessageDelta()) {
+            $event->broadcastNow(new Channel('copilot'));
+        }
+    });
+
+    $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+}, config: new SessionConfig(streaming: true));
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

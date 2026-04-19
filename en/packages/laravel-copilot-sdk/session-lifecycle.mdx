@@ -1,0 +1,164 @@
+---
+title: "Session lifecycle events"
+description: "Subscribe to Laravel Copilot SDK session lifecycle events for create, update, delete, and foreground or background state changes."
+---
+
+## Session lifecycle events
+
+Session lifecycle events notify you about session creation, deletion, updates, and foreground/background state changes (in TUI + server mode).
+
+## Event types
+
+The `SessionLifecycleEventType` enum defines five event types:
+
+| Event | Description |
+| --- | --- |
+| `session.created` | A new session was created |
+| `session.deleted` | A session was deleted |
+| `session.updated` | A session was updated |
+| `session.foreground` | A session moved to foreground |
+| `session.background` | A session moved to background |
+
+```php
+use Revolution\Copilot\Enums\SessionLifecycleEventType;
+
+// Get enum value
+echo SessionLifecycleEventType::SESSION_CREATED->value; // 'session.created'
+```
+
+## Subscribe to events
+
+Use `onLifecycle()` to subscribe to session lifecycle events:
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionLifecycleEvent;
+
+// Get client and subscribe to lifecycle events
+$client = Copilot::client();
+
+// Subscribe to all lifecycle events
+$unsubscribe = $client->onLifecycle(function (SessionLifecycleEvent $event) {
+    match ($event->type) {
+        SessionLifecycleEventType::SESSION_CREATED => info("Session created: {$event->sessionId}"),
+        SessionLifecycleEventType::SESSION_DELETED => info("Session deleted: {$event->sessionId}"),
+        SessionLifecycleEventType::SESSION_FOREGROUND => info("Foreground: {$event->sessionId}"),
+        SessionLifecycleEventType::SESSION_BACKGROUND => info("Background: {$event->sessionId}"),
+        default => null,
+    };
+});
+
+// Unsubscribe
+$unsubscribe();
+```
+
+## SessionLifecycleEvent
+
+`SessionLifecycleEvent` is a readonly class with lifecycle event details:
+
+```php
+use Revolution\Copilot\Types\SessionLifecycleEvent;
+use Revolution\Copilot\Types\SessionLifecycleEventMetadata;
+
+readonly class SessionLifecycleEvent implements Arrayable
+{
+    public function __construct(
+        public SessionLifecycleEventType $type,                   // Event type
+        public string $sessionId,                                 // Session ID
+        public ?SessionLifecycleEventMetadata $metadata = null,   // Metadata (null on delete)
+    ) {}
+}
+```
+
+### SessionLifecycleEventMetadata
+
+This class includes session metadata (not included for delete events):
+
+```php
+readonly class SessionLifecycleEventMetadata implements Arrayable
+{
+    public function __construct(
+        public string $startTime,       // Session start time
+        public string $modifiedTime,    // Last modified time
+        public ?string $summary = null, // Session summary
+    ) {}
+}
+```
+
+## Foreground session management
+
+When connected to a server running in TUI + server mode (`--ui-server`), you can manage the foreground session.
+
+### Get current foreground session
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$client = Copilot::client();
+
+// Get the current session ID shown in TUI
+$sessionId = $client->getForegroundSessionId();
+
+if ($sessionId !== null) {
+    echo "Current foreground session: {$sessionId}";
+}
+```
+
+### Set foreground session
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$client = Copilot::client();
+
+// Show a specific session in TUI
+$client->setForegroundSessionId('session-123');
+```
+
+## ForegroundSessionInfo
+
+`ForegroundSessionInfo` is a readonly class with foreground session details:
+
+```php
+use Revolution\Copilot\Types\ForegroundSessionInfo;
+
+readonly class ForegroundSessionInfo implements Arrayable
+{
+    public function __construct(
+        public ?string $sessionId = null,       // Foreground session ID
+        public ?string $workspacePath = null,   // Workspace path
+    ) {}
+}
+```
+
+## TCP mode usage
+
+Run Copilot CLI in TUI + server mode, then connect from the SDK to use lifecycle events:
+
+```bash
+# Start Copilot CLI in TUI + server mode
+copilot --ui-server --port 8080
+```
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionLifecycleEvent;
+
+// Connect in TCP mode
+$client = Copilot::useTcp('tcp://127.0.0.1:8080')->client();
+
+// Subscribe to lifecycle events
+$client->onLifecycle(function (SessionLifecycleEvent $event) {
+    // Handle events
+});
+```
+
+## Notes
+
+- `session.foreground` and `session.background` events occur only in TUI + server mode.
+- On session delete (`session.deleted`), `metadata` is `null`.
+- `onLifecycle()` returns a callback for unsubscribing.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
