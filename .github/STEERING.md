@@ -50,3 +50,31 @@
  - 英語版は完成。
  - 最後に日本語ページを作成。日本語版は急がないので`index.mdx`と`getting-started.mdx`の日本語版だけ作って残りは後から。
  - docs.jsonのnavigationはネストしてindex以外の各ページを配置。
+
+こうやってネストするとページが多い箇所を折りたたんで表示できる。
+```json
+    {
+      "tab": "マイパッケージ",
+      "groups": [
+        {
+          "group": "AI SDK",
+          "pages": [
+            "jp/packages/laravel-amazon-bedrock"
+          ]
+        },
+        {
+          "group": "GitHub Copilot",
+          "pages": [
+            {
+              "group": "GitHub Copilot SDK for Laravel",
+              "root": "jp/packages/laravel-copilot-sdk/index",
+              "expanded": false,
+              "pages": [
+                "jp/packages/laravel-copilot-sdk/getting-started"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+```
