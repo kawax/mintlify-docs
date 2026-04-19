@@ -37,3 +37,14 @@
  - README.mdの情報でページは作れるはず。他のページのスタイルと合わせる。
  - 他のカスタムプロバイダーの事例は知らないので初かも。
  - BedrockでストリーミングはAWS公式のPHP用SDKでもPrismでも対応できてない。このパッケージが唯一。
+- [ ] GitHub Copilot SDK for Laravel。https://github.com/invokable/laravel-copilot-sdk
+ - [GitHub Copilot SDK](https://github.com/github/copilot-sdk) のLaravel版。
+ - 公式SDKの機能を再現したレイヤーの上にLaravelらしいFacadeを中心にした使い方を提供している。
+ - ドキュメントはREADME.mdとdocs/getting-started.mdが英語。docs/jp/内に日本語のドキュメントが大量。公式SDKに英語のドキュメントがしっかりあるので日本語中心にしか用意してない。こっちのマイパッケージで英語ドキュメントを作る。
+ - 1ページでは収まらないので`{lang}/packages/laravel-copilot-sdk/`ディレクトリを作ってその中に複数ページに分けて入れる。
+ - 一度では終わらないので少しずつ実行する。
+ - docs/jp/内のドキュメントの英語版を先に作成。細かいドキュメントは不要かもしれないけど英語版では全部翻訳。
+ - SDK側のgetting-started.mdを上で作った英語ドキュメントにリンクするように変更するのでその後に`getting-started.mdx`を作成。
+ - `index.mdx` 基本的な説明とLaravel版特有機能の説明。ここまで作った各ページへのリンク。
+ - 最後に日本語ページを作成。日本語はSDK側が最新なのでページの最後にGitHubへのリンクを入れる。
+ - docs.jsonのnavigationはネストしてindex以外の各ページを配置。
