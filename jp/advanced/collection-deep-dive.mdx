@@ -72,7 +72,7 @@ classDiagram
 
 ## PHPDoc と PHPStan スタイルの Generics
 
-PHP本体にはGenericsがありません。  
+PHP本体にはGenericsがありません。
 それでもCollection周辺では、PHPDocで強い型情報を表現しています。
 
 主な目的は2つです。
@@ -99,7 +99,7 @@ class Collection implements Enumerable
 
 | 記法 | 意味 |
 |---|---|
-| `@template TKey of array-key` | キー型を `int|string` に制約 |
+| `@template TKey of array-key` | キー型を `int\|string` に制約 |
 | `@template-covariant TValue` | 値型を共変として扱う（より具体的な型へ安全に置換しやすい） |
 | `@implements ...<TKey, TValue>` | 実装しているインターフェースへ型引数を渡す |
 | `@extends ...<TKey, TModel>` | 親クラス継承時の型引数を宣言 |
@@ -124,12 +124,12 @@ class Collection extends BaseCollection
 
 ### 1. 入口として `Enumerable` を読む
 
-まずは「何を提供する契約か」を掴みます。  
+まずは「何を提供する契約か」を掴みます。
 ここでメソッド一覧を把握すると、後続の実装読みが速くなります。
 
 ### 2. `EnumeratesValues` で共通メソッドを追う
 
-`map`・`filter`・`reduce` など、共通ロジックの多くはここにあります。  
+`map`・`filter`・`reduce` など、共通ロジックの多くはここにあります。
 `Collection` と `LazyCollection` の差分だけを後で見ると、読み飛ばしが減ります。
 
 ### 3. `Collection` と `LazyCollection` の差分を見る
@@ -141,7 +141,7 @@ class Collection extends BaseCollection
 
 ### 4. 最後に `Eloquent\Collection` を読む
 
-`find`・`load`・`modelKeys` など、モデル集合向けの拡張に集中します。  
+`find`・`load`・`modelKeys` など、モデル集合向けの拡張に集中します。
 基底の `Collection` を理解してから読むと意図が見えやすくなります。
 
 <Tip>
