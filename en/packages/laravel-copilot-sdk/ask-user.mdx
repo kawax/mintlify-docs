@@ -1,0 +1,92 @@
+---
+title: "Ask user"
+description: "Handle user questions from Laravel Copilot SDK with the onUserInputRequest callback and return UserInputResponse."
+---
+
+## User input requests
+
+Set the `onUserInputRequest` handler so your agent can ask users questions through the `ask_user` tool.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Types\UserInputRequest;
+use Revolution\Copilot\Types\UserInputResponse;
+
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(prompt: 'Ask the user which language they like.');
+    dump($response->content());
+}, config: [
+    'model' => 'gpt-5',
+    'onUserInputRequest' => function (UserInputRequest $request): UserInputResponse {
+        // $request->question - The question content
+        // $request->choices - Array of choices for multiple-choice input (optional)
+        // $request->allowFreeform - Whether freeform input is allowed (default: true)
+
+        dump("Question from agent: {$request->question}");
+        if ($request->choices) {
+            dump('Choices: '.implode(', ', $request->choices));
+        }
+
+        return new UserInputResponse(
+            answer: 'PHP',
+            wasFreeform: true, // true when the answer did not come from predefined choices
+        );
+    },
+]);
+```
+
+## UserInputRequest
+
+A user input request from the agent.
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `question` | `string` | Question to ask the user |
+| `choices` | `?array` | Options for multiple-choice input (optional) |
+| `allowFreeform` | `?bool` | Whether freeform input is allowed (default: `true`) |
+
+## UserInputResponse
+
+A response to a user input request.
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `answer` | `string` | User answer |
+| `wasFreeform` | `bool` | Whether the answer was freeform (true when not from choices) |
+
+## Practical usage
+
+Use this in interactive commands:
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Types\UserInputRequest;
+use Revolution\Copilot\Types\UserInputResponse;
+
+Copilot::start(function (CopilotSession $session) use ($command) {
+    $response = $session->sendAndWait(prompt: 'Configure this project.');
+    $command->info($response->content());
+}, config: [
+    'onUserInputRequest' => function (UserInputRequest $request) use ($command): UserInputResponse {
+        if ($request->choices) {
+            $answer = $command->choice(
+                $request->question,
+                $request->choices,
+                $request->choices[0] ?? null
+            );
+
+            return new UserInputResponse(answer: $answer, wasFreeform: false);
+        }
+
+        $answer = $command->ask($request->question);
+
+        return new UserInputResponse(answer: $answer, wasFreeform: true);
+    },
+]);
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

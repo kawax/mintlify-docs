@@ -1,0 +1,57 @@
+---
+title: "GitHub Actions"
+description: "Run Laravel Copilot SDK commands in GitHub Actions using Copilot CLI authentication tokens."
+---
+
+## Usage in GitHub Actions
+
+This is a pattern for running an Artisan command in GitHub Actions where that command uses Copilot CLI.
+
+In GitHub Actions, stdio mode is typically the standard choice.
+
+## Install `copilot` directly
+
+```yaml
+      - name: Install Copilot CLI
+        run: |
+          curl -fsSL https://gh.io/copilot-install | bash
+          copilot version
+
+      - name: Run command
+        run: php artisan copilot:ping
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+```
+
+- Install with `copilot-install`. The executable is available as `copilot` without extra path setup.
+- Authenticate with `COPILOT_GITHUB_TOKEN`. You can also use any auth method supported by Copilot CLI, such as `GH_TOKEN` or `GITHUB_TOKEN`.
+- The token needs `Copilot Requests` permission, so default `GITHUB_TOKEN` may not be enough.
+
+## Use `gh` command
+
+GitHub CLI `2.86.0` added Copilot install support. Since GitHub Actions runners usually already include `gh`, you can use it without an extra install step.
+
+Most environments install Copilot automatically on the first `gh copilot ...` call, so running `gh copilot version` is usually enough.
+
+> gh version 2.86.0 (2026-01-21)  
+> https://github.com/cli/cli/releases/tag/v2.86.0  
+> ✓ Copilot CLI installed successfully
+
+```yaml
+      - name: Install Copilot CLI
+        run: |
+          gh --version
+          gh copilot version
+
+      - name: Run command
+        run: php artisan copilot:ping
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_CLI_PATH: "gh copilot"
+```
+
+`COPILOT_CLI_PATH` has special handling only for `gh copilot`. Other custom values are not supported in the same way.
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
