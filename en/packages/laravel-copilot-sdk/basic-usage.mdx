@@ -1,0 +1,47 @@
+---
+title: "Basic usage"
+description: "Use the Laravel Copilot SDK with an official SDK-style flow while keeping Laravel-friendly ergonomics."
+---
+
+## Official SDK-style usage
+
+This package supports a pure PHP style that mirrors the official SDK while still giving you a Laravel-friendly developer experience.
+
+```php
+use Revolution\Copilot\Client;
+use Revolution\Copilot\Session;
+use Revolution\Copilot\Types\SessionEvent;
+
+$client = new Client([
+    'cli_path' => 'copilot',
+    'cli_args' => [],
+    'cwd' => base_path(),
+    'log_level' => 'info',
+    'env' => null,
+]);
+
+$client->start();
+
+/** @var Session $session */
+$session = $client->createSession([
+    'model' => 'gpt-5',
+]);
+
+$done = $session->on(function (SessionEvent $event) {
+    if($event->isAssistantMessage()) {
+        echo $event->content();
+    }
+});
+
+$session->send(prompt: 'Tell me something about Laravel.');
+$session->wait(timeout: 60.0); // Force waiting with wait() until true async support is officially implemented.
+
+$done();
+
+$session->disconnect();
+$client->stop();
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

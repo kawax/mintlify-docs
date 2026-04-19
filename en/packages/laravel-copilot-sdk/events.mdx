@@ -1,0 +1,47 @@
+---
+title: "Events"
+description: "Use Laravel events emitted by Laravel Copilot SDK for logging, debugging, and async handling."
+---
+
+## Laravel events
+
+The package emits event classes from `src/Events`, so you can use them for logging and debugging.
+
+You can achieve similar behavior with hooks, but events can be placed in areas where hooks are not available.
+
+```text
+src/
+├── Events/
+│   ├── Client/
+│   │   ├── ClientStarted.php
+│   │   ├── ToolCall.php
+│   │   └── PingPong.php
+│   ├── JsonRpc/
+│   │   ├── MessageReceived.php
+│   │   ├── MessageSending.php
+│   │   └── ResponseReceived.php
+│   ├── Process/
+│   │   └── ProcessStarted.php
+│   └── Session/
+│       ├── CreateSession.php
+│       ├── MessageSend.php
+│       ├── MessageSendAndWait.php
+│       ├── SessionEventReceived.php
+│       └── ResumeSession.php
+```
+
+For example, you can dispatch longer-running work to a queue or `defer`. You cannot receive the `Copilot::run()` result directly in this case, but you can handle it in a listener for `MessageSendAndWait`.
+
+```php
+dispatch(fn() => Copilot::run(''));
+```
+
+```php
+use function Illuminate\Support\defer;
+
+defer(fn() => Copilot::run(''));
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

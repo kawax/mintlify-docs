@@ -1,0 +1,120 @@
+---
+title: "Authentication"
+description: "Choose the appropriate Laravel Copilot SDK authentication method for local development, CI, server workloads, or BYOK setups."
+---
+
+## Authentication
+
+The Copilot SDK supports multiple authentication methods. Choose one based on your use case.
+
+## Authentication methods
+
+| Method | Primary use case | Copilot subscription | Notes |
+| --- | --- | --- | --- |
+| GitHub login (CLI) | Development and manual runs | Required | Uses the login session from the `copilot` CLI |
+| OAuth GitHub App / PAT | Per-user tokens | Required | Set via `github_token` |
+| Environment variables | CI/CD and server runtime | Required | `COPILOT_GITHUB_TOKEN`, etc. |
+| BYOK (Bring Your Own Key) | Your own model provider | Not required | Configure a custom provider |
+
+For BYOK, see `custom-providers.md`.
+
+## GitHub login (CLI)
+
+If you are already logged in with `copilot` or `gh` CLI, the SDK uses stored credentials by default.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$response = Copilot::run(prompt: 'Hello');
+```
+
+## OAuth GitHub App / PAT
+
+Pass a user access token from OAuth, or a fine-grained PAT, to `github_token`.
+
+- Expected token prefixes: `gho_`, `ghu_`, `github_pat_`
+- `ghp_` (classic PAT) is discouraged
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$config = array_merge(config('copilot'), [
+    'github_token' => $user->github_token,
+]);
+
+$response = Copilot::useStdio($config)->run(prompt: '...');
+Copilot::stop();
+```
+
+When you set `github_token`, `use_logged_in_user` is automatically set to `false`. To override explicitly:
+
+```php
+$config = [
+    'github_token' => $user->github_token,
+    'use_logged_in_user' => true,
+];
+```
+
+For details, see `github-token.md`.
+Both `github_token` and `use_logged_in_user` are only available in stdio mode. In TCP mode, the Copilot CLI must already be authenticated.
+
+## Environment variables
+
+If you pass a token via environment variables, the CLI auto-detects it using this priority order:
+
+1. `COPILOT_GITHUB_TOKEN`
+2. `GH_TOKEN`
+3. `GITHUB_TOKEN`
+
+```dotenv
+COPILOT_GITHUB_TOKEN=github_pat_xxx
+```
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$response = Copilot::run(prompt: 'Hello');
+```
+
+In TCP mode, set environment variables on the CLI server side.
+
+## Authentication priority
+
+The SDK resolves credentials in this order:
+
+1. `github_token` (explicitly provided)
+2. Environment variable tokens (`COPILOT_GITHUB_TOKEN` → `GH_TOKEN` → `GITHUB_TOKEN`)
+3. OAuth credentials stored by CLI
+4. Credentials from `gh` CLI
+
+## Disable automatic login
+
+If you do not want to use stored credentials, set `use_logged_in_user` to `false`.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$response = Copilot::useStdio([
+    'use_logged_in_user' => false,
+])->run(prompt: 'Hello');
+```
+
+As with `github_token`, this is supported in stdio mode only. In TCP mode, the Copilot CLI must already be authenticated.
+
+## Check authentication status
+
+You can read the result of `auth.getStatus`.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$status = Copilot::client()->getAuthStatus();
+
+if (! $status->isAuthenticated) {
+    // Not authenticated
+}
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

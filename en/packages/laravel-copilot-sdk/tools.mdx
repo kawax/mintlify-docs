@@ -1,0 +1,159 @@
+---
+title: "Tools"
+description: "Define and handle custom tools in Laravel Copilot SDK, including permissions, invocation metadata, and MCP result conversion."
+---
+
+## Tools
+
+Built-in Copilot CLI tools are enabled by default. The settings here apply to custom tools.
+
+## Basic usage
+
+Set tool definitions in `SessionConfig.tools`.
+
+`Tool::define()` is a helper equivalent to `defineTool` in other language SDKs.
+For parameters, you can use Laravel's JSON Schema implementation (also used by Laravel MCP), or pass an array directly.
+
+```php
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\JsonSchema\JsonSchema;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\Tool;
+use Revolution\Copilot\Types\ToolResultObject;
+
+use function Laravel\Prompts\{info, note, spin, warning};
+
+Artisan::command('copilot:tools', function () {
+    $facts = [
+        'PHP' => 'A popular general-purpose scripting language that is especially suited to web development.',
+        'Laravel' => 'A web application framework with expressive, elegant syntax.',
+    ];
+
+    $parameters = JsonSchema::object(
+        properties: [
+            'topic' => JsonSchema::string()
+                ->description('Topic to look up (e.g., "PHP", "Laravel")')
+                ->required(),
+        ],
+    )->toArray();
+
+    $config = new SessionConfig(
+        tools: [
+            Tool::define(
+                name: 'lookup_fact',
+                description: 'Returns a fun fact about a given topic.',
+                parameters: $parameters,
+                handler: function (array $params, array $invocation) use ($facts): ToolResultObject {
+                    $topic = $params['topic'] ?? '';
+
+                    $fact = $facts[$topic] ?? null;
+
+                    if (! $fact) {
+                        return new ToolResultObject(
+                            textResultForLlm: "No fact stored for {$topic}.",
+                            resultType: 'failure',
+                            sessionLog: "lookup_fact: missing topic {$topic}",
+                            toolTelemetry: [],
+                        );
+                    }
+
+                    return new ToolResultObject(
+                        textResultForLlm: $fact,
+                        resultType: 'success',
+                        sessionLog: "lookup_fact: served {$topic}",
+                        toolTelemetry: [],
+                    );
+                },
+                overridesBuiltInTool: false,
+                skipPermission: false, // Set to true to execute without a permission prompt
+            ),
+        ],
+    );
+
+    Copilot::start(function (CopilotSession $session) {
+        info('Starting Copilot with tools: '.$session->id());
+
+        $prompt = 'You can call the lookup_fact tool. Use lookup_fact to tell me something about Laravel.';
+
+        warning($prompt);
+
+        $response = spin(
+            callback: fn () => $session->sendAndWait($prompt),
+            message: 'Copilot thinking...',
+        );
+
+        note($response->content());
+    }, config: $config);
+});
+```
+
+## `skipPermission`
+
+When you set `skipPermission: true`, the tool runs without a permission prompt.
+
+```php
+Tool::define(
+    name: 'read_only_lookup',
+    description: 'Read-only data lookup.',
+    parameters: $parameters,
+    handler: fn ($params) => new ToolResultObject(
+        textResultForLlm: 'data',
+        resultType: 'success',
+        sessionLog: 'read_only_lookup',
+        toolTelemetry: [],
+    ),
+    skipPermission: true,
+),
+```
+
+## `$invocation`
+
+The second argument of the tool handler, `$invocation`, includes:
+
+```php
+[
+    'sessionId'  => '...',
+    'toolCallId' => '...',
+    'toolName'   => 'lookup_fact',
+    'arguments'  => [...], // Tool args (same content as $params)
+    // Included only when OpenTelemetry is enabled
+    'traceparent' => '...', // W3C Trace Context traceparent
+    'tracestate'  => '...', // W3C Trace Context tracestate
+]
+```
+
+## Protocol details
+
+In Protocol v3 (current default), tool calls are broadcast as session events (`external_tool.requested`) instead of JSON-RPC requests. The SDK handles this internally and responds with the `session.tools.handlePendingToolCall` RPC.
+
+**You do not need to change how you use `SessionConfig`.** Pass definitions in `tools`, and the SDK handles protocol differences.
+
+## Converting MCP `CallToolResult`
+
+To convert an MCP server tool result (`CallToolResult`) into Copilot SDK `ToolResultObject`, use `McpCallToolResult::convert()`.
+MCP results contain `content` blocks such as text, image, and resource, but Copilot SDK expects `ToolResultObject`.
+
+```php
+use Revolution\Copilot\Support\McpCallToolResult;
+
+// MCP CallToolResult format
+$mcpResult = [
+    'content' => [
+        ['type' => 'text', 'text' => 'File contents here'],
+        ['type' => 'image', 'data' => 'base64...', 'mimeType' => 'image/png'],
+    ],
+    'isError' => false,
+];
+
+// Convert to Copilot SDK ToolResultObject format
+$toolResult = McpCallToolResult::convert($mcpResult);
+// $toolResult->textResultForLlm => 'File contents here'
+// $toolResult->resultType => 'success'
+// $toolResult->binaryResultsForLlm => [['data' => 'base64...', 'mimeType' => 'image/png', 'type' => 'image']]
+```
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
