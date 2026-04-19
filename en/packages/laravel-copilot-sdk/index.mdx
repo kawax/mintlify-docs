@@ -1,0 +1,51 @@
+---
+title: "GitHub Copilot SDK for Laravel"
+description: "Understand what the Laravel Copilot SDK provides and jump to the key guides for setup, sessions, tools, and runtime configuration."
+---
+
+GitHub Copilot SDK for Laravel is a community SDK that brings the official [GitHub Copilot SDK](https://github.com/github/copilot-sdk) workflow into Laravel applications.
+
+You can call Copilot from Artisan commands, controllers, jobs, and other Laravel runtime contexts.
+
+## What is specific to Laravel
+
+This package adds Laravel-native ergonomics on top of an SDK-compatible layer:
+
+- Facade-first API with `Copilot::run()` and `Copilot::start()`
+- Laravel-style configuration via `config/copilot.php` and `.env`
+- Integration points for Laravel Prompts, queues, and console UX
+- Testing utilities such as `Copilot::fake()` and prompt assertions
+
+## Start here
+
+<Columns cols={2}>
+  <Card title="Getting started" href="/en/packages/laravel-copilot-sdk/getting-started">
+    Build your first Copilot-powered Laravel app.
+  </Card>
+  <Card title="Basic usage" href="/en/packages/laravel-copilot-sdk/basic-usage">
+    Use the official SDK-style flow with Laravel-friendly patterns.
+  </Card>
+  <Card title="Authentication" href="/en/packages/laravel-copilot-sdk/auth">
+    Configure GitHub login, token-based auth, or BYOK workflows.
+  </Card>
+  <Card title="Session config" href="/en/packages/laravel-copilot-sdk/session-config">
+    Control tools, models, MCP servers, and session behavior.
+  </Card>
+  <Card title="Tools" href="/en/packages/laravel-copilot-sdk/tools">
+    Define custom tools that Copilot can call.
+  </Card>
+  <Card title="Streaming" href="/en/packages/laravel-copilot-sdk/streaming">
+    Handle incremental output and live assistant responses.
+  </Card>
+  <Card title="MCP" href="/en/packages/laravel-copilot-sdk/mcp">
+    Connect MCP servers to extend capabilities.
+  </Card>
+  <Card title="Laravel Cloud" href="/en/packages/laravel-copilot-sdk/laravel-cloud">
+    Run the SDK in Laravel Cloud environments.
+  </Card>
+</Columns>
+
+## Official repositories
+
+- Laravel package: [invokable/laravel-copilot-sdk](https://github.com/invokable/laravel-copilot-sdk)
+- Official SDK: [github/copilot-sdk](https://github.com/github/copilot-sdk)

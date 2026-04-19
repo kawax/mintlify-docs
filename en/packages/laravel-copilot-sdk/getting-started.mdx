@@ -1,0 +1,181 @@
+---
+title: "Getting started"
+description: "Build your first Copilot-powered Laravel command and learn the core Laravel Copilot SDK workflow."
+---
+
+## Build your first Copilot-powered Laravel app
+
+In this guide, you build a command-line assistant with the Laravel Copilot SDK.
+You start with a single prompt, then move to sessions, events, and tools.
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- GitHub Copilot CLI installed and authenticated
+- PHP `8.4+`
+- Laravel `13.x`
+
+Verify the CLI is available:
+
+```bash
+copilot --version
+```
+
+## Install the SDK
+
+Install the package with Composer:
+
+```bash
+composer require revolution/laravel-copilot-sdk
+```
+
+Optional configuration:
+
+```bash
+php artisan vendor:publish --tag=copilot-config
+```
+
+If needed, set the CLI path in your `.env`:
+
+```dotenv
+COPILOT_CLI_PATH=copilot
+```
+
+## Send your first message
+
+Create a command and call `Copilot::run()`:
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Revolution\Copilot\Facades\Copilot;
+
+class CopilotDemo extends Command
+{
+    protected $signature = 'copilot:demo';
+    protected $description = 'Demo Copilot SDK';
+
+    public function handle()
+    {
+        $response = Copilot::run(prompt: 'What is 2 + 2?');
+
+        $this->info($response->content());
+    }
+}
+```
+
+Run the command:
+
+```bash
+php artisan copilot:demo
+```
+
+## Keep context with sessions
+
+Use `Copilot::start()` when you need multiple prompts in one conversation:
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(prompt: 'What is 2 + 2?');
+    $this->info('Answer: '.$response->content());
+
+    $response = $session->sendAndWait(prompt: 'Now multiply that by 3');
+    $this->info('Answer: '.$response->content());
+});
+```
+
+## Handle session events
+
+Register an event handler with `on()` to inspect assistant messages and failures:
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionEvent;
+
+Copilot::start(function (CopilotSession $session) {
+    $session->on(function (SessionEvent $event): void {
+        if ($event->isAssistantMessage()) {
+            $this->info($event->content());
+        } elseif ($event->failed()) {
+            $this->error($event->errorMessage() ?? 'Unknown error');
+        }
+    });
+
+    $session->sendAndWait(prompt: 'Tell me a short Laravel joke');
+});
+```
+
+## Add a custom tool
+
+Define a tool with a JSON schema and a handler:
+
+```php
+use Illuminate\JsonSchema\JsonSchema;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\Tool;
+
+$parameters = JsonSchema::object([
+    'topic' => JsonSchema::string()
+        ->description('Topic to look up')
+        ->required(),
+])->toArray();
+
+$config = new SessionConfig(
+    tools: [
+        Tool::define(
+            name: 'lookup_fact',
+            description: 'Returns a fact for a topic.',
+            parameters: $parameters,
+            handler: function (array $params): array {
+                $topic = $params['topic'] ?? '';
+
+                return [
+                    'textResultForLlm' => "Fact for {$topic}",
+                    'resultType' => 'success',
+                    'sessionLog' => "lookup_fact: {$topic}",
+                    'toolTelemetry' => [],
+                ];
+            },
+        ),
+    ],
+);
+
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(
+        prompt: 'Use lookup_fact to tell me something about Laravel.'
+    );
+
+    $this->info($response->content());
+}, config: $config);
+```
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Basic usage" href="/en/packages/laravel-copilot-sdk/basic-usage">
+    Learn the official SDK-style flow in Laravel.
+  </Card>
+  <Card title="Authentication" href="/en/packages/laravel-copilot-sdk/auth">
+    Choose the right auth method for local and CI environments.
+  </Card>
+  <Card title="Tools" href="/en/packages/laravel-copilot-sdk/tools">
+    Let Copilot call your application code.
+  </Card>
+  <Card title="Session config" href="/en/packages/laravel-copilot-sdk/session-config">
+    Configure models, hooks, MCP servers, and runtime behavior.
+  </Card>
+</Columns>
+
+<Info>
+Source references: [Laravel Copilot SDK README](https://github.com/invokable/laravel-copilot-sdk/blob/main/README.md), [Laravel Copilot SDK Getting Started](https://github.com/invokable/laravel-copilot-sdk/blob/main/docs/getting-started.md), and [GitHub Copilot SDK](https://github.com/github/copilot-sdk).
+</Info>
