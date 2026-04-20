@@ -362,7 +362,7 @@
           "pages": [
             {
               "group": "GitHub Copilot SDK for Laravel",
-              "root": "jp/packages/laravel-copilot-sdk/index",
+              "root": "jp/packages/laravel-copilot-sdk",
               "expanded": false,
               "pages": [
                 "jp/packages/laravel-copilot-sdk/getting-started",
