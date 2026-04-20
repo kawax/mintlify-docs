@@ -374,7 +374,7 @@
                 "jp/packages/laravel-copilot-sdk/session-event",
                 "jp/packages/laravel-copilot-sdk/permission-request",
                 "jp/packages/laravel-copilot-sdk/laravel-cloud",
-                "jp/packages/laravel-copilot-sdk/basic-usage"
+                "jp/packages/laravel-copilot-sdk/bare-usage"
               ]
             }
           ]
