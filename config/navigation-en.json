@@ -369,9 +369,9 @@
                 "en/packages/laravel-copilot-sdk/session-lifecycle",
                 "en/packages/laravel-copilot-sdk/telemetry",
                 "en/packages/laravel-copilot-sdk/custom-providers",
-                "en/packages/laravel-copilot-sdk/basic-usage",
                 "en/packages/laravel-copilot-sdk/concurrency",
-                "en/packages/laravel-copilot-sdk/steering"
+                "en/packages/laravel-copilot-sdk/steering",
+                "en/packages/laravel-copilot-sdk/bare-usage"
               ]
             }
           ]
