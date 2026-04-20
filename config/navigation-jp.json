@@ -376,7 +376,8 @@
                 "jp/packages/laravel-copilot-sdk/laravel-cloud",
                 "jp/packages/laravel-copilot-sdk/bare-usage"
               ]
-            }
+            },
+            "jp/packages/laravel-boost-copilot-cli"
           ]
         }
       ]

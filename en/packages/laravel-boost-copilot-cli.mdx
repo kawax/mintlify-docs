@@ -1,0 +1,79 @@
+---
+title: "Laravel Boost Custom Agent for GitHub Copilot CLI"
+description: "A package that adds a custom GitHub Copilot CLI agent to Laravel Boost, with strong Testbench support."
+---
+
+## Overview
+
+`revolution/laravel-boost-copilot-cli` adds a custom GitHub Copilot CLI agent as an extension for [Laravel Boost](https://github.com/laravel/boost).
+
+Laravel Boost already includes `GitHub Copilot`, but that path is mainly oriented to VS Code GitHub Copilot workflows. This package gives you a clearer setup for Copilot CLI and is especially useful for package developers using Testbench.
+
+## Requirements
+
+- PHP 8.2+
+- Laravel 12+
+- Laravel Boost 2.0+
+- Copilot CLI 1.0.25+
+
+## Supported platforms
+
+- macOS
+- WSL (Native Windows also works, but WSL is recommended)
+- Linux
+
+Laravel Sail is also supported. Run `vendor/bin/sail up -d` first, then execute the `copilot` command outside Sail.
+
+## Installation
+
+```shell
+composer require revolution/laravel-boost-copilot-cli --dev
+```
+
+## Usage
+
+```shell
+php artisan boost:install
+# Select "GitHub Copilot CLI"
+copilot
+```
+
+Copilot CLI automatically loads `.mcp.json` from your project root, so you do not need extra configuration.
+
+## Testbench support (for package developers)
+
+This package is designed to work smoothly in Testbench-based package development workflows where Laravel Boost defaults can be harder to apply directly.
+
+<Steps>
+  <Step title="Set up Testbench workbench">
+    ```shell
+    vendor/bin/testbench workbench:install
+    ```
+  </Step>
+  <Step title="Add @build to composer.json">
+    Add `@build` to `post-autoload-dump`.
+
+    ```json
+    {
+      "scripts": {
+        "post-autoload-dump": [
+          "@clear",
+          "@prepare",
+          "@build"
+        ]
+      }
+    }
+    ```
+  </Step>
+  <Step title="Install Boost through Testbench">
+    ```shell
+    vendor/bin/testbench boost:install
+    ```
+  </Step>
+</Steps>
+
+## Related links
+
+- GitHub: [invokable/laravel-boost-copilot-cli](https://github.com/invokable/laravel-boost-copilot-cli)
+- Related package for PhpStorm: [invokable/laravel-boost-phpstorm-copilot](https://github.com/invokable/laravel-boost-phpstorm-copilot)
+- Copilot SDK for Laravel: [invokable/laravel-copilot-sdk](https://github.com/invokable/laravel-copilot-sdk)
