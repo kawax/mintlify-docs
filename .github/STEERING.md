@@ -85,7 +85,7 @@
     }
 ```
 
-- [ ] Laravel Boost Custom Agent for GitHub Copilot CLI https://github.com/invokable/laravel-boost-copilot-cli
+- [x] Laravel Boost Custom Agent for GitHub Copilot CLI https://github.com/invokable/laravel-boost-copilot-cli
  - 上で`GitHub Copilot`グループにしているのは他にも作っているから。
  - Laravel BoostにCopilot CLI用のカスタムエージェントを追加するパッケージ。
  - Laravel Boost公式で`GitHub Copilot`に対応してるけどこれは実際にはVS CodeのGitHub Copilot機能用。
@@ -93,7 +93,7 @@
  - Copilot CLIが登場した当初は上手く動かなかったのでパッケージを作った。
  - その後のCopilot CLIとLaravel Boostのアップデートでこのパッケージなしでも工夫すれば使えるようになってるけどLaravel Boost公式が対応できてないTestbench対応を実現できているのでパッケージ開発が多い管理者は今でも使っている。
  - advanced/boost-custom-agent ページからカスタムエージェントの例としてこのパッケージへのリンクを追加。
-- [ ] Laravel Boost Custom Agent for PhpStorm with GitHub Copilot plugin https://github.com/invokable/laravel-boost-phpstorm-copilot
+- [x] Laravel Boost Custom Agent for PhpStorm with GitHub Copilot plugin https://github.com/invokable/laravel-boost-phpstorm-copilot
  - 同様にPhpStormのGitHub Copilotプラグイン用のカスタムエージェント。
  - PhpStormのGitHub CopilotプラグインはプロジェクトレベルのMCP設定ファイルに対応してないのでこのパッケージでグローバルなMCP設定ファイルを書き換えないとLaravel BoostのMCPが使えないはず。
  - macOSとLinuxは`HOME`のファイルを書き換えればいいので簡単だけど、Windows対応はかなり苦労している。
