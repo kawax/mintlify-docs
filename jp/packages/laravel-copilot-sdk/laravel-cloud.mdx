@@ -1,0 +1,57 @@
+---
+title: "Laravel Cloud"
+description: "Laravel Copilot SDK を Laravel Cloud で動かすための、Copilot CLI インストール、環境変数、stdio/TCP モードの運用ポイントを解説します。"
+---
+
+## Laravel Cloud で使う
+
+## インストール
+
+**Settings > Deployments > Build commands** に次を追加してデプロイします。
+
+```shell
+export PATH="$PATH:/var/www/.local/bin"
+curl -fsSL https://gh.io/copilot-install | bash
+/var/www/.local/bin/copilot --version
+```
+
+CLI のパスは `/var/www/.local/bin/copilot` なので、**Custom environment variables** に次を設定します。
+
+```dotenv
+COPILOT_CLI_PATH=/var/www/.local/bin/copilot
+COPILOT_GITHUB_TOKEN=
+```
+
+`COPILOT_GITHUB_TOKEN` には、`GH_TOKEN` や `GITHUB_TOKEN` など Copilot CLI がサポートする認証方式を使えます。
+
+デフォルトの stdio モードを使う場合は、このインストールだけで十分です。
+
+## TCP モードで運用する
+
+**App cluster > Background processes > Custom worker** で `/var/www/.local/bin/copilot --headless --port 12345` を設定します。  
+バックグラウンドプロセスとして継続稼働し、デプロイ時に自動再起動します。
+
+ポート番号は任意です。
+
+**Custom environment variables** で `COPILOT_URL` を設定します。
+
+```dotenv
+COPILOT_URL=tcp://127.0.0.1:12345
+# COPILOT_CLI_PATH は TCP モードでは不要。両方ある場合は TCP モードが優先されます。
+```
+
+常時稼働のためメモリ使用量が高く、2 GiB RAM 以上のサーバーが必要になる場合があります。  
+HTTP リクエスト内で使うと 60 秒以内に終わらず失敗しやすいため、キュー実行を推奨します。
+
+Laravel Cloud では TCP モードの実用性が高くないため、stdio モード推奨です。
+
+上位プランの Worker cluster でも利用できます。App cluster のメモリ不足を避けたい場合に有効です。
+
+## 注意点
+
+- 低価格サーバーはメモリ不足になりやすいです。
+- デフォルトの HTTP タイムアウトは 20 秒です。失敗が多い場合は最大 60 秒まで延ばしてください。
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>

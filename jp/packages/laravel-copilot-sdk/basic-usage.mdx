@@ -1,0 +1,53 @@
+---
+title: "基本的な使い方"
+description: "Laravel Copilot SDK を公式 SDK スタイルで使う手順を、Laravel での推奨スタイルと併せて確認します。"
+---
+
+## 公式 SDK スタイルで使う
+
+このパッケージは、公式 SDK の使い方を再現した pure PHP スタイルにも対応しています。
+そのうえで Laravel らしい開発体験を提供します。
+
+<Info>
+このページは「Facade の内部で公式 SDK を再現しているため同じ使い方もできる」ことの説明です。
+通常は Facade を使う方法を推奨します。
+</Info>
+
+```php
+use Revolution\Copilot\Client;
+use Revolution\Copilot\Session;
+use Revolution\Copilot\Types\SessionEvent;
+
+$client = new Client([
+    'cli_path' => 'copilot',
+    'cli_args' => [],
+    'cwd' => base_path(),
+    'log_level' => 'info',
+    'env' => null,
+]);
+
+$client->start();
+
+/** @var Session $session */
+$session = $client->createSession([
+    'model' => 'gpt-5',
+]);
+
+$done = $session->on(function (SessionEvent $event) {
+    if($event->isAssistantMessage()) {
+        echo $event->content();
+    }
+});
+
+$session->send(prompt: 'Tell me something about Laravel.');
+$session->wait(timeout: 60.0); // True async が正式実装されるまでは wait() で待機します。
+
+$done();
+
+$session->disconnect();
+$client->stop();
+```
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>
