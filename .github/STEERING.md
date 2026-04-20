@@ -29,7 +29,7 @@
  - [x] agent-skills-introduction
  - [x] laravel-ecosystem-analysis: surveyor, ranger, roster
  - [x] sentinel-introduction
-- [ ] パッケージ紹介。Blaze https://github.com/livewire/blaze
+- [x] パッケージ紹介。Blaze https://github.com/livewire/blaze
  - LivewireだけでなくBladeコンポーネントの高速化
  - 普通に使うだけでも制限事項があるので注意が必要。
  - 高速化を実現している仕組みまで理解しようとすると難しい。`compile`, `memo`, `fold`のどれを選ぶかを判断できるための解説を追加。
