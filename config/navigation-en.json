@@ -373,7 +373,8 @@
                 "en/packages/laravel-copilot-sdk/steering",
                 "en/packages/laravel-copilot-sdk/bare-usage"
               ]
-            }
+            },
+            "en/packages/laravel-boost-copilot-cli"
           ]
         }
       ]

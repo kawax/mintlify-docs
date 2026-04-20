@@ -1,0 +1,79 @@
+---
+title: "Laravel Boost Custom Agent for GitHub Copilot CLI"
+description: "Laravel Boost に GitHub Copilot CLI 用のカスタムエージェントを追加するパッケージ。Testbench 対応が特徴。"
+---
+
+## 概要
+
+`revolution/laravel-boost-copilot-cli` は、[Laravel Boost](https://github.com/laravel/boost) の拡張として GitHub Copilot CLI 用のカスタムエージェントを追加するパッケージです。
+
+Laravel Boost 本体にも `GitHub Copilot` はありますが、こちらは主に VS Code の GitHub Copilot 連携向けです。このパッケージは Copilot CLI 向けの導線を明確にし、特に Testbench を使うパッケージ開発で扱いやすい構成を提供します。
+
+## 要件
+
+- PHP 8.2+
+- Laravel 12+
+- Laravel Boost 2.0+
+- Copilot CLI 1.0.25+
+
+## 対応プラットフォーム
+
+- macOS
+- WSL（Native Windows も可。WSL 推奨）
+- Linux
+
+Laravel Sail も利用できます。先に `vendor/bin/sail up -d` を実行し、`copilot` コマンドは Sail の外側で実行します。
+
+## インストール
+
+```shell
+composer require revolution/laravel-boost-copilot-cli --dev
+```
+
+## 使い方
+
+```shell
+php artisan boost:install
+# "GitHub Copilot CLI" を選択
+copilot
+```
+
+Copilot CLI はプロジェクトルートの `.mcp.json` を自動読み込みするため、追加設定は不要です。
+
+## Testbench 対応（パッケージ開発者向け）
+
+このパッケージは、Laravel Boost 公式ではカバーしづらい Testbench 前提の運用に対応しやすい構成を提供します。
+
+<Steps>
+  <Step title="Testbench の workbench をセットアップする">
+    ```shell
+    vendor/bin/testbench workbench:install
+    ```
+  </Step>
+  <Step title="composer.json に @build を追加する">
+    `post-autoload-dump` に `@build` を追加します。
+
+    ```json
+    {
+      "scripts": {
+        "post-autoload-dump": [
+          "@clear",
+          "@prepare",
+          "@build"
+        ]
+      }
+    }
+    ```
+  </Step>
+  <Step title="Testbench 経由で Boost をインストールする">
+    ```shell
+    vendor/bin/testbench boost:install
+    ```
+  </Step>
+</Steps>
+
+## 関連リンク
+
+- GitHub: [invokable/laravel-boost-copilot-cli](https://github.com/invokable/laravel-boost-copilot-cli)
+- PhpStorm 向け関連パッケージ: [invokable/laravel-boost-phpstorm-copilot](https://github.com/invokable/laravel-boost-phpstorm-copilot)
+- Copilot SDK for Laravel: [invokable/laravel-copilot-sdk](https://github.com/invokable/laravel-copilot-sdk)
