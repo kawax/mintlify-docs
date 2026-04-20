@@ -1,0 +1,93 @@
+---
+title: "Laravel Boost Custom Agent for PhpStorm with GitHub Copilot"
+description: "A package that adds a Laravel Boost custom agent for the PhpStorm GitHub Copilot plugin, with macOS/Windows/Linux/WSL support."
+---
+
+## Package overview
+
+[revolution/laravel-boost-phpstorm-copilot](https://github.com/invokable/laravel-boost-phpstorm-copilot) is a Laravel Boost extension that adds a custom agent for the **GitHub Copilot plugin in PhpStorm**.
+
+It adds `PhpStorm with GitHub Copilot` to the AI agent choices in `php artisan boost:install`.
+
+<Warning>
+  `PhpStorm` is the option for `PhpStorm Junie`. Always select `PhpStorm with GitHub Copilot`.
+</Warning>
+
+## Requirements
+
+- PHP 8.3 or later
+- Laravel 12 or later
+- Laravel Boost 2.0 or later
+- GitHub Copilot plugin installed in PhpStorm
+
+## Installation
+
+```shell
+composer require revolution/laravel-boost-phpstorm-copilot --dev
+```
+
+## Usage
+
+<Steps>
+  <Step title="Run the Boost installer">
+    ```shell
+    php artisan boost:install
+    ```
+  </Step>
+  <Step title="Select features">
+    Choose the features you need: `AI Guidelines`, `Agent Skills`, and `Boost MCP Server Configuration`.
+  </Step>
+  <Step title="Choose PhpStorm with GitHub Copilot as the AI agent">
+    In `Which AI agents would you like to configure?`, select `PhpStorm with GitHub Copilot`.
+  </Step>
+</Steps>
+
+## MCP configuration file location
+
+| OS | Path |
+| --- | --- |
+| macOS, Linux | `~/.config/github-copilot/intellij/mcp.json` |
+| Windows | `%LOCALAPPDATA%\github-copilot\intellij\mcp.json` |
+
+## Important: rerun when you switch projects
+
+With PhpStorm and the GitHub Copilot plugin, MCP config is stored in a **system-wide** location, not per project.  
+The file contains the **absolute path** to your Laravel project, so you must regenerate it every time you switch projects.
+
+```shell
+php artisan boost:install --guidelines --skills --mcp --no-interaction
+```
+
+<Info>
+  In Boost 1.8 and later, `boost:update` does not update the MCP configuration file.
+</Info>
+
+## WSL support
+
+This package supports the setup where **PhpStorm runs on Windows** and **PHP runs in WSL**.
+
+### Requirements
+
+- The `wslu` package is required
+- Install it if needed: `sudo apt install wslu`
+
+### How it works
+
+- Detects WSL through `WSL_DISTRO_NAME`
+- Uses `wslvar LOCALAPPDATA` to read the Windows AppData path
+- Writes `%LOCALAPPDATA%\github-copilot\intellij\mcp.json` via PowerShell
+
+### Notes
+
+Running PhpStorm as remote development inside WSL is not supported. If needed, configure the MCP file manually.
+
+## Testbench is not supported
+
+This package does not support Testbench usage.  
+For package development with Testbench, use [laravel-boost-copilot-cli](https://github.com/invokable/laravel-boost-copilot-cli) instead.
+
+## Related links
+
+- [laravel-boost-phpstorm-copilot (GitHub)](https://github.com/invokable/laravel-boost-phpstorm-copilot)
+- [Laravel Boost (GitHub)](https://github.com/laravel/boost)
+- [GitHub Copilot plugin for PhpStorm](https://plugins.jetbrains.com/plugin/17718-github-copilot)

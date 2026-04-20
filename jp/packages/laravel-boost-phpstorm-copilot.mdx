@@ -1,0 +1,93 @@
+---
+title: "Laravel Boost Custom Agent for PhpStorm with GitHub Copilot"
+description: "PhpStorm の GitHub Copilot プラグイン向けに Laravel Boost のカスタムエージェントを追加するパッケージ。macOS/Windows/Linux/WSL 対応。"
+---
+
+## パッケージの概要
+
+[revolution/laravel-boost-phpstorm-copilot](https://github.com/invokable/laravel-boost-phpstorm-copilot) は、Laravel Boost の拡張として **PhpStorm の GitHub Copilot プラグイン**向けのカスタムエージェントを追加するパッケージです。
+
+`php artisan boost:install` の AI エージェント選択に `PhpStorm with GitHub Copilot` が追加されます。
+
+<Warning>
+  `PhpStorm` は `PhpStorm Junie` 用の選択肢です。必ず `PhpStorm with GitHub Copilot` を選んでください。
+</Warning>
+
+## 要件
+
+- PHP 8.3 以上
+- Laravel 12 以上
+- Laravel Boost 2.0 以上
+- PhpStorm に GitHub Copilot プラグインをインストール済み
+
+## インストール
+
+```shell
+composer require revolution/laravel-boost-phpstorm-copilot --dev
+```
+
+## 使い方
+
+<Steps>
+  <Step title="Boost のインストールコマンドを実行する">
+    ```shell
+    php artisan boost:install
+    ```
+  </Step>
+  <Step title="機能を選択する">
+    `AI Guidelines` / `Agent Skills` / `Boost MCP Server Configuration` から必要な機能を選択します。
+  </Step>
+  <Step title="AI エージェントで PhpStorm with GitHub Copilot を選択する">
+    `Which AI agents would you like to configure?` で `PhpStorm with GitHub Copilot` を選択します。
+  </Step>
+</Steps>
+
+## MCP 設定ファイルの保存先
+
+| OS | パス |
+| --- | --- |
+| macOS, Linux | `~/.config/github-copilot/intellij/mcp.json` |
+| Windows | `%LOCALAPPDATA%\github-copilot\intellij\mcp.json` |
+
+## 重要: プロジェクト切り替え時は再実行が必要
+
+PhpStorm + GitHub Copilot プラグインでは、MCP 設定が**プロジェクト単位ではなくシステム全体**に保存されます。  
+設定ファイルには Laravel プロジェクトの**絶対パス**が入るため、プロジェクトを切り替えるたびに更新が必要です。
+
+```shell
+php artisan boost:install --guidelines --skills --mcp --no-interaction
+```
+
+<Info>
+  Boost 1.8 以降の `boost:update` では MCP 設定ファイルは更新されません。
+</Info>
+
+## WSL 対応
+
+このパッケージは、**PhpStorm は Windows 側、PHP は WSL 側**で動かす構成をサポートします。
+
+### 要件
+
+- `wslu` パッケージが必要
+- 未導入なら `sudo apt install wslu`
+
+### 仕組み
+
+- `WSL_DISTRO_NAME` で WSL 環境を検出
+- `wslvar LOCALAPPDATA` で Windows 側の AppData パスを取得
+- PowerShell 経由で `%LOCALAPPDATA%\github-copilot\intellij\mcp.json` を書き込み
+
+### 注意事項
+
+WSL 内で PhpStorm をリモート開発として使う場合はサポート対象外です。必要な場合は MCP ファイルを手動で設定してください。
+
+## Testbench 非対応と代替案
+
+このパッケージは Testbench での利用をサポートしていません。  
+パッケージ開発で Testbench を使う場合は、代わりに [laravel-boost-copilot-cli](https://github.com/invokable/laravel-boost-copilot-cli) を使ってください。
+
+## 関連リンク
+
+- [laravel-boost-phpstorm-copilot (GitHub)](https://github.com/invokable/laravel-boost-phpstorm-copilot)
+- [Laravel Boost (GitHub)](https://github.com/laravel/boost)
+- [GitHub Copilot plugin for PhpStorm](https://plugins.jetbrains.com/plugin/17718-github-copilot)
