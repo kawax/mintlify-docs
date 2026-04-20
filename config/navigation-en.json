@@ -374,6 +374,7 @@
                 "en/packages/laravel-copilot-sdk/bare-usage"
               ]
             },
+            "en/packages/laravel-boost-copilot-cli",
             "en/packages/laravel-boost-phpstorm-copilot"
           ]
         }
