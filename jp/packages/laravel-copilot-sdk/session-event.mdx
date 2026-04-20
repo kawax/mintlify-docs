@@ -1,0 +1,173 @@
+---
+title: "SessionEvent"
+description: "Laravel Copilot SDK の SessionEvent を、Laravel らしいヘルパー、型判定、ブロードキャストで扱います。"
+---
+
+## SessionEvent
+
+Copilot からのメッセージはすべて `Revolution\Copilot\Types\SessionEvent` クラスです。
+このクラスは最もよく使うため、Laravel らしい便利機能が追加されています。
+
+## `content()`
+
+AI からの最も重要な応答メッセージを取得します。
+
+```php
+$response = Copilot::run('1 + 1');
+echo $response->content(); // '2'
+// content() は null になることがあります
+```
+
+`__toString()` による暗黙の型変換でもメッセージ内容を返します。
+
+```php
+echo (string) $response; // '2'
+// こちらは null になりません
+```
+
+## Event type の判定
+
+`isAssistantMessage()`, `isUserMessage()`, `isIdle()`, `isAssistantMessageDelta()` が使えます。
+よく使う Event type があれば、さらにヘルパーが追加される場合があります。
+
+`is()` で任意の `EventType` を判定できます。
+
+```php
+use Revolution\Copilot\Enums\SessionEventType;
+
+if ($response->is(SessionEventType::HOOK_START)) {
+    // フック開始イベント時の処理
+}
+```
+
+`type()` は `SessionEventType` enum の文字列値を返します。
+
+```php
+echo $response->type(); // 'assistant.message'
+```
+
+## `failed()` / `successful()`
+
+イベントタイプが `SESSION_ERROR` の時は `failed()` が true になります。
+`successful()` はその逆です。
+
+Laravel の命名に合わせるため、`isError()` から改名されています。
+
+## `throw()`
+
+Laravel の HTTP API や Process API と同じように、エラーは保持され、`throw()` で例外を送出できます。
+エラーがない場合は何もしないため、次のように書けます。
+
+```php
+$content = $response->throw()->content();
+```
+
+イベントタイプが `SESSION_ERROR` の場合は `Revolution\Copilot\Exceptions\SessionErrorException` を送出します。
+タイムアウト時は `Revolution\Copilot\Exceptions\SessionTimeoutException` を送出します。
+
+JSON-RPC のエラーでは `Revolution\Copilot\Exceptions\JsonRpcException` を送出します。
+
+## Conditionable
+
+`when()` と `unless()` が使えます。
+
+```php
+$response->when($response->isAssistantMessage(), function (SessionEvent $event) {
+    // アシスタントメッセージ時の処理
+});
+```
+
+## Dumpable
+
+`dump()` と `dd()` が使えます。
+
+```php
+$response->dump();
+```
+
+## Tappable
+
+`tap()` が使えます。
+
+```php
+return $response->tap(function (SessionEvent $event) {
+    // 何か処理
+    info($event->content());
+});
+```
+
+## InteractsWithData
+
+この機能は SessionEvent の `$data` プロパティにのみ適用されます。
+
+`all()`, `has()`, `only()`, `collect()` などの使い慣れたヘルパーを使えます。
+詳しくは [InteractsWithData](/jp/advanced/interacts-with-data) を参照してください。
+
+SessionEvent の `$data` は `EventType` ごとに構造が異なるため、イベントごとの値アクセスに便利です。
+
+`content()` も内部的に InteractsWithData を使っています。
+
+```php
+return $this->data('content', $default);
+
+// default を指定すると content() は null になりません
+echo $response->content('');
+```
+
+## `toArray()` / `toJson()`
+
+SessionEvent 全体を配列または JSON に変換できます。
+
+```php
+$array = $response->toArray();
+$json = $response->toJson();
+```
+
+イベント全体向けの `collect()` メソッドはありません。
+`$data` には InteractsWithData の `collect()` があるためです。
+イベント全体をコレクション操作したい場合は Laravel の `collect()` ヘルパーを使います。
+
+```php
+$collect = collect($response->toArray());
+```
+
+## `broadcast()` / `broadcastNow()`
+
+Laravel AI SDK の `StreamEvent` と同じインターフェースでブロードキャストできます。
+AI SDK ではストリーミング時に使いますが、SessionEvent では任意の `EventType` で使えます。
+
+```php
+use Illuminate\Broadcasting\Channel;
+
+$event->broadcast(new Channel('channel-name'));
+```
+
+`broadcastNow()` はキューを経由せずに即時ブロードキャストします。
+
+```php
+$event->broadcastNow(new Channel('channel-name'));
+```
+
+ストリーミング時の利用例:
+
+```php
+use Illuminate\Broadcasting\Channel;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SessionEvent;
+
+Copilot::start(function (CopilotSession $session) {
+    $session->on(function (SessionEvent $event): void {
+        if ($event->isAssistantMessageDelta()) {
+            $event->broadcastNow(new Channel('copilot'));
+        }
+    });
+
+    $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+}, config: new SessionConfig(streaming: true));
+```
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>

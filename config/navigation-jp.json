@@ -369,7 +369,11 @@
                 "jp/packages/laravel-copilot-sdk/session-config",
                 "jp/packages/laravel-copilot-sdk/tools",
                 "jp/packages/laravel-copilot-sdk/streaming",
-                "jp/packages/laravel-copilot-sdk/mcp"
+                "jp/packages/laravel-copilot-sdk/mcp",
+                "jp/packages/laravel-copilot-sdk/session-event",
+                "jp/packages/laravel-copilot-sdk/permission-request",
+                "jp/packages/laravel-copilot-sdk/laravel-cloud",
+                "jp/packages/laravel-copilot-sdk/basic-usage"
               ]
             }
           ]
