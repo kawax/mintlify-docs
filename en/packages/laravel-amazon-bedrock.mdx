@@ -7,7 +7,7 @@ description: "An Amazon Bedrock driver for Laravel AI SDK. Supports text generat
 
 [revolution/laravel-amazon-bedrock](https://github.com/invokable/laravel-amazon-bedrock) is a driver that lets you use Amazon Bedrock through the [Laravel AI SDK](https://laravel.com/docs/13.x/ai-sdk). You can access multiple Bedrock models through one Laravel AI SDK interface.
 
-The main README features are as follows.
+The main features are as follows.
 
 | Feature | Available with Bedrock API key only | Supported models / services |
 | --- | --- | --- |
@@ -247,7 +247,7 @@ class ChatAgent implements Agent, Conversational
     }
 }
 
-$response = (new ChatAgent(auth()->id()))->prompt('What did we discuss before?');
+$response = (new ChatAgent(auth()->id()))->prompt('Summarize our previous conversation if we had one.');
 echo $response->text;
 ```
 
