@@ -18,9 +18,6 @@
  - `package-versioning`が作られたけど今後もネタがあれば継続。
 - [x] Laravel Cloudも2025年からなので実際に使った人しか知らない情報が多い。一般的なLaravel専用PaaSって部分以上だと、Task SchedulerやバックグラウンドプロセスやNightwatch連携はForge同様に簡単、Octaneの使用が簡単、Inertia SSRの使用が簡単、WebSocketサーバーが簡単に導入可能。Laravelの高度な機能まで使い込んでる人が欲しい機能が全部揃っている。Forgeと比べて足りないのはroot権限がない。
  - 使っていくうちに新しい情報が入ったら後で追加。
-- [x] `Illuminate\Support\Traits\InteractsWithData`トレイトの解説。プロジェクトで直接使うことは少ないのでパッケージ開発者向け。
-- [x] `tap()`ヘルパー、`Illuminate\Support\Traits\Tappable`トレイトの解説。存在は知ってるけど使い所が分からないと言われることが多い機能第一位。これもトレイトはパッケージ開発者向け。すでにページのあるMacroableやConditionableと合わせてLaravel風の使い方を提供できる。
-- [x] Collection Deep Dive。使うだけならドキュメントで十分だけど実装コードまで理解しようとすると複雑。個別のメソッドまで追うと長すぎるのでコードを読んでいきたい人向けのCollectionクラスの全体構造の解説にする。Laravel5.8までは`Illuminate\Support\Collection`と継承先の`Illuminate\Database\Eloquent\Collection`だったけどLaravel6で`LazyCollection`が追加された時に`Enumerable`インターフェースと`EnumeratesValues`トレイトで共通化する構造になった。その後はPHPDoc部分がPHPStanスタイルになる更新が何度も入っている。むしろ一番解説が必要なのはこのPHPDoc部分かも。GenericsはPHPにはまだないのにPHPDocでだけ使われていて馴染みのない人も多い。
 
 ## blog ページ案
 
@@ -29,10 +26,6 @@
  - [x] agent-skills-introduction
  - [x] laravel-ecosystem-analysis: surveyor, ranger, roster
  - [x] sentinel-introduction
-- [x] パッケージ紹介。Blaze https://github.com/livewire/blaze
- - LivewireだけでなくBladeコンポーネントの高速化
- - 普通に使うだけでも制限事項があるので注意が必要。
- - 高速化を実現している仕組みまで理解しようとすると難しい。`compile`, `memo`, `fold`のどれを選ぶかを判断できるための解説を追加。
 
 ## packages ページ案
 - [x] Amazon Bedrock driver for Laravel AI SDK。https://github.com/invokable/laravel-amazon-bedrock
