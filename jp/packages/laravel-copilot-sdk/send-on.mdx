@@ -11,6 +11,7 @@ description: "Laravel Copilot SDK の send() / sendAndWait() と on() を組み�
 use Revolution\Copilot\Contracts\CopilotSession;
 use Revolution\Copilot\Facades\Copilot;
 use Revolution\Copilot\Types\SessionEvent;
+use Revolution\Copilot\Types\SessionEvent;
 
 Copilot::start(function (CopilotSession $session) {
     $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
@@ -71,7 +72,6 @@ Copilot::start(function (CopilotSession $session) {
 `SessionEventType` enum か文字列でイベントタイプを指定すればそのイベントのみ購読できます。
 
 ```php
-use Revolution\Copilot\Enums\SessionEventType;
 use Revolution\Copilot\Types\SessionEvent;
 
 $session->on(SessionEventType::ASSISTANT_MESSAGE, function (SessionEvent $event): void {
