@@ -10,6 +10,7 @@ description: "Laravel Copilot SDK の send() / sendAndWait() と on() を組み�
 ```php
 use Revolution\Copilot\Contracts\CopilotSession;
 use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionEvent;
 
 Copilot::start(function (CopilotSession $session) {
     $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
@@ -22,6 +23,7 @@ Copilot::start(function (CopilotSession $session) {
 ```php
 use Revolution\Copilot\Contracts\CopilotSession;
 use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionEvent;
 
 Copilot::start(function (CopilotSession $session) {
     $session->on(function (SessionEvent $event): void {
