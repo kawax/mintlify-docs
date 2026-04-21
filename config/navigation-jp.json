@@ -374,14 +374,19 @@
                 "jp/packages/laravel-copilot-sdk/models",
                 "jp/packages/laravel-copilot-sdk/resume",
                 "jp/packages/laravel-copilot-sdk/tools",
-                "jp/packages/laravel-copilot-sdk/ask-user",
-                "jp/packages/laravel-copilot-sdk/mcp",
-                "jp/packages/laravel-copilot-sdk/hooks",
-                "jp/packages/laravel-copilot-sdk/streaming",
-                "jp/packages/laravel-copilot-sdk/laravel-cloud",
-                "jp/packages/laravel-copilot-sdk/bare-usage"
-              ]
-            },
+                 "jp/packages/laravel-copilot-sdk/ask-user",
+                 "jp/packages/laravel-copilot-sdk/mcp",
+                 "jp/packages/laravel-copilot-sdk/hooks",
+                 "jp/packages/laravel-copilot-sdk/events",
+                 "jp/packages/laravel-copilot-sdk/send-on",
+                 "jp/packages/laravel-copilot-sdk/streaming",
+                 "jp/packages/laravel-copilot-sdk/attachments",
+                 "jp/packages/laravel-copilot-sdk/fake",
+                 "jp/packages/laravel-copilot-sdk/laravel-cloud",
+                 "jp/packages/laravel-copilot-sdk/github-actions",
+                 "jp/packages/laravel-copilot-sdk/bare-usage"
+               ]
+             },
             "jp/packages/laravel-boost-copilot-cli",
             "jp/packages/laravel-boost-phpstorm-copilot"
           ]

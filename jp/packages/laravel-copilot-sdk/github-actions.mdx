@@ -1,0 +1,55 @@
+---
+title: "GitHub Actions"
+description: "Laravel Copilot SDK を GitHub Actions で使うための Copilot CLI インストールとトークン認証設定を説明します。"
+---
+
+## GitHub Actions での使い方
+
+GitHub Actions で Artisan コマンドを実行してその中で Copilot CLI を使う例です。
+
+GitHub Actions では stdio モードで使うのが一般的です。
+
+## `copilot` コマンドを直接インストールする場合
+
+```yaml
+      - name: Install Copilot CLI
+        run: |
+          curl -fsSL https://gh.io/copilot-install | bash
+          copilot version
+
+      - name: Run command
+        run: php artisan copilot:ping
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+```
+
+- `copilot-install` を使ってインストールします。path は `copilot` のまま追加の設定不要で使えます。
+- `COPILOT_GITHUB_TOKEN` で認証します。`GH_TOKEN` や `GITHUB_TOKEN` など Copilot CLI がサポートしている認証方法ならなんでもよいです。
+- トークンは `Copilot Requests` の権限が必要なのでデフォルトの `GITHUB_TOKEN` ではおそらく使えません。
+
+## `gh` コマンドを使う場合
+
+GitHub CLI 2.86.0 で Copilot のインストール機能が追加されました。普通の GitHub Actions 環境では `gh` コマンドがプリインストールされているので追加のインストール不要で使えます。おそらく最初に `gh copilot ...` コマンドが実行された時に Copilot が自動でインストールされるので `gh copilot version` だけ実行します。
+
+> gh version 2.86.0 (2026-01-21)  
+> https://github.com/cli/cli/releases/tag/v2.86.0  
+> ✓ Copilot CLI installed successfully
+
+```yaml
+      - name: Install Copilot CLI
+        run: |
+          gh --version
+          gh copilot version
+
+      - name: Run command
+        run: php artisan copilot:ping
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_CLI_PATH: "gh copilot"
+```
+
+`COPILOT_CLI_PATH` は `gh copilot` の時のみ特別な対応をしているので、`gh copilot` 以外の設定では動きません。
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>

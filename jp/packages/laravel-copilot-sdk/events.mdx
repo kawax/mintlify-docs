@@ -1,0 +1,47 @@
+---
+title: "イベント"
+description: "Laravel Copilot SDK が発火する Laravel イベントを、ログ収集やデバッグ、非同期処理に活用する方法を説明します。"
+---
+
+## Laravel イベント
+
+[Events](https://github.com/invokable/laravel-copilot-sdk/tree/main/src/Events) のイベントクラスを各所に仕込んでいるのでログやデバッグに活用できます。
+
+[フック](/jp/packages/laravel-copilot-sdk/hooks) でも似たことができますが、フックがない場所にも仕込めます。
+
+```text
+src/
+├── Events/
+│   ├── Client/
+│   │   ├── ClientStarted.php
+│   │   ├── ToolCall.php
+│   │   └── PingPong.php
+│   ├── JsonRpc/
+│   │   ├── MessageReceived.php
+│   │   ├── MessageSending.php
+│   │   └── ResponseReceived.php
+│   ├── Process/
+│   │   └── ProcessStarted.php
+│   └── Session/
+│       ├── CreateSession.php
+│       ├── MessageSend.php
+│       ├── MessageSendAndWait.php
+│       ├── SessionEventReceived.php
+│       └── ResumeSession.php
+```
+
+例えば少し時間のかかる処理をキューや `defer` に投げることができます。この `Copilot::run()` の結果は直接受け取れませんが、代わりに `MessageSendAndWait` イベントのリスナーで受け取ることができます。
+
+```php
+dispatch(fn() => Copilot::run(''));
+```
+
+```php
+use function Illuminate\Support\defer;
+
+defer(fn() => Copilot::run(''));
+```
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>
