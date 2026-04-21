@@ -1,51 +1,51 @@
 ---
-title: "Laravel AI SDK 用の Amazon Bedrock ドライバー"
-description: "Laravel AI SDK 用の Amazon Bedrock ドライバー。テキスト生成、ストリーミング、ツール使用、会話履歴、構造化出力、埋め込み、画像生成、音声、文字起こし、リランキングをサポートします。"
+title: "Amazon Bedrock driver for Laravel AI SDK"
+description: "An Amazon Bedrock driver for Laravel AI SDK. Supports text generation, streaming, tool use, conversation history, structured output, embeddings, image generation, audio, transcription, and reranking."
 ---
 
-## 概要
+## Overview
 
-[revolution/laravel-amazon-bedrock](https://github.com/invokable/laravel-amazon-bedrock) は、[Laravel AI SDK](https://laravel.com/docs/13.x/ai-sdk) で Amazon Bedrock を使うためのドライバーです。Bedrock の複数モデルを Laravel AI SDK の統一 API で扱えます。
+[revolution/laravel-amazon-bedrock](https://github.com/invokable/laravel-amazon-bedrock) is a driver that lets you use Amazon Bedrock through the [Laravel AI SDK](https://laravel.com/docs/13.x/ai-sdk). You can access multiple Bedrock models through one Laravel AI SDK interface.
 
-README で公開されている主な対応機能は次のとおりです。
+The main README features are as follows.
 
-| 機能 | Bedrock API キーのみで利用可 | 対応モデル / サービス |
+| Feature | Available with Bedrock API key only | Supported models / services |
 | --- | --- | --- |
-| テキスト生成 / ストリーミング | ✅ | Anthropic Claude, Amazon Nova, Meta Llama, Mistral, Cohere Command R, DeepSeek, AI21 Jamba |
-| ツール使用（Function Calling） | ✅ | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R |
-| 構造化出力 | ✅ | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R |
-| 画像生成 | ✅ | Stability AI（既定）|
-| 音声（TTS） | ❌ | Amazon Polly |
-| 文字起こし（STT） | ❌ | Amazon Nova 2 Lite（Converse API AudioBlock） |
-| 埋め込み | ✅ | Amazon Titan Embeddings V2（既定）, Cohere Embed V3 / V4 |
-| リランキング | ❌ | Cohere Rerank 3.5, Amazon Rerank 1.0 |
+| Text generation / streaming | ✅ | Anthropic Claude, Amazon Nova, Meta Llama, Mistral, Cohere Command R, DeepSeek, AI21 Jamba |
+| Tool use (Function Calling) | ✅ | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R |
+| Structured output | ✅ | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R |
+| Image generation | ✅ | Stability AI (default) |
+| Audio (TTS) | ❌ | Amazon Polly |
+| Transcription (STT) | ❌ | Amazon Nova 2 Lite (Converse API AudioBlock) |
+| Embeddings | ✅ | Amazon Titan Embeddings V2 (default), Cohere Embed V3 / V4 |
+| Reranking | ❌ | Cohere Rerank 3.5, Amazon Rerank 1.0 |
 
 <Info>
-  表の `❌` は「機能自体が未対応」ではなく「Bedrock API キーのみでは利用できない」ことを示します。
+  `❌` in this table means the feature is not available with only a Bedrock API key. It does not mean the feature itself is unsupported.
 </Info>
 
 <Info>
-  認証方式は 3 つです。Bedrock API キー、AWS IAM クレデンシャル（SigV4）、デフォルト AWS クレデンシャルチェーン（IAM ロール等）を選べます。
+  You can choose from three authentication methods: Bedrock API key, AWS IAM credentials (SigV4), and the default AWS credential chain (IAM roles and related sources).
 </Info>
 
-## インストール
+## Installation
 
 <Steps>
-  <Step title="パッケージをインストールする">
+  <Step title="Install the package">
     ```bash
     composer require revolution/laravel-amazon-bedrock
     ```
   </Step>
-  <Step title="AI SDK の設定を公開する">
+  <Step title="Publish AI SDK configuration">
     ```bash
     php artisan vendor:publish --provider="Laravel\Ai\AiServiceProvider"
     ```
   </Step>
 </Steps>
 
-## 設定
+## Configuration
 
-`config/ai.php` に `bedrock` プロバイダーを追加します。必要に応じて既定プロバイダーも Bedrock に切り替えます。
+Add the `bedrock` provider to `config/ai.php`. Switch your default providers to Bedrock if needed.
 
 ```php
 'default' => 'bedrock',
@@ -56,7 +56,7 @@ README で公開されている主な対応機能は次のとおりです。
 'default_for_transcription' => 'bedrock',
 ```
 
-### Option 1: Bedrock API キー
+### Option 1: Bedrock API key
 
 ```php
 'providers' => [
@@ -74,10 +74,10 @@ AWS_DEFAULT_REGION=us-east-1
 ```
 
 <Warning>
-  Bedrock API キーは Bedrock Runtime API 専用です。`bedrock-agent-runtime` を使うリランキングや Amazon Polly（TTS）では使えません。これらは SigV4 またはデフォルト AWS クレデンシャルチェーンを使ってください。
+  A Bedrock API key only works for the Bedrock Runtime API. It does not work with reranking (`bedrock-agent-runtime`) or Amazon Polly (TTS). Use SigV4 or the default AWS credential chain for those features.
 </Warning>
 
-### Option 2: AWS IAM クレデンシャル（SigV4）
+### Option 2: AWS IAM credentials (SigV4)
 
 ```php
 'providers' => [
@@ -94,15 +94,15 @@ AWS_DEFAULT_REGION=us-east-1
 ```dotenv
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
-AWS_SESSION_TOKEN= # 任意
+AWS_SESSION_TOKEN= # optional
 AWS_DEFAULT_REGION=us-east-1
 ```
 
 <Info>
-  `AWS_SESSION_TOKEN` は一時クレデンシャル（STS）を使う場合のみ設定します。
+  Set `AWS_SESSION_TOKEN` only when you use temporary credentials (STS).
 </Info>
 
-### Option 3: デフォルト AWS クレデンシャルチェーン（IAM ロール）
+### Option 3: Default AWS credential chain (IAM roles)
 
 ```php
 'providers' => [
@@ -118,10 +118,10 @@ AWS_DEFAULT_REGION=us-east-1
 ```
 
 <Info>
-  EC2 / ECS / Lambda など IAM ロールがある環境では、この方法が安全です。
+  This option is usually safest in environments such as EC2, ECS, and Lambda where IAM roles are available.
 </Info>
 
-## 基本的な使い方
+## Basic usage
 
 ```php
 use App\Ai\Agents\BedrockAgent;
@@ -134,33 +134,33 @@ class BedrockAgent implements Agent
 
     public function instructions(): string
     {
-        return 'あなたはソフトウェア開発の専門家です。';
+        return 'You are an expert in software development.';
     }
 }
 
-$response = (new BedrockAgent)->prompt('Laravel 13 の新機能を要約してください。');
+$response = (new BedrockAgent)->prompt('Summarize what is new in Laravel 13.');
 
 echo $response->text;
 ```
 
-## ストリーミング
+## Streaming
 
-Bedrock のストリーミングを Laravel AI SDK 経由で使えます。
+You can use Bedrock streaming through the Laravel AI SDK.
 
 ```php
 use App\Ai\Agents\BedrockAgent;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/stream', function () {
-    return (new BedrockAgent)->stream('Laravel 13 について教えてください。');
+    return (new BedrockAgent)->stream('Tell me about Laravel 13.');
 });
 ```
 
 <Tip>
-  Bedrock のストリーミングは AWS 公式 PHP SDK や Prism では未対応で、このパッケージが PHP / Laravel で実用できる実装です。
+  Bedrock streaming is not available in the official AWS SDK for PHP or Prism. This package provides a practical implementation for PHP and Laravel.
 </Tip>
 
-## ツール使用（Function Calling）
+## Tool use (Function Calling)
 
 ```php
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -171,7 +171,7 @@ class GetWeather implements Tool
 {
     public function description(): string
     {
-        return '都市の現在の天気を返します。';
+        return 'Return the current weather for a city.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -205,17 +205,17 @@ class WeatherAgent implements Agent
 
     public function instructions(): string
     {
-        return 'あなたは天気アシスタントです。';
+        return 'You are a weather assistant.';
     }
 }
 
-$response = (new WeatherAgent)->prompt('東京の天気は？');
+$response = (new WeatherAgent)->prompt('What is the weather in Tokyo?');
 echo $response->text;
 ```
 
-## 会話履歴
+## Conversation history
 
-`Conversational` インターフェースを実装すると、過去のメッセージを各プロンプトに含められます。
+Implement the `Conversational` interface to include previous messages in each prompt.
 
 ```php
 use App\Models\ChatHistory;
@@ -232,7 +232,7 @@ class ChatAgent implements Agent, Conversational
 
     public function instructions(): string
     {
-        return 'あなたは役に立つアシスタントです。';
+        return 'You are a helpful assistant.';
     }
 
     public function messages(): iterable
@@ -247,11 +247,11 @@ class ChatAgent implements Agent, Conversational
     }
 }
 
-$response = (new ChatAgent(auth()->id()))->prompt('前回の内容を要約してください。');
+$response = (new ChatAgent(auth()->id()))->prompt('What did we discuss before?');
 echo $response->text;
 ```
 
-## 構造化出力
+## Structured output
 
 ```php
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -265,7 +265,7 @@ class ExtractPerson implements Agent, HasStructuredOutput
 
     public function instructions(): string
     {
-        return '文章から人物情報を抽出してください。';
+        return 'Extract person information from the text.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -281,37 +281,37 @@ $response = (new ExtractPerson)->prompt('Alice is 25 years old.');
 echo $response['name'];
 ```
 
-## 画像生成
+## Image generation
 
-Stability AI を使った画像生成例です。
+Example using Stability AI.
 
 ```php
 use Laravel\Ai\Image;
 
-$response = Image::of('桜の下を歩く猫')
+$response = Image::of('A cat walking under cherry blossoms')
     ->square()
     ->generate(provider: 'bedrock');
 
 $response->store('images', 's3');
 ```
 
-## 音声（TTS）
+## Audio (TTS)
 
-Amazon Polly を使った音声生成例です。
+Example using Amazon Polly.
 
 ```php
 use Laravel\Ai\Audio;
 
-$response = Audio::of('Laravel で音声を生成します。')
+$response = Audio::of('Generate speech with Laravel.')
     ->voice('Joanna')
     ->generate(provider: 'bedrock');
 
 $path = $response->storeAs('voice.mp3');
 ```
 
-## 文字起こし（STT）
+## Transcription (STT)
 
-Nova 2 Lite を使った文字起こし例です。
+Example using Nova 2 Lite.
 
 ```php
 use Laravel\Ai\Transcription;
@@ -322,7 +322,7 @@ $response = Transcription::fromPath('/path/to/audio.mp3')
 echo $response->text;
 ```
 
-## 埋め込み
+## Embeddings
 
 ```php
 use Laravel\Ai\Embeddings;
@@ -334,7 +334,7 @@ $response = Embeddings::for(['Laravel', 'Bedrock'])
 $vector = $response->first();
 ```
 
-## リランキング
+## Reranking
 
 ```php
 use Laravel\Ai\Reranking;
@@ -342,9 +342,9 @@ use Laravel\Ai\Reranking;
 $response = Reranking::of([
     'Laravel is a PHP framework.',
     'Bedrock provides foundation models.',
-    'Laravel AI SDK gives a unified API.',
+    'Laravel AI SDK provides a unified API.',
 ])->limit(2)->rerank(
-    query: 'Laravel と AI の説明',
+    query: 'Explain Laravel and AI',
     provider: 'bedrock'
 );
 

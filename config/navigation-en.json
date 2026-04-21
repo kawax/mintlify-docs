@@ -335,6 +335,12 @@
       "tab": "My Packages",
       "groups": [
         {
+          "group": "AI SDK",
+          "pages": [
+            "en/packages/laravel-amazon-bedrock"
+          ]
+        },
+        {
           "group": "GitHub Copilot",
           "pages": [
             {
