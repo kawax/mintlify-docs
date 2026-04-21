@@ -1,0 +1,82 @@
+---
+title: "Attachments"
+description: "Laravel Copilot SDK でファイル、ディレクトリ、選択範囲、Blob を添付してプロンプト送信する方法を説明します。"
+---
+
+## File attachments
+
+以下のようにファイルかディレクトリを配列で指定します。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$attachments = [
+    [
+        'type' => 'file',
+        'path' => '/path/to/file.php',
+        'displayName' => 'My File',// 省略可
+    ],
+    [
+        'type' => 'directory',
+        'path' => '/path/to/dir/',
+        'displayName' => 'dir',// 省略可
+    ],
+    [
+        'type' => 'selection',
+        'filePath' => '/path/to/file.php',
+        'displayName' => 'My File',// ここは省略不可
+        'selection' => [
+            'start' => ['line' => 1, 'character' => 10],
+            'end' => ['line' => 5, 'character' => 10],
+        ],
+        'text' => '...',
+    ],
+    [
+        'type' => 'blob',
+        'data' => base64_encode(file_get_contents('/path/to/image.png')),
+        'mimeType' => 'image/png',
+        'displayName' => 'screenshot.png',// 省略可
+    ],
+];
+
+$response = Copilot::run(prompt: '...', attachments: $attachments);
+```
+
+こんなフォーマットを覚えるのは難しいので簡単に使えるようにヘルパーを用意しています。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Support\Attachment;
+
+$attachments = [
+    Attachment::file(path: '/path/to/file.php', displayName: 'My File'),
+    Attachment::directory(path: '/path/to/dir/', displayName: 'dir'),
+    Attachment::selection(filePath: '/path/to/file.php', displayName: 'My File', selection: ['start' => ['line' => 1, 'character' => 10], 'end' => ['line' => 5, 'character' => 10]], text: '...'),
+    Attachment::blob(data: base64_encode(file_get_contents('/path/to/image.png')), mimeType: 'image/png', displayName: 'screenshot.png'),
+];
+
+$response = Copilot::run(prompt: '...', attachments: $attachments);
+```
+
+## Blob attachments
+
+`blob` タイプは Base64 エンコードされたデータをインラインで添付するために使います。ディスクI/Oなしで画像などのバイナリデータを直接送信できます。
+
+```php
+use Revolution\Copilot\Support\Attachment;
+
+// 画像ファイルをBase64エンコードして添付
+$attachment = Attachment::blob(
+    data: base64_encode(file_get_contents('/path/to/image.png')),
+    mimeType: 'image/png',
+    displayName: 'screenshot.png',
+);
+```
+
+<Info>
+`selection` は公式 SDK にまだドキュメントがないので詳細は不明です。`github_reference` も公式情報が不足しているため今後対応予定です。
+</Info>
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>
