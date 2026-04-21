@@ -1,0 +1,92 @@
+---
+title: "Ask user"
+description: "Laravel Copilot SDK の onUserInputRequest ハンドラーで、ask_user ツール経由のユーザー質問に応答します。"
+---
+
+## ユーザー入力リクエスト
+
+`onUserInputRequest` ハンドラーを設定すると、エージェントが `ask_user` ツールでユーザーに質問できます。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Types\UserInputRequest;
+use Revolution\Copilot\Types\UserInputResponse;
+
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(prompt: 'Ask the user which language they like.');
+    dump($response->content());
+}, config: [
+    'model' => 'gpt-5',
+    'onUserInputRequest' => function (UserInputRequest $request): UserInputResponse {
+        // $request->question - The question content
+        // $request->choices - Array of choices for multiple-choice input (optional)
+        // $request->allowFreeform - Whether freeform input is allowed (default: true)
+
+        dump("Question from agent: {$request->question}");
+        if ($request->choices) {
+            dump('Choices: '.implode(', ', $request->choices));
+        }
+
+        return new UserInputResponse(
+            answer: 'PHP',
+            wasFreeform: true, // true when the answer did not come from predefined choices
+        );
+    },
+]);
+```
+
+## UserInputRequest クラス
+
+エージェントからのユーザー入力リクエストです。
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `question` | `string` | ユーザーに尋ねる質問 |
+| `choices` | `?array` | 複数選択の場合の選択肢（オプション） |
+| `allowFreeform` | `?bool` | 自由入力が許可されているか（デフォルト: `true`） |
+
+## UserInputResponse クラス
+
+ユーザー入力リクエストへの応答です。
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `answer` | `string` | ユーザーの回答 |
+| `wasFreeform` | `bool` | 回答が自由入力だったか（選択肢からではない場合 `true`） |
+
+## 実践例
+
+インタラクティブなコマンドで使う場合です。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Types\UserInputRequest;
+use Revolution\Copilot\Types\UserInputResponse;
+
+Copilot::start(function (CopilotSession $session) use ($command) {
+    $response = $session->sendAndWait(prompt: 'Configure this project.');
+    $command->info($response->content());
+}, config: [
+    'onUserInputRequest' => function (UserInputRequest $request) use ($command): UserInputResponse {
+        if ($request->choices) {
+            $answer = $command->choice(
+                $request->question,
+                $request->choices,
+                $request->choices[0] ?? null
+            );
+
+            return new UserInputResponse(answer: $answer, wasFreeform: false);
+        }
+
+        $answer = $command->ask($request->question);
+
+        return new UserInputResponse(answer: $answer, wasFreeform: true);
+    },
+]);
+```
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>

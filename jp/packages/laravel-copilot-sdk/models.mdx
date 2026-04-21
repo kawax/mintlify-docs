@@ -1,0 +1,23 @@
+---
+title: "モデル"
+description: "Copilot CLI がサポートするモデル一覧を確認し、Laravel Copilot SDK のセッション設定でモデル ID を指定します。"
+---
+
+## モデルリスト
+
+`Copilot::client()->listModels()` で Copilot CLI がサポートしているモデルの一覧を取得できます。
+
+利用可能なモデルは Copilot CLI のアップデートや組織のポリシーで変わります。  
+[モデルリスト](https://github.com/invokable/laravel-copilot-sdk/blob/main/docs/models-list.md) は参考情報として扱ってください。
+
+## モデル ID の指定
+
+SessionConfig の `model` に指定するのは `ID` です。
+
+```php
+Copilot::run($prompt, config: ['model' => 'auto']);
+```
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>

@@ -1,0 +1,200 @@
+---
+title: "セッションフック"
+description: "Laravel Copilot SDK の SessionHooks でセッションライフサイクルにフックし、ツール実行・プロンプト・エラー処理を制御します。"
+---
+
+## セッションフック
+
+`hooks` 設定でハンドラーを提供すると、セッションのライフサイクルイベントにフックできます。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Types\SessionHooks;
+use Revolution\Copilot\Types\Hooks\PreToolUseHookInput;
+use Revolution\Copilot\Types\Hooks\PreToolUseHookOutput;
+use Revolution\Copilot\Types\Hooks\PostToolUseHookInput;
+use Revolution\Copilot\Types\Hooks\PostToolUseHookOutput;
+use Revolution\Copilot\Types\Hooks\UserPromptSubmittedHookInput;
+use Revolution\Copilot\Types\Hooks\UserPromptSubmittedHookOutput;
+use Revolution\Copilot\Types\Hooks\SessionStartHookInput;
+use Revolution\Copilot\Types\Hooks\SessionStartHookOutput;
+use Revolution\Copilot\Types\Hooks\SessionEndHookInput;
+use Revolution\Copilot\Types\Hooks\SessionEndHookOutput;
+use Revolution\Copilot\Types\Hooks\ErrorOccurredHookInput;
+use Revolution\Copilot\Types\Hooks\ErrorOccurredHookOutput;
+
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(prompt: 'Hello');
+    dump($response->content());
+}, config: [
+    'model' => 'gpt-5',
+    'hooks' => new SessionHooks(
+        // Called before each tool execution
+        onPreToolUse: function (PreToolUseHookInput $input): ?PreToolUseHookOutput {
+            dump("Upcoming tool: {$input->toolName}");
+            // Return permission decision and optionally modify arguments
+            return new PreToolUseHookOutput(
+                permissionDecision: 'allow', // "allow", "deny", or "ask"
+                modifiedArgs: $input->toolArgs, // Optionally modify tool arguments
+                additionalContext: 'Additional context for the model',
+            );
+        },
+
+        // Called after each tool execution
+        onPostToolUse: function (PostToolUseHookInput $input): ?PostToolUseHookOutput {
+            dump("Tool {$input->toolName} completed");
+            // Optionally modify result or add context
+            return new PostToolUseHookOutput(
+                additionalContext: 'Post-execution note',
+            );
+        },
+
+        // Called when a user submits a prompt
+        onUserPromptSubmitted: function (UserPromptSubmittedHookInput $input): ?UserPromptSubmittedHookOutput {
+            dump("User prompt: {$input->prompt}");
+            return new UserPromptSubmittedHookOutput(
+                modifiedPrompt: $input->prompt, // Optionally modify prompt
+            );
+        },
+
+        // Called when a session starts
+        onSessionStart: function (SessionStartHookInput $input): ?SessionStartHookOutput {
+            dump("Session started: {$input->source}"); // "startup", "resume", "new"
+            return new SessionStartHookOutput(
+                additionalContext: 'Session initialization context',
+            );
+        },
+
+        // Called when a session ends
+        onSessionEnd: function (SessionEndHookInput $input): ?SessionEndHookOutput {
+            dump("Session ended: {$input->reason}");
+            return null;
+        },
+
+        // Called when an error occurs
+        onErrorOccurred: function (ErrorOccurredHookInput $input): ?ErrorOccurredHookOutput {
+            dump("Error occurred {$input->errorContext}: {$input->error}");
+            return new ErrorOccurredHookOutput(
+                errorHandling: 'retry', // "retry", "skip", or "abort"
+            );
+        },
+    ),
+]);
+```
+
+## 利用可能なフック
+
+| フック | 説明 |
+| --- | --- |
+| `onPreToolUse` | ツール実行前にインターセプト。許可/拒否や引数変更が可能です。 |
+| `onPostToolUse` | ツール実行後に結果を処理。結果変更やコンテキスト追加が可能です。 |
+| `onUserPromptSubmitted` | ユーザープロンプトをインターセプト。処理前に変更可能です。 |
+| `onSessionStart` | セッション開始または再開時にロジックを実行します。 |
+| `onSessionEnd` | セッション終了時のクリーンアップやログ記録に使います。 |
+| `onErrorOccurred` | `retry` / `skip` / `abort` 戦略でエラーを処理します。 |
+
+## Hook の入力/出力型
+
+### PreToolUseHookInput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `toolName` | `string` | 実行するツール名 |
+| `toolArgs` | `?array` | ツールに渡される引数 |
+| `timestamp` | `?int` | タイムスタンプ（ミリ秒） |
+| `cwd` | `?string` | 現在の作業ディレクトリ |
+
+### PreToolUseHookOutput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `permissionDecision` | `?string` | `"allow"`、`"deny"`、`"ask"` |
+| `modifiedArgs` | `?array` | 変更後のツール引数 |
+| `additionalContext` | `?string` | モデルへの追加コンテキスト |
+
+### PostToolUseHookInput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `toolName` | `string` | 実行したツール名 |
+| `toolArgs` | `?array` | ツールに渡された引数 |
+| `result` | `?ToolResultObject` | ツール実行結果 |
+| `timestamp` | `?int` | タイムスタンプ（ミリ秒） |
+| `cwd` | `?string` | 現在の作業ディレクトリ |
+
+### PostToolUseHookOutput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `modifiedResult` | `?ToolResultObject` | 変更後のツール結果 |
+| `additionalContext` | `?string` | 追加コンテキスト |
+
+### UserPromptSubmittedHookInput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `prompt` | `string` | ユーザープロンプト |
+| `timestamp` | `?int` | タイムスタンプ（ミリ秒） |
+| `cwd` | `?string` | 現在の作業ディレクトリ |
+
+### UserPromptSubmittedHookOutput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `modifiedPrompt` | `?string` | 変更後のプロンプト |
+
+### SessionStartHookInput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `source` | `string` | 開始元: `"startup"`、`"resume"`、`"new"` |
+| `timestamp` | `?int` | タイムスタンプ（ミリ秒） |
+| `cwd` | `?string` | 現在の作業ディレクトリ |
+
+### SessionStartHookOutput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `additionalContext` | `?string` | セッション初期化コンテキスト |
+
+### SessionEndHookInput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `reason` | `string` | 終了理由 |
+| `timestamp` | `?int` | タイムスタンプ（ミリ秒） |
+| `cwd` | `?string` | 現在の作業ディレクトリ |
+
+### SessionEndHookOutput
+
+出力はありません（`null` を返します）。
+
+### ErrorOccurredHookInput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `error` | `string` | エラーメッセージ |
+| `errorContext` | `?string` | エラーが発生したコンテキスト |
+| `timestamp` | `?int` | タイムスタンプ（ミリ秒） |
+| `cwd` | `?string` | 現在の作業ディレクトリ |
+
+### ErrorOccurredHookOutput
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `errorHandling` | `?string` | `"retry"`、`"skip"`、`"abort"` |
+
+## ToolResultObject クラス
+
+ツール実行結果を表すオブジェクトです。
+
+| プロパティ | 型 | 説明 |
+| --- | --- | --- |
+| `textResultForLlm` | `?string` | LLM に渡すテキスト結果 |
+| `resultType` | `?string` | `"success"`、`"failure"`、`"rejected"`、`"denied"` |
+| `resultForAssistant` | `?array` | アシスタント向け結果データ |
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>
