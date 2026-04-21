@@ -30,53 +30,53 @@ Copilot::start(function (CopilotSession $session) {
 }, config: [
     'model' => 'gpt-5',
     'hooks' => new SessionHooks(
-        // Called before each tool execution
+        // 各ツール実行前に呼ばれる
         onPreToolUse: function (PreToolUseHookInput $input): ?PreToolUseHookOutput {
             dump("Upcoming tool: {$input->toolName}");
-            // Return permission decision and optionally modify arguments
+            // 許可判定を返し、オプションで引数を変更
             return new PreToolUseHookOutput(
-                permissionDecision: 'allow', // "allow", "deny", or "ask"
-                modifiedArgs: $input->toolArgs, // Optionally modify tool arguments
-                additionalContext: 'Additional context for the model',
+                permissionDecision: 'allow', // "allow", "deny", または "ask"
+                modifiedArgs: $input->toolArgs, // オプションでツール引数を変更
+                additionalContext: 'モデルへの追加コンテキスト',
             );
         },
 
-        // Called after each tool execution
+        // 各ツール実行後に呼ばれる
         onPostToolUse: function (PostToolUseHookInput $input): ?PostToolUseHookOutput {
-            dump("Tool {$input->toolName} completed");
-            // Optionally modify result or add context
+            dump("ツール {$input->toolName} 完了");
+            // オプションで結果を変更またはコンテキストを追加
             return new PostToolUseHookOutput(
-                additionalContext: 'Post-execution note',
+                additionalContext: '実行後のメモ,
             );
         },
 
-        // Called when a user submits a prompt
+        // ユーザーがプロンプトを送信したときに呼ばれる
         onUserPromptSubmitted: function (UserPromptSubmittedHookInput $input): ?UserPromptSubmittedHookOutput {
-            dump("User prompt: {$input->prompt}");
+            dump("ユーザープロンプト: {$input->prompt}");
             return new UserPromptSubmittedHookOutput(
-                modifiedPrompt: $input->prompt, // Optionally modify prompt
+                modifiedPrompt: $input->prompt, // オプションでプロンプトを変更
             );
         },
 
-        // Called when a session starts
+        // セッション開始時に呼ばれる
         onSessionStart: function (SessionStartHookInput $input): ?SessionStartHookOutput {
-            dump("Session started: {$input->source}"); // "startup", "resume", "new"
+            dump("セッション開始: {$input->source}"); // "startup", "resume", "new"
             return new SessionStartHookOutput(
-                additionalContext: 'Session initialization context',
+                additionalContext: 'セッション初期化コンテキスト',
             );
         },
 
-        // Called when a session ends
+        // セッション終了時に呼ばれる
         onSessionEnd: function (SessionEndHookInput $input): ?SessionEndHookOutput {
-            dump("Session ended: {$input->reason}");
+            dump("セッション終了: $input->reason}");
             return null;
         },
 
-        // Called when an error occurs
+        // エラー発生時に呼ばれる
         onErrorOccurred: function (ErrorOccurredHookInput $input): ?ErrorOccurredHookOutput {
-            dump("Error occurred {$input->errorContext}: {$input->error}");
+            dump("エラー発生 {$input->errorContext}: {$input->error}");
             return new ErrorOccurredHookOutput(
-                errorHandling: 'retry', // "retry", "skip", or "abort"
+                errorHandling: 'retry', // "retry", "skip", または "abort"
             );
         },
     ),
