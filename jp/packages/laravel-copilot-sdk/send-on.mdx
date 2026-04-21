@@ -23,7 +23,6 @@ Copilot::start(function (CopilotSession $session) {
 use Revolution\Copilot\Contracts\CopilotSession;
 use Revolution\Copilot\Facades\Copilot;
 use Revolution\Copilot\Types\SessionEvent;
-use Revolution\Copilot\Types\SessionEvent;
 
 Copilot::start(function (CopilotSession $session) {
     $session->on(function (SessionEvent $event): void {
@@ -46,6 +45,7 @@ PHP でこれは分かりにくいので `on()` と `sendAndWait()` の組み合
 ```php
 use Revolution\Copilot\Contracts\CopilotSession;
 use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionEvent;
 
 Copilot::start(function (CopilotSession $session) {
     $session->on(function (SessionEvent $event): void {
