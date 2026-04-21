@@ -339,7 +339,7 @@
           "pages": [
             {
               "group": "Laravel Copilot SDK",
-              "root": "en/packages/laravel-copilot-sdk/index",
+              "root": "en/packages/laravel-copilot-sdk",
               "expanded": false,
               "pages": [
                 "en/packages/laravel-copilot-sdk/getting-started",
