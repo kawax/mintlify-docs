@@ -45,23 +45,23 @@ README で公開されている主な対応機能は次のとおりです。
 
 ## 設定
 
-`config/ai.php` に `bedrock` プロバイダーを追加します。必要に応じて既定プロバイダーも Bedrock に切り替えます。
+`config/ai.php` に `amazon-bedrock` プロバイダーを追加します。必要に応じて既定プロバイダーも Bedrock に切り替えます。
 
 ```php
-'default' => 'bedrock',
-'default_for_images' => 'bedrock',
-'default_for_audio' => 'bedrock',
-'default_for_embeddings' => 'bedrock',
-'default_for_reranking' => 'bedrock',
-'default_for_transcription' => 'bedrock',
+'default' => 'amazon-bedrock',
+'default_for_images' => 'amazon-bedrock',
+'default_for_audio' => 'amazon-bedrock',
+'default_for_embeddings' => 'amazon-bedrock',
+'default_for_reranking' => 'amazon-bedrock',
+'default_for_transcription' => 'amazon-bedrock',
 ```
 
 ### Option 1: Bedrock API キー
 
 ```php
 'providers' => [
-    'bedrock' => [
-        'driver' => 'bedrock',
+    'amazon-bedrock' => [
+        'driver' => 'amazon-bedrock',
         'key' => env('AWS_BEDROCK_API_KEY', ''),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
@@ -81,8 +81,8 @@ AWS_DEFAULT_REGION=us-east-1
 
 ```php
 'providers' => [
-    'bedrock' => [
-        'driver' => 'bedrock',
+    'amazon-bedrock' => [
+        'driver' => 'amazon-bedrock',
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'token' => env('AWS_SESSION_TOKEN'),
@@ -106,8 +106,8 @@ AWS_DEFAULT_REGION=us-east-1
 
 ```php
 'providers' => [
-    'bedrock' => [
-        'driver' => 'bedrock',
+    'amazon-bedrock' => [
+        'driver' => 'amazon-bedrock',
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 ],
@@ -155,10 +155,6 @@ Route::get('/stream', function () {
     return (new BedrockAgent)->stream('Laravel 13 について教えてください。');
 });
 ```
-
-<Tip>
-  Bedrock のストリーミングは AWS 公式 PHP SDK や Prism では未対応で、このパッケージが PHP / Laravel で実用できる実装です。
-</Tip>
 
 ## ツール使用（Function Calling）
 
@@ -287,10 +283,11 @@ Stability AI を使った画像生成例です。
 
 ```php
 use Laravel\Ai\Image;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Image::of('桜の下を歩く猫')
     ->square()
-    ->generate(provider: 'bedrock');
+    ->generate(provider: Bedrock::KEY);
 
 $response->store('images', 's3');
 ```
@@ -301,10 +298,11 @@ Amazon Polly を使った音声生成例です。
 
 ```php
 use Laravel\Ai\Audio;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Audio::of('Laravel で音声を生成します。')
     ->voice('Joanna')
-    ->generate(provider: 'bedrock');
+    ->generate(provider: Bedrock::KEY);
 
 $path = $response->storeAs('voice.mp3');
 ```
@@ -315,9 +313,10 @@ Nova 2 Lite を使った文字起こし例です。
 
 ```php
 use Laravel\Ai\Transcription;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Transcription::fromPath('/path/to/audio.mp3')
-    ->generate(provider: 'bedrock');
+    ->generate(provider: Bedrock::KEY);
 
 echo $response->text;
 ```
@@ -326,10 +325,11 @@ echo $response->text;
 
 ```php
 use Laravel\Ai\Embeddings;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Embeddings::for(['Laravel', 'Bedrock'])
     ->dimensions(1024)
-    ->generate(provider: 'bedrock', model: 'amazon.titan-embed-text-v2:0');
+    ->generate(provider: Bedrock::KEY, model: 'amazon.titan-embed-text-v2:0');
 
 $vector = $response->first();
 ```
@@ -338,6 +338,7 @@ $vector = $response->first();
 
 ```php
 use Laravel\Ai\Reranking;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Reranking::of([
     'Laravel is a PHP framework.',
@@ -345,7 +346,7 @@ $response = Reranking::of([
     'Laravel AI SDK gives a unified API.',
 ])->limit(2)->rerank(
     query: 'Laravel と AI の説明',
-    provider: 'bedrock'
+    provider: Bedrock::KEY
 );
 
 echo $response->first()->document;
