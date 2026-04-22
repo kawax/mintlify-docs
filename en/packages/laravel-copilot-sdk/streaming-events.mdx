@@ -1,0 +1,411 @@
+---
+title: "Streaming events"
+description: "Reference for session event types and payloads when streaming is enabled in Laravel Copilot SDK."
+---
+
+## Streaming events
+
+When you enable `streaming: true` in `SessionConfig`, session behavior is delivered as incremental events.
+
+> `/en/packages/laravel-copilot-sdk/session-event` explains Laravel-specific helpers for the `SessionEvent` class itself.
+> This page is a type-and-payload reference for each event.
+
+## Overview
+
+Copilot agent behavior (reasoning, messages, tool execution, permission checks, and more) flows through session events.
+
+- **Ephemeral event**: Real-time only. Not persisted in session logs.
+- **Persisted event**: Stored in session logs and replayed when resuming.
+- **Delta event**: Fragment event (`deltaContent`, etc.) that you stitch into full content.
+- **`parentId` chain**: Each event links to its previous event.
+
+## Event envelope (common fields)
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `string` | Event ID (UUID v4) |
+| `timestamp` | `string` | ISO 8601 timestamp |
+| `parentId` | `string \| null` | Previous event ID (`null` for first event) |
+| `ephemeral` | `boolean?` | `true` when the event is ephemeral |
+| `type` | `string` | Event type |
+| `data` | `object` | Event-specific payload |
+
+## Laravel subscription example
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Enums\SessionEventType;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SessionEvent;
+
+Copilot::start(function (CopilotSession $session): void {
+    // All events
+    $session->on(function (SessionEvent $event): void {
+        info($event->type(), $event->toArray());
+    });
+
+    // Specific event type
+    $session->on(SessionEventType::ASSISTANT_MESSAGE_DELTA, function (SessionEvent $event): void {
+        echo $event->deltaContent();
+    });
+
+    $session->sendAndWait(prompt: 'Explain key Laravel strengths');
+}, config: new SessionConfig(streaming: true));
+```
+
+## Major event categories
+
+## Assistant events
+
+### `assistant.turn_start`
+Turn starts.
+
+- `turnId` (required)
+- `interactionId` (optional)
+
+### `assistant.intent` (ephemeral)
+Current execution intent (for example, `Exploring codebase`).
+
+- `intent` (required)
+
+### `assistant.reasoning`
+Completed reasoning block.
+
+- `reasoningId` (required)
+- `content` (required)
+
+### `assistant.reasoning_delta` (ephemeral)
+Reasoning text delta.
+
+- `reasoningId` (required)
+- `deltaContent` (required)
+
+### `assistant.message`
+Completed assistant message.
+
+Common fields:
+
+- `messageId` (required)
+- `content` (required)
+- `toolRequests` (optional)
+- `reasoningOpaque` / `reasoningText` / `encryptedContent` (optional)
+- `phase` / `outputTokens` / `interactionId` (optional)
+- `parentToolCallId` (optional)
+
+### `assistant.message_delta` (ephemeral)
+Message body delta.
+
+- `messageId` (required)
+- `deltaContent` (required)
+- `parentToolCallId` (optional)
+
+### `assistant.turn_end`
+Turn ends.
+
+- `turnId` (required)
+
+### `assistant.usage` (ephemeral)
+Per-API-call usage metrics.
+
+Common fields:
+
+- `model` (required)
+- `inputTokens` / `outputTokens` / `cost` / `duration` (optional)
+- `apiCallId` / `providerCallId` (optional)
+- `quotaSnapshots` / `copilotUsage` (optional)
+
+### `assistant.streaming_delta` (ephemeral)
+Low-level stream progress.
+
+- `totalResponseSizeBytes` (required)
+
+## Tool execution events
+
+### `tool.execution_start`
+Tool execution starts.
+
+- `toolCallId` (required)
+- `toolName` (required)
+- `arguments` / `mcpServerName` / `mcpToolName` / `parentToolCallId` (optional)
+
+### `tool.execution_partial_result` (ephemeral)
+Partial output while tool runs.
+
+- `toolCallId` (required)
+- `partialOutput` (required)
+
+### `tool.execution_progress` (ephemeral)
+Progress message.
+
+- `toolCallId` (required)
+- `progressMessage` (required)
+
+### `tool.execution_complete`
+Tool execution ends (success/failure).
+
+- `toolCallId` (required)
+- `success` (required)
+- `result` (on success)
+- `error` (on failure)
+- `toolTelemetry` / `parentToolCallId` (optional)
+
+### `tool.user_requested`
+Tool call explicitly requested by user.
+
+- `toolCallId` (required)
+- `toolName` (required)
+- `arguments` (optional)
+
+## Session lifecycle events
+
+### `session.idle` (ephemeral)
+Processing finished. Waiting for next input.
+
+- `backgroundTasks` (optional)
+
+### `session.error`
+Error during session processing.
+
+- `errorType` (required)
+- `message` (required)
+- `stack` / `statusCode` / `providerCallId` (optional)
+
+### `session.compaction_start`
+Context compaction starts (`data` is an empty object).
+
+### `session.compaction_complete`
+Context compaction completes.
+
+Common fields:
+
+- `success` (required)
+- `error` (optional)
+- `preCompactionTokens` / `postCompactionTokens` (optional)
+- `summaryContent` / `checkpointPath` (optional)
+
+### `session.title_changed` (ephemeral)
+Auto title update.
+
+- `title` (required)
+
+### `session.context_changed`
+Working context changed.
+
+- `cwd` (required)
+- `gitRoot` / `repository` / `branch` (optional)
+
+### `session.usage_info` (ephemeral)
+Context window usage status.
+
+- `tokenLimit` (required)
+- `currentTokens` (required)
+- `messagesLength` (required)
+
+### `session.task_complete`
+Task completion notification.
+
+- `summary` (optional)
+
+### `session.shutdown`
+Session shutdown.
+
+Common fields:
+
+- `shutdownType` (required)
+- `errorReason` (optional)
+- `totalPremiumRequests` / `totalApiDurationMs` (required)
+- `codeChanges` / `modelMetrics` (required)
+
+## Permission and user input events
+
+### `permission.requested` (ephemeral)
+Permission request.
+
+- `requestId` (required)
+- `permissionRequest` (required)
+
+`permissionRequest.kind` values:
+
+- `shell`
+- `write`
+- `read`
+- `mcp`
+- `url`
+- `memory`
+- `custom-tool`
+
+### `permission.completed` (ephemeral)
+Permission resolution result.
+
+- `requestId` (required)
+- `result.kind` (required)
+
+### `user_input.requested` (ephemeral)
+Question asked to user.
+
+- `requestId` (required)
+- `question` (required)
+- `choices` / `allowFreeform` (optional)
+
+### `user_input.completed` (ephemeral)
+User input completed.
+
+- `requestId` (required)
+
+### `elicitation.requested` (ephemeral)
+Structured input request (form).
+
+- `requestId` (required)
+- `message` (required)
+- `requestedSchema` (required)
+
+### `elicitation.completed` (ephemeral)
+Structured input completed.
+
+- `requestId` (required)
+
+## Sub-agent and skill events
+
+### `subagent.started`
+
+- `toolCallId` (required)
+- `agentName` / `agentDisplayName` / `agentDescription` (required)
+
+### `subagent.completed`
+
+- `toolCallId` (required)
+- `agentName` / `agentDisplayName` (required)
+
+### `subagent.failed`
+
+- `toolCallId` (required)
+- `agentName` / `agentDisplayName` (required)
+- `error` (required)
+
+### `subagent.selected`
+
+- `agentName` (required)
+- `agentDisplayName` (required)
+- `tools` (required, can be `null`)
+
+### `subagent.deselected`
+Returns to default agent (`data` is an empty object).
+
+### `skill.invoked`
+
+- `name` / `path` / `content` (required)
+- `allowedTools` / `pluginName` / `pluginVersion` (optional)
+
+## Other events
+
+### `abort`
+
+- `reason` (required)
+
+### `user.message`
+
+- `content` (required)
+- `transformedContent` / `attachments` / `source` / `agentMode` / `interactionId` (optional)
+
+### `system.message`
+
+- `content` (required)
+- `role` (required)
+- `name` / `metadata` (optional)
+
+### `external_tool.requested` (ephemeral)
+
+- `requestId` / `sessionId` / `toolCallId` / `toolName` (required)
+- `arguments` (optional)
+
+### `external_tool.completed` (ephemeral)
+
+- `requestId` (required)
+
+### `exit_plan_mode.requested` (ephemeral)
+
+- `requestId` / `summary` / `planContent` / `actions` / `recommendedAction` (required)
+
+### `exit_plan_mode.completed` (ephemeral)
+
+- `requestId` (required)
+
+### `command.queued` (ephemeral)
+
+- `requestId` (required)
+- `command` (required)
+
+### `command.completed` (ephemeral)
+
+- `requestId` (required)
+
+## Typical event order
+
+```text
+assistant.turn_start
+├── assistant.intent (ephemeral)
+├── assistant.reasoning_delta (ephemeral, repeated)
+├── assistant.reasoning
+├── assistant.message_delta (ephemeral, repeated)
+├── assistant.message
+├── assistant.usage (ephemeral)
+├── [permission / tool.* loops if needed]
+assistant.turn_end
+session.idle (ephemeral)
+```
+
+## Quick reference of all events
+
+| Event Type | Ephemeral | Category |
+|---|---|---|
+| `assistant.turn_start` |  | Assistant |
+| `assistant.intent` | ✅ | Assistant |
+| `assistant.reasoning` |  | Assistant |
+| `assistant.reasoning_delta` | ✅ | Assistant |
+| `assistant.streaming_delta` | ✅ | Assistant |
+| `assistant.message` |  | Assistant |
+| `assistant.message_delta` | ✅ | Assistant |
+| `assistant.turn_end` |  | Assistant |
+| `assistant.usage` | ✅ | Assistant |
+| `tool.user_requested` |  | Tool |
+| `tool.execution_start` |  | Tool |
+| `tool.execution_partial_result` | ✅ | Tool |
+| `tool.execution_progress` | ✅ | Tool |
+| `tool.execution_complete` |  | Tool |
+| `session.idle` | ✅ | Session |
+| `session.error` |  | Session |
+| `session.compaction_start` |  | Session |
+| `session.compaction_complete` |  | Session |
+| `session.title_changed` | ✅ | Session |
+| `session.context_changed` |  | Session |
+| `session.usage_info` | ✅ | Session |
+| `session.task_complete` |  | Session |
+| `session.shutdown` |  | Session |
+| `permission.requested` | ✅ | Permission |
+| `permission.completed` | ✅ | Permission |
+| `user_input.requested` | ✅ | User Input |
+| `user_input.completed` | ✅ | User Input |
+| `elicitation.requested` | ✅ | User Input |
+| `elicitation.completed` | ✅ | User Input |
+| `subagent.started` |  | Sub-Agent |
+| `subagent.completed` |  | Sub-Agent |
+| `subagent.failed` |  | Sub-Agent |
+| `subagent.selected` |  | Sub-Agent |
+| `subagent.deselected` |  | Sub-Agent |
+| `skill.invoked` |  | Skill |
+| `abort` |  | Control |
+| `user.message` |  | User |
+| `system.message` |  | System |
+| `external_tool.requested` | ✅ | External Tool |
+| `external_tool.completed` | ✅ | External Tool |
+| `command.queued` | ✅ | Command |
+| `command.completed` | ✅ | Command |
+| `exit_plan_mode.requested` | ✅ | Plan Mode |
+| `exit_plan_mode.completed` | ✅ | Plan Mode |
+
+## Related docs
+
+- [Official streaming events reference](https://github.com/github/copilot-sdk/blob/main/docs/features/streaming-events.md)
+- Laravel event class details: [SessionEvent](/en/packages/laravel-copilot-sdk/session-event)
+- Streaming implementation patterns: [Streaming](/en/packages/laravel-copilot-sdk/streaming)

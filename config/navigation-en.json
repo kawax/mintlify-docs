@@ -363,6 +363,7 @@
                 "en/packages/laravel-copilot-sdk/events",
                 "en/packages/laravel-copilot-sdk/send-on",
                 "en/packages/laravel-copilot-sdk/streaming",
+                "en/packages/laravel-copilot-sdk/streaming-events",
                 "en/packages/laravel-copilot-sdk/attachments",
                 "en/packages/laravel-copilot-sdk/fake",
                 "en/packages/laravel-copilot-sdk/laravel-cloud",
@@ -377,6 +378,9 @@
                 "en/packages/laravel-copilot-sdk/custom-providers",
                 "en/packages/laravel-copilot-sdk/concurrency",
                 "en/packages/laravel-copilot-sdk/steering",
+                "en/packages/laravel-copilot-sdk/agent-loop",
+                "en/packages/laravel-copilot-sdk/custom-agents",
+                "en/packages/laravel-copilot-sdk/skills",
                 "en/packages/laravel-copilot-sdk/bare-usage"
               ]
             },

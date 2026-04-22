@@ -1,83 +1,112 @@
 ---
 title: "Session hooks"
-description: "Hook into Laravel Copilot SDK session lifecycle events with SessionHooks and customize tool, prompt, session, and error handling behavior."
+description: "Insert custom logic into Copilot session lifecycle events with SessionHooks in Laravel Copilot SDK."
 ---
 
 ## Session hooks
 
-You can hook into session lifecycle events by providing handlers in the `hooks` configuration.
+With `hooks`, you can insert logic at each stage of a Copilot session lifecycle.
+You can add tool execution control, audit logging, prompt enrichment, and error handling without changing core implementation.
+
+## Hook flow
+
+```mermaid
+flowchart LR
+    A[Session starts] -->|onSessionStart| B[User prompt]
+    B -->|onUserPromptSubmitted| C[Pre tool]
+    C -->|onPreToolUse| D[Tool execution]
+    D -->|onPostToolUse| E{Continue?}
+    E -->|yes| C
+    E -->|no| F[Session ends]
+    F -->|onSessionEnd| G((Done))
+    C -. error .-> H[onErrorOccurred]
+    D -. error .-> H
+```
+
+## Basic usage
 
 ```php
-use Revolution\Copilot\Facades\Copilot;
 use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
 use Revolution\Copilot\Types\SessionHooks;
-use Revolution\Copilot\Types\Hooks\PreToolUseHookInput;
-use Revolution\Copilot\Types\Hooks\PreToolUseHookOutput;
-use Revolution\Copilot\Types\Hooks\PostToolUseHookInput;
-use Revolution\Copilot\Types\Hooks\PostToolUseHookOutput;
-use Revolution\Copilot\Types\Hooks\UserPromptSubmittedHookInput;
-use Revolution\Copilot\Types\Hooks\UserPromptSubmittedHookOutput;
-use Revolution\Copilot\Types\Hooks\SessionStartHookInput;
-use Revolution\Copilot\Types\Hooks\SessionStartHookOutput;
-use Revolution\Copilot\Types\Hooks\SessionEndHookInput;
-use Revolution\Copilot\Types\Hooks\SessionEndHookOutput;
 use Revolution\Copilot\Types\Hooks\ErrorOccurredHookInput;
 use Revolution\Copilot\Types\Hooks\ErrorOccurredHookOutput;
+use Revolution\Copilot\Types\Hooks\PostToolUseHookInput;
+use Revolution\Copilot\Types\Hooks\PostToolUseHookOutput;
+use Revolution\Copilot\Types\Hooks\PreToolUseHookInput;
+use Revolution\Copilot\Types\Hooks\PreToolUseHookOutput;
+use Revolution\Copilot\Types\Hooks\SessionEndHookInput;
+use Revolution\Copilot\Types\Hooks\SessionEndHookOutput;
+use Revolution\Copilot\Types\Hooks\SessionStartHookInput;
+use Revolution\Copilot\Types\Hooks\SessionStartHookOutput;
+use Revolution\Copilot\Types\Hooks\UserPromptSubmittedHookInput;
+use Revolution\Copilot\Types\Hooks\UserPromptSubmittedHookOutput;
 
 Copilot::start(function (CopilotSession $session) {
-    $response = $session->sendAndWait(prompt: 'Hello');
+    $response = $session->sendAndWait(prompt: 'Summarize the key points of this README');
     dump($response->content());
 }, config: [
     'model' => 'gpt-5',
     'hooks' => new SessionHooks(
-        // Called before each tool execution
-        onPreToolUse: function (PreToolUseHookInput $input): ?PreToolUseHookOutput {
-            dump("Upcoming tool: {$input->toolName}");
-            // Return permission decision and optionally modify arguments
-            return new PreToolUseHookOutput(
-                permissionDecision: 'allow', // "allow", "deny", or "ask"
-                modifiedArgs: $input->toolArgs, // Optionally modify tool arguments
-                additionalContext: 'Additional context for the model',
-            );
-        },
-
-        // Called after each tool execution
-        onPostToolUse: function (PostToolUseHookInput $input): ?PostToolUseHookOutput {
-            dump("Tool {$input->toolName} completed");
-            // Optionally modify result or add context
-            return new PostToolUseHookOutput(
-                additionalContext: 'Post-execution note',
-            );
-        },
-
-        // Called when a user submits a prompt
-        onUserPromptSubmitted: function (UserPromptSubmittedHookInput $input): ?UserPromptSubmittedHookOutput {
-            dump("User prompt: {$input->prompt}");
-            return new UserPromptSubmittedHookOutput(
-                modifiedPrompt: $input->prompt, // Optionally modify prompt
-            );
-        },
-
-        // Called when a session starts
         onSessionStart: function (SessionStartHookInput $input): ?SessionStartHookOutput {
-            dump("Session started: {$input->source}"); // "startup", "resume", "new"
             return new SessionStartHookOutput(
-                additionalContext: 'Session initialization context',
+                additionalContext: "Project root: {$input->cwd}",
             );
         },
 
-        // Called when a session ends
-        onSessionEnd: function (SessionEndHookInput $input): ?SessionEndHookOutput {
-            dump("Session ended: {$input->reason}");
+        onUserPromptSubmitted: function (UserPromptSubmittedHookInput $input): ?UserPromptSubmittedHookOutput {
+            if (str_starts_with($input->prompt, '/fix')) {
+                return new UserPromptSubmittedHookOutput(
+                    modifiedPrompt: 'Fix the current error and summarize what changed.',
+                );
+            }
+
             return null;
         },
 
-        // Called when an error occurs
+        onPreToolUse: function (PreToolUseHookInput $input): ?PreToolUseHookOutput {
+            $blocked = ['bash', 'shell', 'delete_file'];
+
+            if (in_array($input->toolName, $blocked, true)) {
+                return new PreToolUseHookOutput(
+                    permissionDecision: 'deny',
+                    permissionDecisionReason: "{$input->toolName} is not allowed in this environment",
+                );
+            }
+
+            return new PreToolUseHookOutput(permissionDecision: 'allow');
+        },
+
+        onPostToolUse: function (PostToolUseHookInput $input): ?PostToolUseHookOutput {
+            if ($input->toolName === 'read_file') {
+                return new PostToolUseHookOutput(
+                    additionalContext: 'If needed, explore related files and compare them.',
+                );
+            }
+
+            return null;
+        },
+
         onErrorOccurred: function (ErrorOccurredHookInput $input): ?ErrorOccurredHookOutput {
-            dump("Error occurred {$input->errorContext}: {$input->error}");
-            return new ErrorOccurredHookOutput(
-                errorHandling: 'retry', // "retry", "skip", or "abort"
-            );
+            if ($input->errorContext === 'model_call' && $input->recoverable) {
+                return new ErrorOccurredHookOutput(
+                    errorHandling: 'retry',
+                    retryCount: 2,
+                    userNotification: 'Retrying due to a temporary model error.',
+                );
+            }
+
+            return null;
+        },
+
+        onSessionEnd: function (SessionEndHookInput $input): ?SessionEndHookOutput {
+            if ($input->reason !== 'complete') {
+                return new SessionEndHookOutput(
+                    sessionSummary: "Session ended with reason: {$input->reason}",
+                );
+            }
+
+            return null;
         },
     ),
 ]);
@@ -85,115 +114,172 @@ Copilot::start(function (CopilotSession $session) {
 
 ## Available hooks
 
-| Hook | Description |
-|---|---|
-| `onPreToolUse` | Intercepts before tool execution. Can allow/deny and modify arguments. |
-| `onPostToolUse` | Handles results after tool execution. Can modify result and add context. |
-| `onUserPromptSubmitted` | Intercepts user prompts. Can modify prompt before processing. |
-| `onSessionStart` | Runs logic when a session starts or resumes. |
-| `onSessionEnd` | Cleans up or logs at session end. |
-| `onErrorOccurred` | Handles errors with retry/skip/abort strategies. |
+| Hook | Trigger timing | Primary use |
+|---|---|---|
+| `onSessionStart` | Session start (`new` / `resume` / `startup`) | Inject initial context, override config |
+| `onUserPromptSubmitted` | User prompt submission | Prompt enrichment, template expansion, input filtering |
+| `onPreToolUse` | Before tool execution | Allow/deny/ask, modify args, suppress output |
+| `onPostToolUse` | After tool execution | Modify result, mask secrets, audit logging |
+| `onErrorOccurred` | Error inside session | Retry, notify user, classify errors |
+| `onSessionEnd` | Session end | Cleanup, metrics, summary |
 
-## Hook input/output types
+Returning `null` keeps default behavior.
 
-### PreToolUseHookInput
+## Typical use cases
+
+### 1) Permission control
+
+- Use `onPreToolUse` with allow-list policies.
+- Require human approval for destructive actions with `permissionDecision: 'ask'`.
+- Use `permissionDecisionReason` for explicit denial reasons.
+- See [Tools](/en/packages/laravel-copilot-sdk/tools) for tool name candidates such as `view`, `glob`, and `bash`.
+
+### 2) Auditing and compliance
+
+- Combine lifecycle hooks to collect audit events.
+- Persist collected records by session ID.
+
+### 3) Prompt enrichment
+
+- Add project context in `onSessionStart` (`language`, framework, conventions).
+- Expand shortcuts such as `/fix` and `/test` in `onUserPromptSubmitted`.
+
+### 4) Result filtering
+
+- Mask API keys, tokens, and passwords in `onPostToolUse`.
+- Summarize oversized results and return details only when needed.
+
+### 5) Error recovery
+
+- Retry only when `errorContext` is `model_call` and `recoverable=true`.
+- Provide concise user notifications for non-recoverable paths.
+
+### 6) Session metrics
+
+- Record start time in `onSessionStart`.
+- Update counters in `onPreToolUse` and `onUserPromptSubmitted`.
+- Emit duration, tool counts, and termination reason in `onSessionEnd`.
+
+## Hook input and output types
+
+### Common input (`BaseHookInput`)
 
 | Property | Type | Description |
 |---|---|---|
-| `toolName` | `string` | Name of tool to run |
-| `toolArgs` | `?array` | Arguments passed to the tool |
-| `timestamp` | `?int` | Timestamp (milliseconds) |
-| `cwd` | `?string` | Current working directory |
+| `timestamp` | `int` | Hook timestamp (Unix ms) |
+| `cwd` | `string` | Current working directory |
 
-### PreToolUseHookOutput
+### `PreToolUseHookInput`
 
 | Property | Type | Description |
 |---|---|---|
-| `permissionDecision` | `?string` | "allow", "deny", or "ask" |
-| `modifiedArgs` | `?array` | Modified tool arguments |
-| `additionalContext` | `?string` | Additional context for the model |
+| `toolName` | `string` | Tool name to execute |
+| `toolArgs` | `mixed` | Planned tool arguments |
 
-### PostToolUseHookInput
-
-| Property | Type | Description |
-|---|---|---|
-| `toolName` | `string` | Name of executed tool |
-| `toolArgs` | `?array` | Arguments passed to the tool |
-| `result` | `?ToolResultObject` | Tool execution result |
-| `timestamp` | `?int` | Timestamp (milliseconds) |
-| `cwd` | `?string` | Current working directory |
-
-### PostToolUseHookOutput
+### `PreToolUseHookOutput`
 
 | Property | Type | Description |
 |---|---|---|
-| `modifiedResult` | `?ToolResultObject` | Modified tool result |
+| `permissionDecision` | `?string` | `allow` / `deny` / `ask` |
+| `permissionDecisionReason` | `?string` | Reason for deny/ask |
+| `modifiedArgs` | `mixed` | Overridden tool arguments |
 | `additionalContext` | `?string` | Additional context |
+| `suppressOutput` | `?bool` | Suppress tool output |
 
-### UserPromptSubmittedHookInput
+### `PostToolUseHookInput`
+
+| Property | Type | Description |
+|---|---|---|
+| `toolName` | `string` | Executed tool name |
+| `toolArgs` | `mixed` | Runtime tool arguments |
+| `toolResult` | `ToolResultObject\|array` | Tool result |
+
+### `PostToolUseHookOutput`
+
+| Property | Type | Description |
+|---|---|---|
+| `modifiedResult` | `ToolResultObject\|array\|null` | Modified result |
+| `additionalContext` | `?string` | Additional context |
+| `suppressOutput` | `?bool` | Suppress result output |
+
+### `UserPromptSubmittedHookInput`
 
 | Property | Type | Description |
 |---|---|---|
 | `prompt` | `string` | User prompt |
-| `timestamp` | `?int` | Timestamp (milliseconds) |
-| `cwd` | `?string` | Current working directory |
 
-### UserPromptSubmittedHookOutput
+### `UserPromptSubmittedHookOutput`
 
 | Property | Type | Description |
 |---|---|---|
 | `modifiedPrompt` | `?string` | Modified prompt |
+| `additionalContext` | `?string` | Additional context |
+| `suppressOutput` | `?bool` | Suppress response output |
 
-### SessionStartHookInput
-
-| Property | Type | Description |
-|---|---|---|
-| `source` | `string` | Start source: "startup", "resume", "new" |
-| `timestamp` | `?int` | Timestamp (milliseconds) |
-| `cwd` | `?string` | Current working directory |
-
-### SessionStartHookOutput
+### `SessionStartHookInput`
 
 | Property | Type | Description |
 |---|---|---|
-| `additionalContext` | `?string` | Session initialization context |
+| `source` | `string` | `startup` / `resume` / `new` |
+| `initialPrompt` | `?string` | Initial prompt |
 
-### SessionEndHookInput
+### `SessionStartHookOutput`
 
 | Property | Type | Description |
 |---|---|---|
-| `reason` | `string` | End reason |
-| `timestamp` | `?int` | Timestamp (milliseconds) |
-| `cwd` | `?string` | Current working directory |
+| `additionalContext` | `?string` | Initial session context |
+| `modifiedConfig` | `?array` | Partial session config override |
 
-### SessionEndHookOutput
+### `SessionEndHookInput`
 
-No output (return `null`).
+| Property | Type | Description |
+|---|---|---|
+| `reason` | `string` | `complete` / `error` / `abort` / `timeout` / `user_exit` |
+| `finalMessage` | `?string` | Final message |
+| `error` | `?string` | Final error |
 
-### ErrorOccurredHookInput
+### `SessionEndHookOutput`
+
+| Property | Type | Description |
+|---|---|---|
+| `suppressOutput` | `?bool` | Suppress final output |
+| `cleanupActions` | `?array` | Cleanup details |
+| `sessionSummary` | `?string` | Session summary |
+
+### `ErrorOccurredHookInput`
 
 | Property | Type | Description |
 |---|---|---|
 | `error` | `string` | Error message |
-| `errorContext` | `?string` | Context where the error occurred |
-| `timestamp` | `?int` | Timestamp (milliseconds) |
-| `cwd` | `?string` | Current working directory |
+| `errorContext` | `?string` | One of `model_call`, `tool_execution`, `system`, or `user_input` |
+| `recoverable` | `bool` | Whether it is recoverable |
 
-### ErrorOccurredHookOutput
+### `ErrorOccurredHookOutput`
 
 | Property | Type | Description |
 |---|---|---|
-| `errorHandling` | `?string` | "retry", "skip", or "abort" |
+| `suppressOutput` | `?bool` | Suppress error output |
+| `errorHandling` | `?string` | `retry` / `skip` / `abort` |
+| `retryCount` | `?int` | Retry count |
+| `userNotification` | `?string` | Message shown to user |
 
 ## ToolResultObject
 
-Object representing a tool execution result.
+Standard object for tool execution results.
 
 | Property | Type | Description |
 |---|---|---|
 | `textResultForLlm` | `?string` | Text result passed to the LLM |
-| `resultType` | `?string` | "success", "failure", "rejected", "denied" |
-| `resultForAssistant` | `?array` | Result data for the assistant |
+| `resultType` | `?string` | `success` / `failure` / `rejected` / `denied` |
+| `resultForAssistant` | `?array` | Assistant-facing result data |
+
+## Best practices
+
+1. Avoid heavy sync work inside hooks. Offload when needed.
+2. Return `null` when no customization is required.
+3. Make `permissionDecision` explicit whenever possible.
+4. Do not over-suppress critical errors. Keep logs and notifications.
+5. Manage session state by session ID and clean up in `onSessionEnd`.
 
 <Info>
 For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).

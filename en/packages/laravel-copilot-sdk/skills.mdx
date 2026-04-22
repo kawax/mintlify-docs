@@ -1,0 +1,148 @@
+---
+title: "Skills"
+description: "Load reusable SKILL.md prompt modules and manage them with SessionConfig skillDirectories and disabledSkills."
+---
+
+## Skills
+
+Skills are reusable prompt modules. By loading `SKILL.md`, you can inject domain-specific instructions into a session.
+
+## Overview
+
+- Reuse domain knowledge as skills.
+- Share consistent behavior across projects.
+- Enable or disable skills per session.
+
+In Laravel, use `SessionConfig` `skillDirectories` and `disabledSkills`.
+
+## Basic usage
+
+If you set a parent directory in `skillDirectories`, each `SKILL.md` in its subdirectories is loaded.
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(prompt: 'Review this diff from a security perspective');
+
+    dump($response->content());
+}, config: new SessionConfig(
+    skillDirectories: [
+        base_path('skills'),
+    ],
+));
+```
+
+You can also pass the config as an array.
+
+```php
+Copilot::run(
+    prompt: 'Suggest improvements for this README',
+    config: [
+        'skillDirectories' => [base_path('skills')],
+    ],
+);
+```
+
+## Disable specific skills
+
+Use `disabledSkills` to disable selected skills after discovery.
+
+```php
+$config = new SessionConfig(
+    skillDirectories: [base_path('skills')],
+    disabledSkills: ['experimental-feature', 'deprecated-tool'],
+);
+```
+
+## Directory structure
+
+```text
+skills/
+├── code-review/
+│   └── SKILL.md
+└── documentation/
+    └── SKILL.md
+```
+
+Point `skillDirectories` to the parent folder, such as `skills/`.
+
+## `SKILL.md` format
+
+`SKILL.md` is Markdown. You can optionally include YAML frontmatter.
+
+```markdown
+---
+name: code-review
+description: Specialized code review capabilities
+---
+
+# Code Review Guidelines
+
+When reviewing code, always check for:
+
+1. Security vulnerabilities
+2. Performance issues
+3. Code style
+4. Test coverage
+```
+
+Main frontmatter fields:
+
+- `name`: Skill identifier (used by `disabledSkills`)
+- `description`: Short skill description
+
+If you omit `name`, the directory name is used.
+
+## Combine with custom agents
+
+If you set `customAgents[].skills`, those skill contents are preloaded when that agent starts.
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    skillDirectories: [base_path('skills/security')],
+    customAgents: [
+        [
+            'name' => 'security-auditor',
+            'description' => 'Security-focused code reviewer',
+            'prompt' => 'Focus on OWASP Top 10 vulnerabilities',
+            'skills' => ['security-scan', 'dependency-check'],
+        ],
+    ],
+);
+```
+
+> If you omit `skills`, no skill content is injected into that agent.
+
+## Inspect and manage via RPC
+
+You can discover, enable, and disable skills through RPC.
+
+```php
+// Discover skills at server level
+$result = Copilot::client()->rpc()->skills()->discover();
+
+// List skills in the session
+$session->rpc()->skills()->list();
+
+// Enable/disable a specific skill in the session
+$session->rpc()->skills()->enable(['name' => 'security-scan']);
+$session->rpc()->skills()->disable(['name' => 'security-scan']);
+```
+
+## Best practices
+
+- Split skills by domain (`skills/security`, `skills/testing`, etc.).
+- Add both `name` and `description` in frontmatter.
+- Explicitly exclude conflicting instructions with `disabledSkills`.
+- Verify each skill alone before combining multiple skills.
+
+## Related docs
+
+- [Session config](/en/packages/laravel-copilot-sdk/session-config)
+- [Custom agents](/en/packages/laravel-copilot-sdk/custom-agents)
+- [RPC](/en/packages/laravel-copilot-sdk/rpc)
