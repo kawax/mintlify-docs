@@ -47,7 +47,7 @@
  - ~~英語版は完成。~~
  - 最後に日本語ページを作成。日本語版は急がないので`index.mdx`と`getting-started.mdx`の日本語版だけ作って残りは後から。
  - 日本語版は元のSDKリポジトリのdocs/jp/を参照する。日→英→日と翻訳を挟むと情報が抜けすぎる。docs/jp/はGitHubまで見る人用なのでドキュメントサイト用に調整はしていい。コード内のコメントも日本語にする。
- - Laravel SDK側で追加・更新したので英語・日本語ともに反映。`agent-loop.md` `custom-agents.md` `streaming-events.md` `skills.md`は追加。`resume.md`は少し更新。`hooks.md`は大幅に更新。
+ - Laravel SDK側で追加・更新したので英語・日本語ともに反映。`agent-loop.md` `custom-agents.md` `streaming-events.md` `skills.md`は追加。`resume.md` `hooks.md`は更新。
  - 日本語版のページが完成したらnavigationの並びを英語版と揃える。読者が必要とするだろうページを上に並べている。
  - docs.jsonのnavigationはネストしてindex以外の各ページを配置。
 
