@@ -384,9 +384,14 @@
                  "jp/packages/laravel-copilot-sdk/fake",
                  "jp/packages/laravel-copilot-sdk/laravel-cloud",
                  "jp/packages/laravel-copilot-sdk/github-actions",
+                 "jp/packages/laravel-copilot-sdk/github-token",
+                 "jp/packages/laravel-copilot-sdk/ai-sdk",
+                 "jp/packages/laravel-copilot-sdk/bundle-cli",
+                 "jp/packages/laravel-copilot-sdk/tcp-mode",
+                 "jp/packages/laravel-copilot-sdk/session-context",
                  "jp/packages/laravel-copilot-sdk/bare-usage"
-               ]
-             },
+                ]
+              },
             "jp/packages/laravel-boost-copilot-cli",
             "jp/packages/laravel-boost-phpstorm-copilot"
           ]

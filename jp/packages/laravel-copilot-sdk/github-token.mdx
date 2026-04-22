@@ -1,0 +1,55 @@
+---
+title: "GitHubトークン"
+description: "Laravel Copilot SDK の stdio モードで、ユーザーごとの GitHub トークンを実行時に切り替える方法を説明します。"
+---
+
+## 認証するGitHubトークンの実行時切り替え
+
+Socialite などを使って認証したユーザーごとの GitHub トークンで Copilot CLI を実行する方法です。
+
+<Note>
+Personal Access Token では `Copilot Requests` の権限が必要です。Socialite のトークンでも同様の要件になるはずです。
+Socialite から使えるトークンを取得できない場合は、PAT を直接入力してもらう方式にします。
+</Note>
+
+この方法は stdio モードでのみ利用できます。
+TCP モードは Copilot CLI プロセスを起動したまま使うため、実行時に切り替えできません。
+TCP モード（`cli_url`）で `github_token` や `use_logged_in_user` を指定するとエラーになります。
+
+## `github_token` オプション
+
+SDK の公式オプションです。トークンは環境変数 `COPILOT_SDK_AUTH_TOKEN` 経由で CLI に渡されます。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+
+$config = array_merge(
+    config('copilot'),
+    [
+        'github_token' => $user->github_token,
+    ]
+);
+
+$response = Copilot::useStdio($config)->run(prompt: '...');
+Copilot::stop(); // 念のためユーザートークンを持ったクライアントを破棄
+```
+
+## `use_logged_in_user` オプション
+
+`github_token` を指定すると自動的に `use_logged_in_user` は `false` になります。
+これにより CLI は保存済み OAuth トークンや `gh` CLI 認証を使わず、明示的に渡したトークンだけを使います。
+
+明示的に `use_logged_in_user` を `true` にすることもできます。
+
+```php
+$config = [
+    'github_token' => $user->github_token,
+    'use_logged_in_user' => true, // 明示的に有効化
+];
+```
+
+`github_token` なしで `use_logged_in_user` を `false` にすると、`--no-auto-login` フラグが追加され、CLI は自動ログインを行いません。
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>
