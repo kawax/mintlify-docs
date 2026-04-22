@@ -362,7 +362,7 @@
           "pages": [
             {
               "group": "GitHub Copilot SDK for Laravel",
-              "root": "jp/packages/laravel-copilot-sdk/index",
+              "root": "jp/packages/laravel-copilot-sdk",
               "expanded": false,
                "pages": [
                  "jp/packages/laravel-copilot-sdk/getting-started",
@@ -377,6 +377,9 @@
                  "jp/packages/laravel-copilot-sdk/ask-user",
                  "jp/packages/laravel-copilot-sdk/mcp",
                  "jp/packages/laravel-copilot-sdk/hooks",
+                 "jp/packages/laravel-copilot-sdk/skills",
+                 "jp/packages/laravel-copilot-sdk/custom-agents",
+                 "jp/packages/laravel-copilot-sdk/agent-loop",
                  "jp/packages/laravel-copilot-sdk/events",
                  "jp/packages/laravel-copilot-sdk/send-on",
                  "jp/packages/laravel-copilot-sdk/streaming",
@@ -390,9 +393,6 @@
                  "jp/packages/laravel-copilot-sdk/bundle-cli",
                  "jp/packages/laravel-copilot-sdk/tcp-mode",
                  "jp/packages/laravel-copilot-sdk/session-context",
-                 "jp/packages/laravel-copilot-sdk/agent-loop",
-                 "jp/packages/laravel-copilot-sdk/custom-agents",
-                 "jp/packages/laravel-copilot-sdk/skills",
                  "jp/packages/laravel-copilot-sdk/session-lifecycle-event",
                  "jp/packages/laravel-copilot-sdk/telemetry",
                  "jp/packages/laravel-copilot-sdk/custom-providers",

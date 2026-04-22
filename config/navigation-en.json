@@ -345,7 +345,7 @@
           "pages": [
             {
               "group": "Laravel Copilot SDK",
-              "root": "en/packages/laravel-copilot-sdk/index",
+              "root": "en/packages/laravel-copilot-sdk",
               "expanded": false,
               "pages": [
                 "en/packages/laravel-copilot-sdk/getting-started",
@@ -360,6 +360,9 @@
                 "en/packages/laravel-copilot-sdk/ask-user",
                 "en/packages/laravel-copilot-sdk/mcp",
                 "en/packages/laravel-copilot-sdk/hooks",
+                "en/packages/laravel-copilot-sdk/skills",
+                "en/packages/laravel-copilot-sdk/custom-agents",
+                "en/packages/laravel-copilot-sdk/agent-loop",
                 "en/packages/laravel-copilot-sdk/events",
                 "en/packages/laravel-copilot-sdk/send-on",
                 "en/packages/laravel-copilot-sdk/streaming",
@@ -378,9 +381,6 @@
                 "en/packages/laravel-copilot-sdk/custom-providers",
                 "en/packages/laravel-copilot-sdk/concurrency",
                 "en/packages/laravel-copilot-sdk/steering",
-                "en/packages/laravel-copilot-sdk/agent-loop",
-                "en/packages/laravel-copilot-sdk/custom-agents",
-                "en/packages/laravel-copilot-sdk/skills",
                 "en/packages/laravel-copilot-sdk/bare-usage"
               ]
             },
