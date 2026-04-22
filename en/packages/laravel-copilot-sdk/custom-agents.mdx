@@ -1,0 +1,177 @@
+---
+title: "Custom agents"
+description: "Define task-specific sub-agents with SessionConfig customAgents in Laravel Copilot SDK."
+---
+
+## Custom agents
+
+Custom agents let you split responsibilities by role and run sub-agents for specific tasks.
+In Laravel, configure them with `SessionConfig` `customAgents`.
+
+## Basic usage
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+
+Copilot::start(function (CopilotSession $session) {
+    $response = $session->sendAndWait(prompt: 'Review the authentication design and propose improvements');
+
+    dump($response->content());
+}, config: new SessionConfig(
+    customAgents: [
+        [
+            'name' => 'researcher',
+            'displayName' => 'Research Agent',
+            'description' => 'Investigate the codebase and summarize findings',
+            'tools' => ['grep', 'glob', 'view'],
+            'prompt' => 'You are a research assistant. Analyze code and summarize findings.',
+        ],
+        [
+            'name' => 'editor',
+            'displayName' => 'Editor Agent',
+            'description' => 'Make minimal code changes',
+            'tools' => ['view', 'edit', 'bash'],
+            'prompt' => 'You are a code editor. Make minimal, surgical changes only.',
+        ],
+    ],
+));
+```
+
+You can also pass it as an array config.
+
+```php
+Copilot::run(
+    prompt: 'Improve the README',
+    config: [
+        'customAgents' => [
+            [
+                'name' => 'docs-writer',
+                'description' => 'Write technical documentation',
+                'prompt' => 'Write clear technical documentation.',
+            ],
+        ],
+    ],
+);
+```
+
+## Configuration fields
+
+| Property | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Agent identifier |
+| `displayName` | `string` |  | Display name |
+| `description` | `string` |  | Description used for delegation selection |
+| `tools` | `?array` |  | Allowed tools. `null` or omitted means all tools |
+| `prompt` | `string` | ✅ | Agent-specific system prompt |
+| `mcpServers` | `array` |  | MCP server config for this agent |
+| `infer` | `bool` |  | Whether the runtime can auto-select it (default `true`) |
+| `skills` | `array` |  | Skill names to preload on startup |
+
+> Write concrete `description` values to improve auto-selection accuracy.
+
+## Start a session with a specific agent
+
+Set `agent` to activate one custom agent from the first turn.
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    customAgents: [
+        [
+            'name' => 'researcher',
+            'prompt' => 'You analyze code and answer questions.',
+        ],
+        [
+            'name' => 'editor',
+            'prompt' => 'You edit code with minimal changes.',
+        ],
+    ],
+    agent: 'researcher',
+);
+```
+
+## Disable auto-selection with `infer: false`
+
+For high-risk agents, disable automatic selection and require explicit use.
+
+```php
+$config = new SessionConfig(
+    customAgents: [
+        [
+            'name' => 'dangerous-cleanup',
+            'description' => 'Delete unnecessary files',
+            'tools' => ['bash', 'edit', 'view'],
+            'prompt' => 'Remove dead code and unused files carefully.',
+            'infer' => false,
+        ],
+    ],
+);
+```
+
+## Hide tools from the default agent
+
+Use `defaultAgent.excludedTools` to hide specific tools from only the default agent.
+This makes delegation to a custom agent easier.
+
+```php
+$config = new SessionConfig(
+    tools: [...],
+    defaultAgent: [
+        'excludedTools' => ['analyze-codebase'],
+    ],
+    customAgents: [
+        [
+            'name' => 'researcher',
+            'tools' => ['analyze-codebase'],
+            'prompt' => 'You perform deep codebase analysis.',
+        ],
+    ],
+);
+```
+
+## Observe sub-agent events
+
+`subagent.*` events are emitted while sub-agents run.
+You can observe them with `onEvent` or `$session->on()`.
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Enums\SessionEventType;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionEvent;
+
+Copilot::start(function (CopilotSession $session) {
+    $session->on(function (SessionEvent $event): void {
+        if ($event->is(SessionEventType::SUBAGENT_STARTED)) {
+            info('Sub-agent started', $event->toArray());
+        }
+
+        if ($event->is(SessionEventType::SUBAGENT_COMPLETED)) {
+            info('Sub-agent completed', $event->toArray());
+        }
+
+        if ($event->is(SessionEventType::SUBAGENT_FAILED)) {
+            info('Sub-agent failed', $event->toArray());
+        }
+    });
+
+    $session->sendAndWait(prompt: 'Inspect the auth implementation in this repository');
+});
+```
+
+## Best practices
+
+- Separate `researcher` (read-heavy) and `editor` (change-heavy).
+- Keep `tools` minimal and least-privileged.
+- Make `description` concrete to improve delegation.
+- Handle `subagent.failed` with retry or fallback strategy.
+
+## Related docs
+
+- [Session config](/en/packages/laravel-copilot-sdk/session-config)
+- [SessionEvent](/en/packages/laravel-copilot-sdk/session-event)
+- [MCP](/en/packages/laravel-copilot-sdk/mcp)
+- [Tools](/en/packages/laravel-copilot-sdk/tools)

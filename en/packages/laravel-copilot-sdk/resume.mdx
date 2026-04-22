@@ -1,6 +1,6 @@
 ---
 title: "Resume session"
-description: "Resume previous Laravel Copilot SDK sessions with listSessions(), fixed session IDs, and ResumeSessionConfig."
+description: "Resume previous Laravel Copilot SDK sessions using listSessions(), fixed session IDs, ResumeSessionConfig, and last-session helpers."
 ---
 
 ## Resume session
@@ -34,9 +34,9 @@ $messages = $session->getMessages();
 
 ## When using a fixed session ID
 
-If your flow is not interactive, you cannot ask users to choose a session, so specify a fixed ID from the start.  
-Prepare IDs based on user IDs or other context.
-For example, in a multi-user web service, this approach is better because you prepare IDs in advance.
+If your flow is not interactive, specify a fixed ID from the beginning.
+Create IDs based on user IDs or other context.
+For example, this works well in a multi-user web service.
 
 ```php
 use Revolution\Copilot\Types\SessionConfig;
@@ -54,7 +54,7 @@ Copilot::start(function (CopilotSession $session) {
 }, config: $config);
 ```
 
-When resuming, `Copilot::start` can also use the `resume` argument.
+When resuming, you can also pass `resume` to `Copilot::start`.
 
 ```php
 use Revolution\Copilot\Contracts\CopilotSession;
@@ -71,7 +71,7 @@ Copilot::start(function (CopilotSession $session) {
 }, config: $config, resume: 'user-123-conversation');
 ```
 
-You can also discard the current session inside the `Copilot::start` closure and resume a new one.
+You can also discard the current session inside the `Copilot::start` closure and resume another one.
 
 ```php
 use Revolution\Copilot\Contracts\CopilotSession;
@@ -86,6 +86,44 @@ Copilot::start(function (CopilotSession $session) {
 
     $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
 });
+```
+
+## Resume the last session
+
+If no session exists, `getLastSessionId()` returns `null`, and the session starts as new.
+You can switch between `SessionConfig` and `ResumeSessionConfig`.
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\ResumeSessionConfig;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+
+$session_id = Copilot::client()->getLastSessionId();
+
+if (empty($session_id)) {
+    $config = new SessionConfig();
+} else {
+    $config = new ResumeSessionConfig();
+}
+
+Copilot::start(function (CopilotSession $session) {
+    dump('Starting Copilot session: '.$session->id());
+
+    $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+}, config: $config, resume: $session_id);
+```
+
+## Use `SessionMetadata`
+
+`getSessionMetadata()` also returns `null` when the session does not exist, so you can use the same new-session fallback.
+It also provides metadata such as created/updated timestamps.
+
+```php
+use Revolution\Copilot\Types\SessionMetadata;
+use Revolution\Copilot\Facades\Copilot;
+
+$meta = Copilot::client()->getSessionMetadata('user-123-conversation');
 ```
 
 <Info>

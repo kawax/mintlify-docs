@@ -1,19 +1,19 @@
 ---
 title: "セッション再開"
-description: "listSessions()・固定セッション ID・ResumeSessionConfig を使って、Laravel Copilot SDK の過去セッションを再開します。"
+description: "listSessions()・固定セッション ID・ResumeSessionConfig・最後のセッション再開を使って Laravel Copilot SDK の会話を復元します。"
 ---
 
 ## セッション再開
 
-以前のセッションを再開する方法です。
+以前のセッションを再開する方法。
 
-## Artisan コマンドで対話チャットを使う場合
+## Artisanコマンドで対話形式のチャットで使用している場合
 
 ```php
-// Get previous sessions with listSessions
+// listSessionsでこれまでのセッション一覧を取得
 $sessions = Copilot::client()->listSessions();
 
-// Choose a session ID to resume with Laravel\Prompts\select
+// Laravel\Prompts\selectなどで再開するセッションIDを選択
 $sessions = collect(Copilot::client()->listSessions())
     ->mapWithKeys(function (SessionMetadata $session) {
         return [$session->sessionId => $session->summary ?? ''];
@@ -25,17 +25,17 @@ $session_id = select(
     options: $sessions,
 );
 
-// Resume the session with the selected ID
+// 選択されたIDでセッションを再開
 $session = Copilot::client()->resumeSession($session_id);
 
-// Get previous messages
+// これまでのメッセージを取得
 $messages = $session->getMessages();
 ```
 
-## 固定のセッション ID を使う場合
+## 固定のセッションIDを使う場合
 
-対話形式でない場合はユーザーに選択してもらえないため、最初から固定 ID を指定します。  
-ユーザー ID や任意のコンテキストに応じた ID を用意してください。
+対話形式でない場合は選択できないので最初から固定のIDを指定します。ユーザーIDやなんらかのコンテキストに応じたIDを用意します。  
+例えばウェブサービス上でマルチユーザーで使うなら事前にIDを用意するこちらの方法を使います。
 
 ```php
 use Revolution\Copilot\Types\SessionConfig;
@@ -53,14 +53,14 @@ Copilot::start(function (CopilotSession $session) {
 }, config: $config);
 ```
 
-再開時は `Copilot::start` の `resume` 引数でも指定できます。
+再開時の方法は `Copilot::start` なら `resume` 引数で指定することもできます。
 
 ```php
 use Revolution\Copilot\Contracts\CopilotSession;
 use Revolution\Copilot\Facades\Copilot;
 use Revolution\Copilot\Types\ResumeSessionConfig;
 
-// ResumeSessionConfig does not allow setting sessionId
+// ResumeSessionConfigではsessionIdを指定できない
 $config = new ResumeSessionConfig();
 
 Copilot::start(function (CopilotSession $session) {
@@ -70,7 +70,7 @@ Copilot::start(function (CopilotSession $session) {
 }, config: $config, resume: 'user-123-conversation');
 ```
 
-`Copilot::start` のクロージャ内で現在のセッションを破棄して、新しく再開することもできます。
+`Copilot::start` のクロージャ内で今のセッションを破棄して新しく再開する方法もあります。
 
 ```php
 use Revolution\Copilot\Contracts\CopilotSession;
@@ -85,6 +85,42 @@ Copilot::start(function (CopilotSession $session) {
 
     $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
 });
+```
+
+## 最後のセッションを再開
+
+セッションが存在しない場合は `getLastSessionId()` は `null` を返すので自動的に新規セッションとして開始されます。`SessionConfig` の切り替えもできます。
+
+```php
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\ResumeSessionConfig;
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+
+$session_id = Copilot::client()->getLastSessionId();
+
+if (empty($session_id)) {
+    $config = new SessionConfig();
+} else {
+    $config = new ResumeSessionConfig();
+}
+
+Copilot::start(function (CopilotSession $session) {
+    dump('Starting Copilot session: '.$session->id());
+
+    $response = $session->sendAndWait(prompt: 'Tell me something about Laravel.');
+}, config: $config, resume: $session_id);
+```
+
+## SessionMetadataを使う
+
+`getSessionMetadata()` もセッションが存在しなければ `null` を返すので同様に新規セッションとして開始されます。セッションの作成日時や更新日時なども取得できます。
+
+```php
+use Revolution\Copilot\Types\SessionMetadata;
+use Revolution\Copilot\Facades\Copilot;
+
+$meta = Copilot::client()->getSessionMetadata('user-123-conversation');
 ```
 
 <Info>
