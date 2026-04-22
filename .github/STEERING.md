@@ -39,14 +39,15 @@
  - 公式SDKの機能を再現したレイヤーの上にLaravelらしいFacadeを中心にした使い方を提供している。
  - ドキュメントはREADME.mdとdocs/getting-started.mdが英語。docs/jp/内に日本語のドキュメントが大量。公式SDKに英語のドキュメントがしっかりあるので日本語中心にしか用意してない。こっちのマイパッケージで英語ドキュメントを作る。
  - 1ページでは収まらないので`{lang}/packages/laravel-copilot-sdk/`ディレクトリを作ってその中に複数ページに分けて入れる。
- - 一度では終わらないので少しずつ実行する。手動でCommanderを実行して制御。
+ - 一度では終わらないので少しずつ実行する。
  - docs/jp/内のドキュメントの英語版を先に作成。細かいドキュメントは不要かもしれないけど英語版では全部翻訳。
  - `docs/jp/steering.md`はステアリングとキューイング機能の説明なので追加対象。実際に使うことはないけど「Laravelでは使わなくていい」という情報は必要。
  - SDK側のgetting-started.mdを上で作った英語ドキュメントにリンクするように変更するのでその後に`getting-started.mdx`を作成。
  - `index.mdx` 基本的な説明とLaravel版特有機能の説明。ここまで作った各ページへのリンク。
- - 英語版は完成。
+ - ~~英語版は完成。~~
  - 最後に日本語ページを作成。日本語版は急がないので`index.mdx`と`getting-started.mdx`の日本語版だけ作って残りは後から。
  - 日本語版は元のSDKリポジトリのdocs/jp/を参照する。日→英→日と翻訳を挟むと情報が抜けすぎる。docs/jp/はGitHubまで見る人用なのでドキュメントサイト用に調整はしていい。コード内のコメントも日本語にする。
+ - Laravel SDK側で追加・更新したので英語・日本語ともに反映。`agent-loop.md` `custom-agents.md` `streaming-events.md` `skills.md`は追加。`resume.md`は少し更新。`hooks.md`は大幅に更新。
  - 日本語版のページが完成したらnavigationの並びを英語版と揃える。読者が必要とするだろうページを上に並べている。
  - docs.jsonのnavigationはネストしてindex以外の各ページを配置。
 
