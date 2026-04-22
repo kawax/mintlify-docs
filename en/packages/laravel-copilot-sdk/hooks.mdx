@@ -251,7 +251,7 @@ Returning `null` keeps default behavior.
 | Property | Type | Description |
 |---|---|---|
 | `error` | `string` | Error message |
-| `errorContext` | `string` | `model_call` / `tool_execution` / `system` / `user_input` |
+| `errorContext` | `?string` | Error context such as `model_call`, `tool_execution`, `system`, or `user_input` |
 | `recoverable` | `bool` | Whether it is recoverable |
 
 ### `ErrorOccurredHookOutput`
