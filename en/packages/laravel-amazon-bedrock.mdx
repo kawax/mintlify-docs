@@ -48,20 +48,20 @@ The main features are as follows.
 Add the `bedrock` provider to `config/ai.php`. Switch your default providers to Bedrock if needed.
 
 ```php
-'default' => 'bedrock',
-'default_for_images' => 'bedrock',
-'default_for_audio' => 'bedrock',
-'default_for_embeddings' => 'bedrock',
-'default_for_reranking' => 'bedrock',
-'default_for_transcription' => 'bedrock',
+'default' => 'amazon-bedrock',
+'default_for_images' => 'amazon-bedrock',
+'default_for_audio' => 'amazon-bedrock',
+'default_for_embeddings' => 'amazon-bedrock',
+'default_for_reranking' => 'amazon-bedrock',
+'default_for_transcription' => 'amazon-bedrock',
 ```
 
 ### Option 1: Bedrock API key
 
 ```php
 'providers' => [
-    'bedrock' => [
-        'driver' => 'bedrock',
+    'amazon-bedrock' => [
+        'driver' => 'amazon-bedrock',
         'key' => env('AWS_BEDROCK_API_KEY', ''),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
@@ -81,8 +81,8 @@ AWS_DEFAULT_REGION=us-east-1
 
 ```php
 'providers' => [
-    'bedrock' => [
-        'driver' => 'bedrock',
+    'amazon-bedrock' => [
+        'driver' => 'amazon-bedrock',
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'token' => env('AWS_SESSION_TOKEN'),
@@ -106,8 +106,8 @@ AWS_DEFAULT_REGION=us-east-1
 
 ```php
 'providers' => [
-    'bedrock' => [
-        'driver' => 'bedrock',
+    'amazon-bedrock' => [
+        'driver' => 'amazon-bedrock',
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 ],
@@ -155,10 +155,6 @@ Route::get('/stream', function () {
     return (new BedrockAgent)->stream('Tell me about Laravel 13.');
 });
 ```
-
-<Tip>
-  Bedrock streaming is not available in the official AWS SDK for PHP or Prism. This package provides a practical implementation for PHP and Laravel.
-</Tip>
 
 ## Tool use (Function Calling)
 
@@ -287,10 +283,11 @@ Example using Stability AI.
 
 ```php
 use Laravel\Ai\Image;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Image::of('A cat walking under cherry blossoms')
     ->square()
-    ->generate(provider: 'bedrock');
+    ->generate(provider: Bedrock::KEY);
 
 $response->store('images', 's3');
 ```
@@ -301,10 +298,11 @@ Example using Amazon Polly.
 
 ```php
 use Laravel\Ai\Audio;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Audio::of('Generate speech with Laravel.')
     ->voice('Joanna')
-    ->generate(provider: 'bedrock');
+    ->generate(provider: Bedrock::KEY);
 
 $path = $response->storeAs('voice.mp3');
 ```
@@ -315,9 +313,10 @@ Example using Nova 2 Lite.
 
 ```php
 use Laravel\Ai\Transcription;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Transcription::fromPath('/path/to/audio.mp3')
-    ->generate(provider: 'bedrock');
+    ->generate(provider: Bedrock::KEY);
 
 echo $response->text;
 ```
@@ -326,10 +325,11 @@ echo $response->text;
 
 ```php
 use Laravel\Ai\Embeddings;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Embeddings::for(['Laravel', 'Bedrock'])
     ->dimensions(1024)
-    ->generate(provider: 'bedrock', model: 'amazon.titan-embed-text-v2:0');
+    ->generate(provider: Bedrock::KEY, model: 'amazon.titan-embed-text-v2:0');
 
 $vector = $response->first();
 ```
@@ -338,6 +338,7 @@ $vector = $response->first();
 
 ```php
 use Laravel\Ai\Reranking;
+use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Reranking::of([
     'Laravel is a PHP framework.',
@@ -345,7 +346,7 @@ $response = Reranking::of([
     'Laravel AI SDK provides a unified API.',
 ])->limit(2)->rerank(
     query: 'Explain Laravel and AI',
-    provider: 'bedrock'
+    provider: Bedrock::KEY
 );
 
 echo $response->first()->document;
