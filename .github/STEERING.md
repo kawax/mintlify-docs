@@ -34,7 +34,7 @@
  - README.mdの情報でページは作れるはず。他のページのスタイルと合わせる。
  - 他のカスタムプロバイダーの事例は知らないので初かも。
  - BedrockでストリーミングはAWS公式のPHP用SDKでもPrismでも対応できてない。このパッケージが唯一。
-- [ ] GitHub Copilot SDK for Laravel。https://github.com/invokable/laravel-copilot-sdk
+- [x] GitHub Copilot SDK for Laravel。https://github.com/invokable/laravel-copilot-sdk
  - [GitHub Copilot SDK](https://github.com/github/copilot-sdk) のLaravel版。
  - 公式SDKの機能を再現したレイヤーの上にLaravelらしいFacadeを中心にした使い方を提供している。
  - ドキュメントはREADME.mdとdocs/getting-started.mdが英語。docs/jp/内に日本語のドキュメントが大量。公式SDKに英語のドキュメントがしっかりあるので日本語中心にしか用意してない。こっちのマイパッケージで英語ドキュメントを作る。
@@ -44,37 +44,9 @@
  - `docs/jp/steering.md`はステアリングとキューイング機能の説明なので追加対象。実際に使うことはないけど「Laravelでは使わなくていい」という情報は必要。
  - SDK側のgetting-started.mdを上で作った英語ドキュメントにリンクするように変更するのでその後に`getting-started.mdx`を作成。
  - `index.mdx` 基本的な説明とLaravel版特有機能の説明。ここまで作った各ページへのリンク。
- - ~~英語版は完成。~~
+ - 英語版は完成。
  - 最後に日本語ページを作成。日本語版は急がないので`index.mdx`と`getting-started.mdx`の日本語版だけ作って残りは後から。
  - 日本語版は元のSDKリポジトリのdocs/jp/を参照する。日→英→日と翻訳を挟むと情報が抜けすぎる。docs/jp/はGitHubまで見る人用なのでドキュメントサイト用に調整はしていい。コード内のコメントも日本語にする。
  - Laravel SDK側で追加・更新したので英語・日本語ともに反映。`agent-loop.md` `custom-agents.md` `streaming-events.md` `skills.md`は追加。`resume.md` `hooks.md`は更新。
  - 日本語版のページが完成したらnavigationの並びを英語版と揃える。読者が必要とするだろうページを上に並べている。
- - docs.jsonのnavigationはネストしてindex以外の各ページを配置。
-
-こうやってネストするとページが多い箇所を折りたたんで表示できる。
-```json
-    {
-      "tab": "マイパッケージ",
-      "groups": [
-        {
-          "group": "AI SDK",
-          "pages": [
-            "jp/packages/laravel-amazon-bedrock"
-          ]
-        },
-        {
-          "group": "GitHub Copilot",
-          "pages": [
-            {
-              "group": "GitHub Copilot SDK for Laravel",
-              "root": "jp/packages/laravel-copilot-sdk",
-              "expanded": false,
-              "pages": [
-                "jp/packages/laravel-copilot-sdk/getting-started"
-              ]
-            }
-          ]
-        }
-      ]
-    }
-```
+ - 英語・日本語の全ページ完成。今後も追加・変更はあるだろうけど管理者がIssueを作ってエージェントをアサインして対応していく。
