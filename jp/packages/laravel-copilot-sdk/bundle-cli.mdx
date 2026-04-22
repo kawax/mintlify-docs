@@ -1,0 +1,79 @@
+---
+title: "Copilot CLIをバンドル"
+description: "Copilot CLI のバージョンを厳密に管理したい場合に、Laravel プロジェクトへ npm 依存としてバンドルする方法を説明します。"
+---
+
+## プロジェクトにCopilot CLIを含める
+
+Copilot CLI のバージョンを厳密に管理したい場合、npm パッケージとしてプロジェクトに含めることができます。
+
+一般的にはデプロイ時に別途 Copilot CLI をインストールする方法で十分です。  
+[Laravel Cloudでの使い方](/jp/packages/laravel-copilot-sdk/laravel-cloud) と [GitHub Actionsでの使い方](/jp/packages/laravel-copilot-sdk/github-actions) も参照してください。
+
+## 前提条件
+
+Laravel プロジェクトに `package.json` があり、本番サーバーにも Node.js 実行環境があるため、npm パッケージをインストールできます。
+
+## セットアップ
+
+### 1. npmパッケージをインストール
+
+`dependencies` に `@github/copilot` をインストールします。
+
+```shell
+npm install @github/copilot
+```
+
+インストール後、以下のパスで Copilot CLI を直接実行できます。
+
+```shell
+node node_modules/@github/copilot/index.js --version
+```
+
+### 2. `.env` を設定
+
+`COPILOT_CLI_PATH` に `index.js` までのフルパスを指定します。
+
+```dotenv
+COPILOT_CLI_PATH=/path/to/project/node_modules/@github/copilot/index.js
+```
+
+`base_path()` を使って動的にパスを設定したい場合は `config/copilot.php` を直接編集します。
+
+```php
+'cli_path' => base_path('node_modules/@github/copilot/index.js'),
+```
+
+## デプロイ
+
+本番サーバーへデプロイする時は、アセットビルド後に `devDependencies` を除外して再インストールします。`@github/copilot` は `dependencies` にあるため残ります。
+
+```shell
+npm install
+npm run build
+npm install --omit=dev
+```
+
+`npm install --omit=dev` により `devDependencies` のパッケージが削除され、`@github/copilot` を含む `dependencies` のパッケージだけが `node_modules` に残ります。
+
+## メリットと注意点
+
+| メリット | 注意点 |
+| --- | --- |
+| CLI のバージョンを厳密に管理できる | `node_modules` のサイズが増加する |
+| `package.json` でバージョンを固定できる | CLI の更新は手動で行う必要がある |
+| チーム全員が同じバージョンを使える | Node.js 実行環境が必要 |
+
+## 認証
+
+認証方法はインストール方法に関係なく同じです。`.env` で `COPILOT_GITHUB_TOKEN` を設定します。
+
+```dotenv
+COPILOT_GITHUB_TOKEN=your-token
+```
+
+詳しくは [認証](/jp/packages/laravel-copilot-sdk/auth) を参照してください。
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>
