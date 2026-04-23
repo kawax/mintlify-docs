@@ -1,0 +1,86 @@
+---
+title: "Laravel Bluesky"
+description: "revolution/laravel-bluesky の概要、要件、インストール、初期設定、最初の投稿までをまとめて確認します。"
+---
+
+## 概要
+
+[revolution/laravel-bluesky](https://github.com/invokable/laravel-bluesky) は、AT Protocol（Bluesky）をLaravelから扱うためのパッケージです。
+
+Facadeは `Revolution\Bluesky\Facades\Bluesky` です。投稿作成、フィード取得、検索、メディア投稿などをLaravelのHTTPクライアントに近い形で扱えます。
+
+## 要件
+
+- PHP `>= 8.3`
+- Laravel `>= 12.x`
+
+## インストール
+
+```bash
+composer require revolution/laravel-bluesky
+```
+
+## 環境変数
+
+App Password認証を使う場合は `.env` を設定します。
+
+```dotenv
+BLUESKY_IDENTIFIER=your-handle.bsky.social
+BLUESKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+```
+
+## クイックスタート
+
+### 最初の投稿
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$response = Bluesky::login(
+    identifier: config('bluesky.identifier'),
+    password: config('bluesky.password'),
+)->post('Hello Bluesky');
+```
+
+### TextBuilderでリンクとタグを扱う
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+use Revolution\Bluesky\RichText\TextBuilder;
+
+$post = Post::build(function (TextBuilder $builder) {
+    $builder->text('Hello Bluesky')
+        ->newLine(count: 2)
+        ->link('https://bsky.app/')
+        ->newLine()
+        ->tag('#Bluesky');
+});
+
+$response = Bluesky::login(
+    identifier: config('bluesky.identifier'),
+    password: config('bluesky.password'),
+)->post($post);
+```
+
+<Warning>
+`searchPosts()` はAPIの一時的な制限により、現在は未認証では動作しません。検索を使う場合も認証済みセッションを使ってください。
+</Warning>
+
+## ドキュメント
+
+<Columns cols={2}>
+  <Card title="Basic client" href="/jp/packages/laravel-bluesky/basic-client" icon="terminal-square">
+    App Password / OAuth、投稿、メディア、リプライ、引用、フィード、検索を確認します。
+  </Card>
+  <Card title="Socialite" href="/jp/socialite" icon="shield-check">
+    OAuth連携の前提になるLaravel Socialiteの使い方を確認します。
+  </Card>
+</Columns>
+
+## 参考リンク
+
+- GitHub: [invokable/laravel-bluesky](https://github.com/invokable/laravel-bluesky)
+- Basic Client docs: [docs/basic-client.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/basic-client.md)
+- Workbench docs: [docs/workbench.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/workbench.md)
+- DeepWiki: [invokable/laravel-bluesky](https://deepwiki.com/invokable/laravel-bluesky)

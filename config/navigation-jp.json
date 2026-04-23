@@ -283,7 +283,8 @@
             "jp/advanced/package-development",
             "jp/advanced/interacts-with-data",
             "jp/advanced/package-versioning",
-            "jp/advanced/package-testing"
+            "jp/advanced/package-testing",
+            "jp/advanced/package-workbench"
           ]
         },
         {
@@ -361,11 +362,11 @@
         {
           "group": "GitHub Copilot",
           "pages": [
-            {
-              "group": "GitHub Copilot SDK for Laravel",
-              "root": "jp/packages/laravel-copilot-sdk",
-              "expanded": false,
-               "pages": [
+              {
+                "group": "GitHub Copilot SDK for Laravel",
+                "root": "jp/packages/laravel-copilot-sdk",
+                "expanded": false,
+                "pages": [
                  "jp/packages/laravel-copilot-sdk/getting-started",
                  "jp/packages/laravel-copilot-sdk/auth",
                  "jp/packages/laravel-copilot-sdk/session-config",
@@ -398,13 +399,20 @@
                  "jp/packages/laravel-copilot-sdk/telemetry",
                  "jp/packages/laravel-copilot-sdk/custom-providers",
                  "jp/packages/laravel-copilot-sdk/concurrency",
-                 "jp/packages/laravel-copilot-sdk/steering",
-                 "jp/packages/laravel-copilot-sdk/bare-usage"
-               ]
-               },
-            "jp/packages/laravel-boost-copilot-cli",
-            "jp/packages/laravel-boost-phpstorm-copilot"
-          ]
+                  "jp/packages/laravel-copilot-sdk/steering",
+                  "jp/packages/laravel-copilot-sdk/bare-usage"
+                ]
+              },
+              {
+                "group": "Laravel Bluesky",
+                "pages": [
+                  "jp/packages/laravel-bluesky/index",
+                  "jp/packages/laravel-bluesky/basic-client"
+                ]
+              },
+             "jp/packages/laravel-boost-copilot-cli",
+             "jp/packages/laravel-boost-phpstorm-copilot"
+           ]
         }
       ]
     }
