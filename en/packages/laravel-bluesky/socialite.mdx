@@ -151,6 +151,7 @@ class SocialiteController extends Controller
     public function callback(Request $request)
     {
         if ($request->missing('code')) {
+            // For debugging during development. Replace with proper error handling in production.
             dd($request);
         }
 
