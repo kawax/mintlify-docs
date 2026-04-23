@@ -402,7 +402,7 @@
               "expanded": false,
               "pages": [
                 "en/packages/laravel-bluesky/basic-client",
-                "en/packages/laravel-bluesky/socialite"
+                "en/packages/laravel-bluesky/socialite",
                 "en/packages/laravel-bluesky/notification",
                 "en/packages/laravel-bluesky/testing"
               ]
