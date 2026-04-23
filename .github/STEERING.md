@@ -62,3 +62,20 @@
  - WebSocketはもっと難しいので意図的にドキュメントを作ってないけどこっちで作る。`JetstreamServeCommand` `FirehoseServeCommand`
  - CryptoやCoreまで行くと本当の深淵。AIもない頃に他言語版と仕様を調べまくって作った。
  - 詳細なドキュメントを作りたいけど一から調べると大変なのでDeepWikiを参照するのが良さそう。 https://deepwiki.com/invokable/laravel-bluesky
+
+仮でSNSグループに配置。index.mdxは`jp/packages/laravel-bluesky`なのでpagesに追加したり`laravel-bluesky/index`に変更は不要。内側のpagesに他のページを追加していく。
+```json
+        {
+          "group": "SNS",
+          "pages": [
+            {
+              "group": "Laravel Bluesky",
+              "root": "jp/packages/laravel-bluesky",
+              "expanded": false,
+              "pages": [
+                "jp/packages/laravel-bluesky/basic-client"
+              ]
+            }
+          ]
+        }
+```
