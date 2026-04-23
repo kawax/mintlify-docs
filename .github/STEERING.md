@@ -54,7 +54,7 @@
 - [ ] Testbench `package-testing.mdx` が作られてたので次はLaravel Bluesky https://github.com/invokable/laravel-bluesky
  - `docs`内に英語のドキュメントがある。AI普及前なので最低限のドキュメントしかない。
  - docs/workbench.md はBlueskyとは関係ないTestbench Workbenchのドキュメント。Workbenchの情報がなさすぎて調べた結果をとりあえずここに置いていた。こっちのサイトに移せばいいのでworkbench.mdを元に`package-testing.mdx`の続きのページを作成。
- - 残りのページは`{lang}/packages/laravel-bluesky/`内に複数ページで作成。`laravel-copilot-sdk`と同様に`{lang}/packages/laravel-bluesky/index.mdx`がURLの`{lang}/packages/laravel-bluesky`になるので`laravel-bluesky.mdx`を作ったり、`{lang}/packages/laravel-bluesky/index`をrootにしたりしない。
+ - 残りのページは`{lang}/packages/laravel-bluesky/`内に複数ページで作成。`laravel-copilot-sdk`と同様に`{lang}/packages/laravel-bluesky/index.mdx`がURLの`{lang}/packages/laravel-bluesky`になるので`laravel-bluesky.mdx`を作ったり、`{lang}/packages/laravel-bluesky/index`を使わない。
  - SNSのパッケージは色々作ってるけど基本的なクライアント機能が完成したらNotificationsやSocialiteのLaravelの機能を被せて実際に使うのは通知機能での投稿ばかりなことも多い。
  - BlueskyのSocialiteは他と違うので若干難しい。詳しい説明が必要。
  - Bluesky特有機能でLaravelユーザーが作りやすいのはFeed Generator。
