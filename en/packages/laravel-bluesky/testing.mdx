@@ -1,0 +1,90 @@
+---
+title: "Testing"
+description: "How to test code that uses laravel-bluesky: Facade mocks, HTTP fakes, and features that cannot be mocked."
+---
+
+## Overview
+
+Most features are available via the `Bluesky` Facade, so you can use standard Laravel mocks when writing tests. For general Laravel package testing, see [package-testing](/en/advanced/package-testing).
+
+## Facade mocks
+
+Use `Bluesky::shouldReceive()` to mock entire method chains.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Response;
+
+Bluesky::shouldReceive('login->getProfile->json')->once()->andReturn([]);
+Bluesky::shouldReceive('login->getProfile')->once()->andReturn(new Response(Http::response([])->wait()));
+```
+
+## HTTP fake
+
+`laravel-bluesky` uses Laravel's HTTP client internally. Add `Http::preventStrayRequests()` to your test `setUp()` to catch unexpected external requests immediately.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Illuminate\Support\Facades\Http;
+
+protected function setUp(): void
+{
+    parent::setUp();
+
+    Http::preventStrayRequests();
+}
+
+public function test_post(): void
+{
+    Http::fake();
+
+    Http::fakeSequence()
+        ->push();
+
+    Bluesky::shouldReceive('resolveHandle->json')->once()->andReturn('did');
+}
+```
+
+<Tip>
+`Http::preventStrayRequests()` throws an exception if a real HTTP request is made during the test. This makes it easy to detect unintended external calls and keeps your test suite fast and reliable.
+</Tip>
+
+## Features that cannot be mocked
+
+### FeedGenerator
+
+FeedGenerator is called by the Bluesky server, so there is no end-to-end mock. However, the algorithm part of FeedGenerator can be mocked.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\FeedGenerator\FeedGenerator;
+
+public function test_feed_generator(): void
+{
+    FeedGenerator::register(name: 'test', algo: function (?int $limit, ?string $cursor) {
+        // Authentication is required due to a temporary API restriction
+        $posts = Bluesky::login(identifier: config('bluesky.identifier'), password: config('bluesky.password'))
+            ->searchPosts(q: '#bluesky')->collect('posts');
+        $feed = $posts->map(function (array $post) {
+            return ['post' => data_get($post, 'uri')];
+        })->toArray();
+        return ['feed' => $feed];
+    });
+
+    Bluesky::shouldReceive('login->searchPosts->collect')->once()->andReturn(collect([['uri' => 'at://']]));
+
+    $response = $this->get(route('bluesky.feed.skeleton', ['feed' => 'at://did:/app.bsky.feed.generator/test']));
+
+    $response->assertSuccessful();
+    $response->assertJson(['feed' => [['post' => 'at://']]]);
+}
+```
+
+### Core
+
+The "Core" functionality of Bluesky/AtProtocol does not involve external access, so mocking is not needed.
+
+<Info>
+Source: [docs/testing.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/testing.md)
+</Info>
