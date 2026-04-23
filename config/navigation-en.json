@@ -265,7 +265,8 @@
           "group": "Package Development",
           "pages": [
             "en/advanced/package-development",
-            "en/advanced/package-versioning"
+            "en/advanced/package-versioning",
+            "en/advanced/package-testing"
           ]
         },
         {

@@ -282,7 +282,8 @@
           "pages": [
             "jp/advanced/package-development",
             "jp/advanced/interacts-with-data",
-            "jp/advanced/package-versioning"
+            "jp/advanced/package-versioning",
+            "jp/advanced/package-testing"
           ]
         },
         {
