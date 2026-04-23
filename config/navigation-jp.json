@@ -416,7 +416,9 @@
               "root": "jp/packages/laravel-bluesky",
               "expanded": false,
               "pages": [
-                "jp/packages/laravel-bluesky/basic-client"
+                "jp/packages/laravel-bluesky/basic-client",
+                "jp/packages/laravel-bluesky/notification",
+                "jp/packages/laravel-bluesky/testing"
               ]
             }
           ]
