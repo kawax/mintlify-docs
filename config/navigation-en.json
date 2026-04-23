@@ -340,12 +340,6 @@
       "tab": "My Packages",
       "groups": [
         {
-          "group": "AI SDK",
-          "pages": [
-            "en/packages/laravel-amazon-bedrock"
-          ]
-        },
-        {
           "group": "GitHub Copilot",
           "pages": [
             {
@@ -389,15 +383,27 @@
                 "en/packages/laravel-copilot-sdk/bare-usage"
               ]
             },
-            {
-              "group": "Laravel Bluesky",
-              "pages": [
-                "en/packages/laravel-bluesky/index",
-                "en/packages/laravel-bluesky/basic-client"
-              ]
-            },
             "en/packages/laravel-boost-copilot-cli",
             "en/packages/laravel-boost-phpstorm-copilot"
+          ]
+        },
+        {
+          "group": "AI SDK",
+          "pages": [
+            "en/packages/laravel-amazon-bedrock"
+          ]
+        },
+        {
+          "group": "SNS",
+          "pages": [
+            {
+              "group": "Laravel Bluesky",
+              "root": "en/packages/laravel-bluesky",
+              "expanded": false,
+              "pages": [
+                "en/packages/laravel-bluesky/basic-client"
+              ]
+            }
           ]
         }
       ]

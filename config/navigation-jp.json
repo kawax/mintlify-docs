@@ -355,65 +355,71 @@
       "tab": "マイパッケージ",
       "groups": [
         {
+          "group": "GitHub Copilot",
+          "pages": [
+            {
+              "group": "GitHub Copilot SDK for Laravel",
+              "root": "jp/packages/laravel-copilot-sdk",
+              "expanded": false,
+              "pages": [
+                "jp/packages/laravel-copilot-sdk/getting-started",
+                "jp/packages/laravel-copilot-sdk/auth",
+                "jp/packages/laravel-copilot-sdk/session-config",
+                "jp/packages/laravel-copilot-sdk/permission-request",
+                "jp/packages/laravel-copilot-sdk/session-event",
+                "jp/packages/laravel-copilot-sdk/rpc",
+                "jp/packages/laravel-copilot-sdk/models",
+                "jp/packages/laravel-copilot-sdk/resume",
+                "jp/packages/laravel-copilot-sdk/tools",
+                "jp/packages/laravel-copilot-sdk/ask-user",
+                "jp/packages/laravel-copilot-sdk/mcp",
+                "jp/packages/laravel-copilot-sdk/hooks",
+                "jp/packages/laravel-copilot-sdk/skills",
+                "jp/packages/laravel-copilot-sdk/custom-agents",
+                "jp/packages/laravel-copilot-sdk/agent-loop",
+                "jp/packages/laravel-copilot-sdk/events",
+                "jp/packages/laravel-copilot-sdk/send-on",
+                "jp/packages/laravel-copilot-sdk/streaming",
+                "jp/packages/laravel-copilot-sdk/streaming-events",
+                "jp/packages/laravel-copilot-sdk/attachments",
+                "jp/packages/laravel-copilot-sdk/fake",
+                "jp/packages/laravel-copilot-sdk/laravel-cloud",
+                "jp/packages/laravel-copilot-sdk/github-actions",
+                "jp/packages/laravel-copilot-sdk/github-token",
+                "jp/packages/laravel-copilot-sdk/ai-sdk",
+                "jp/packages/laravel-copilot-sdk/bundle-cli",
+                "jp/packages/laravel-copilot-sdk/tcp-mode",
+                "jp/packages/laravel-copilot-sdk/session-context",
+                "jp/packages/laravel-copilot-sdk/session-lifecycle-event",
+                "jp/packages/laravel-copilot-sdk/telemetry",
+                "jp/packages/laravel-copilot-sdk/custom-providers",
+                "jp/packages/laravel-copilot-sdk/concurrency",
+                "jp/packages/laravel-copilot-sdk/steering",
+                "jp/packages/laravel-copilot-sdk/bare-usage"
+              ]
+            },
+            "jp/packages/laravel-boost-copilot-cli",
+            "jp/packages/laravel-boost-phpstorm-copilot"
+          ]
+        },
+        {
           "group": "AI SDK",
           "pages": [
             "jp/packages/laravel-amazon-bedrock"
           ]
         },
         {
-          "group": "GitHub Copilot",
+          "group": "SNS",
           "pages": [
-              {
-                "group": "GitHub Copilot SDK for Laravel",
-                "root": "jp/packages/laravel-copilot-sdk",
-                "expanded": false,
-                "pages": [
-                 "jp/packages/laravel-copilot-sdk/getting-started",
-                 "jp/packages/laravel-copilot-sdk/auth",
-                 "jp/packages/laravel-copilot-sdk/session-config",
-                 "jp/packages/laravel-copilot-sdk/permission-request",
-                 "jp/packages/laravel-copilot-sdk/session-event",
-                 "jp/packages/laravel-copilot-sdk/rpc",
-                 "jp/packages/laravel-copilot-sdk/models",
-                 "jp/packages/laravel-copilot-sdk/resume",
-                 "jp/packages/laravel-copilot-sdk/tools",
-                 "jp/packages/laravel-copilot-sdk/ask-user",
-                 "jp/packages/laravel-copilot-sdk/mcp",
-                 "jp/packages/laravel-copilot-sdk/hooks",
-                 "jp/packages/laravel-copilot-sdk/skills",
-                 "jp/packages/laravel-copilot-sdk/custom-agents",
-                 "jp/packages/laravel-copilot-sdk/agent-loop",
-                 "jp/packages/laravel-copilot-sdk/events",
-                 "jp/packages/laravel-copilot-sdk/send-on",
-                 "jp/packages/laravel-copilot-sdk/streaming",
-                 "jp/packages/laravel-copilot-sdk/streaming-events",
-                 "jp/packages/laravel-copilot-sdk/attachments",
-                 "jp/packages/laravel-copilot-sdk/fake",
-                 "jp/packages/laravel-copilot-sdk/laravel-cloud",
-                 "jp/packages/laravel-copilot-sdk/github-actions",
-                 "jp/packages/laravel-copilot-sdk/github-token",
-                 "jp/packages/laravel-copilot-sdk/ai-sdk",
-                 "jp/packages/laravel-copilot-sdk/bundle-cli",
-                 "jp/packages/laravel-copilot-sdk/tcp-mode",
-                 "jp/packages/laravel-copilot-sdk/session-context",
-                 "jp/packages/laravel-copilot-sdk/session-lifecycle-event",
-                 "jp/packages/laravel-copilot-sdk/telemetry",
-                 "jp/packages/laravel-copilot-sdk/custom-providers",
-                 "jp/packages/laravel-copilot-sdk/concurrency",
-                  "jp/packages/laravel-copilot-sdk/steering",
-                  "jp/packages/laravel-copilot-sdk/bare-usage"
-                ]
-              },
-              {
-                "group": "Laravel Bluesky",
-                "pages": [
-                  "jp/packages/laravel-bluesky/index",
-                  "jp/packages/laravel-bluesky/basic-client"
-                ]
-              },
-             "jp/packages/laravel-boost-copilot-cli",
-             "jp/packages/laravel-boost-phpstorm-copilot"
-           ]
+            {
+              "group": "Laravel Bluesky",
+              "root": "jp/packages/laravel-bluesky",
+              "expanded": false,
+              "pages": [
+                "jp/packages/laravel-bluesky/basic-client"
+              ]
+            }
+          ]
         }
       ]
     }
