@@ -232,7 +232,8 @@
             "en/advanced/conditionable",
             "en/advanced/tap",
             "en/advanced/higher-order-messages",
-            "en/advanced/manager"
+            "en/advanced/manager",
+            "en/advanced/collection-deep-dive"
           ]
         },
         {
@@ -265,6 +266,7 @@
           "group": "Package Development",
           "pages": [
             "en/advanced/package-development",
+            "en/advanced/interacts-with-data",
             "en/advanced/package-versioning"
           ]
         },
