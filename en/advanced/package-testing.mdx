@@ -36,6 +36,9 @@ flowchart TD
     
     abstract class TestCase extends BaseTestCase
     {
+        /**
+         * $app is the Laravel application instance booted by Testbench.
+         */
         protected function getPackageProviders($app): array
         {
             return [
