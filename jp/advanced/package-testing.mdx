@@ -49,6 +49,8 @@ flowchart TD
     ```
   </Step>
   <Step title="必要なら設定やエイリアスを追加する">
+    `getPackageAliases()` では、`config/app.php` の `aliases` と同様に、テスト中に使うファサードエイリアスを登録できます。
+
     ```php
     protected function getPackageAliases($app): array
     {

@@ -49,6 +49,8 @@ flowchart TD
     ```
   </Step>
   <Step title="Add aliases or environment overrides if needed">
+    Use `getPackageAliases()` to register facade aliases for tests, similar to the `aliases` section in `config/app.php`.
+
     ```php
     protected function getPackageAliases($app): array
     {
