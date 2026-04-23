@@ -1,0 +1,154 @@
+---
+title: "Laravel Passkeys early investigation (passkeys-server + @laravel/passkeys)"
+description: "An early investigation of laravel/passkeys-server (PHP) and @laravel/passkeys (npm): installation, user model integration, routes, config options, events, frontend APIs, typed errors, and SSR behavior."
+---
+
+<Info>
+  This article is based on the official README files of `laravel/passkeys-server` and `laravel/passkeys`. Both packages are still pre-tag and under active development (as of April 2026).
+</Info>
+
+## What these packages are
+
+Laravel has published two official repositories for passwordless authentication with WebAuthn/passkeys:
+
+- Server-side package: [`laravel/passkeys-server`](https://github.com/laravel/passkeys-server)
+- Browser/client package: [`@laravel/passkeys`](https://github.com/laravel/passkeys)
+
+Together, they provide an end-to-end passkey authentication flow for Laravel applications.
+
+## Server side package: `laravel/passkeys-server`
+
+### Installation and initial setup
+
+<Steps>
+  <Step title="Install the PHP package">
+    ```bash
+    composer require laravel/passkeys
+    ```
+  </Step>
+  <Step title="Publish and run migrations">
+    ```bash
+    php artisan vendor:publish --tag=passkeys-migrations
+    php artisan migrate
+    ```
+  </Step>
+  <Step title="Update your User model">
+    Add the `PasskeyAuthenticatable` trait and implement the `PasskeyUser` contract.
+    ```php
+    use Laravel\Passkeys\Contracts\PasskeyUser;
+    use Laravel\Passkeys\PasskeyAuthenticatable;
+
+    class User extends Authenticatable implements PasskeyUser
+    {
+        use PasskeyAuthenticatable;
+    }
+    ```
+  </Step>
+</Steps>
+
+If you want to customize defaults, publish the config:
+
+```bash
+php artisan vendor:publish --tag=passkeys-config
+```
+
+### Auto-registered routes
+
+| Area | Method | Route | Purpose |
+|---|---|---|---|
+| Login (guest) | `GET` | `/passkeys/login/options` | Get verification options |
+| Login (guest) | `POST` | `/passkeys/login` | Verify credential and sign in |
+| Confirmation (auth) | `GET` | `/passkeys/confirm/options` | Get confirmation options |
+| Confirmation (auth) | `POST` | `/passkeys/confirm` | Verify passkey for confirmation |
+| Management (auth) | `GET` | `/user/passkeys/options` | Get registration options |
+| Management (auth) | `POST` | `/user/passkeys` | Store a new passkey |
+| Management (auth) | `DELETE` | `/user/passkeys/{passkey}` | Delete an existing passkey |
+
+### Key options in `config/passkeys.php`
+
+- `relying_party_id`
+- `allowed_origins`
+- `user_handle_secret`
+- `timeout`
+- `guard`
+- `middleware`
+- `throttle`
+- `redirect`
+
+### Events
+
+The package emits:
+
+- `PasskeyRegistered`
+- `PasskeyVerified`
+- `PasskeyDeleted`
+
+### Customization points
+
+<AccordionGroup>
+  <Accordion title="Login authorization callback">
+    Use `Passkeys::authorizeLoginUsing()` to block or allow login after a successful passkey assertion. You can return `false` or throw `ValidationException` for custom validation messages.
+  </Accordion>
+  <Accordion title="Custom actions">
+    You can extend and bind action classes such as `GenerateRegistrationOptions`, `GenerateVerificationOptions`, `StorePasskey`, `VerifyPasskey`, and `DeletePasskey`.
+  </Accordion>
+  <Accordion title="Custom responses">
+    You can bind response contracts like `PasskeyLoginResponse` to return your own JSON payloads or redirects after passkey operations.
+  </Accordion>
+</AccordionGroup>
+
+## Browser package: `@laravel/passkeys`
+
+`@laravel/passkeys` is the JavaScript client that runs WebAuthn ceremonies in the browser.
+
+### Installation
+
+```bash
+npm install @laravel/passkeys
+```
+
+### Core API
+
+```js
+import { Passkeys } from "@laravel/passkeys";
+
+await Passkeys.register({ name: "My MacBook" });
+await Passkeys.verify();
+```
+
+### Framework helpers
+
+- React: `usePasskeyVerify`, `usePasskeyRegister` from `@laravel/passkeys/react`
+- Vue: `usePasskeyVerify`, `usePasskeyRegister` from `@laravel/passkeys/vue`
+- Svelte: `usePasskeyVerify`, `usePasskeyRegister` from `@laravel/passkeys/svelte`
+
+### Passkey autofill
+
+With `autofill: true`, the client asks the browser to show saved passkeys in a credential picker attached to an input that includes the `webauthn` autocomplete token.
+
+### Typed error classes
+
+The README documents these typed errors:
+
+- `NotSupportedError`
+- `UserCancelledError`
+- `PasskeyExistsError`
+- `PasskeyError` (base class)
+
+### SSR support
+
+WebAuthn is browser-only, but the framework hooks are SSR-safe. During SSR, `isSupported` is `false`, then it updates after mount on the client.
+
+## Summary
+
+- `laravel/passkeys-server` and `@laravel/passkeys` together form a complete passkey authentication stack for Laravel.
+- Both are still early-stage (no tags yet), but they strongly indicate official ecosystem-level passkey support.
+- The architecture is Laravel-native end to end: routes, middleware/guards, actions/responses, and typed frontend integration.
+
+<Card title="laravel/passkeys-server" icon="github" href="https://github.com/laravel/passkeys-server">
+  Read the latest server-side README and source code directly in the official repository.
+</Card>
+
+<Card title="@laravel/passkeys" icon="github" href="https://github.com/laravel/passkeys">
+  Read the latest browser client README and framework helper APIs.
+</Card>
