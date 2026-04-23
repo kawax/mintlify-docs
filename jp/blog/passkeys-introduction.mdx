@@ -1,0 +1,153 @@
+---
+title: "Laravel Passkeys 初期調査（passkeys-server + @laravel/passkeys）"
+description: "laravel/passkeys-server（PHP）と @laravel/passkeys（npm）を初期調査。インストール、Userモデル統合、ルート、設定、イベント、フロントエンドAPI、型付きエラー、SSR対応まで整理します。"
+---
+
+<Info>
+  この記事は `laravel/passkeys-server` と `laravel/passkeys` の README に基づく初期調査です。両パッケージはまだタグなしの開発段階です（2026年4月時点）。
+</Info>
+
+## これは何のパッケージか
+
+Laravel の公式リポジトリで、パスワードレス認証（WebAuthn / パスキー）を実装するための 2 つのパッケージが公開されています。
+
+- サーバー側（PHP）: [`laravel/passkeys-server`](https://github.com/laravel/passkeys-server)
+- クライアント側（JavaScript）: [`@laravel/passkeys`](https://github.com/laravel/passkeys)
+
+この 2 つを組み合わせると、Laravel アプリでパスキー登録とパスキーログインを一貫して実装できます。
+
+## サーバー側: `laravel/passkeys-server`
+
+### インストールと初期セットアップ
+
+<Steps>
+  <Step title="PHPパッケージを追加する">
+    ```bash
+    composer require laravel/passkeys
+    ```
+  </Step>
+  <Step title="マイグレーションを公開して実行する">
+    ```bash
+    php artisan vendor:publish --tag=passkeys-migrations
+    php artisan migrate
+    ```
+  </Step>
+  <Step title="Userモデルに trait と contract を追加する">
+    ```php
+    use Laravel\Passkeys\Contracts\PasskeyUser;
+    use Laravel\Passkeys\PasskeyAuthenticatable;
+
+    class User extends Authenticatable implements PasskeyUser
+    {
+        use PasskeyAuthenticatable;
+    }
+    ```
+  </Step>
+</Steps>
+
+必要に応じて設定ファイルも公開できます。
+
+```bash
+php artisan vendor:publish --tag=passkeys-config
+```
+
+### 自動登録されるルート
+
+| 区分 | メソッド | ルート | 役割 |
+|---|---|---|---|
+| Login (guest) | `GET` | `/passkeys/login/options` | 認証オプション取得 |
+| Login (guest) | `POST` | `/passkeys/login` | パスキー検証とログイン |
+| Confirm (auth) | `GET` | `/passkeys/confirm/options` | 確認用オプション取得 |
+| Confirm (auth) | `POST` | `/passkeys/confirm` | パスキー確認 |
+| Management (auth) | `GET` | `/user/passkeys/options` | 登録オプション取得 |
+| Management (auth) | `POST` | `/user/passkeys` | 新規パスキー保存 |
+| Management (auth) | `DELETE` | `/user/passkeys/{passkey}` | パスキー削除 |
+
+### `config/passkeys.php` の主要オプション
+
+- `relying_party_id`
+- `allowed_origins`
+- `user_handle_secret`
+- `timeout`
+- `guard`
+- `middleware`
+- `throttle`
+- `redirect`
+
+### イベント
+
+パッケージは以下のイベントを発火します。
+
+- `PasskeyRegistered`
+- `PasskeyVerified`
+- `PasskeyDeleted`
+
+### カスタマイズポイント
+
+<AccordionGroup>
+  <Accordion title="LoginAuthorizationCallback（ログイン許可判定）">
+    `Passkeys::authorizeLoginUsing()` で、検証成功後のログイン許可を制御できます。停止したい場合は `false` を返すか、`ValidationException` を投げます。
+  </Accordion>
+  <Accordion title="CustomActions（WebAuthn処理の差し替え）">
+    `GenerateRegistrationOptions` / `GenerateVerificationOptions` / `StorePasskey` / `VerifyPasskey` / `DeletePasskey` を継承してサービスコンテナへバインドし、挙動を差し替えできます。
+  </Accordion>
+  <Accordion title="CustomResponses（レスポンスの差し替え）">
+    `PasskeyLoginResponse` などのコントラクトを独自実装して、成功時レスポンス（JSON・リダイレクトなど）をアプリ要件に合わせて変更できます。
+  </Accordion>
+</AccordionGroup>
+
+## クライアント側: `@laravel/passkeys`
+
+`@laravel/passkeys` はブラウザ側 WebAuthn ceremony を扱う JavaScript クライアントです。
+
+### インストール
+
+```bash
+npm install @laravel/passkeys
+```
+
+### 基本 API
+
+```js
+import { Passkeys } from "@laravel/passkeys";
+
+await Passkeys.register({ name: "My MacBook" });
+await Passkeys.verify();
+```
+
+### フレームワークヘルパー
+
+- React: `@laravel/passkeys/react` の `usePasskeyVerify`, `usePasskeyRegister`
+- Vue: `@laravel/passkeys/vue` の `usePasskeyVerify`, `usePasskeyRegister`
+- Svelte: `@laravel/passkeys/svelte` の `usePasskeyVerify`, `usePasskeyRegister`
+
+### パスキーオートフィル
+
+`autofill: true` を指定すると、`autocomplete="... webauthn"` を持つ input にブラウザのパスキーピッカーを表示できます。サポートされない環境やユーザーキャンセル時は通常フローへフォールバックします。
+
+### 型付きエラー
+
+README では次のエラークラスが公開されています。
+
+- `NotSupportedError`
+- `UserCancelledError`
+- `PasskeyExistsError`
+- `PasskeyError`（ベースクラス）
+
+### SSR 対応
+
+WebAuthn はブラウザ API ですが、各フレームワーク用フックは SSR セーフです。サーバー側では `isSupported` が `false` として扱われ、マウント後に実ブラウザ状態へ更新されます。
+
+## まとめ
+
+- `laravel/passkeys-server`（PHP）と `@laravel/passkeys`（JS）を組み合わせると、Laravel で完結したパスキー認証スタックを構築できます。
+- どちらもタグなしの開発段階ですが、Laravel 公式エコシステムとして今後の標準認証手段になる可能性が高いです。
+- 早期採用する場合は、README のルート・設定・エラーハンドリング・カスタマイズ拡張点を前提に設計すると安全です。
+
+<Card title="laravel/passkeys-server" icon="github" href="https://github.com/laravel/passkeys-server">
+  サーバー側パッケージの最新 README と実装を確認します。
+</Card>
+
+<Card title="@laravel/passkeys" icon="github" href="https://github.com/laravel/passkeys">
+  クライアント側パッケージの最新 README と API を確認します。
+</Card>
