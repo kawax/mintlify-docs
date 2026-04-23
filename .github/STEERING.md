@@ -26,6 +26,7 @@
  - [x] agent-skills-introduction
  - [x] laravel-ecosystem-analysis: surveyor, ranger, roster
  - [x] sentinel-introduction
+ - [ ] 公開されたばかりのパスキーパッケージ。まだタグも付いてないけど今後使われるだろうからすばやく初期調査。 https://github.com/laravel/passkeys-server, https://github.com/laravel/passkeys
 
 ## packages ページ案
 - [x] Amazon Bedrock driver for Laravel AI SDK。https://github.com/invokable/laravel-amazon-bedrock
@@ -50,3 +51,14 @@
  - Laravel SDK側で追加・更新したので英語・日本語ともに反映。`agent-loop.md` `custom-agents.md` `streaming-events.md` `skills.md`は追加。`resume.md` `hooks.md`は更新。
  - 日本語版のページが完成したらnavigationの並びを英語版と揃える。読者が必要とするだろうページを上に並べている。
  - 英語・日本語の全ページ完成。今後も追加・変更はあるだろうけど管理者がIssueを作ってエージェントをアサインして対応していく。
+- [ ] Testbench `package-testing.mdx` が作られてたので次はLaravel Bluesky https://github.com/invokable/laravel-bluesky
+ - `docs`内に英語のドキュメントがある。AI普及前なので最低限のドキュメントしかない。
+ - docs/workbench.md はBlueskyとは関係ないTestbench Workbenchのドキュメント。Workbenchの情報がなさすぎて調べた結果をとりあえずここに置いていた。こっちのサイトに移せばいいのでworkbench.mdを元に`package-testing.mdx`の続きのページを作成。
+ - 残りのページは`{lang}/packages/laravel-bluesky/`内に複数ページで作成。
+ - SNSのパッケージは色々作ってるけど基本的なクライアント機能が完成したらNotificationsやSocialiteのLaravelの機能を被せて実際に使うのは通知機能での投稿ばかりなことも多い。
+ - BlueskyのSocialiteは他と違うので若干難しい。詳しい説明が必要。
+ - Bluesky特有機能でLaravelユーザーが作りやすいのはFeed Generator。
+ - Labelerはサーバーとして動かし続ける必要があるのでLaravel ForgeやLaravel Cloudを使っているか自力で構築できる人向け。
+ - WebSocketはもっと難しいので意図的にドキュメントを作ってないけどこっちで作る。`JetstreamServeCommand` `FirehoseServeCommand`
+ - CryptoやCoreまで行くと本当の深淵。AIもない頃に他言語版と仕様を調べまくって作った。
+ - 詳細なドキュメントを作りたいけど一から調べると大変なのでDeepWikiを参照するのが良さそう。 https://deepwiki.com/invokable/laravel-bluesky
