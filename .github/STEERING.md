@@ -26,7 +26,7 @@
  - [x] agent-skills-introduction
  - [x] laravel-ecosystem-analysis: surveyor, ranger, roster
  - [x] sentinel-introduction
- - [ ] 公開されたばかりのパスキーパッケージ。まだタグも付いてないけど今後使われるだろうからすばやく初期調査。 https://github.com/laravel/passkeys-server, https://github.com/laravel/passkeys
+ - [x] 公開されたばかりのパスキーパッケージ。まだタグも付いてないけど今後使われるだろうからすばやく初期調査。 https://github.com/laravel/passkeys-server, https://github.com/laravel/passkeys
 
 ## packages ページ案
 - [x] Amazon Bedrock driver for Laravel AI SDK。https://github.com/invokable/laravel-amazon-bedrock
