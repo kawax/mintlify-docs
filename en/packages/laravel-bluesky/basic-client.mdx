@@ -1,0 +1,193 @@
+---
+title: "Basic client"
+description: "Core Laravel Bluesky client usage: authentication, posting, media, replies, quotes, feeds, and search."
+---
+
+## Authentication
+
+Bluesky supports two authentication modes: App Password and OAuth. For new implementations, consider OAuth.
+
+### App Password
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$profile = Bluesky::login(
+    identifier: config('bluesky.identifier'),
+    password: config('bluesky.password'),
+)->getProfile();
+```
+
+Use `LegacySession` when you want to resume an existing App Password session.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Session\LegacySession;
+
+Bluesky::login(identifier: config('bluesky.identifier'), password: config('bluesky.password'));
+
+cache()->put('bluesky_legacy_session', Bluesky::agent()->session()->toArray(), now()->addDay());
+
+Bluesky::withToken(LegacySession::create(cache('bluesky_legacy_session', [])));
+
+if (! Bluesky::check()) {
+    Bluesky::refreshSession();
+}
+```
+
+### OAuth
+
+Convert the Socialite token payload into `OAuthSession`.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Session\OAuthSession;
+
+$session = OAuthSession::create(session('bluesky_session'));
+
+$timeline = Bluesky::withToken($session)->getTimeline();
+```
+
+See [Socialite](/en/socialite) for the full OAuth flow.
+
+## Create posts
+
+### Simple text post
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$response = Bluesky::withToken()->post('test');
+```
+
+### Build rich text with TextBuilder
+
+Use `TextBuilder` for links, tags, and mentions.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\RichText\TextBuilder;
+
+$post = TextBuilder::make(text: 'test')
+    ->newLine()
+    ->mention('@example.bsky.social')
+    ->newLine()
+    ->link('https://bsky.app/')
+    ->newLine()
+    ->tag('#Laravel')
+    ->toPost();
+
+$response = Bluesky::withToken()->post($post);
+```
+
+## Attach media
+
+### Image attachment
+
+```php
+use Illuminate\Support\Facades\Storage;
+use Revolution\Bluesky\Embed\Images;
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+
+Bluesky::withToken();
+
+$images = Images::create()->add(
+    alt: 'App screenshot',
+    blob: fn (): array => Bluesky::uploadBlob(
+        Storage::get('test.png'),
+        Storage::mimeType('test.png')
+    )->json('blob')
+);
+
+$post = Post::create(text: 'image post')->embed($images);
+
+$response = Bluesky::post($post);
+```
+
+### External link card
+
+```php
+use Revolution\Bluesky\Embed\External;
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+
+$external = External::create(
+    title: 'Title',
+    description: 'Description',
+    uri: 'https://example.com'
+);
+
+$post = Post::create(text: 'external card')->embed($external);
+
+$response = Bluesky::withToken()->post($post);
+```
+
+## Replies and quote posts
+
+### Reply
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+use Revolution\Bluesky\Types\ReplyRef;
+use Revolution\Bluesky\Types\StrongRef;
+
+$reply = ReplyRef::to(
+    root: StrongRef::to(uri: 'at://', cid: 'cid'),
+    parent: StrongRef::to(uri: 'at://', cid: 'cid')
+);
+
+$post = Post::create(text: 'reply')->reply($reply);
+
+$response = Bluesky::withToken()->post($post);
+```
+
+### Quote post
+
+```php
+use Revolution\Bluesky\Embed\QuoteRecord;
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+use Revolution\Bluesky\Types\StrongRef;
+
+$quote = QuoteRecord::create(StrongRef::to(uri: 'at://', cid: 'cid'));
+
+$post = Post::create(text: 'quote')->embed($quote);
+
+$response = Bluesky::withToken()->post($post);
+```
+
+## Read feeds
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$response = Bluesky::withToken()->getTimeline();
+
+$items = $response->collect('feed');
+```
+
+For public feed reads, you can use non-auth methods.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$feed = Bluesky::getAuthorFeed(actor: 'alice.bsky.social')->json('feed');
+```
+
+## Search posts
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$response = Bluesky::withToken()->searchPosts(q: '#bluesky', limit: 10);
+```
+
+<Warning>
+Due to a temporary API restriction, `searchPosts()` is currently unavailable for unauthenticated access.
+</Warning>
+
+<Info>
+Source: [docs/basic-client.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/basic-client.md)
+</Info>

@@ -1,0 +1,136 @@
+---
+title: "Develop Laravel packages with Testbench Workbench"
+description: "Use Orchestra Testbench Workbench to build a realistic package development environment with routes, migrations, and a local app runtime."
+---
+
+## What is Testbench Workbench?
+
+[Orchestra Testbench](https://github.com/orchestral/testbench) is focused on automated tests. With Workbench, you also get a small Laravel app inside your package repository for interactive development.
+
+Use it as a continuation of `package-testing` when you need UI checks, route verification, and seeded integration scenarios.
+
+```mermaid
+flowchart LR
+    A["Package code<br>`src/`"] --> B["Workbench<br>`workbench/`"]
+    B --> C["Routes and controllers<br>interactive checks"]
+    B --> D["Migrations and seeders<br>realistic data"]
+    B --> E["`vendor/bin/testbench serve`<br>local runtime"]
+```
+
+## Setup
+
+<Steps>
+  <Step title="Install Testbench">
+    ```bash
+    composer require --dev orchestra/testbench
+    ```
+  </Step>
+  <Step title="Install Workbench scaffold">
+    ```bash
+    vendor/bin/testbench workbench:install
+    ```
+  </Step>
+  <Step title="Build and serve">
+    ```bash
+    composer clear
+    composer prepare
+    composer build
+    vendor/bin/testbench serve
+    ```
+  </Step>
+</Steps>
+
+<Info>
+`workbench:install` prepares the `workbench/` tree, `autoload-dev`, and related scripts in one step.
+</Info>
+
+## Define your environment in testbench.yaml
+
+Use `testbench.yaml` in the package root to control providers, migrations, and build steps.
+
+```yaml
+providers:
+  - Vendor\Package\PackageServiceProvider
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+migrations:
+  - workbench/database/migrations
+
+workbench:
+  start: '/'
+  install: true
+  discovers:
+    web: true
+    api: false
+    commands: true
+    config: true
+  build:
+    - create-sqlite-db
+    - migrate-fresh:
+        --seed: true
+        --seeder: Workbench\Database\Seeders\DatabaseSeeder
+```
+
+If you do not want to commit local settings, keep a `testbench.yaml.example` template and ignore `testbench.yaml`.
+
+## Core features Workbench gives you
+
+### Routes and controllers
+
+Place development routes in `workbench/routes/web.php` and `workbench/routes/api.php` so you can verify package behavior from a browser or HTTP client.
+
+```php
+use Illuminate\Support\Facades\Route;
+use Vendor\Package\Facades\Package;
+
+Route::get('/', function () {
+    return Package::status();
+});
+```
+
+### Migrations and seeders
+
+Use `workbench/database/migrations` and `workbench/database/seeders` to test your package against realistic schema and data.
+
+```php
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+Schema::create('widgets', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->timestamps();
+});
+```
+
+### Local runtime and console workflows
+
+Run Artisan commands through `vendor/bin/testbench`.
+
+```bash
+vendor/bin/testbench list
+vendor/bin/testbench route:list
+vendor/bin/testbench migrate:fresh --seed
+```
+
+## Combine Workbench with automated tests
+
+Use Workbench for interactive checks and keep your `tests/` directory for repeatable automated assertions.
+
+- Automation: regression safety in `tests/`
+- Interactive verification: end-to-end behavior in `workbench/`
+
+## Related pages
+
+<Columns cols={2}>
+  <Card title="Testing Laravel packages with Orchestra Testbench" icon="flask-conical" href="/en/advanced/package-testing">
+    Start with the package testing foundation first.
+  </Card>
+  <Card title="Package version compatibility management" icon="git-branch" href="/en/advanced/package-versioning">
+    Learn version mapping and CI matrix strategy for Laravel and Testbench.
+  </Card>
+</Columns>
+
+<Info>
+Source: [invokable/laravel-bluesky docs/workbench.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/workbench.md), [Orchestra Testbench](https://github.com/orchestral/testbench)
+</Info>

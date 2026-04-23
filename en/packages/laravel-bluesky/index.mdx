@@ -1,0 +1,86 @@
+---
+title: "Laravel Bluesky"
+description: "Get started with revolution/laravel-bluesky: requirements, installation, environment setup, and your first post."
+---
+
+## Overview
+
+[revolution/laravel-bluesky](https://github.com/invokable/laravel-bluesky) is a Laravel package for AT Protocol (Bluesky).
+
+It exposes `Revolution\Bluesky\Facades\Bluesky` and lets you create posts, fetch feeds, search posts, and attach media through Laravel-friendly APIs.
+
+## Requirements
+
+- PHP `>= 8.3`
+- Laravel `>= 12.x`
+
+## Installation
+
+```bash
+composer require revolution/laravel-bluesky
+```
+
+## Environment variables
+
+For App Password authentication, configure your `.env` values.
+
+```dotenv
+BLUESKY_IDENTIFIER=your-handle.bsky.social
+BLUESKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+```
+
+## Quick start
+
+### Create your first post
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$response = Bluesky::login(
+    identifier: config('bluesky.identifier'),
+    password: config('bluesky.password'),
+)->post('Hello Bluesky');
+```
+
+### Use TextBuilder for links and tags
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+use Revolution\Bluesky\RichText\TextBuilder;
+
+$post = Post::build(function (TextBuilder $builder) {
+    $builder->text('Hello Bluesky')
+        ->newLine(count: 2)
+        ->link('https://bsky.app/')
+        ->newLine()
+        ->tag('#Bluesky');
+});
+
+$response = Bluesky::login(
+    identifier: config('bluesky.identifier'),
+    password: config('bluesky.password'),
+)->post($post);
+```
+
+<Warning>
+Due to a temporary API restriction, `searchPosts()` currently does not work for unauthenticated access. Use an authenticated session for searches.
+</Warning>
+
+## Documentation map
+
+<Columns cols={2}>
+  <Card title="Basic client" href="/en/packages/laravel-bluesky/basic-client" icon="terminal-square">
+    Learn App Password and OAuth auth, posting, media, replies, quotes, feeds, and search.
+  </Card>
+  <Card title="Socialite" href="/en/socialite" icon="shield-check">
+    Review Laravel Socialite basics for OAuth-based Bluesky auth.
+  </Card>
+</Columns>
+
+## References
+
+- GitHub: [invokable/laravel-bluesky](https://github.com/invokable/laravel-bluesky)
+- Basic Client docs: [docs/basic-client.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/basic-client.md)
+- Workbench docs: [docs/workbench.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/workbench.md)
+- DeepWiki: [invokable/laravel-bluesky](https://deepwiki.com/invokable/laravel-bluesky)

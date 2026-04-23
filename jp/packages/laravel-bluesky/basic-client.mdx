@@ -1,0 +1,193 @@
+---
+title: "Basic client"
+description: "Laravel Blueskyの基本クライアント操作。認証、投稿、メディア、リプライ、引用、フィード取得、検索を確認します。"
+---
+
+## 認証
+
+Blueskyの認証は App Password と OAuth の2つです。新規実装ではOAuthの採用も検討してください。
+
+### App Password
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$profile = Bluesky::login(
+    identifier: config('bluesky.identifier'),
+    password: config('bluesky.password'),
+)->getProfile();
+```
+
+セッションを再利用する場合は `LegacySession` を使います。
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Session\LegacySession;
+
+Bluesky::login(identifier: config('bluesky.identifier'), password: config('bluesky.password'));
+
+cache()->put('bluesky_legacy_session', Bluesky::agent()->session()->toArray(), now()->addDay());
+
+Bluesky::withToken(LegacySession::create(cache('bluesky_legacy_session', [])));
+
+if (! Bluesky::check()) {
+    Bluesky::refreshSession();
+}
+```
+
+### OAuth
+
+Socialiteで取得したトークンを `OAuthSession` に変換して使います。
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Session\OAuthSession;
+
+$session = OAuthSession::create(session('bluesky_session'));
+
+$timeline = Bluesky::withToken($session)->getTimeline();
+```
+
+OAuthフロー全体は [Socialite](/jp/socialite) を参照してください。
+
+## 投稿を作成する
+
+### 単純なテキスト投稿
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$response = Bluesky::withToken()->post('test');
+```
+
+### TextBuilderで投稿を組み立てる
+
+リンク・タグ・メンションを正しく扱うには `TextBuilder` を使います。
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\RichText\TextBuilder;
+
+$post = TextBuilder::make(text: 'test')
+    ->newLine()
+    ->mention('@example.bsky.social')
+    ->newLine()
+    ->link('https://bsky.app/')
+    ->newLine()
+    ->tag('#Laravel')
+    ->toPost();
+
+$response = Bluesky::withToken()->post($post);
+```
+
+## メディアを添付する
+
+### 画像添付
+
+```php
+use Illuminate\Support\Facades\Storage;
+use Revolution\Bluesky\Embed\Images;
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+
+Bluesky::withToken();
+
+$images = Images::create()->add(
+    alt: 'App screenshot',
+    blob: fn (): array => Bluesky::uploadBlob(
+        Storage::get('test.png'),
+        Storage::mimeType('test.png')
+    )->json('blob')
+);
+
+$post = Post::create(text: 'image post')->embed($images);
+
+$response = Bluesky::post($post);
+```
+
+### 外部リンクカード
+
+```php
+use Revolution\Bluesky\Embed\External;
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+
+$external = External::create(
+    title: 'Title',
+    description: 'Description',
+    uri: 'https://example.com'
+);
+
+$post = Post::create(text: 'external card')->embed($external);
+
+$response = Bluesky::withToken()->post($post);
+```
+
+## リプライ・引用
+
+### リプライ
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+use Revolution\Bluesky\Types\ReplyRef;
+use Revolution\Bluesky\Types\StrongRef;
+
+$reply = ReplyRef::to(
+    root: StrongRef::to(uri: 'at://', cid: 'cid'),
+    parent: StrongRef::to(uri: 'at://', cid: 'cid')
+);
+
+$post = Post::create(text: 'reply')->reply($reply);
+
+$response = Bluesky::withToken()->post($post);
+```
+
+### 引用投稿
+
+```php
+use Revolution\Bluesky\Embed\QuoteRecord;
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Post;
+use Revolution\Bluesky\Types\StrongRef;
+
+$quote = QuoteRecord::create(StrongRef::to(uri: 'at://', cid: 'cid'));
+
+$post = Post::create(text: 'quote')->embed($quote);
+
+$response = Bluesky::withToken()->post($post);
+```
+
+## フィード取得
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$response = Bluesky::withToken()->getTimeline();
+
+$items = $response->collect('feed');
+```
+
+公開投稿を取得するだけなら、認証なしのメソッドも使えます。
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$feed = Bluesky::getAuthorFeed(actor: 'alice.bsky.social')->json('feed');
+```
+
+## 検索
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$response = Bluesky::withToken()->searchPosts(q: '#bluesky', limit: 10);
+```
+
+<Warning>
+`searchPosts()` はAPI側の一時的な制限により、未認証アクセスでは現在利用できません。
+</Warning>
+
+<Info>
+Source: [docs/basic-client.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/basic-client.md)
+</Info>

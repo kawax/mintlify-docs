@@ -1,0 +1,136 @@
+---
+title: "Testbench Workbenchでパッケージ開発を進める"
+description: "Orchestra Testbench Workbenchを使って、ルート・マイグレーション・サービス起動を備えた実アプリに近い検証環境を作る方法を解説します。"
+---
+
+## Testbench Workbenchとは
+
+[Orchestra Testbench](https://github.com/orchestral/testbench) はテスト向けですが、Workbenchを組み合わせるとパッケージリポジトリ内に小さなLaravelアプリを作って手元で動かせます。
+
+`package-testing` で作ったテストを補完しつつ、UI確認、ルート疎通、シーダー付き検証を進めたいときに使います。
+
+```mermaid
+flowchart LR
+    A["パッケージ本体<br>`src/`"] --> B["Workbench<br>`workbench/`"]
+    B --> C["ルート・コントローラ<br>画面確認"]
+    B --> D["マイグレーション・Seeder<br>データ検証"]
+    B --> E["`vendor/bin/testbench serve`<br>ローカル起動"]
+```
+
+## セットアップ
+
+<Steps>
+  <Step title="Testbenchをインストールする">
+    ```bash
+    composer require --dev orchestra/testbench
+    ```
+  </Step>
+  <Step title="Workbenchを作成する">
+    ```bash
+    vendor/bin/testbench workbench:install
+    ```
+  </Step>
+  <Step title="ビルドして起動する">
+    ```bash
+    composer clear
+    composer prepare
+    composer build
+    vendor/bin/testbench serve
+    ```
+  </Step>
+</Steps>
+
+<Info>
+`workbench:install` は `workbench/` ディレクトリや `autoload-dev`、関連スクリプトをまとめて整備します。
+</Info>
+
+## testbench.yamlで開発環境を定義する
+
+Workbenchの動作はルートに置く `testbench.yaml` で管理します。
+
+```yaml
+providers:
+  - Vendor\Package\PackageServiceProvider
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+migrations:
+  - workbench/database/migrations
+
+workbench:
+  start: '/'
+  install: true
+  discovers:
+    web: true
+    api: false
+    commands: true
+    config: true
+  build:
+    - create-sqlite-db
+    - migrate-fresh:
+        --seed: true
+        --seeder: Workbench\Database\Seeders\DatabaseSeeder
+```
+
+`testbench.yaml` をコミット対象から外したい場合は、テンプレートとして `testbench.yaml.example` を置いて実ファイルはローカルで管理します。
+
+## Workbenchが提供する主要機能
+
+### ルートとコントローラ
+
+`workbench/routes/web.php` や `workbench/routes/api.php` に検証ルートを置けます。パッケージAPIの実行結果を、ブラウザやHTTPクライアントで直接確認できます。
+
+```php
+use Illuminate\Support\Facades\Route;
+use Vendor\Package\Facades\Package;
+
+Route::get('/', function () {
+    return Package::status();
+});
+```
+
+### マイグレーションとSeeder
+
+`workbench/database/migrations` と `workbench/database/seeders` を使うと、実運用に近いデータ構造で検証できます。
+
+```php
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+Schema::create('widgets', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->timestamps();
+});
+```
+
+### サービス起動とCLI確認
+
+`vendor/bin/testbench` 経由でArtisanコマンドを実行できます。
+
+```bash
+vendor/bin/testbench list
+vendor/bin/testbench route:list
+vendor/bin/testbench migrate:fresh --seed
+```
+
+## テストとの連携
+
+Workbenchは「手動確認・デモ用アプリ」、Testbenchのテストコードは「自動検証」として役割分担すると運用しやすくなります。
+
+- 自動化: `tests/` で回帰を防ぐ
+- 手動確認: `workbench/` で画面・導線・統合挙動を確認する
+
+## 関連ページ
+
+<Columns cols={2}>
+  <Card title="Orchestra TestbenchでLaravelパッケージをテストする" icon="flask-conical" href="/jp/advanced/package-testing">
+    パッケージテスト基盤の作り方を先に確認します。
+  </Card>
+  <Card title="パッケージのバージョン互換性管理" icon="git-branch" href="/jp/advanced/package-versioning">
+    LaravelとTestbenchの対応表とCIマトリクス運用を確認します。
+  </Card>
+</Columns>
+
+<Info>
+Source: [invokable/laravel-bluesky docs/workbench.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/workbench.md), [Orchestra Testbench](https://github.com/orchestral/testbench)
+</Info>
