@@ -1,0 +1,126 @@
+---
+title: "検証(Verify)"
+description: "Bluesky / AT Protocol の検証機能。投稿・画像・CAR ファイルの CID 検証方法。"
+---
+
+## 概要
+
+検証可能性は Bluesky / AT Protocol の重要なコンセプトです。
+
+## 投稿の検証
+
+[com.atproto.repo.getRecord](https://docs.bsky.app/docs/api/com-atproto-repo-get-record) で取得した投稿データの CID がレコードと一致するか検証できます。
+
+```php
+$block = [
+    'uri' => 'at://did:plc:***/app.bsky.feed.post/***',
+    'cid' => 'bafyreih5y47li4zuvvzevmq4xl7woqxchfc2pnfclv3kfz3zefb2qd3bzm',
+    'value' => [
+        'text' => 'Hello, Bluesky!',
+        '$type' => 'app.bsky.feed.post',
+        'createdAt' => '2025-01-01T00:00:00.000Z',
+    ],
+];
+```
+
+```php
+use Revolution\Bluesky\Core\CBOR;
+use Revolution\Bluesky\Core\CID;
+
+$cid = data_get($block, 'cid');
+$record = data_get($block, 'value');
+
+// DAG-CBOR にエンコード
+$cbor = CBOR::encode($record);
+
+$bool = CID::verify($cbor, $cid);
+```
+
+サンプル実装: [DownloadRecordCommand](https://github.com/invokable/laravel-bluesky/blob/main/src/Console/DownloadRecordCommand.php)
+
+## 画像ファイルの検証
+
+画像を含む投稿では、`$link` が画像の CID になります。
+
+```php
+$block = [
+    'uri' => 'at://did:plc:***/app.bsky.feed.post/***',
+    'cid' => 'b+++',
+    'value' => [
+        'text' => '画像付き投稿',
+        '$type' => 'app.bsky.feed.post',
+        'embed' => [
+            '$type' => 'app.bsky.embed.images',
+            'images' => [
+                [
+                    'alt' => '',
+                    'image' => [
+                        'ref' => [
+                            '$link' => 'b***image'
+                        ],
+                        'size' => 100000,
+                        '$type' => 'blob',
+                        'mimeType' => 'image/jpeg'
+                    ],
+                    'aspectRatio' => [
+                        'width' => 1000,
+                        'height' => 1000
+                    ]
+                ]
+            ]
+        ],
+        'createdAt' => '2025-01-01T00:00:00.000Z'
+    ]
+];
+```
+
+[com.atproto.sync.getBlob](https://docs.bsky.app/docs/api/com-atproto-sync-get-blob) でダウンロードした画像の生データを検証します。
+
+```php
+use Revolution\Bluesky\Core\CID;
+
+$cid = data_get($block, 'cid');
+$file = file_get_contents('path/to/b***image.jpg');
+
+$bool = CID::verify($file, $cid, codec: CID::RAW);
+```
+
+サンプル実装: [DownloadBlobsCommand](https://github.com/invokable/laravel-bluesky/blob/main/src/Console/DownloadBlobsCommand.php)
+
+## CAR ファイルの検証
+
+CAR ファイルにはユーザーのすべてのレコードが含まれます。
+
+[com.atproto.sync.getRepo](https://docs.bsky.app/docs/api/com-atproto-sync-get-repo) でダウンロードした CAR ファイルが対象ユーザーのものかどうか検証できます。
+
+```php
+use Revolution\Bluesky\Core\CAR;
+use Revolution\Bluesky\Crypto\DidKey;
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Support\DidDocument;
+
+$did = 'did:plc:***';
+
+// 検証には didDoc の公開鍵が必要
+$didDoc = DidDocument::make(Bluesky::identity()->resolveDID($did)->json());
+
+$didKey = DidKey::parse($didDoc->publicKey());
+
+$car = 'CAR ファイルの生データまたはファイルへのストリーム';
+
+$signed = CAR::signedCommit($car);
+
+$bool = CAR::verifySignedCommit($signed, $didKey);
+```
+
+サンプル実装: [DownloadRepoCommand](https://github.com/invokable/laravel-bluesky/blob/main/src/Console/DownloadRepoCommand.php)
+
+## CAR ファイルの展開後の検証
+
+CAR ファイルを展開して取得したレコードの検証は、最初の投稿の例と同じ方法で行います。
+
+サンプル実装: [UnpackRepoCommand](https://github.com/invokable/laravel-bluesky/blob/main/src/Console/UnpackRepoCommand.php)
+
+<Info>
+Source: [docs/verify.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/verify.md)
+</Info>

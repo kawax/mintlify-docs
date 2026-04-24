@@ -1,0 +1,25 @@
+---
+title: "ルート"
+description: "laravel-bluesky パッケージが自動で定義する AT Protocol / XRPC ルートの一覧と設定方法。"
+---
+
+## パッケージが定義するルート
+
+パッケージは以下のルートを自動的に定義します。config または `.env` で個別に無効化できます。
+
+| パス | ルート名 |
+|-----|---------|
+| `/bluesky/oauth/client-metadata.json` | `bluesky.oauth.client-metadata` |
+| `/bluesky/oauth/jwks.json` | `bluesky.oauth.jwks` |
+| `/xrpc/app.bsky.feed.getFeedSkeleton` | `bluesky.feed.skeleton` |
+| `/xrpc/app.bsky.feed.describeFeedGenerator` | `bluesky.feed.describe` |
+| `/xrpc/com.atproto.label.queryLabels` | `bluesky.labeler.query` |
+| `/xrpc/com.atproto.moderation.createReport` | `bluesky.labeler.report` |
+| `/.well-known/did.json` | `bluesky.well-known.did` |
+| `/.well-known/atproto-did` | `bluesky.well-known.atproto` |
+
+レスポンスを変更するには [OAuthConfig](https://github.com/invokable/laravel-bluesky/blob/main/src/Socialite/OAuthConfig.php) または [WellKnownConfig](https://github.com/invokable/laravel-bluesky/blob/main/src/WellKnown/WellKnownConfig.php) を使用してください。
+
+<Info>
+Source: [docs/route.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/route.md)
+</Info>
