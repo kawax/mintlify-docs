@@ -420,6 +420,9 @@
                 "jp/packages/laravel-bluesky/socialite",
                 "jp/packages/laravel-bluesky/notification",
                 "jp/packages/laravel-bluesky/testing",
+                "jp/packages/laravel-bluesky/identity",
+                "jp/packages/laravel-bluesky/route",
+                "jp/packages/laravel-bluesky/verify",
                 "jp/packages/laravel-bluesky/feed-generator"
               ]
             }

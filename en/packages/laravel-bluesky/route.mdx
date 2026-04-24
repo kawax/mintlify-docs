@@ -1,0 +1,25 @@
+---
+title: "Routes"
+description: "AT Protocol and XRPC routes automatically registered by the laravel-bluesky package."
+---
+
+## Routes defined in the package
+
+The package automatically registers the following routes. You can disable individual routes via config or `.env`.
+
+| Path | Route name |
+|------|------------|
+| `/bluesky/oauth/client-metadata.json` | `bluesky.oauth.client-metadata` |
+| `/bluesky/oauth/jwks.json` | `bluesky.oauth.jwks` |
+| `/xrpc/app.bsky.feed.getFeedSkeleton` | `bluesky.feed.skeleton` |
+| `/xrpc/app.bsky.feed.describeFeedGenerator` | `bluesky.feed.describe` |
+| `/xrpc/com.atproto.label.queryLabels` | `bluesky.labeler.query` |
+| `/xrpc/com.atproto.moderation.createReport` | `bluesky.labeler.report` |
+| `/.well-known/did.json` | `bluesky.well-known.did` |
+| `/.well-known/atproto-did` | `bluesky.well-known.atproto` |
+
+To change the response, use [OAuthConfig](https://github.com/invokable/laravel-bluesky/blob/main/src/Socialite/OAuthConfig.php) or [WellKnownConfig](https://github.com/invokable/laravel-bluesky/blob/main/src/WellKnown/WellKnownConfig.php).
+
+<Info>
+Source: [docs/route.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/route.md)
+</Info>

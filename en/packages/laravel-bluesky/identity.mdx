@@ -1,0 +1,118 @@
+---
+title: "Identity"
+description: "Resolve Bluesky handles and DIDs with Bluesky::identity(). Handle-to-DID, DID-to-document, and profile lookups."
+---
+
+## Overview
+
+In Bluesky, mutual resolution of handles, DIDs, and related identities is often required.
+
+- https://docs.bsky.app/docs/advanced-guides/resolving-identities
+- https://atproto.com/guides/identity
+
+## Handle to DID
+
+### Using the API
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$did = Bluesky::resolveHandle('***.bsky.social')->json('did');
+```
+
+### Using DNS or well-known
+
+Check a DNS TXT record or `/.well-known/atproto-did`.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$did = Bluesky::identity()->resolveHandle('alice.test');
+```
+
+These two methods are similar but differ in how they resolve the handle. The API method queries the Bluesky service over the network, while the DNS/well-known method is suited for custom-domain handles.
+
+## DID to DID Document
+
+`resolveDID` returns the DID Document.
+
+https://plc.directory/did:plc:ewvi7nxzyoun6zhxrhs64oiz
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$didDoc = Bluesky::identity()->resolveDID('did:plc:*** or did:web:***')->json();
+```
+
+## DID Document to Handle
+
+The `alsoKnownAs` field in the DID Document contains the handle.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Support\DidDocument;
+
+$didDoc = DidDocument::make(Bluesky::identity()->resolveDID('did:plc:*** or did:web:***')->json());
+$handle = $didDoc->handle();
+```
+
+## resolveIdentity
+
+`resolveIdentity` combines `resolveHandle` and `resolveDID`. You can resolve from either a DID or a handle, and it returns the DID Document.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Support\DidDocument;
+
+$didDoc = DidDocument::make(Bluesky::identity()->resolveIdentity('did or handle')->json());
+$didDoc->id();
+$didDoc->handle();
+```
+
+## Public profile
+
+You can look up a public profile from either a DID or a handle. The response includes both the DID and handle.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$profile = Bluesky::getProfile('did or handle');
+$profile->json('did');
+$profile->json('handle');
+```
+
+## PDS URL / serviceEndpoint
+
+The `serviceEndpoint` in the DID Document is the PDS URL. You are unlikely to need this directly, but it is available.
+
+```
+https://***.***.host.bsky.network
+```
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Support\DidDocument;
+
+$didDoc = DidDocument::make(Bluesky::identity()->resolveIdentity('did or handle')->json());
+$didDoc->pdsUrl();
+```
+
+## Authorization Server URL
+
+Resolve the Authorization Server URL via the PDS.
+
+For accounts registered on Bluesky, this is typically `https://bsky.social`.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Support\DidDocument;
+
+$didDoc = DidDocument::make(Bluesky::identity()->resolveIdentity('did or handle')->json());
+
+$pds = Bluesky::pds()->getProtectedResource($didDoc->pdsUrl());
+$pds->authServer();
+```
+
+<Info>
+Source: [docs/identity.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/identity.md)
+</Info>

@@ -1,0 +1,118 @@
+---
+title: "Identity"
+description: "Bluesky の Handle と DID の相互解決方法。Bluesky::identity() を使った操作をまとめます。"
+---
+
+## 概要
+
+Bluesky では Handle、DID などの相互解決が頻繁に必要になります。
+
+- https://docs.bsky.app/docs/advanced-guides/resolving-identities
+- https://atproto.com/guides/identity
+
+## Handle から DID を解決する
+
+### API 経由
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$did = Bluesky::resolveHandle('***.bsky.social')->json('did');
+```
+
+### DNS/well-known 経由
+
+DNS TXT レコードまたは `/.well-known/atproto-did` を確認します。
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$did = Bluesky::identity()->resolveHandle('alice.test');
+```
+
+2つは似ていますが動作が異なります。API 経由はネットワーク越しに Bluesky サービスへ問い合わせるのに対し、DNS/well-known 経由はカスタムドメインの Handle 解決に適しています。
+
+## DID から DID Document を取得する
+
+`resolveDID` は DID Document を返します。
+
+https://plc.directory/did:plc:ewvi7nxzyoun6zhxrhs64oiz
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$didDoc = Bluesky::identity()->resolveDID('did:plc:*** または did:web:***')->json();
+```
+
+## DID Document から Handle を取得する
+
+DID Document の `alsoKnownAs` フィールドに Handle が含まれています。
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Support\DidDocument;
+
+$didDoc = DidDocument::make(Bluesky::identity()->resolveDID('did:plc:*** または did:web:***')->json());
+$handle = $didDoc->handle();
+```
+
+## resolveIdentity による統合解決
+
+`resolveHandle` と `resolveDID` を組み合わせた `resolveIdentity` を使うと、DID または Handle のどちらからでも解決でき、DID Document を返します。
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Support\DidDocument;
+
+$didDoc = DidDocument::make(Bluesky::identity()->resolveIdentity('did または handle')->json());
+$didDoc->id();
+$didDoc->handle();
+```
+
+## 公開プロフィールの取得
+
+公開プロフィールは DID または Handle のどちらからでも解決でき、レスポンスに DID と Handle の両方が含まれます。
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+
+$profile = Bluesky::getProfile('did または handle');
+$profile->json('did');
+$profile->json('handle');
+```
+
+## PDS URL / serviceEndpoint の取得
+
+DID Document の `serviceEndpoint` は PDS の URL です。直接使用することは少ないですが、必要に応じて取得できます。
+
+```
+https://***.***.host.bsky.network
+```
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Support\DidDocument;
+
+$didDoc = DidDocument::make(Bluesky::identity()->resolveIdentity('did または handle')->json());
+$didDoc->pdsUrl();
+```
+
+## Authorization Server URL の取得
+
+PDS を経由して Authorization Server の URL を解決します。
+
+Bluesky に登録したアカウントの場合、通常は `https://bsky.social` になります。
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Support\DidDocument;
+
+$didDoc = DidDocument::make(Bluesky::identity()->resolveIdentity('did または handle')->json());
+
+$pds = Bluesky::pds()->getProtectedResource($didDoc->pdsUrl());
+$pds->authServer();
+```
+
+<Info>
+Source: [docs/identity.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/identity.md)
+</Info>

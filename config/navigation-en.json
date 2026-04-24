@@ -405,6 +405,9 @@
                 "en/packages/laravel-bluesky/socialite",
                 "en/packages/laravel-bluesky/notification",
                 "en/packages/laravel-bluesky/testing",
+                "en/packages/laravel-bluesky/identity",
+                "en/packages/laravel-bluesky/route",
+                "en/packages/laravel-bluesky/verify",
                 "en/packages/laravel-bluesky/feed-generator"
               ]
             }
