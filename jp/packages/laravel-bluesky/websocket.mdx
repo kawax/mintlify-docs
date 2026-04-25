@@ -141,16 +141,6 @@ class JetstreamPostListener
 }
 ```
 
-`AppServiceProvider` またはイベントサービスプロバイダーでリスナーを登録します。
-
-```php
-use Illuminate\Support\Facades\Event;
-use Revolution\Bluesky\Events\Jetstream\JetstreamCommitMessage;
-use App\Listeners\JetstreamPostListener;
-
-Event::listen(JetstreamCommitMessage::class, JetstreamPostListener::class);
-```
-
 ## Firehose
 
 ### 概要
@@ -220,14 +210,6 @@ class FirehosePostListener
         info("[$action] $did: $text");
     }
 }
-```
-
-```php
-use Illuminate\Support\Facades\Event;
-use Revolution\Bluesky\Events\Firehose\FirehoseCommitMessage;
-use App\Listeners\FirehosePostListener;
-
-Event::listen(FirehoseCommitMessage::class, FirehosePostListener::class);
 ```
 
 ## 設定
