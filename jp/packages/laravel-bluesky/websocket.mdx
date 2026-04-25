@@ -28,7 +28,7 @@ graph LR
 ```
 
 <Warning>
-WebSocket による長時間実行プロセスは **VPS や EC2 などの常時起動サーバー**が必要です。Laravel Vapor や Vercel などのサーバーレス環境では動作しません。
+WebSocket による長時間実行プロセスは **VPS や EC2 などの常時起動サーバー** または **Laravel Cloud のカスタムワーカー** が必要です。Laravel Vapor や Vercel などのサーバーレス環境では動作しません。
 </Warning>
 
 ## インストール
@@ -317,6 +317,28 @@ Laravel Forge を使用している場合は、**Daemons** セクションから
 - **Command**: `php artisan bluesky:ws start -C app.bsky.feed.post`
 - **Directory**: `/var/www/html`
 - **User**: `forge`
+
+### Laravel Cloud でのバックグラウンドプロセス設定
+
+WebSocket コマンドは **WebSocket クライアント** として Bluesky のストリームに接続するため、Laravel Cloud でも動作します。Laravel Cloud のバックグラウンドプロセス（カスタムワーカー）として設定してください。
+
+Laravel Cloud のバックグラウンドプロセス設定で **Custom Worker** を追加します。
+
+**Jetstream の場合:**
+
+```bash
+php artisan bluesky:ws start
+```
+
+**Firehose の場合:**
+
+```bash
+php artisan bluesky:firehose start
+```
+
+<Info>
+デプロイ時のプロセス停止・再起動などはすべて Laravel Cloud 側で自動的に処理されます。バックグラウンドプロセスの設定以外に追加の設定は不要です。
+</Info>
 
 ### 注意事項
 
