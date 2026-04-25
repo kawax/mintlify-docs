@@ -36,12 +36,16 @@ Copilot::client()->rpc()->ping();
 
 // models
 Copilot::client()->rpc()->models()->list();
+// Fetch with per-session GitHub token
+Copilot::client()->rpc()->models()->list(new ModelsListRequest(gitHubToken: $token));
 
 // tools
 Copilot::client()->rpc()->tools()->list();
 
 // account
 Copilot::client()->rpc()->account()->getQuota();
+// Fetch with per-session GitHub token
+Copilot::client()->rpc()->account()->getQuota(new AccountGetQuotaRequest(gitHubToken: $token));
 
 // mcp config (manage MCP server settings)
 Copilot::client()->rpc()->mcp()->list();
@@ -54,6 +58,9 @@ Copilot::client()->rpc()->mcp()->update(new McpConfigUpdateRequest(
     config: new McpServerValue(type: 'http', url: 'https://mcp.example.com'),
 ));
 Copilot::client()->rpc()->mcp()->remove(new McpConfigRemoveRequest(name: 'my-server'));
+// Enable/disable MCP servers (global config)
+Copilot::client()->rpc()->mcp()->enable(new McpConfigEnableRequest(names: ['my-server']));
+Copilot::client()->rpc()->mcp()->disable(new McpConfigDisableRequest(names: ['my-server']));
 
 // mcp discover (auto-discover MCP servers)
 Copilot::client()->rpc()->mcp()->discover(new McpDiscoverRequest(
@@ -159,6 +166,10 @@ $session->rpc()->workspaces()->listFiles();
 $session->rpc()->workspaces()->readFile(new WorkspacesReadFileRequest(path: 'file.txt'));
 $session->rpc()->workspaces()->createFile(new WorkspacesCreateFileRequest(path: 'file.txt', content: '...'));
 
+// instructions (get session instruction sources)
+$result = $session->rpc()->instructions()->getSources();
+// $result->sources - array of InstructionsSources
+
 // fleet
 $session->rpc()->fleet()->start(new FleetStartRequest(prompt: '...'));
 
@@ -180,6 +191,9 @@ $session->rpc()->mcp()->list();
 $session->rpc()->mcp()->enable(new McpEnableRequest(serverName: 'server-name'));
 $session->rpc()->mcp()->disable(new McpDisableRequest(serverName: 'server-name'));
 $session->rpc()->mcp()->reload();
+// MCP OAuth login (for MCP servers requiring authentication)
+$result = $session->rpc()->mcp()->login(new McpOauthLoginRequest(serverName: 'my-server'));
+// $result->authorizationUrl - OAuth flow URL (when authentication is required)
 
 // plugins (experimental: list plugins)
 $session->rpc()->plugins()->list();
@@ -206,8 +220,12 @@ $session->rpc()->tools()->handlePendingToolCall(new ToolsHandlePendingToolCallRe
 // permissions (protocol v3+: respond to permission.requested events)
 $session->rpc()->permissions()->handlePendingPermissionRequest(new PermissionDecisionRequest(
     requestId: '...',
-    result: PermissionRequestResultKind::approved(),
+    result: PermissionRequestResultKind::approveOnce(),
 ));
+// Auto-approve all permission requests in the session
+$session->rpc()->permissions()->setApproveAll(new PermissionsSetApproveAllRequest(enabled: true));
+// Reset session-scoped permission approvals
+$session->rpc()->permissions()->resetSessionApprovals();
 
 // commands: respond to command invocation events
 $session->rpc()->commands()->handlePendingCommand(new CommandsHandlePendingCommandRequest(
@@ -255,6 +273,15 @@ $metrics = $session->rpc()->usage()->getMetrics();
 // $metrics->codeChanges - code change metrics (added lines, deleted lines, changed files)
 // $metrics->modelMetrics - per-model token usage and request count
 // $metrics->currentModel - current model identifier
+
+// auth: get session authentication status
+$status = $session->rpc()->auth()->getStatus();
+// $status->isAuthenticated - whether the session is authenticated
+// $status->authType - authentication type (AuthInfoType enum: gh-cli, token, env, etc.)
+// $status->login - GitHub login name
+// $status->host - GitHub host
+// $status->copilotPlan - Copilot plan (individual, business, etc.)
+// $status->statusMessage - authentication status message
 ```
 
 ## SessionFS callback types

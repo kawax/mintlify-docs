@@ -119,6 +119,7 @@ To control approval or rejection per request type, pass a closure.
 use Illuminate\Support\Facades\Artisan;
 use Revolution\Copilot\Contracts\CopilotSession;
 use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Support\PermissionRequestResultKind;
 use Revolution\Copilot\Types\SessionConfig;
 
 use function Laravel\Prompts\{confirm, note, spin, text};
@@ -130,9 +131,9 @@ Artisan::command('copilot:chat', function () {
                 label: 'Do you accept the requested permissions?',
             );
             if ($confirm) {
-                return ['kind' => 'approved'];
+                return PermissionRequestResultKind::approveOnce();
             } else {
-                return ['kind' => 'denied-interactively-by-user'];
+                return PermissionRequestResultKind::reject();
             }
         },
     );
@@ -198,8 +199,8 @@ Return an array for the permission decision.
 Using the `PermissionRequestResultKind` class is convenient.
 
 ```php
-return PermissionRequestResultKind::approved();
-return PermissionRequestResultKind::deniedInteractivelyByUser();
+return PermissionRequestResultKind::approveOnce();
+return PermissionRequestResultKind::reject();
 ```
 
 ## Protocol details
@@ -212,7 +213,7 @@ You only need to pass a handler to `onPermissionRequest`, and the SDK absorbs pr
 
 ## PermissionRequestResultKind
 
-You can return the `['kind' => 'approved']` format directly, but it is easier to read with `PermissionRequestResultKind`.
+You can return the `['kind' => 'approve-once']` format directly, but it is easier to read with `PermissionRequestResultKind`.
 
 ```php
 use Revolution\Copilot\Support\PermissionRequestResultKind;
@@ -222,13 +223,24 @@ $confirm = confirm(
 );
 
 if ($confirm) {
-    return PermissionRequestResultKind::approved();
+    return PermissionRequestResultKind::approveOnce();
 } else {
-    return PermissionRequestResultKind::deniedInteractivelyByUser();
+    return PermissionRequestResultKind::reject();
 }
 ```
 
-If you prefer `Laravel\Prompts\select` over `Laravel\Prompts\confirm`, use `PermissionRequestResultKind::select()` for options.
+### Available methods
+
+| Method | Value | Description |
+|---|---|---|
+| `approveOnce()` | `approve-once` | Approve this request only |
+| `approveForSession()` | `approve-for-session` | Approve all requests of the same type for this session |
+| `approveForLocation()` | `approve-for-location` | Approve all requests of the same type from this location (file path, etc.) |
+| `reject()` | `reject` | Reject the request |
+| `userNotAvailable()` | `user-not-available` | User cannot respond (non-interactive environment, etc.) |
+| `noResult()` | `no-result` | Handler cannot return a result (skip RPC call) |
+
+If you prefer `Laravel\Prompts\select` over `Laravel\Prompts\confirm`, use `PermissionRequestResultKind::select()` for options. It includes 5 `PermissionDecisionKind` options to present to the user.
 
 ```php
 use Revolution\Copilot\Support\PermissionRequestResultKind;
@@ -250,18 +262,6 @@ When `no-result` is returned, the RPC call is skipped and Copilot CLI applies it
 ```php
 return PermissionRequestResultKind::noResult();
 // or ['kind' => 'no-result']
-```
-
-### denied-by-permission-request-hook
-
-For permission requests that are already resolved by the `permissionRequest` hook, the SDK automatically detects the `resolvedByHook` flag and skips calling the `onPermissionRequest` handler.
-
-If you need to return this manually, use `deniedByPermissionRequestHook()`.
-You can optionally specify `message` and `interrupt`.
-
-```php
-return PermissionRequestResultKind::deniedByPermissionRequestHook();
-return PermissionRequestResultKind::deniedByPermissionRequestHook(message: 'Blocked by hook', interrupt: true);
 ```
 
 <Info>
