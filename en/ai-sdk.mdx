@@ -45,18 +45,7 @@ description: "A unified, expressive API for interacting with AI providers — bu
 
 ## Configuration
 
-Set API keys in `.env`. The default models used for text, images, audio, transcription, and embeddings may also be configured in `config/ai.php`:
-
-```php
-// config/ai.php
-'models' => [
-    'text'          => env('AI_TEXT_MODEL'),
-    'image'         => env('AI_IMAGE_MODEL'),
-    'audio'         => env('AI_AUDIO_MODEL'),
-    'transcription' => env('AI_TRANSCRIPTION_MODEL'),
-    'embeddings'    => env('AI_EMBEDDINGS_MODEL'),
-],
-```
+Set your API keys in `.env`. Only add keys for providers you plan to use:
 
 ```ini
 ANTHROPIC_API_KEY=
@@ -73,6 +62,19 @@ OPENROUTER_API_KEY=
 JINA_API_KEY=
 VOYAGEAI_API_KEY=
 XAI_API_KEY=
+```
+
+The default models for each capability (text, images, audio, transcription, embeddings) may also be configured in `config/ai.php`. For example, to default to GPT-4o for text generation and `dall-e-3` for image generation:
+
+```php
+// config/ai.php
+'models' => [
+    'text'          => env('AI_TEXT_MODEL', 'gpt-4o'),
+    'image'         => env('AI_IMAGE_MODEL', 'dall-e-3'),
+    'audio'         => env('AI_AUDIO_MODEL', 'tts-1'),
+    'transcription' => env('AI_TRANSCRIPTION_MODEL', 'whisper-1'),
+    'embeddings'    => env('AI_EMBEDDINGS_MODEL', 'text-embedding-3-small'),
+],
 ```
 
 ### Custom base URLs

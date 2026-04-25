@@ -1,6 +1,6 @@
 ---
 title: "Laravel AI SDK"
-description: "OpenAI・Anthropic・Gemini など複数の AI プロバイダーを統一インターフェースで扱える Laravel AI SDK の完全ガイド。エージェント、画像生成、音声、埋め込み、テストまで網羅します。"
+description: "OpenAI・Anthropic・Geminiなど複数のAIプロバイダーを統一インターフェースで扱えるLaravel AI SDKの完全ガイド。エージェント、画像生成、音声、埋め込み、テストまで網羅します。"
 ---
 
 ## はじめに
@@ -180,11 +180,14 @@ class SalesCoach implements Agent, Conversational, HasTools, HasStructuredOutput
 ```mermaid
 flowchart TD
     A["ユーザーのプロンプト"] --> B["Agent::prompt()"]
-    B --> C{"インターフェース確認"}
-    C -->|"Conversational"| D["会話履歴を付与"]
-    C -->|"HasTools"| E["ツール一覧を付与"]
-    C -->|"HasStructuredOutput"| F["JSONスキーマを付与"]
-    D & E & F --> G["AI プロバイダーへ送信"]
+    B --> C["オプション付与"]
+    C -->|"Conversational の場合"| D["会話履歴を付与"]
+    C -->|"HasTools の場合"| E["ツール一覧を付与"]
+    C -->|"HasStructuredOutput の場合"| F["JSONスキーマを付与"]
+    D --> G["AI プロバイダーへ送信"]
+    E --> G
+    F --> G
+    B --> G
     G --> H["レスポンス"]
     H -->|"ツール呼び出し"| I["ツール実行"]
     I --> G
