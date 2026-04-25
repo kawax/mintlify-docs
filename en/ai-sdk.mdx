@@ -1,22 +1,22 @@
 ---
 title: "Laravel AI SDK"
-description: "Interact with OpenAI, Anthropic, Gemini, and other AI providers through a unified Laravel API — covering agents, image generation, streaming, structured output, and testing."
+description: "A unified, expressive API for interacting with AI providers — build agents with tools and structured output, generate images, synthesise and transcribe audio, create vector embeddings, and more, all with a consistent Laravel-friendly interface."
 ---
 
 ## Introduction
 
-[Laravel AI SDK](https://github.com/laravel/ai) provides a unified, expressive API for interacting with AI providers such as OpenAI, Anthropic, and Gemini. Build agents, generate images, synthesise speech, transcribe audio, and create vector embeddings — all with a consistent, Laravel-native interface.
+[Laravel AI SDK](https://github.com/laravel/ai) provides a unified, expressive API for interacting with AI providers such as OpenAI, Anthropic, Gemini, and more. With the AI SDK you can build intelligent agents with tools and structured output, generate images, synthesize and transcribe audio, create vector embeddings, and much more — all using a consistent, Laravel-friendly interface.
 
 <Info>
-  Laravel AI SDK is an official package added in Laravel 13, available as `laravel/ai`. It supports multiple AI providers through a single API.
+  Laravel AI SDK is an official package (`laravel/ai`) available in Laravel 13.
 </Info>
 
 | Capability | Supported providers |
 | --- | --- |
-| Text generation | OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama |
-| Image generation | OpenAI, Gemini, xAI |
-| Text-to-speech | OpenAI, ElevenLabs |
-| Speech-to-text | OpenAI, ElevenLabs, Mistral |
+| Text | OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama |
+| Images | OpenAI, Gemini, xAI |
+| TTS | OpenAI, ElevenLabs |
+| STT | OpenAI, ElevenLabs, Mistral |
 | Embeddings | OpenAI, Gemini, Azure, Cohere, Mistral, Jina, VoyageAI |
 | Reranking | Cohere, Jina |
 | Files | OpenAI, Anthropic, Gemini |
@@ -43,26 +43,43 @@ description: "Interact with OpenAI, Anthropic, Gemini, and other AI providers th
   </Step>
 </Steps>
 
-## Provider configuration
+## Configuration
 
-Set your API keys in `config/ai.php` or `.env`:
+Set your API keys in `.env`. Only add keys for providers you plan to use:
 
 ```ini
 ANTHROPIC_API_KEY=
+AZURE_OPENAI_API_KEY=
 COHERE_API_KEY=
+DEEPSEEK_API_KEY=
 ELEVENLABS_API_KEY=
 GEMINI_API_KEY=
+GROQ_API_KEY=
 MISTRAL_API_KEY=
 OLLAMA_API_KEY=
 OPENAI_API_KEY=
+OPENROUTER_API_KEY=
 JINA_API_KEY=
 VOYAGEAI_API_KEY=
 XAI_API_KEY=
 ```
 
+The default models for each capability (text, images, audio, transcription, embeddings) may also be configured in `config/ai.php`. For example, to default to GPT-4o for text generation and `dall-e-3` for image generation:
+
+```php
+// config/ai.php
+'models' => [
+    'text'          => env('AI_TEXT_MODEL', 'gpt-4o'),
+    'image'         => env('AI_IMAGE_MODEL', 'dall-e-3'),
+    'audio'         => env('AI_AUDIO_MODEL', 'tts-1'),
+    'transcription' => env('AI_TRANSCRIPTION_MODEL', 'whisper-1'),
+    'embeddings'    => env('AI_EMBEDDINGS_MODEL', 'text-embedding-3-small'),
+],
+```
+
 ### Custom base URLs
 
-If you route requests through a proxy such as LiteLLM or Azure OpenAI Gateway, configure a custom URL per provider:
+If you route requests through a proxy, configure a custom URL per provider in `config/ai.php`:
 
 ```php
 'providers' => [
@@ -71,7 +88,6 @@ If you route requests through a proxy such as LiteLLM or Azure OpenAI Gateway, c
         'key'    => env('OPENAI_API_KEY'),
         'url'    => env('OPENAI_BASE_URL'),
     ],
-
     'anthropic' => [
         'driver' => 'anthropic',
         'key'    => env('ANTHROPIC_API_KEY'),
@@ -82,7 +98,7 @@ If you route requests through a proxy such as LiteLLM or Azure OpenAI Gateway, c
 
 Custom base URLs are supported for OpenAI, Anthropic, Gemini, Groq, Cohere, DeepSeek, xAI, and OpenRouter.
 
-### Referencing providers in code
+### Lab enum
 
 Use the `Lab` enum to reference providers without hardcoding strings:
 
@@ -96,7 +112,7 @@ Lab::Gemini;
 
 ## Agents
 
-Agents are the core abstraction of the Laravel AI SDK. Each agent is a dedicated PHP class that encapsulates a system prompt, conversation context, tools, and an optional output schema.
+Agents are the fundamental building block of the Laravel AI SDK. Each agent is a PHP class that encapsulates a system prompt, conversation context, tools, and an optional structured output schema.
 
 ### Creating an agent
 
@@ -110,65 +126,98 @@ Add `--structured` for agents that return structured JSON output:
 php artisan make:agent SalesCoach --structured
 ```
 
-A generated agent class:
+A full agent implementing all available interfaces:
 
 ```php
 <?php
 
 namespace App\Ai\Agents;
 
+use App\Ai\Tools\RetrievePreviousTranscripts;
+use App\Models\History;
+use App\Models\User;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasStructuredOutput;
+use Laravel\Ai\Contracts\HasTools;
+use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Promptable;
 use Stringable;
 
-class SalesCoach implements Agent
+class SalesCoach implements Agent, Conversational, HasTools, HasStructuredOutput
 {
     use Promptable;
 
+    public function __construct(public User $user) {}
+
     public function instructions(): Stringable|string
     {
-        return 'You are a sales coach. Analyse sales call transcripts and provide feedback with an overall score.';
+        return 'You are a sales coach, analyzing transcripts and providing feedback and an overall sales strength score.';
+    }
+
+    public function messages(): iterable
+    {
+        return History::where('user_id', $this->user->id)
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->reverse()
+            ->map(function ($message) {
+                return new Message($message->role, $message->content);
+            })
+            ->all();
+    }
+
+    public function tools(): iterable
+    {
+        return [new RetrievePreviousTranscripts];
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'feedback' => $schema->string()->required(),
+            'score'    => $schema->integer()->min(1)->max(10)->required(),
+        ];
     }
 }
 ```
 
-### Running a prompt
+### Prompting
 
 Instantiate the agent and call `prompt`:
 
 ```php
-$response = (new SalesCoach)
-    ->prompt('Please analyse this sales call transcript...');
+$response = (new SalesCoach)->prompt('Analyze this sales transcript...');
 
 return (string) $response;
 ```
 
-Use `make` to resolve the agent from the service container (enables dependency injection):
+Use `make` to resolve the agent from the service container:
 
 ```php
 $agent = SalesCoach::make(user: $user);
 ```
 
-Override the provider or model per request:
+Override the provider, model, or timeout per request:
 
 ```php
 use Laravel\Ai\Enums\Lab;
 
 $response = (new SalesCoach)->prompt(
-    'Please analyse this sales call transcript...',
+    'Analyze this sales transcript...',
     provider: Lab::Anthropic,
     model:    'claude-haiku-4-5-20251001',
     timeout:  120,
 );
 ```
 
-## Conversation context
+### Conversation context
 
-To maintain a chat history across messages, implement the `Conversational` interface.
+Implement `Conversational` and define a `messages()` method to supply previous messages to the agent.
 
-### Managing history manually
-
-Return previous messages from the `messages` method:
+#### Manual history
 
 ```php
 use Laravel\Ai\Contracts\Conversational;
@@ -181,25 +230,19 @@ class SalesCoach implements Agent, Conversational
     public function messages(): iterable
     {
         return History::where('user_id', $this->user->id)
-            ->latest()
-            ->limit(50)
-            ->get()
-            ->reverse()
+            ->latest()->limit(50)->get()->reverse()
             ->map(fn ($message) => new Message($message->role, $message->content))
             ->all();
     }
 }
 ```
 
-### Persisting history automatically
+#### Automatic DB storage with `RemembersConversations`
 
-The `RemembersConversations` trait stores and retrieves conversation history in the database automatically:
+The `RemembersConversations` trait stores and retrieves history automatically using the published migrations:
 
 ```php
 use Laravel\Ai\Concerns\RemembersConversations;
-use Laravel\Ai\Contracts\Agent;
-use Laravel\Ai\Contracts\Conversational;
-use Laravel\Ai\Promptable;
 
 class SalesCoach implements Agent, Conversational
 {
@@ -210,105 +253,182 @@ class SalesCoach implements Agent, Conversational
         return 'You are a sales coach...';
     }
 }
-```
 
-Start a new conversation with `forUser`:
-
-```php
+// Start a new conversation
 $response = (new SalesCoach)->forUser($user)->prompt('Hello!');
-
 $conversationId = $response->conversationId;
-```
 
-Continue an existing conversation with `continue`:
-
-```php
+// Continue an existing conversation
 $response = (new SalesCoach)
     ->continue($conversationId, as: $user)
-    ->prompt('Could you elaborate on that?');
+    ->prompt('Tell me more about that.');
 ```
 
-## Streaming
+### Structured output
 
-Use `stream` to deliver the AI response in real time. Returning a `StreamableAgentResponse` from a route automatically sends it as Server-Sent Events (SSE):
+Implement `HasStructuredOutput` and define a `schema()` method:
 
 ```php
-use App\Ai\Agents\SalesCoach;
+public function schema(JsonSchema $schema): array
+{
+    return [
+        'feedback' => $schema->string()->required(),
+        'score'    => $schema->integer()->min(1)->max(10)->required(),
+    ];
+}
 
+$response = (new SalesCoach)->prompt('Analyze this...');
+
+return $response['score'];
+```
+
+#### Nested objects
+
+```php
+public function schema(JsonSchema $schema): array
+{
+    return [
+        'score'    => $schema->integer()->required(),
+        'metadata' => $schema->object(fn ($schema) => [
+            'confidence' => $schema->string()->enum(['low', 'medium', 'high'])->required(),
+            'language'   => $schema->string()->required(),
+        ])->required(),
+    ];
+}
+```
+
+#### Arrays of objects
+
+```php
+public function schema(JsonSchema $schema): array
+{
+    return [
+        'feedback' => $schema->array()->items(
+            $schema->object(fn ($schema) => [
+                'comment' => $schema->string()->required(),
+                'score'   => $schema->integer()->required(),
+            ])
+        )->required(),
+    ];
+}
+```
+
+### Attachments
+
+Attach documents or images to a prompt:
+
+```php
+use Laravel\Ai\Files;
+
+$response = (new SalesCoach)->prompt(
+    'Analyze the attached sales transcript...',
+    attachments: [
+        Files\Document::fromStorage('transcript.pdf'),
+        Files\Document::fromPath('/home/laravel/transcript.md'),
+        $request->file('transcript'),
+    ]
+);
+```
+
+For image attachments use `Files\Image`:
+
+```php
+$response = (new ImageAnalyzer)->prompt('What is in this image?', attachments: [
+    Files\Image::fromStorage('photo.jpg'),
+    Files\Image::fromPath('/home/laravel/photo.jpg'),
+    $request->file('photo'),
+]);
+```
+
+### Streaming
+
+Return a stream from a route to deliver the response as Server-Sent Events (SSE):
+
+```php
 Route::get('/coach', function () {
-    return (new SalesCoach)->stream('Please analyse this sales call transcript...');
+    return (new SalesCoach)->stream('Analyze this sales transcript...');
 });
 ```
 
-Register a callback to run after streaming completes with `then`:
+Register a `then` callback to run after streaming completes:
 
 ```php
 use Laravel\Ai\Responses\StreamedAgentResponse;
 
 Route::get('/coach', function () {
     return (new SalesCoach)
-        ->stream('Please analyse this sales call transcript...')
+        ->stream('Analyze this sales transcript...')
         ->then(function (StreamedAgentResponse $response) {
-            // $response->text, $response->events, $response->usage
+            // $response->text, $response->events, $response->usage...
         });
 });
 ```
 
-### Vercel AI SDK protocol
-
-To integrate with the [Vercel AI SDK](https://ai-sdk.dev/) stream protocol, call `usingVercelDataProtocol`:
+Iterate the stream manually:
 
 ```php
-Route::post('/api/chat', function () {
-    return (new SalesCoach)
-        ->stream(request()->input('message'))
-        ->usingVercelDataProtocol();
-});
-```
+$stream = (new SalesCoach)->stream('Analyze this sales transcript...');
 
-## Advanced agent features
-
-### Structured output
-
-Implement `HasStructuredOutput` to return a JSON object that matches a defined schema:
-
-```php
-use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Ai\Contracts\Agent;
-use Laravel\Ai\Contracts\HasStructuredOutput;
-use Laravel\Ai\Promptable;
-
-class SalesCoach implements Agent, HasStructuredOutput
-{
-    use Promptable;
-
-    public function schema(JsonSchema $schema): array
-    {
-        return [
-            'feedback' => $schema->string()->required(),
-            'score'    => $schema->integer()->min(1)->max(10)->required(),
-        ];
-    }
+foreach ($stream as $event) {
+    // handle each event
 }
 ```
 
-Access the response as an array:
+#### Vercel AI SDK protocol
 
 ```php
-$response = (new SalesCoach)->prompt('Please analyse this transcript...');
+Route::get('/coach', function () {
+    return (new SalesCoach)->stream('Analyze...')->usingVercelDataProtocol();
+});
+```
 
-return $response['score'];
+### Broadcasting
+
+Broadcast each streamed event over a Laravel channel:
+
+```php
+use Illuminate\Broadcasting\Channel;
+
+$stream = (new SalesCoach)->stream('Analyze this sales transcript...');
+
+foreach ($stream as $event) {
+    $event->broadcast(new Channel('channel-name'));
+}
+```
+
+Or use `broadcastOnQueue` to broadcast asynchronously:
+
+```php
+(new SalesCoach)->broadcastOnQueue(
+    'Analyze this sales transcript...',
+    new Channel('channel-name'),
+);
+```
+
+### Queueing
+
+Run the agent in the background:
+
+```php
+use Laravel\Ai\Responses\AgentResponse;
+
+Route::post('/coach', function (Request $request) {
+    (new SalesCoach)
+        ->queue($request->input('transcript'))
+        ->then(function (AgentResponse $response) { /* ... */ })
+        ->catch(function (Throwable $e) { /* ... */ });
+
+    return back();
+});
 ```
 
 ### Tools
 
-Tools extend what an agent can do — call external APIs, run searches, or perform calculations.
+Tools extend what an agent can do — query databases, call external APIs, perform calculations, etc.
 
 ```shell
 php artisan make:tool RandomNumberGenerator
 ```
-
-The generated class lives in `app/Ai/Tools`:
 
 ```php
 <?php
@@ -324,7 +444,7 @@ class RandomNumberGenerator implements Tool
 {
     public function description(): Stringable|string
     {
-        return 'Generates a cryptographically secure random number.';
+        return 'This tool may be used to generate cryptographically secure random numbers.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -353,93 +473,321 @@ class SalesCoach implements Agent, HasTools
 
     public function tools(): iterable
     {
-        return [
-            new RandomNumberGenerator,
-        ];
+        return [new RandomNumberGenerator];
     }
 }
 ```
 
-### Queuing
+#### Similarity search tool
 
-Run the agent in the background with `queue`:
+Use the built-in `SimilaritySearch` tool to query a vector-enabled Eloquent model:
 
 ```php
-use Laravel\Ai\Responses\AgentResponse;
+use App\Models\Document;
+use Laravel\Ai\Tools\SimilaritySearch;
 
-Route::post('/coach', function (Request $request) {
-    (new SalesCoach)
-        ->queue($request->input('transcript'))
-        ->then(function (AgentResponse $response) {
-            // handle completion
-        })
-        ->catch(function (Throwable $e) {
-            // handle failure
-        });
-
-    return back();
-});
+public function tools(): iterable
+{
+    return [
+        SimilaritySearch::usingModel(Document::class, 'embedding'),
+    ];
+}
 ```
 
-### Attachments
-
-Attach documents or images to a prompt:
+With additional options:
 
 ```php
-use Laravel\Ai\Files;
+SimilaritySearch::usingModel(
+    model:         Document::class,
+    column:        'embedding',
+    minSimilarity: 0.7,
+    limit:         10,
+    query:         fn ($query) => $query->where('published', true),
+),
+```
 
-$response = (new SalesCoach)->prompt(
-    'Please analyse the attached transcript...',
-    attachments: [
-        Files\Document::fromStorage('transcript.pdf'),
-        Files\Document::fromPath('/home/laravel/transcript.md'),
-        $request->file('transcript'),
-    ]
+Using a custom closure:
+
+```php
+new SimilaritySearch(using: function (string $query) {
+    return Document::query()
+        ->where('user_id', $this->user->id)
+        ->whereVectorSimilarTo('embedding', $query)
+        ->limit(10)
+        ->get();
+}),
+```
+
+Provide a custom description shown to the model:
+
+```php
+SimilaritySearch::usingModel(Document::class, 'embedding')
+    ->withDescription('Search the knowledge base for relevant articles.'),
+```
+
+### Provider tools
+
+Provider tools are implemented natively by AI providers.
+
+#### Web Search
+
+Supported: Anthropic, OpenAI, Gemini
+
+```php
+use Laravel\Ai\Providers\Tools\WebSearch;
+
+public function tools(): iterable
+{
+    return [new WebSearch];
+}
+```
+
+With options:
+
+```php
+(new WebSearch)->max(5)->allow(['laravel.com', 'php.net']),
+(new WebSearch)->location(city: 'New York', region: 'NY', country: 'US');
+```
+
+#### Web Fetch
+
+Supported: Anthropic, Gemini
+
+```php
+use Laravel\Ai\Providers\Tools\WebFetch;
+
+public function tools(): iterable
+{
+    return [new WebFetch];
+}
+
+(new WebFetch)->max(3)->allow(['docs.laravel.com']),
+```
+
+#### File Search
+
+Supported: OpenAI, Gemini
+
+```php
+use Laravel\Ai\Providers\Tools\FileSearch;
+
+public function tools(): iterable
+{
+    return [new FileSearch(stores: ['store_id'])];
+}
+
+// Multiple stores
+new FileSearch(stores: ['store_1', 'store_2']);
+
+// Filter by metadata
+new FileSearch(stores: ['store_id'], where: ['author' => 'Taylor Otwell', 'year' => 2026]);
+
+// Complex filter using a closure
+use Laravel\Ai\Providers\Tools\FileSearchQuery;
+
+new FileSearch(stores: ['store_id'], where: fn (FileSearchQuery $query) =>
+    $query->where('author', 'Taylor Otwell')
+          ->whereNot('status', 'draft')
+          ->whereIn('category', ['news', 'updates'])
 );
 ```
 
-For images, use `Files\Image`:
+### Middleware
+
+Agent middleware lets you inspect or modify prompts and responses before and after they are sent.
+
+```shell
+php artisan make:agent-middleware LogPrompts
+```
+
+Implement the middleware on the agent:
 
 ```php
-use Laravel\Ai\Files;
+use App\Ai\Middleware\LogPrompts;
+use Laravel\Ai\Contracts\HasMiddleware;
 
-$response = (new ImageAnalyser)->prompt(
-    'What is in this image?',
-    attachments: [
-        Files\Image::fromStorage('photo.jpg'),
-        Files\Image::fromPath('/home/laravel/photo.jpg'),
-        $request->file('photo'),
-    ]
-);
+class SalesCoach implements Agent, HasMiddleware
+{
+    use Promptable;
+
+    public function middleware(): array
+    {
+        return [new LogPrompts];
+    }
+}
+```
+
+A middleware class:
+
+```php
+<?php
+
+namespace App\Ai\Middleware;
+
+use Closure;
+use Laravel\Ai\Prompts\AgentPrompt;
+
+class LogPrompts
+{
+    public function handle(AgentPrompt $prompt, Closure $next)
+    {
+        Log::info('Prompting agent', ['prompt' => $prompt->prompt]);
+
+        return $next($prompt);
+    }
+}
+```
+
+Inspect the response after it is generated using `then`:
+
+```php
+public function handle(AgentPrompt $prompt, Closure $next)
+{
+    return $next($prompt)->then(function (AgentResponse $response) {
+        Log::info('Agent responded', ['text' => $response->text]);
+    });
+}
+```
+
+### Anonymous agents
+
+Create a one-off agent inline with the `agent()` helper:
+
+```php
+use function Laravel\Ai\{agent};
+
+$response = agent(
+    instructions: 'You are an expert at software development.',
+    messages:     [],
+    tools:        [],
+)->prompt('Tell me about Laravel');
+```
+
+With structured output:
+
+```php
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+
+$response = agent(
+    schema: fn (JsonSchema $schema) => ['number' => $schema->integer()->required()],
+)->prompt('Generate a random number less than 100');
+```
+
+### Agent configuration via PHP attributes
+
+Use PHP attributes to configure an agent's default provider, model, and behaviour:
+
+```php
+<?php
+
+namespace App\Ai\Agents;
+
+use Laravel\Ai\Attributes\MaxSteps;
+use Laravel\Ai\Attributes\MaxTokens;
+use Laravel\Ai\Attributes\Model;
+use Laravel\Ai\Attributes\Provider;
+use Laravel\Ai\Attributes\Temperature;
+use Laravel\Ai\Attributes\Timeout;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Enums\Lab;
+use Laravel\Ai\Promptable;
+
+#[Provider(Lab::Anthropic)]
+#[Model('claude-haiku-4-5-20251001')]
+#[MaxSteps(10)]
+#[MaxTokens(4096)]
+#[Temperature(0.7)]
+#[Timeout(120)]
+class SalesCoach implements Agent
+{
+    use Promptable;
+}
+```
+
+Two convenience attributes automatically select the cheapest or most capable model available:
+
+```php
+use Laravel\Ai\Attributes\UseCheapestModel;
+use Laravel\Ai\Attributes\UseSmartestModel;
+
+#[UseCheapestModel]
+class SimpleSummarizer implements Agent { use Promptable; }
+
+#[UseSmartestModel]
+class ComplexReasoner implements Agent { use Promptable; }
+```
+
+### Provider options
+
+Pass provider-specific options by implementing `HasProviderOptions`:
+
+```php
+<?php
+
+namespace App\Ai\Agents;
+
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasProviderOptions;
+use Laravel\Ai\Enums\Lab;
+use Laravel\Ai\Promptable;
+
+class SalesCoach implements Agent, HasProviderOptions
+{
+    use Promptable;
+
+    public function providerOptions(Lab|string $provider): array
+    {
+        return match ($provider) {
+            Lab::OpenAI => [
+                'reasoning'         => ['effort' => 'low'],
+                'frequency_penalty' => 0.5,
+                'presence_penalty'  => 0.3,
+            ],
+            Lab::Anthropic => [
+                'thinking' => ['budget_tokens' => 1024],
+            ],
+            default => [],
+        };
+    }
+}
 ```
 
 ## Image generation
 
-Generate images with the `Image` class. Supported providers: `openai`, `gemini`, and `xai`.
+Generate images with the `Image` class. Supported providers: OpenAI, Gemini, xAI.
 
 ```php
 use Laravel\Ai\Image;
 
-$image = Image::of('A donut sitting on a kitchen counter')->generate();
+$image = Image::of('A donut sitting on the kitchen counter')->generate();
 
 $rawContent = (string) $image;
 ```
 
-Specify aspect ratio and quality:
+Specify quality and aspect ratio:
 
 ```php
-$image = Image::of('A donut sitting on a kitchen counter')
-    ->quality('high')   // 'high', 'medium', 'low'
-    ->landscape()       // square(), portrait(), landscape()
+$image = Image::of('A donut sitting on the kitchen counter')
+    ->quality('high')
+    ->landscape()
     ->timeout(120)
+    ->generate();
+```
+
+Generate from a reference image:
+
+```php
+use Laravel\Ai\Files;
+
+$image = Image::of('Update this photo to be in the style of an impressionist painting.')
+    ->attachments([Files\Image::fromStorage('photo.jpg')])
+    ->landscape()
     ->generate();
 ```
 
 ### Storing generated images
 
 ```php
-$image = Image::of('A donut sitting on a kitchen counter');
-
 $path = $image->store();
 $path = $image->storeAs('image.jpg');
 $path = $image->storePublicly();
@@ -449,10 +797,9 @@ $path = $image->storePubliclyAs('image.jpg');
 ### Queuing image generation
 
 ```php
-use Laravel\Ai\Image;
 use Laravel\Ai\Responses\ImageResponse;
 
-Image::of('A donut sitting on a kitchen counter')
+Image::of('A donut sitting on the kitchen counter')
     ->portrait()
     ->queue()
     ->then(function (ImageResponse $image) {
@@ -460,131 +807,421 @@ Image::of('A donut sitting on a kitchen counter')
     });
 ```
 
-## Practical use cases
+## Audio (TTS)
 
-### Chatbot
-
-A simple chatbot using `RemembersConversations`:
+Generate speech from text with the `Audio` class. Supported providers: OpenAI, ElevenLabs.
 
 ```php
-// app/Ai/Agents/SupportBot.php
-class SupportBot implements Agent, Conversational
-{
-    use Promptable, RemembersConversations;
+use Laravel\Ai\Audio;
 
-    public function instructions(): string
-    {
-        return 'You are a friendly customer support agent. Answer user questions politely and concisely.';
-    }
-}
+$audio = Audio::of('I love coding with Laravel.')->generate();
 
-// routes/web.php
-Route::post('/chat', function (Request $request) {
-    $conversationId = $request->input('conversation_id');
-
-    $agent = new SupportBot;
-
-    if ($conversationId) {
-        $agent = $agent->continue($conversationId, as: $request->user());
-    } else {
-        $agent = $agent->forUser($request->user());
-    }
-
-    $response = $agent->prompt($request->input('message'));
-
-    return response()->json([
-        'message'         => (string) $response,
-        'conversation_id' => $response->conversationId,
-    ]);
-});
+$rawContent = (string) $audio;
 ```
 
-### Streaming chat with the Vercel AI SDK
-
-Backend implementation for a frontend powered by the Vercel AI SDK:
+Select a voice:
 
 ```php
-use App\Ai\Agents\SupportBot;
-
-Route::post('/api/chat', function (Request $request) {
-    return (new SupportBot)
-        ->forUser($request->user())
-        ->stream($request->input('message'))
-        ->usingVercelDataProtocol();
-});
+$audio = Audio::of('I love coding with Laravel.')->female()->generate();
+$audio = Audio::of('I love coding with Laravel.')->voice('voice-id-or-name')->generate();
+$audio = Audio::of('I love coding with Laravel.')->female()->instructions('Said like a pirate')->generate();
 ```
 
-### Document analysis with structured output
-
-Attach a PDF and return structured data:
+### Storing generated audio
 
 ```php
-use Laravel\Ai\Contracts\HasStructuredOutput;
-use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Ai\Files;
+$path = $audio->store();
+$path = $audio->storeAs('audio.mp3');
+$path = $audio->storePublicly();
+$path = $audio->storePubliclyAs('audio.mp3');
+```
 
-class DocumentAnalyser implements Agent, HasStructuredOutput
+### Queuing audio generation
+
+```php
+use Laravel\Ai\Responses\AudioResponse;
+
+Audio::of('I love coding with Laravel.')
+    ->queue()
+    ->then(function (AudioResponse $audio) {
+        $path = $audio->store();
+    });
+```
+
+## Transcription (STT)
+
+Transcribe audio files with the `Transcription` class. Supported providers: OpenAI, ElevenLabs, Mistral.
+
+```php
+use Laravel\Ai\Transcription;
+
+$transcript = Transcription::fromPath('/home/laravel/audio.mp3')->generate();
+$transcript = Transcription::fromStorage('audio.mp3')->generate();
+$transcript = Transcription::fromUpload($request->file('audio'))->generate();
+
+return (string) $transcript;
+```
+
+Enable speaker diarization:
+
+```php
+$transcript = Transcription::fromStorage('audio.mp3')->diarize()->generate();
+```
+
+### Queuing transcription
+
+```php
+use Laravel\Ai\Responses\TranscriptionResponse;
+
+Transcription::fromStorage('audio.mp3')
+    ->queue()
+    ->then(function (TranscriptionResponse $transcript) {
+        // ...
+    });
+```
+
+## Embeddings
+
+Generate embeddings using the `Embeddings` class or the `Str` macro.
+
+```php
+use Illuminate\Support\Str;
+
+$embeddings = Str::of('Napa Valley has great wine.')->toEmbeddings();
+```
+
+```php
+use Laravel\Ai\Embeddings;
+
+$response = Embeddings::for([
+    'Napa Valley has great wine.',
+    'Laravel is a PHP framework.',
+])->generate();
+
+$response->embeddings; // [[0.123, 0.456, ...], [0.789, 0.012, ...]]
+```
+
+Specify dimensions and model:
+
+```php
+$response = Embeddings::for(['Napa Valley has great wine.'])
+    ->dimensions(1536)
+    ->generate(Lab::OpenAI, 'text-embedding-3-small');
+```
+
+### Querying embeddings (pgvector)
+
+Add the vector column in your migration:
+
+```php
+Schema::ensureVectorExtensionExists();
+
+Schema::create('documents', function (Blueprint $table) {
+    $table->id();
+    $table->string('title');
+    $table->text('content');
+    $table->vector('embedding', dimensions: 1536);
+    $table->timestamps();
+});
+
+// Optional HNSW index for performance
+$table->vector('embedding', dimensions: 1536)->index();
+```
+
+Cast the column to an array on the model:
+
+```php
+protected function casts(): array
 {
-    use Promptable;
-
-    public function instructions(): string
-    {
-        return 'Analyse the attached document and return a summary, key points, and a sentiment score.';
-    }
-
-    public function schema(JsonSchema $schema): array
-    {
-        return [
-            'summary'    => $schema->string()->required(),
-            'key_points' => $schema->array()->items($schema->string())->required(),
-            'sentiment'  => $schema->string()->enum(['positive', 'neutral', 'negative'])->required(),
-        ];
-    }
+    return ['embedding' => 'array'];
 }
+```
 
-$response = (new DocumentAnalyser)->prompt(
-    'Please analyse this document.',
-    attachments: [
-        Files\Document::fromStorage('report.pdf'),
-    ]
+Query by vector similarity:
+
+```php
+// Using a pre-computed embedding vector
+$documents = Document::query()
+    ->whereVectorSimilarTo('embedding', $queryEmbedding, minSimilarity: 0.4)
+    ->limit(10)
+    ->get();
+
+// Pass a string — it is automatically embedded
+$documents = Document::query()
+    ->whereVectorSimilarTo('embedding', 'best wineries in Napa Valley')
+    ->limit(10)
+    ->get();
+```
+
+Lower-level query methods:
+
+```php
+$documents = Document::query()
+    ->select('*')
+    ->selectVectorDistance('embedding', $queryEmbedding, as: 'distance')
+    ->whereVectorDistanceLessThan('embedding', $queryEmbedding, maxDistance: 0.3)
+    ->orderByVectorDistance('embedding', $queryEmbedding)
+    ->limit(10)
+    ->get();
+```
+
+### Caching embeddings
+
+Enable caching globally in `config/ai.php`:
+
+```php
+'caching' => [
+    'embeddings' => [
+        'cache' => true,
+        'store' => env('CACHE_STORE', 'database'),
+    ],
+],
+```
+
+Or enable per request:
+
+```php
+$response = Embeddings::for(['Napa Valley has great wine.'])->cache()->generate();
+$response = Embeddings::for(['Napa Valley has great wine.'])->cache(seconds: 3600)->generate();
+
+// Via the Str macro
+$embeddings = Str::of('Napa Valley has great wine.')->toEmbeddings(cache: true);
+$embeddings = Str::of('Napa Valley has great wine.')->toEmbeddings(cache: 3600);
+```
+
+## Reranking
+
+Rerank a list of documents by relevance to a query. Supported providers: Cohere, Jina.
+
+```php
+use Laravel\Ai\Reranking;
+
+$response = Reranking::of([
+    'Django is a Python web framework.',
+    'Laravel is a PHP web application framework.',
+    'React is a JavaScript library for building user interfaces.',
+])->rerank('PHP frameworks');
+
+$response->first()->document; // "Laravel is a PHP web application framework."
+$response->first()->score;    // 0.95
+$response->first()->index;    // 1
+
+$response = Reranking::of($documents)->limit(5)->rerank('search query');
+```
+
+### Reranking Eloquent collections
+
+Rerank by a single field:
+
+```php
+$posts = Post::all()->rerank('body', 'Laravel tutorials');
+```
+
+Rerank by multiple fields (concatenated as JSON):
+
+```php
+$reranked = $posts->rerank(['title', 'body'], 'Laravel tutorials');
+```
+
+Using a closure:
+
+```php
+$reranked = $posts->rerank(
+    fn ($post) => $post->title.': '.$post->body,
+    'Laravel tutorials'
+);
+```
+
+With additional options:
+
+```php
+$reranked = $posts->rerank(
+    by:       'content',
+    query:    'Laravel tutorials',
+    limit:    10,
+    provider: Lab::Cohere,
+);
+```
+
+## Files
+
+Upload files to AI providers for use in subsequent prompts or vector stores.
+
+```php
+use Laravel\Ai\Files\Document;
+use Laravel\Ai\Files\Image;
+
+$response = Document::fromPath('/home/laravel/document.pdf')->put();
+$response = Image::fromPath('/home/laravel/photo.jpg')->put();
+$response = Document::fromStorage('document.pdf', disk: 'local')->put();
+$response = Image::fromStorage('photo.jpg', disk: 'local')->put();
+$response = Document::fromUrl('https://example.com/document.pdf')->put();
+$response = Image::fromUrl('https://example.com/photo.jpg')->put();
+
+return $response->id;
+```
+
+Upload raw content or a form upload:
+
+```php
+$stored = Document::fromString('Hello, World!', 'text/plain')->put();
+$stored = Document::fromUpload($request->file('document'))->put();
+```
+
+Reference a previously stored file in a prompt:
+
+```php
+$response = (new SalesCoach)->prompt(
+    'Analyze the attached sales transcript...',
+    attachments: [Files\Document::fromId('file-id')]
+);
+```
+
+Retrieve file metadata:
+
+```php
+$file = Document::fromId('file-id')->get();
+$file->id;
+$file->mimeType();
+```
+
+Delete a stored file:
+
+```php
+Document::fromId('file-id')->delete();
+```
+
+Specify the provider explicitly:
+
+```php
+$response = Document::fromPath('/home/laravel/document.pdf')->put(provider: Lab::Anthropic);
+```
+
+## Vector stores
+
+Manage vector stores for file-search tools.
+
+```php
+use Laravel\Ai\Stores;
+
+// Create a store
+$store = Stores::create('Knowledge Base');
+$store = Stores::create(
+    name:                 'Knowledge Base',
+    description:          'Documentation.',
+    expiresWhenIdleFor:   days(30),
 );
 
-$summary   = $response['summary'];
-$sentiment = $response['sentiment'];
+return $store->id;
+
+// Retrieve a store
+$store = Stores::get('store_id');
+$store->id;
+$store->name;
+$store->fileCounts;
+$store->ready;
+
+// Delete a store
+Stores::delete('store_id');
+$store->delete();
 ```
 
-<Tip>
-  Agents can be returned directly from routes or injected into service classes. In larger applications, use `SalesCoach::make()` to resolve agents from the container, which makes them easier to test.
-</Tip>
+### Adding files to a store
+
+```php
+$store = Stores::get('store_id');
+
+$document = $store->add('file_id');
+$document = $store->add(Document::fromId('file_id'));
+$document = $store->add(Document::fromPath('/path/to/document.pdf'));
+$document = $store->add(Document::fromStorage('manual.pdf'));
+$document = $store->add($request->file('document'));
+
+$document->id;
+$document->fileId;
+```
+
+With metadata:
+
+```php
+$store->add(
+    Document::fromPath('/path/to/document.pdf'),
+    metadata: [
+        'author'     => 'Taylor Otwell',
+        'department' => 'Engineering',
+        'year'       => 2026,
+    ]
+);
+```
+
+Remove a file from a store:
+
+```php
+$store->remove('file_id');
+$store->remove('file_abc123', deleteFile: true);
+```
+
+## Failover
+
+Pass an array of providers to automatically fall back when one is unavailable:
+
+```php
+use App\Ai\Agents\SalesCoach;
+use Laravel\Ai\Image;
+
+$response = (new SalesCoach)->prompt(
+    'Analyze this sales transcript...',
+    provider: [Lab::OpenAI, Lab::Anthropic],
+);
+
+$image = Image::of('A donut sitting on the kitchen counter')
+    ->generate(provider: [Lab::Gemini, Lab::xAI]);
+```
 
 ## Testing
 
-The SDK provides a fake implementation so you can test agent behaviour without calling real APIs. Call the `fake` method on the agent class:
+The AI SDK provides fake implementations for every capability so you can test without real API calls.
+
+### Agents
 
 ```php
 use App\Ai\Agents\SalesCoach;
 use Laravel\Ai\Prompts\AgentPrompt;
 
-// Return a fixed response for every prompt...
-SalesCoach::fake(['Your score is 8 out of 10.']);
-
-$response = (new SalesCoach)->prompt('Please analyse this transcript.');
-
-expect((string) $response)->toBe('Your score is 8 out of 10.');
-
-// Assert that the expected prompt was received...
-SalesCoach::assertPrompted('Please analyse this transcript.');
-```
-
-You may also pass a closure to dynamically generate responses based on the incoming prompt:
-
-```php
+SalesCoach::fake();
+SalesCoach::fake(['First response', 'Second response']);
 SalesCoach::fake(function (AgentPrompt $prompt) {
     return 'Response for: '.$prompt->prompt;
 });
+
+SalesCoach::assertPrompted('Analyze this...');
+SalesCoach::assertPrompted(function (AgentPrompt $prompt) {
+    return $prompt->contains('Analyze');
+});
+SalesCoach::assertNotPrompted('Missing prompt');
+SalesCoach::assertNeverPrompted();
 ```
 
-To test anonymous agents created with the `agent()` helper, use `AnonymousAgent::fake()`:
+Queued prompt assertions:
+
+```php
+use Laravel\Ai\QueuedAgentPrompt;
+
+SalesCoach::assertQueued('Analyze this...');
+SalesCoach::assertQueued(function (QueuedAgentPrompt $prompt) {
+    return $prompt->contains('Analyze');
+});
+SalesCoach::assertNotQueued('Missing prompt');
+SalesCoach::assertNeverQueued();
+```
+
+Prevent real prompts from being sent during tests:
+
+```php
+SalesCoach::fake()->preventStrayPrompts();
+```
+
+For anonymous agents:
 
 ```php
 use Laravel\Ai\AnonymousAgent;
@@ -592,6 +1229,237 @@ use Laravel\Ai\AnonymousAgent;
 AnonymousAgent::fake(['Test response']);
 ```
 
+### Images
+
+```php
+use Laravel\Ai\Image;
+use Laravel\Ai\Prompts\ImagePrompt;
+
+Image::fake();
+Image::fake([base64_encode($firstImage), base64_encode($secondImage)]);
+Image::fake(function (ImagePrompt $prompt) {
+    return base64_encode('...');
+});
+
+Image::assertGenerated(function (ImagePrompt $prompt) {
+    return $prompt->contains('sunset') && $prompt->isLandscape();
+});
+Image::assertNotGenerated('Missing prompt');
+Image::assertNothingGenerated();
+
+Image::assertQueued(fn (QueuedImagePrompt $prompt) => $prompt->contains('sunset'));
+Image::assertNotQueued('Missing prompt');
+Image::assertNothingQueued();
+
+Image::fake()->preventStrayImages();
+```
+
+### Audio
+
+```php
+use Laravel\Ai\Audio;
+use Laravel\Ai\Prompts\AudioPrompt;
+
+Audio::fake();
+Audio::fake([base64_encode($firstAudio), base64_encode($secondAudio)]);
+Audio::fake(function (AudioPrompt $prompt) {
+    return base64_encode('...');
+});
+
+Audio::assertGenerated(function (AudioPrompt $prompt) {
+    return $prompt->contains('Hello') && $prompt->isFemale();
+});
+Audio::assertNotGenerated('Missing prompt');
+Audio::assertNothingGenerated();
+
+Audio::assertQueued(fn (QueuedAudioPrompt $prompt) => $prompt->contains('Hello'));
+Audio::assertNotQueued('Missing prompt');
+Audio::assertNothingQueued();
+
+Audio::fake()->preventStrayAudio();
+```
+
+### Transcriptions
+
+```php
+use Laravel\Ai\Transcription;
+use Laravel\Ai\Prompts\TranscriptionPrompt;
+
+Transcription::fake();
+Transcription::fake(['First transcription text.', 'Second transcription text.']);
+Transcription::fake(function (TranscriptionPrompt $prompt) {
+    return 'Transcribed text...';
+});
+
+Transcription::assertGenerated(function (TranscriptionPrompt $prompt) {
+    return $prompt->language === 'en' && $prompt->isDiarized();
+});
+Transcription::assertNotGenerated(fn (TranscriptionPrompt $prompt) => $prompt->language === 'fr');
+Transcription::assertNothingGenerated();
+
+Transcription::assertQueued(fn (QueuedTranscriptionPrompt $prompt) => $prompt->isDiarized());
+Transcription::assertNotQueued(fn (QueuedTranscriptionPrompt $prompt) => $prompt->language === 'fr');
+Transcription::assertNothingQueued();
+
+Transcription::fake()->preventStrayTranscriptions();
+```
+
+### Embeddings
+
+```php
+use Laravel\Ai\Embeddings;
+use Laravel\Ai\Prompts\EmbeddingsPrompt;
+
+Embeddings::fake();
+Embeddings::fake([[$firstEmbeddingVector], [$secondEmbeddingVector]]);
+Embeddings::fake(function (EmbeddingsPrompt $prompt) {
+    return array_map(
+        fn () => Embeddings::fakeEmbedding($prompt->dimensions),
+        $prompt->inputs
+    );
+});
+
+Embeddings::assertGenerated(function (EmbeddingsPrompt $prompt) {
+    return $prompt->contains('Laravel') && $prompt->dimensions === 1536;
+});
+Embeddings::assertNotGenerated(fn (EmbeddingsPrompt $prompt) => $prompt->contains('Other'));
+Embeddings::assertNothingGenerated();
+
+Embeddings::assertQueued(fn (QueuedEmbeddingsPrompt $prompt) => $prompt->contains('Laravel'));
+Embeddings::assertNotQueued(fn (QueuedEmbeddingsPrompt $prompt) => $prompt->contains('Other'));
+Embeddings::assertNothingQueued();
+
+Embeddings::fake()->preventStrayEmbeddings();
+```
+
+### Reranking
+
+```php
+use Laravel\Ai\Reranking;
+use Laravel\Ai\Prompts\RerankingPrompt;
+use Laravel\Ai\Responses\Data\RankedDocument;
+
+Reranking::fake();
+Reranking::fake([[
+    new RankedDocument(index: 0, document: 'First', score: 0.95),
+    new RankedDocument(index: 1, document: 'Second', score: 0.80),
+]]);
+
+Reranking::assertReranked(function (RerankingPrompt $prompt) {
+    return $prompt->contains('Laravel') && $prompt->limit === 5;
+});
+Reranking::assertNotReranked(fn (RerankingPrompt $prompt) => $prompt->contains('Django'));
+Reranking::assertNothingReranked();
+```
+
+### Files
+
+```php
+use Laravel\Ai\Files;
+use Laravel\Ai\Contracts\Files\StorableFile;
+use Laravel\Ai\Files\Document;
+
+Files::fake();
+
+Document::fromString('Hello, Laravel!', mimeType: 'text/plain')->as('hello.txt')->put();
+
+Files::assertStored(fn (StorableFile $file) =>
+    (string) $file === 'Hello, Laravel!' && $file->mimeType() === 'text/plain'
+);
+Files::assertNotStored(fn (StorableFile $file) => (string) $file === 'Hello, World!');
+Files::assertNothingStored();
+
+Files::assertDeleted('file-id');
+Files::assertNotDeleted('file-id');
+Files::assertNothingDeleted();
+```
+
+### Vector stores
+
+```php
+use Laravel\Ai\Stores;
+
+Stores::fake(); // Also fakes file operations
+
+$store = Stores::create('Knowledge Base');
+
+Stores::assertCreated('Knowledge Base');
+Stores::assertCreated(fn (string $name, ?string $description) => $name === 'Knowledge Base');
+Stores::assertNotCreated('Other Store');
+Stores::assertNothingCreated();
+
+Stores::assertDeleted('store_id');
+Stores::assertNotDeleted('other_store_id');
+Stores::assertNothingDeleted();
+```
+
+File operations on a store:
+
+```php
+$store = Stores::get('store_id');
+
+$store->add('added_id');
+$store->remove('removed_id');
+
+$store->assertAdded('added_id');
+$store->assertRemoved('removed_id');
+$store->assertNotAdded('other_file_id');
+$store->assertNotRemoved('other_file_id');
+
+// Assert by file content
+$store->add(Document::fromString('Hello, World!', 'text/plain')->as('hello.txt'));
+$store->assertAdded(fn (StorableFile $file) => $file->name() === 'hello.txt');
+$store->assertAdded(fn (StorableFile $file) => $file->content() === 'Hello, World!');
+```
+
 <Warning>
-  Always call `fake()` on the agent class in tests to avoid making real API calls. This prevents unexpected costs and rate-limit errors.
+  Always call `fake()` in tests to prevent real API calls, unexpected charges, and rate-limit errors.
 </Warning>
+
+## Events
+
+The Laravel AI SDK dispatches the following events. You can listen for them using standard Laravel event listeners.
+
+<AccordionGroup>
+  <Accordion title="Agent events">
+    | Event | Fired when |
+    | --- | --- |
+    | `PromptingAgent` | Before an agent prompt is sent |
+    | `AgentPrompted` | After an agent prompt completes |
+    | `StreamingAgent` | Before a streaming agent response starts |
+    | `AgentStreamed` | After a streaming agent response completes |
+    | `InvokingTool` | Before an agent tool is invoked |
+    | `ToolInvoked` | After an agent tool is invoked |
+  </Accordion>
+  <Accordion title="Image, audio, and transcription events">
+    | Event | Fired when |
+    | --- | --- |
+    | `GeneratingImage` | Before image generation starts |
+    | `ImageGenerated` | After an image is generated |
+    | `GeneratingAudio` | Before audio generation starts |
+    | `AudioGenerated` | After audio is generated |
+    | `GeneratingTranscription` | Before transcription starts |
+    | `TranscriptionGenerated` | After transcription completes |
+  </Accordion>
+  <Accordion title="Embeddings and reranking events">
+    | Event | Fired when |
+    | --- | --- |
+    | `GeneratingEmbeddings` | Before embeddings generation starts |
+    | `EmbeddingsGenerated` | After embeddings are generated |
+    | `Reranking` | Before reranking starts |
+    | `Reranked` | After reranking completes |
+  </Accordion>
+  <Accordion title="Files and vector store events">
+    | Event | Fired when |
+    | --- | --- |
+    | `StoringFile` | Before a file is uploaded to a provider |
+    | `FileStored` | After a file is uploaded to a provider |
+    | `FileDeleted` | After a stored file is deleted |
+    | `CreatingStore` | Before a vector store is created |
+    | `StoreCreated` | After a vector store is created |
+    | `AddingFileToStore` | Before a file is added to a vector store |
+    | `FileAddedToStore` | After a file is added to a vector store |
+    | `RemovingFileFromStore` | Before a file is removed from a vector store |
+    | `FileRemovedFromStore` | After a file is removed from a vector store |
+  </Accordion>
+</AccordionGroup>
