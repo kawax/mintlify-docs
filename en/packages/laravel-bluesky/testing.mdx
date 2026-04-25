@@ -9,15 +9,15 @@ Most features are available via the `Bluesky` Facade, so you can use standard La
 
 ## Facade mocks
 
-Use `Bluesky::shouldReceive()` to mock entire method chains.
+Use `Bluesky::expects()` to mock entire method chains.
 
 ```php
 use Revolution\Bluesky\Facades\Bluesky;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Response;
 
-Bluesky::shouldReceive('login->getProfile->json')->once()->andReturn([]);
-Bluesky::shouldReceive('login->getProfile')->once()->andReturn(new Response(Http::response([])->wait()));
+Bluesky::expects('login->getProfile->json')->once()->andReturn([]);
+Bluesky::expects('login->getProfile')->once()->andReturn(new Response(Http::response([])->wait()));
 ```
 
 ## HTTP fake
@@ -42,7 +42,7 @@ public function test_post(): void
     Http::fakeSequence()
         ->push();
 
-    Bluesky::shouldReceive('resolveHandle->json')->once()->andReturn('did');
+    Bluesky::expects('resolveHandle->json')->once()->andReturn('did');
 }
 ```
 
@@ -72,7 +72,7 @@ public function test_feed_generator(): void
         return ['feed' => $feed];
     });
 
-    Bluesky::shouldReceive('login->searchPosts->collect')->once()->andReturn(collect([['uri' => 'at://']]));
+    Bluesky::expects('login->searchPosts->collect')->once()->andReturn(collect([['uri' => 'at://']]));
 
     $response = $this->get(route('bluesky.feed.skeleton', ['feed' => 'at://did:/app.bsky.feed.generator/test']));
 
