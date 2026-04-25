@@ -1,0 +1,1125 @@
+---
+title: "HTTP テスト"
+description: "LaravelのHTTPテスト機能を使ったリクエストのシミュレーション、アサーション、認証テスト、ファイルアップロードテストの解説"
+---
+
+## はじめに
+
+Laravelは、HTTPリクエストをシミュレートしてレスポンスを検証するための、豊富なAPIを提供しています。
+実際のHTTPサーバーを立てることなく、アプリケーションへのリクエストをテスト内で再現できます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('アプリケーションが正常なレスポンスを返す', function () {
+    $response = $this->get('/');
+
+    $response->assertStatus(200);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_the_application_returns_a_successful_response(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+}
+```
+</CodeGroup>
+
+`get()` メソッドはアプリケーションに `GET` リクエストを送り、`assertStatus()` は返ってきたレスポンスのHTTPステータスコードを検証します。
+
+<Info>
+  テスト実行中はCSRFミドルウェアが自動的に無効になります。テストで明示的に無効化する必要はありません。
+</Info>
+
+## リクエストの作成
+
+テスト内では `get`、`post`、`put`、`patch`、`delete` メソッドを使ってリクエストを送れます。
+これらのメソッドはネットワークリクエストを実際には発行せず、アプリケーション内部でシミュレートします。
+返り値は `Illuminate\Testing\TestResponse` のインスタンスで、様々なアサーションメソッドを提供します。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('基本的なリクエスト', function () {
+    $response = $this->get('/');
+
+    $response->assertStatus(200);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_a_basic_request(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+}
+```
+</CodeGroup>
+
+<Warning>
+  1つのテストメソッド内では、基本的に1つのリクエストのみ送ることを推奨します。複数のリクエストを同一テスト内で実行すると予期しない動作が発生することがあります。
+</Warning>
+
+### リクエストヘッダーのカスタマイズ
+
+`withHeaders()` メソッドを使ってリクエストのヘッダーをカスタマイズできます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('ヘッダー付きリクエスト', function () {
+    $response = $this->withHeaders([
+        'X-Header' => 'Value',
+    ])->post('/user', ['name' => 'Sally']);
+
+    $response->assertStatus(201);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_interacting_with_headers(): void
+    {
+        $response = $this->withHeaders([
+            'X-Header' => 'Value',
+        ])->post('/user', ['name' => 'Sally']);
+
+        $response->assertStatus(201);
+    }
+}
+```
+</CodeGroup>
+
+### クッキー
+
+`withCookie()` または `withCookies()` メソッドでリクエスト前にクッキー値を設定できます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('クッキー付きリクエスト', function () {
+    $response = $this->withCookie('color', 'blue')->get('/');
+
+    $response = $this->withCookies([
+        'color' => 'blue',
+        'name'  => 'Taylor',
+    ])->get('/');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_interacting_with_cookies(): void
+    {
+        $response = $this->withCookie('color', 'blue')->get('/');
+
+        $response = $this->withCookies([
+            'color' => 'blue',
+            'name'  => 'Taylor',
+        ])->get('/');
+    }
+}
+```
+</CodeGroup>
+
+### セッションと認証
+
+`withSession()` メソッドを使ってリクエスト前にセッションデータを設定できます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('セッション付きリクエスト', function () {
+    $response = $this->withSession(['banned' => false])->get('/');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_interacting_with_the_session(): void
+    {
+        $response = $this->withSession(['banned' => false])->get('/');
+    }
+}
+```
+</CodeGroup>
+
+`actingAs()` メソッドで認証ユーザーとしてリクエストを送れます。モデルファクトリーと組み合わせて使います。
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Models\User;
+
+test('認証が必要なアクション', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->withSession(['banned' => false])
+        ->get('/');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_an_action_that_requires_authentication(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->withSession(['banned' => false])
+            ->get('/');
+    }
+}
+```
+</CodeGroup>
+
+`actingAs()` の第2引数にガード名を渡すと、そのガードで認証されます。テストの間はそのガードがデフォルトになります。
+
+```php
+$this->actingAs($user, 'web');
+```
+
+未認証状態でリクエストしたい場合は `actingAsGuest()` を使います。
+
+```php
+$this->actingAsGuest();
+```
+
+### レスポンスのデバッグ
+
+テスト中にレスポンスの内容を確認したい場合は `dump`、`dumpHeaders`、`dumpSession` メソッドを使います。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('レスポンスのデバッグ', function () {
+    $response = $this->get('/');
+
+    $response->dump();
+    $response->dumpHeaders();
+    $response->dumpSession();
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_debug_response(): void
+    {
+        $response = $this->get('/');
+
+        $response->dump();
+        $response->dumpHeaders();
+        $response->dumpSession();
+    }
+}
+```
+</CodeGroup>
+
+実行を停止したい場合は `dd`、`ddHeaders`、`ddBody`、`ddJson`、`ddSession` メソッドを使います。
+
+```php
+$response->dd();
+$response->ddHeaders();
+$response->ddBody();
+$response->ddJson();
+$response->ddSession();
+```
+
+### 例外のテスト
+
+特定の例外がスローされることをテストするには、`Exceptions` ファサードを使います。
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Exceptions\InvalidOrderException;
+use Illuminate\Support\Facades\Exceptions;
+
+test('例外がスローされる', function () {
+    Exceptions::fake();
+
+    $response = $this->get('/order/1');
+
+    // 例外がスローされたことを確認
+    Exceptions::assertReported(InvalidOrderException::class);
+
+    // 例外の内容を確認
+    Exceptions::assertReported(function (InvalidOrderException $e) {
+        return $e->getMessage() === 'The order was invalid.';
+    });
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Exceptions\InvalidOrderException;
+use Illuminate\Support\Facades\Exceptions;
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_exception_is_thrown(): void
+    {
+        Exceptions::fake();
+
+        $response = $this->get('/');
+
+        Exceptions::assertReported(InvalidOrderException::class);
+
+        Exceptions::assertReported(function (InvalidOrderException $e) {
+            return $e->getMessage() === 'The order was invalid.';
+        });
+    }
+}
+```
+</CodeGroup>
+
+例外がスローされなかったことを確認するには `assertNotReported` や `assertNothingReported` を使います。
+
+```php
+Exceptions::assertNotReported(InvalidOrderException::class);
+
+Exceptions::assertNothingReported();
+```
+
+例外ハンドリングを無効にしてリクエストを送るには `withoutExceptionHandling()` を使います。
+
+```php
+$response = $this->withoutExceptionHandling()->get('/');
+```
+
+クロージャ内のコードが例外をスローするかテストするには `assertThrows()` を使います。
+
+```php
+$this->assertThrows(
+    fn () => (new ProcessOrder)->execute(),
+    OrderInvalid::class
+);
+
+// 例外の内容を確認する場合
+$this->assertThrows(
+    fn () => (new ProcessOrder)->execute(),
+    fn (OrderInvalid $e) => $e->orderId() === 123
+);
+```
+
+例外がスローされないことを確認するには `assertDoesntThrow()` を使います。
+
+```php
+$this->assertDoesntThrow(fn () => (new ProcessOrder)->execute());
+```
+
+## JSON APIのテスト
+
+LaravelはJSON APIのテストのためのヘルパーを多数提供しています。
+`json`、`getJson`、`postJson`、`putJson`、`patchJson`、`deleteJson`、`optionsJson` メソッドを使ってJSONリクエストを送れます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('APIリクエストの送信', function () {
+    $response = $this->postJson('/api/user', ['name' => 'Sally']);
+
+    $response
+        ->assertStatus(201)
+        ->assertJson([
+            'created' => true,
+        ]);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_making_an_api_request(): void
+    {
+        $response = $this->postJson('/api/user', ['name' => 'Sally']);
+
+        $response
+            ->assertStatus(201)
+            ->assertJson([
+                'created' => true,
+            ]);
+    }
+}
+```
+</CodeGroup>
+
+JSONレスポンスのデータには配列変数としてアクセスできます。
+
+<CodeGroup>
+```php Pest
+expect($response['created'])->toBeTrue();
+```
+
+```php PHPUnit
+$this->assertTrue($response['created']);
+```
+</CodeGroup>
+
+<Info>
+  `assertJson()` はレスポンスを配列に変換し、指定した配列がJSONレスポンスの中に含まれているかを検証します。JSONに他のプロパティが存在していても、指定したフラグメントが含まれていればテストは通過します。
+</Info>
+
+### 完全一致のアサーション
+
+`assertExactJson()` を使うと、返却されたJSONと指定した配列が**完全に一致する**ことを検証できます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('完全一致のJSONアサーション', function () {
+    $response = $this->postJson('/user', ['name' => 'Sally']);
+
+    $response
+        ->assertStatus(201)
+        ->assertExactJson([
+            'created' => true,
+        ]);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_asserting_an_exact_json_match(): void
+    {
+        $response = $this->postJson('/user', ['name' => 'Sally']);
+
+        $response
+            ->assertStatus(201)
+            ->assertExactJson([
+                'created' => true,
+            ]);
+    }
+}
+```
+</CodeGroup>
+
+### JSONパスのアサーション
+
+`assertJsonPath()` を使って、指定したパスにあるデータを検証できます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('JSONパスのアサーション', function () {
+    $response = $this->postJson('/user', ['name' => 'Sally']);
+
+    $response
+        ->assertStatus(201)
+        ->assertJsonPath('team.owner.name', 'Darian');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_asserting_a_json_paths_value(): void
+    {
+        $response = $this->postJson('/user', ['name' => 'Sally']);
+
+        $response
+            ->assertStatus(201)
+            ->assertJsonPath('team.owner.name', 'Darian');
+    }
+}
+```
+</CodeGroup>
+
+クロージャを渡してより柔軟に検証することもできます。
+
+```php
+$response->assertJsonPath('team.owner.name', fn (string $name) => strlen($name) >= 3);
+```
+
+### フルーエントなJSONテスト
+
+`assertJson()` にクロージャを渡すと、`AssertableJson` インスタンスを使ってフルーエントにアサーションを記述できます。
+
+<CodeGroup>
+```php Pest
+use Illuminate\Testing\Fluent\AssertableJson;
+
+test('フルーエントなJSONテスト', function () {
+    $response = $this->getJson('/users/1');
+
+    $response
+        ->assertJson(fn (AssertableJson $json) =>
+            $json->where('id', 1)
+                ->where('name', 'Victoria Faith')
+                ->where('email', fn (string $email) => str($email)->is('victoria@gmail.com'))
+                ->whereNot('status', 'pending')
+                ->missing('password')
+                ->etc()
+        );
+});
+```
+
+```php PHPUnit
+use Illuminate\Testing\Fluent\AssertableJson;
+
+public function test_fluent_json(): void
+{
+    $response = $this->getJson('/users/1');
+
+    $response
+        ->assertJson(fn (AssertableJson $json) =>
+            $json->where('id', 1)
+                ->where('name', 'Victoria Faith')
+                ->where('email', fn (string $email) => str($email)->is('victoria@gmail.com'))
+                ->whereNot('status', 'pending')
+                ->missing('password')
+                ->etc()
+        );
+}
+```
+</CodeGroup>
+
+<Tip>
+  `etc()` メソッドはアサーション対象以外のプロパティが存在することを許可します。`etc()` を使わない場合、アサーションしていないプロパティが存在するとテストが失敗します。これにより意図せず機密情報をレスポンスに含めてしまうことを防ぎます。
+</Tip>
+
+属性の存在・不在を確認するには `has()` と `missing()` を使います。
+
+```php
+$response->assertJson(fn (AssertableJson $json) =>
+    $json->has('data')
+        ->missing('message')
+);
+```
+
+複数の属性をまとめて確認するには `hasAll()` や `missingAll()` を使います。
+
+```php
+$response->assertJson(fn (AssertableJson $json) =>
+    $json->hasAll(['status', 'data'])
+        ->missingAll(['message', 'code'])
+);
+```
+
+#### JSONコレクションのアサーション
+
+ルートが複数のアイテムを含むJSONレスポンスを返す場合、`has()` メソッドでアイテム数やコレクションの中身を検証できます。
+
+```php
+$response
+    ->assertJson(fn (AssertableJson $json) =>
+        $json->has(3)
+            ->first(fn (AssertableJson $json) =>
+                $json->where('id', 1)
+                    ->where('name', 'Victoria Faith')
+                    ->missing('password')
+                    ->etc()
+            )
+    );
+```
+
+すべてのアイテムに同じアサーションを適用するには `each()` を使います。
+
+```php
+$response
+    ->assertJson(fn (AssertableJson $json) =>
+        $json->has(3)
+            ->each(fn (AssertableJson $json) =>
+                $json->whereType('id', 'integer')
+                    ->whereType('name', 'string')
+                    ->whereType('email', 'string')
+                    ->missing('password')
+                    ->etc()
+            )
+    );
+```
+
+#### JSONの型アサーション
+
+`whereType()` や `whereAllType()` を使ってプロパティの型を検証できます。
+
+```php
+$response->assertJson(fn (AssertableJson $json) =>
+    $json->whereType('id', 'integer')
+        ->whereAllType([
+            'users.0.name' => 'string',
+            'meta' => 'array'
+        ])
+);
+```
+
+`|` 文字で複数の型を指定することもできます。いずれかの型に一致すればアサーションは通過します。
+
+```php
+$response->assertJson(fn (AssertableJson $json) =>
+    $json->whereType('name', 'string|null')
+        ->whereType('id', ['string', 'integer'])
+);
+```
+
+利用可能な型は `string`、`integer`、`double`、`boolean`、`array`、`null` です。
+
+## 認証テスト
+
+`actingAs()` を使って認証されたユーザーとしてリクエストを送れます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+test('認証済みユーザーがダッシュボードを表示できる', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('/dashboard');
+
+    $response->assertStatus(200);
+});
+
+test('未認証ユーザーはリダイレクトされる', function () {
+    $response = $this->get('/dashboard');
+
+    $response->assertRedirect('/login');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class DashboardTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_authenticated_users_can_view_the_dashboard(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertStatus(200);
+    }
+
+    public function test_unauthenticated_users_are_redirected(): void
+    {
+        $response = $this->get('/dashboard');
+
+        $response->assertRedirect('/login');
+    }
+}
+```
+</CodeGroup>
+
+特定のガードで認証するには第2引数にガード名を指定します。
+
+```php
+$this->actingAs($user, 'api');
+```
+
+### ユーザー登録フローのテスト例
+
+実際のユーザー登録エンドポイントをテストする例です。
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+test('ユーザーが登録できる', function () {
+    $response = $this->post('/register', [
+        'name'                  => 'Test User',
+        'email'                 => 'test@example.com',
+        'password'              => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    $response->assertRedirect('/dashboard');
+    $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
+});
+
+test('重複したメールアドレスでは登録できない', function () {
+    User::factory()->create(['email' => 'test@example.com']);
+
+    $response = $this->post('/register', [
+        'name'                  => 'Test User',
+        'email'                 => 'test@example.com',
+        'password'              => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    $response->assertSessionHasErrors('email');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class RegistrationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_user_can_register(): void
+    {
+        $response = $this->post('/register', [
+            'name'                  => 'Test User',
+            'email'                 => 'test@example.com',
+            'password'              => 'password',
+            'password_confirmation' => 'password',
+        ]);
+
+        $response->assertRedirect('/dashboard');
+        $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
+    }
+
+    public function test_duplicate_email_cannot_register(): void
+    {
+        User::factory()->create(['email' => 'test@example.com']);
+
+        $response = $this->post('/register', [
+            'name'                  => 'Test User',
+            'email'                 => 'test@example.com',
+            'password'              => 'password',
+            'password_confirmation' => 'password',
+        ]);
+
+        $response->assertSessionHasErrors('email');
+    }
+}
+```
+</CodeGroup>
+
+## セッションのテスト
+
+`withSession()` でセッションデータを事前にセットしてリクエストを送れます。
+`assertSessionHas()` でセッションに値が存在するかを検証できます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('セッションの値を検証する', function () {
+    $response = $this->withSession(['locale' => 'ja'])->get('/');
+
+    $response->assertSessionHas('locale', 'ja');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class SessionTest extends TestCase
+{
+    public function test_session_value(): void
+    {
+        $response = $this->withSession(['locale' => 'ja'])->get('/');
+
+        $response->assertSessionHas('locale', 'ja');
+    }
+}
+```
+</CodeGroup>
+
+### セッションアサーションの一覧
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertSessionHas($key, $value)` | セッションに指定したキーと値が存在する |
+| `assertSessionHasAll([...])` | セッションに複数のキーと値が存在する |
+| `assertSessionHasErrors($keys)` | セッションにバリデーションエラーが存在する |
+| `assertSessionHasErrorsIn($bag, $keys)` | 指定したエラーバッグにエラーが存在する |
+| `assertSessionHasNoErrors()` | セッションにバリデーションエラーが存在しない |
+| `assertSessionDoesntHaveErrors()` | セッションにバリデーションエラーが存在しない |
+| `assertSessionMissing($key)` | セッションに指定したキーが存在しない |
+
+## ファイルアップロードのテスト
+
+`Illuminate\Http\UploadedFile` クラスの `fake()` メソッドを使って、ダミーのファイルや画像を生成できます。
+`Storage` ファサードの `fake()` メソッドと組み合わせることで、ファイルアップロードを簡単にテストできます。
+
+<CodeGroup>
+```php Pest
+<?php
+
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+test('アバター画像をアップロードできる', function () {
+    Storage::fake('avatars');
+
+    $file = UploadedFile::fake()->image('avatar.jpg');
+
+    $response = $this->post('/avatar', [
+        'avatar' => $file,
+    ]);
+
+    Storage::disk('avatars')->assertExists($file->hashName());
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class AvatarTest extends TestCase
+{
+    public function test_avatars_can_be_uploaded(): void
+    {
+        Storage::fake('avatars');
+
+        $file = UploadedFile::fake()->image('avatar.jpg');
+
+        $response = $this->post('/avatar', [
+            'avatar' => $file,
+        ]);
+
+        Storage::disk('avatars')->assertExists($file->hashName());
+    }
+}
+```
+</CodeGroup>
+
+ファイルが存在しないことを確認するには `assertMissing()` を使います。
+
+```php
+Storage::disk('avatars')->assertMissing('missing.jpg');
+```
+
+### ダミーファイルのカスタマイズ
+
+画像のサイズやファイルサイズを指定できます。バリデーションルールのテストに便利です。
+
+```php
+// 幅・高さ・ファイルサイズを指定する（サイズはKB単位）
+UploadedFile::fake()->image('avatar.jpg', $width, $height)->size(100);
+
+// 任意のファイルタイプを作成する
+UploadedFile::fake()->create('document.pdf', $sizeInKilobytes);
+
+// MIMEタイプを明示的に指定する
+UploadedFile::fake()->create(
+    'document.pdf', $sizeInKilobytes, 'application/pdf'
+);
+```
+
+## ビューのテスト
+
+HTTPリクエストをシミュレートせずにビューを直接レンダリングしてテストできます。
+`view()` メソッドはビュー名とオプションでデータの配列を受け取り、`Illuminate\Testing\TestView` のインスタンスを返します。
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('ウェルカムビューがレンダリングされる', function () {
+    $view = $this->view('welcome', ['name' => 'Taylor']);
+
+    $view->assertSee('Taylor');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ViewTest extends TestCase
+{
+    public function test_a_welcome_view_can_be_rendered(): void
+    {
+        $view = $this->view('welcome', ['name' => 'Taylor']);
+
+        $view->assertSee('Taylor');
+    }
+}
+```
+</CodeGroup>
+
+`TestView` クラスでは以下のアサーションメソッドが使えます。
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertSee($value)` | ビューに指定した文字列が含まれる |
+| `assertSeeInOrder([...])` | ビューに指定した文字列が順番に含まれる |
+| `assertSeeText($value)` | ビューのテキストに指定した文字列が含まれる |
+| `assertSeeTextInOrder([...])` | ビューのテキストに指定した文字列が順番に含まれる |
+| `assertDontSee($value)` | ビューに指定した文字列が含まれない |
+| `assertDontSeeText($value)` | ビューのテキストに指定した文字列が含まれない |
+
+レンダリングされたビューの内容を文字列として取得するには、`TestView` インスタンスを文字列にキャストします。
+
+```php
+$contents = (string) $this->view('welcome');
+```
+
+バリデーションエラーをビューに渡すには `withViewErrors()` を使います。
+
+```php
+$view = $this->withViewErrors([
+    'name' => ['有効な名前を入力してください。']
+])->view('form');
+
+$view->assertSee('有効な名前を入力してください。');
+```
+
+### コンポーネントのテスト
+
+`blade()` メソッドを使って生のBladeテンプレート文字列をレンダリングできます。
+
+```php
+$view = $this->blade(
+    '<x-component :name="$name" />',
+    ['name' => 'Taylor']
+);
+
+$view->assertSee('Taylor');
+```
+
+`component()` メソッドを使ってBladeコンポーネントをレンダリングできます。`Illuminate\Testing\TestComponent` のインスタンスを返します。
+
+```php
+$view = $this->component(Profile::class, ['name' => 'Taylor']);
+
+$view->assertSee('Taylor');
+```
+
+## レスポンスアサーション一覧
+
+`Illuminate\Testing\TestResponse` クラスが提供する主要なアサーションメソッドです。
+
+### HTTPステータス
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertOk()` | 200 OK |
+| `assertCreated()` | 201 Created |
+| `assertAccepted()` | 202 Accepted |
+| `assertNoContent($status = 204)` | 204 No Content |
+| `assertBadRequest()` | 400 Bad Request |
+| `assertUnauthorized()` | 401 Unauthorized |
+| `assertForbidden()` | 403 Forbidden |
+| `assertNotFound()` | 404 Not Found |
+| `assertUnprocessable()` | 422 Unprocessable Entity |
+| `assertTooManyRequests()` | 429 Too Many Requests |
+| `assertInternalServerError()` | 500 Internal Server Error |
+| `assertStatus($code)` | 指定したステータスコード |
+| `assertSuccessful()` | 2xx 系のステータスコード |
+| `assertClientError()` | 4xx 系のステータスコード |
+| `assertServerError()` | 5xx 系のステータスコード |
+
+### リダイレクト
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertRedirect($uri)` | 指定したURIへリダイレクト |
+| `assertRedirectContains($string)` | リダイレクトURIに指定した文字列が含まれる |
+| `assertRedirectToRoute($name, $params)` | 指定したルートへリダイレクト |
+| `assertRedirectToSignedRoute($name, $params)` | 指定した署名付きルートへリダイレクト |
+| `assertRedirectBack()` | 直前のURLへリダイレクト |
+
+### コンテンツ
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertSee($value, $escaped = true)` | 指定した値がレスポンスに含まれる |
+| `assertSeeInOrder(array $values)` | 指定した値が順番に含まれる |
+| `assertSeeText($value)` | 指定したテキストが含まれる |
+| `assertDontSee($value)` | 指定した値が含まれない |
+| `assertDontSeeText($value)` | 指定したテキストが含まれない |
+| `assertContent($value)` | レスポンスボディが指定した値に一致する |
+| `assertDownload($filename)` | ダウンロードレスポンスである |
+
+### JSON
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertJson(array $data)` | JSONレスポンスが指定したデータを含む |
+| `assertExactJson(array $data)` | JSONレスポンスが指定したデータに完全一致する |
+| `assertJsonPath($path, $value)` | 指定したパスの値が一致する |
+| `assertJsonMissingPath($path)` | 指定したパスが存在しない |
+| `assertJsonStructure(array $structure)` | JSONが指定した構造を持つ |
+| `assertJsonCount($count, $key)` | 指定したキーのJSONが指定数の要素を持つ |
+| `assertJsonFragment(array $data)` | JSONに指定したフラグメントが含まれる |
+| `assertJsonMissing(array $data)` | JSONに指定したデータが含まれない |
+| `assertJsonIsArray()` | JSONがアレイである |
+| `assertJsonIsObject()` | JSONがオブジェクトである |
+| `assertJsonValidationErrors($keys)` | 指定したキーのバリデーションエラーが含まれる |
+| `assertJsonMissingValidationErrors($keys)` | 指定したキーのバリデーションエラーが含まれない |
+
+### ヘッダーとクッキー
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertHeader($headerName, $value)` | 指定したヘッダーが存在する |
+| `assertHeaderMissing($headerName)` | 指定したヘッダーが存在しない |
+| `assertCookie($name, $value)` | 指定したクッキーが存在する |
+| `assertCookieExpired($name)` | 指定したクッキーが期限切れである |
+| `assertCookieMissing($name)` | 指定したクッキーが存在しない |
+| `assertPlainCookie($name, $value)` | 指定した暗号化されていないクッキーが存在する |
+
+### ビュー
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertViewIs($value)` | 指定したビューが返された |
+| `assertViewHas($key, $value)` | ビューに指定したデータが存在する |
+| `assertViewHasAll(array $data)` | ビューに複数のデータが存在する |
+| `assertViewMissing($key)` | ビューに指定したデータが存在しない |
+
+### バリデーション
+
+| メソッド | 説明 |
+| --- | --- |
+| `assertValid($keys)` | 指定したキーにバリデーションエラーがない |
+| `assertInvalid($keys)` | 指定したキーにバリデーションエラーがある |
+
+## TDDを実践するためのポイント
+
+<Tip>
+  HTTPテストはTDD（テスト駆動開発）と相性が抜群です。以下のポイントを意識するとより効果的です。
+</Tip>
+
+<AccordionGroup>
+  <Accordion title="Featureテストから始める">
+    HTTPテストは `tests/Feature/` ディレクトリに作成します。アプリケーションの外から見た動作（リクエスト→レスポンス）を最初に定義することで、実装すべき機能が明確になります。
+  </Accordion>
+
+  <Accordion title="RefreshDatabaseを使う">
+    データベースを使うテストでは `RefreshDatabase` トレイトを使いましょう。各テスト後にデータベースがリセットされ、テスト間でのデータ干渉を防げます。テストの独立性を保つことで、実行順序に依存しない安定したテストスイートが構築できます。
+  </Accordion>
+
+  <Accordion title="ファクトリーを積極的に使う">
+    `User::factory()->create()` のようなモデルファクトリーを使うと、テストデータの作成が簡単になります。特定の状態を持つモデルを作成するためにファクトリーの状態（state）を定義しておくと、テストの可読性が向上します。
+  </Accordion>
+
+  <Accordion title="1テスト1アサーション">
+    1つのテストメソッドではできるだけ1つのことを検証しましょう。テストが失敗したときに原因が特定しやすくなります。「Arrange（準備）→ Act（実行）→ Assert（検証）」のAAAパターンを意識するとテストが読みやすくなります。
+  </Accordion>
+
+  <Accordion title="認証テストを忘れない">
+    認証が必要なルートには必ず「認証済みの場合」と「未認証の場合」の両方のテストを書きましょう。セキュリティ上の問題を早期に発見できます。
+  </Accordion>
+</AccordionGroup>
+
+## 関連ページ
+
+<Card title="テスト入門" icon="flask" href="/jp/testing">
+  Laravelでのテストの基本的な書き方と `php artisan test` の使い方を確認します。
+</Card>
