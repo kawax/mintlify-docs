@@ -57,6 +57,7 @@
           "pages": [
             "jp/testing",
             "jp/http-tests",
+            "jp/mocking",
             "jp/deployment"
           ]
         },
