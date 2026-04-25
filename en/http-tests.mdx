@@ -1,0 +1,1088 @@
+---
+title: "HTTP Tests"
+description: "Simulate HTTP requests, assert responses, test authentication, and validate file uploads in Laravel."
+---
+
+## Introduction
+
+Laravel provides a fluent API for making HTTP requests to your application and inspecting responses. No real HTTP server is needed — requests are simulated internally.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('the application returns a successful response', function () {
+    $response = $this->get('/');
+
+    $response->assertStatus(200);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_the_application_returns_a_successful_response(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+}
+```
+</CodeGroup>
+
+The `get()` method sends a `GET` request and `assertStatus()` verifies the HTTP status code of the response.
+
+<Info>
+  The CSRF middleware is automatically disabled during tests. You do not need to disable it manually.
+</Info>
+
+## Making requests
+
+Use `get`, `post`, `put`, `patch`, or `delete` to send requests in your tests. These methods return an `Illuminate\Testing\TestResponse` instance with many assertion helpers.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('basic request', function () {
+    $response = $this->get('/');
+
+    $response->assertStatus(200);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_a_basic_request(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+}
+```
+</CodeGroup>
+
+<Warning>
+  Each test should generally make only one request. Making multiple requests in a single test method can cause unexpected behavior.
+</Warning>
+
+### Customizing request headers
+
+Use `withHeaders()` to add custom headers to the request before it is sent.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('interacting with headers', function () {
+    $response = $this->withHeaders([
+        'X-Header' => 'Value',
+    ])->post('/user', ['name' => 'Sally']);
+
+    $response->assertStatus(201);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_interacting_with_headers(): void
+    {
+        $response = $this->withHeaders([
+            'X-Header' => 'Value',
+        ])->post('/user', ['name' => 'Sally']);
+
+        $response->assertStatus(201);
+    }
+}
+```
+</CodeGroup>
+
+### Cookies
+
+Use `withCookie()` or `withCookies()` to set cookie values before making a request.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('interacting with cookies', function () {
+    $response = $this->withCookie('color', 'blue')->get('/');
+
+    $response = $this->withCookies([
+        'color' => 'blue',
+        'name'  => 'Taylor',
+    ])->get('/');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_interacting_with_cookies(): void
+    {
+        $response = $this->withCookie('color', 'blue')->get('/');
+
+        $response = $this->withCookies([
+            'color' => 'blue',
+            'name'  => 'Taylor',
+        ])->get('/');
+    }
+}
+```
+</CodeGroup>
+
+### Session and authentication
+
+Use `withSession()` to seed the session with data before sending a request.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('interacting with the session', function () {
+    $response = $this->withSession(['banned' => false])->get('/');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_interacting_with_the_session(): void
+    {
+        $response = $this->withSession(['banned' => false])->get('/');
+    }
+}
+```
+</CodeGroup>
+
+Use `actingAs()` to authenticate a user for the duration of the request. Combine it with model factories to create users on the fly.
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Models\User;
+
+test('an action that requires authentication', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->withSession(['banned' => false])
+        ->get('/');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_an_action_that_requires_authentication(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->withSession(['banned' => false])
+            ->get('/');
+    }
+}
+```
+</CodeGroup>
+
+Pass a guard name as the second argument to authenticate against a specific guard. The provided guard becomes the default for the duration of the test.
+
+```php
+$this->actingAs($user, 'web');
+```
+
+To send an unauthenticated request, use `actingAsGuest()`.
+
+```php
+$this->actingAsGuest();
+```
+
+### Debugging responses
+
+Use `dump`, `dumpHeaders`, and `dumpSession` to inspect response contents without stopping execution.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('debug a response', function () {
+    $response = $this->get('/');
+
+    $response->dump();
+    $response->dumpHeaders();
+    $response->dumpSession();
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_debug_response(): void
+    {
+        $response = $this->get('/');
+
+        $response->dump();
+        $response->dumpHeaders();
+        $response->dumpSession();
+    }
+}
+```
+</CodeGroup>
+
+To dump and stop execution, use `dd`, `ddHeaders`, `ddBody`, `ddJson`, or `ddSession`.
+
+```php
+$response->dd();
+$response->ddHeaders();
+$response->ddBody();
+$response->ddJson();
+$response->ddSession();
+```
+
+### Exception handling
+
+Use the `Exceptions` facade to assert that your application throws specific exceptions.
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Exceptions\InvalidOrderException;
+use Illuminate\Support\Facades\Exceptions;
+
+test('exception is thrown', function () {
+    Exceptions::fake();
+
+    $response = $this->get('/order/1');
+
+    // Assert an exception was thrown
+    Exceptions::assertReported(InvalidOrderException::class);
+
+    // Assert against the exception message
+    Exceptions::assertReported(function (InvalidOrderException $e) {
+        return $e->getMessage() === 'The order was invalid.';
+    });
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Exceptions\InvalidOrderException;
+use Illuminate\Support\Facades\Exceptions;
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_exception_is_thrown(): void
+    {
+        Exceptions::fake();
+
+        $response = $this->get('/');
+
+        Exceptions::assertReported(InvalidOrderException::class);
+
+        Exceptions::assertReported(function (InvalidOrderException $e) {
+            return $e->getMessage() === 'The order was invalid.';
+        });
+    }
+}
+```
+</CodeGroup>
+
+Assert that a given exception was not thrown, or that nothing was thrown at all.
+
+```php
+Exceptions::assertNotReported(InvalidOrderException::class);
+
+Exceptions::assertNothingReported();
+```
+
+Disable exception handling for a request to let exceptions propagate to the test.
+
+```php
+$response = $this->withoutExceptionHandling()->get('/');
+```
+
+Assert that code within a closure throws a specific exception type.
+
+```php
+$this->assertThrows(
+    fn () => (new ProcessOrder)->execute(),
+    OrderInvalid::class
+);
+
+// Assert against the exception instance
+$this->assertThrows(
+    fn () => (new ProcessOrder)->execute(),
+    fn (OrderInvalid $e) => $e->orderId() === 123
+);
+```
+
+Assert that no exception is thrown.
+
+```php
+$this->assertDoesntThrow(fn () => (new ProcessOrder)->execute());
+```
+
+## Testing JSON APIs
+
+Use `json`, `getJson`, `postJson`, `putJson`, `patchJson`, `deleteJson`, and `optionsJson` to send JSON requests with the corresponding HTTP verbs.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('making an api request', function () {
+    $response = $this->postJson('/api/user', ['name' => 'Sally']);
+
+    $response
+        ->assertStatus(201)
+        ->assertJson([
+            'created' => true,
+        ]);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_making_an_api_request(): void
+    {
+        $response = $this->postJson('/api/user', ['name' => 'Sally']);
+
+        $response
+            ->assertStatus(201)
+            ->assertJson([
+                'created' => true,
+            ]);
+    }
+}
+```
+</CodeGroup>
+
+Access JSON response data as array variables on the response.
+
+<CodeGroup>
+```php Pest
+expect($response['created'])->toBeTrue();
+```
+
+```php PHPUnit
+$this->assertTrue($response['created']);
+```
+</CodeGroup>
+
+<Info>
+  `assertJson()` verifies that the given array exists within the JSON response. Other properties may be present and the test will still pass as long as the specified fragment is found.
+</Info>
+
+### Asserting exact JSON matches
+
+Use `assertExactJson()` to verify that the response JSON **exactly matches** the given array.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('asserting an exact json match', function () {
+    $response = $this->postJson('/user', ['name' => 'Sally']);
+
+    $response
+        ->assertStatus(201)
+        ->assertExactJson([
+            'created' => true,
+        ]);
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_asserting_an_exact_json_match(): void
+    {
+        $response = $this->postJson('/user', ['name' => 'Sally']);
+
+        $response
+            ->assertStatus(201)
+            ->assertExactJson([
+                'created' => true,
+            ]);
+    }
+}
+```
+</CodeGroup>
+
+### Asserting on JSON paths
+
+Use `assertJsonPath()` to verify a value at a specific dot-notation path in the JSON response.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('asserting a json path value', function () {
+    $response = $this->postJson('/user', ['name' => 'Sally']);
+
+    $response
+        ->assertStatus(201)
+        ->assertJsonPath('team.owner.name', 'Darian');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ExampleTest extends TestCase
+{
+    public function test_asserting_a_json_paths_value(): void
+    {
+        $response = $this->postJson('/user', ['name' => 'Sally']);
+
+        $response
+            ->assertStatus(201)
+            ->assertJsonPath('team.owner.name', 'Darian');
+    }
+}
+```
+</CodeGroup>
+
+Pass a closure to `assertJsonPath()` for dynamic assertions.
+
+```php
+$response->assertJsonPath('team.owner.name', fn (string $name) => strlen($name) >= 3);
+```
+
+### Fluent JSON testing
+
+Pass a closure to `assertJson()` to receive an `AssertableJson` instance and chain assertions fluently.
+
+<CodeGroup>
+```php Pest
+use Illuminate\Testing\Fluent\AssertableJson;
+
+test('fluent json', function () {
+    $response = $this->getJson('/users/1');
+
+    $response
+        ->assertJson(fn (AssertableJson $json) =>
+            $json->where('id', 1)
+                ->where('name', 'Victoria Faith')
+                ->where('email', fn (string $email) => str($email)->is('victoria@gmail.com'))
+                ->whereNot('status', 'pending')
+                ->missing('password')
+                ->etc()
+        );
+});
+```
+
+```php PHPUnit
+use Illuminate\Testing\Fluent\AssertableJson;
+
+public function test_fluent_json(): void
+{
+    $response = $this->getJson('/users/1');
+
+    $response
+        ->assertJson(fn (AssertableJson $json) =>
+            $json->where('id', 1)
+                ->where('name', 'Victoria Faith')
+                ->where('email', fn (string $email) => str($email)->is('victoria@gmail.com'))
+                ->whereNot('status', 'pending')
+                ->missing('password')
+                ->etc()
+        );
+}
+```
+</CodeGroup>
+
+<Tip>
+  The `etc()` method tells Laravel that additional properties may exist on the JSON object. Without it, the test will fail if any property is present that you did not make an assertion against. This protects against accidentally leaking sensitive data in responses.
+</Tip>
+
+Use `has()` and `missing()` to assert attribute presence or absence.
+
+```php
+$response->assertJson(fn (AssertableJson $json) =>
+    $json->has('data')
+        ->missing('message')
+);
+```
+
+Use `hasAll()` and `missingAll()` to check multiple attributes at once.
+
+```php
+$response->assertJson(fn (AssertableJson $json) =>
+    $json->hasAll(['status', 'data'])
+        ->missingAll(['message', 'code'])
+);
+```
+
+#### Asserting against JSON collections
+
+Use `has()` to assert the count of items and inspect the first item with `first()`.
+
+```php
+$response
+    ->assertJson(fn (AssertableJson $json) =>
+        $json->has(3)
+            ->first(fn (AssertableJson $json) =>
+                $json->where('id', 1)
+                    ->where('name', 'Victoria Faith')
+                    ->missing('password')
+                    ->etc()
+            )
+    );
+```
+
+Use `each()` to apply the same assertions to every item in the collection.
+
+```php
+$response
+    ->assertJson(fn (AssertableJson $json) =>
+        $json->has(3)
+            ->each(fn (AssertableJson $json) =>
+                $json->whereType('id', 'integer')
+                    ->whereType('name', 'string')
+                    ->whereType('email', 'string')
+                    ->missing('password')
+                    ->etc()
+            )
+    );
+```
+
+#### Asserting JSON types
+
+Use `whereType()` and `whereAllType()` to assert that properties have the expected type.
+
+```php
+$response->assertJson(fn (AssertableJson $json) =>
+    $json->whereType('id', 'integer')
+        ->whereAllType([
+            'users.0.name' => 'string',
+            'meta' => 'array'
+        ])
+);
+```
+
+Use the `|` character to accept multiple types. The assertion passes if the value matches any of the specified types.
+
+```php
+$response->assertJson(fn (AssertableJson $json) =>
+    $json->whereType('name', 'string|null')
+        ->whereType('id', ['string', 'integer'])
+);
+```
+
+Supported types: `string`, `integer`, `double`, `boolean`, `array`, `null`.
+
+## Testing authentication
+
+Use `actingAs()` to send requests as an authenticated user.
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+test('authenticated users can view the dashboard', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('/dashboard');
+
+    $response->assertStatus(200);
+});
+
+test('unauthenticated users are redirected to login', function () {
+    $response = $this->get('/dashboard');
+
+    $response->assertRedirect('/login');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class DashboardTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_authenticated_users_can_view_the_dashboard(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/dashboard');
+
+        $response->assertStatus(200);
+    }
+
+    public function test_unauthenticated_users_are_redirected(): void
+    {
+        $response = $this->get('/dashboard');
+
+        $response->assertRedirect('/login');
+    }
+}
+```
+</CodeGroup>
+
+To authenticate against a specific guard, pass its name as the second argument.
+
+```php
+$this->actingAs($user, 'api');
+```
+
+### User registration flow example
+
+Test a registration endpoint end-to-end.
+
+<CodeGroup>
+```php Pest
+<?php
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+test('a user can register', function () {
+    $response = $this->post('/register', [
+        'name'                  => 'Test User',
+        'email'                 => 'test@example.com',
+        'password'              => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    $response->assertRedirect('/dashboard');
+    $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
+});
+
+test('a duplicate email cannot register', function () {
+    User::factory()->create(['email' => 'test@example.com']);
+
+    $response = $this->post('/register', [
+        'name'                  => 'Test User',
+        'email'                 => 'test@example.com',
+        'password'              => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    $response->assertSessionHasErrors('email');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class RegistrationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_user_can_register(): void
+    {
+        $response = $this->post('/register', [
+            'name'                  => 'Test User',
+            'email'                 => 'test@example.com',
+            'password'              => 'password',
+            'password_confirmation' => 'password',
+        ]);
+
+        $response->assertRedirect('/dashboard');
+        $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
+    }
+
+    public function test_duplicate_email_cannot_register(): void
+    {
+        User::factory()->create(['email' => 'test@example.com']);
+
+        $response = $this->post('/register', [
+            'name'                  => 'Test User',
+            'email'                 => 'test@example.com',
+            'password'              => 'password',
+            'password_confirmation' => 'password',
+        ]);
+
+        $response->assertSessionHasErrors('email');
+    }
+}
+```
+</CodeGroup>
+
+## Testing sessions
+
+Use `withSession()` to seed session data before a request and `assertSessionHas()` to verify session values.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('session value is set', function () {
+    $response = $this->withSession(['locale' => 'en'])->get('/');
+
+    $response->assertSessionHas('locale', 'en');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class SessionTest extends TestCase
+{
+    public function test_session_value(): void
+    {
+        $response = $this->withSession(['locale' => 'en'])->get('/');
+
+        $response->assertSessionHas('locale', 'en');
+    }
+}
+```
+</CodeGroup>
+
+### Session assertion reference
+
+| Method | Description |
+| --- | --- |
+| `assertSessionHas($key, $value)` | Session contains the given key and value |
+| `assertSessionHasAll([...])` | Session contains all given keys and values |
+| `assertSessionHasErrors($keys)` | Session contains validation errors for the given keys |
+| `assertSessionHasErrorsIn($bag, $keys)` | Named error bag contains errors for the given keys |
+| `assertSessionHasNoErrors()` | Session contains no validation errors |
+| `assertSessionDoesntHaveErrors()` | Session contains no validation errors |
+| `assertSessionMissing($key)` | Session does not contain the given key |
+
+## Testing file uploads
+
+Use `UploadedFile::fake()` to generate dummy files and images. Combine it with `Storage::fake()` to test file upload flows without touching the real filesystem.
+
+<CodeGroup>
+```php Pest
+<?php
+
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+
+test('avatars can be uploaded', function () {
+    Storage::fake('avatars');
+
+    $file = UploadedFile::fake()->image('avatar.jpg');
+
+    $response = $this->post('/avatar', [
+        'avatar' => $file,
+    ]);
+
+    Storage::disk('avatars')->assertExists($file->hashName());
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class AvatarTest extends TestCase
+{
+    public function test_avatars_can_be_uploaded(): void
+    {
+        Storage::fake('avatars');
+
+        $file = UploadedFile::fake()->image('avatar.jpg');
+
+        $response = $this->post('/avatar', [
+            'avatar' => $file,
+        ]);
+
+        Storage::disk('avatars')->assertExists($file->hashName());
+    }
+}
+```
+</CodeGroup>
+
+Assert that a file does not exist with `assertMissing()`.
+
+```php
+Storage::disk('avatars')->assertMissing('missing.jpg');
+```
+
+### Customizing fake files
+
+Specify dimensions and file size to test validation rules.
+
+```php
+// Specify width, height, and size in kilobytes
+UploadedFile::fake()->image('avatar.jpg', $width, $height)->size(100);
+
+// Create a non-image file
+UploadedFile::fake()->create('document.pdf', $sizeInKilobytes);
+
+// Specify an explicit MIME type
+UploadedFile::fake()->create(
+    'document.pdf', $sizeInKilobytes, 'application/pdf'
+);
+```
+
+## Testing views
+
+Render a view directly without making an HTTP request. The `view()` method returns an `Illuminate\Testing\TestView` instance.
+
+<CodeGroup>
+```php Pest
+<?php
+
+test('a welcome view can be rendered', function () {
+    $view = $this->view('welcome', ['name' => 'Taylor']);
+
+    $view->assertSee('Taylor');
+});
+```
+
+```php PHPUnit
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class ViewTest extends TestCase
+{
+    public function test_a_welcome_view_can_be_rendered(): void
+    {
+        $view = $this->view('welcome', ['name' => 'Taylor']);
+
+        $view->assertSee('Taylor');
+    }
+}
+```
+</CodeGroup>
+
+`TestView` provides the following assertion methods:
+
+| Method | Description |
+| --- | --- |
+| `assertSee($value)` | View contains the given string |
+| `assertSeeInOrder([...])` | View contains the given strings in order |
+| `assertSeeText($value)` | View text contains the given string |
+| `assertSeeTextInOrder([...])` | View text contains the given strings in order |
+| `assertDontSee($value)` | View does not contain the given string |
+| `assertDontSeeText($value)` | View text does not contain the given string |
+
+Cast the `TestView` to a string to access the raw rendered HTML.
+
+```php
+$contents = (string) $this->view('welcome');
+```
+
+Inject errors into the view's error bag with `withViewErrors()`.
+
+```php
+$view = $this->withViewErrors([
+    'name' => ['Please provide a valid name.']
+])->view('form');
+
+$view->assertSee('Please provide a valid name.');
+```
+
+### Rendering Blade and components
+
+Use `blade()` to evaluate a raw Blade template string.
+
+```php
+$view = $this->blade(
+    '<x-component :name="$name" />',
+    ['name' => 'Taylor']
+);
+
+$view->assertSee('Taylor');
+```
+
+Use `component()` to render a Blade component class. Returns an `Illuminate\Testing\TestComponent` instance.
+
+```php
+$view = $this->component(Profile::class, ['name' => 'Taylor']);
+
+$view->assertSee('Taylor');
+```
+
+## Response assertion reference
+
+### HTTP status
+
+| Method | Description |
+| --- | --- |
+| `assertOk()` | 200 OK |
+| `assertCreated()` | 201 Created |
+| `assertAccepted()` | 202 Accepted |
+| `assertNoContent($status = 204)` | 204 No Content |
+| `assertBadRequest()` | 400 Bad Request |
+| `assertUnauthorized()` | 401 Unauthorized |
+| `assertForbidden()` | 403 Forbidden |
+| `assertNotFound()` | 404 Not Found |
+| `assertUnprocessable()` | 422 Unprocessable Entity |
+| `assertTooManyRequests()` | 429 Too Many Requests |
+| `assertInternalServerError()` | 500 Internal Server Error |
+| `assertStatus($code)` | Assert a specific status code |
+| `assertSuccessful()` | 2xx status code |
+| `assertClientError()` | 4xx status code |
+| `assertServerError()` | 5xx status code |
+
+### Redirects
+
+| Method | Description |
+| --- | --- |
+| `assertRedirect($uri)` | Redirects to the given URI |
+| `assertRedirectContains($string)` | Redirect URI contains the given string |
+| `assertRedirectToRoute($name, $params)` | Redirects to the named route |
+| `assertRedirectToSignedRoute($name, $params)` | Redirects to the named signed route |
+| `assertRedirectBack()` | Redirects back to the previous URL |
+
+### Content
+
+| Method | Description |
+| --- | --- |
+| `assertSee($value, $escaped = true)` | Response contains the given value |
+| `assertSeeInOrder(array $values)` | Response contains values in order |
+| `assertSeeText($value)` | Response text contains the given value |
+| `assertDontSee($value)` | Response does not contain the given value |
+| `assertDontSeeText($value)` | Response text does not contain the given value |
+| `assertContent($value)` | Response body equals the given value |
+| `assertDownload($filename)` | Response is a file download |
+
+### JSON
+
+| Method | Description |
+| --- | --- |
+| `assertJson(array $data)` | JSON response contains the given data |
+| `assertExactJson(array $data)` | JSON response exactly matches the given data |
+| `assertJsonPath($path, $value)` | JSON path has the given value |
+| `assertJsonMissingPath($path)` | JSON path does not exist |
+| `assertJsonStructure(array $structure)` | JSON has the given structure |
+| `assertJsonCount($count, $key)` | JSON key contains the given number of items |
+| `assertJsonFragment(array $data)` | JSON contains the given fragment |
+| `assertJsonMissing(array $data)` | JSON does not contain the given data |
+| `assertJsonIsArray()` | JSON response is an array |
+| `assertJsonIsObject()` | JSON response is an object |
+| `assertJsonValidationErrors($keys)` | JSON contains validation errors for the given keys |
+| `assertJsonMissingValidationErrors($keys)` | JSON does not contain validation errors for the given keys |
+
+### Headers and cookies
+
+| Method | Description |
+| --- | --- |
+| `assertHeader($name, $value)` | Response has the given header |
+| `assertHeaderMissing($name)` | Response does not have the given header |
+| `assertCookie($name, $value)` | Response has the given cookie |
+| `assertCookieExpired($name)` | Response cookie is expired |
+| `assertCookieMissing($name)` | Response does not have the given cookie |
+| `assertPlainCookie($name, $value)` | Response has the given unencrypted cookie |
+
+### Views
+
+| Method | Description |
+| --- | --- |
+| `assertViewIs($value)` | Response rendered the given view |
+| `assertViewHas($key, $value)` | View data contains the given key and value |
+| `assertViewHasAll(array $data)` | View data contains all given keys and values |
+| `assertViewMissing($key)` | View data does not contain the given key |
+
+### Validation
+
+| Method | Description |
+| --- | --- |
+| `assertValid($keys)` | No validation errors for the given keys |
+| `assertInvalid($keys)` | Validation errors exist for the given keys |
+
+## Related pages
+
+<Card title="Testing" icon="flask" href="/en/testing">
+  Learn the basics of writing tests in Laravel, including test structure, running tests, and common assertions.
+</Card>
