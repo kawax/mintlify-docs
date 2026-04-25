@@ -45,7 +45,18 @@ description: "A unified, expressive API for interacting with AI providers — bu
 
 ## Configuration
 
-Set API keys in `.env`. The default models used for text, images, audio, transcription, and embeddings may also be configured in `config/ai.php`.
+Set API keys in `.env`. The default models used for text, images, audio, transcription, and embeddings may also be configured in `config/ai.php`:
+
+```php
+// config/ai.php
+'models' => [
+    'text'          => env('AI_TEXT_MODEL'),
+    'image'         => env('AI_IMAGE_MODEL'),
+    'audio'         => env('AI_AUDIO_MODEL'),
+    'transcription' => env('AI_TRANSCRIPTION_MODEL'),
+    'embeddings'    => env('AI_EMBEDDINGS_MODEL'),
+],
+```
 
 ```ini
 ANTHROPIC_API_KEY=
@@ -1405,32 +1416,48 @@ $store->assertAdded(fn (StorableFile $file) => $file->content() === 'Hello, Worl
 
 ## Events
 
-The Laravel AI SDK dispatches the following events that you can listen for in your application:
+The Laravel AI SDK dispatches the following events. You can listen for them using standard Laravel event listeners.
 
-| Event | Fired when |
-| --- | --- |
-| `AddingFileToStore` | Before a file is added to a vector store |
-| `AgentPrompted` | After an agent prompt completes |
-| `AgentStreamed` | After a streaming agent response completes |
-| `AudioGenerated` | After audio is generated |
-| `CreatingStore` | Before a vector store is created |
-| `EmbeddingsGenerated` | After embeddings are generated |
-| `FileAddedToStore` | After a file is added to a vector store |
-| `FileDeleted` | After a stored file is deleted |
-| `FileRemovedFromStore` | After a file is removed from a vector store |
-| `FileStored` | After a file is uploaded to a provider |
-| `GeneratingAudio` | Before audio generation starts |
-| `GeneratingEmbeddings` | Before embeddings generation starts |
-| `GeneratingImage` | Before image generation starts |
-| `GeneratingTranscription` | Before transcription starts |
-| `ImageGenerated` | After an image is generated |
-| `InvokingTool` | Before an agent tool is invoked |
-| `PromptingAgent` | Before an agent prompt is sent |
-| `RemovingFileFromStore` | Before a file is removed from a vector store |
-| `Reranked` | After reranking completes |
-| `Reranking` | Before reranking starts |
-| `StoreCreated` | After a vector store is created |
-| `StoringFile` | Before a file is uploaded to a provider |
-| `StreamingAgent` | Before a streaming agent response starts |
-| `ToolInvoked` | After an agent tool is invoked |
-| `TranscriptionGenerated` | After transcription completes |
+<AccordionGroup>
+  <Accordion title="Agent events">
+    | Event | Fired when |
+    | --- | --- |
+    | `PromptingAgent` | Before an agent prompt is sent |
+    | `AgentPrompted` | After an agent prompt completes |
+    | `StreamingAgent` | Before a streaming agent response starts |
+    | `AgentStreamed` | After a streaming agent response completes |
+    | `InvokingTool` | Before an agent tool is invoked |
+    | `ToolInvoked` | After an agent tool is invoked |
+  </Accordion>
+  <Accordion title="Image, audio, and transcription events">
+    | Event | Fired when |
+    | --- | --- |
+    | `GeneratingImage` | Before image generation starts |
+    | `ImageGenerated` | After an image is generated |
+    | `GeneratingAudio` | Before audio generation starts |
+    | `AudioGenerated` | After audio is generated |
+    | `GeneratingTranscription` | Before transcription starts |
+    | `TranscriptionGenerated` | After transcription completes |
+  </Accordion>
+  <Accordion title="Embeddings and reranking events">
+    | Event | Fired when |
+    | --- | --- |
+    | `GeneratingEmbeddings` | Before embeddings generation starts |
+    | `EmbeddingsGenerated` | After embeddings are generated |
+    | `Reranking` | Before reranking starts |
+    | `Reranked` | After reranking completes |
+  </Accordion>
+  <Accordion title="Files and vector store events">
+    | Event | Fired when |
+    | --- | --- |
+    | `StoringFile` | Before a file is uploaded to a provider |
+    | `FileStored` | After a file is uploaded to a provider |
+    | `FileDeleted` | After a stored file is deleted |
+    | `CreatingStore` | Before a vector store is created |
+    | `StoreCreated` | After a vector store is created |
+    | `AddingFileToStore` | Before a file is added to a vector store |
+    | `FileAddedToStore` | After a file is added to a vector store |
+    | `RemovingFileFromStore` | Before a file is removed from a vector store |
+    | `FileRemovedFromStore` | After a file is removed from a vector store |
+  </Accordion>
+</AccordionGroup>
