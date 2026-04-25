@@ -28,7 +28,7 @@ graph LR
 ```
 
 <Warning>
-WebSocket commands are long-running processes that require a **VPS, EC2, or any always-on server**. They do not work on serverless platforms such as Laravel Vapor or Vercel.
+WebSocket commands are long-running processes that require a **VPS, EC2, or any always-on server**, or a **Laravel Cloud custom worker**. They do not work on serverless platforms such as Laravel Vapor or Vercel.
 </Warning>
 
 ## Installation
@@ -312,6 +312,28 @@ In Laravel Forge, add a daemon from the **Daemons** section.
 - **Command**: `php artisan bluesky:ws start -C app.bsky.feed.post`
 - **Directory**: `/var/www/html`
 - **User**: `forge`
+
+### Laravel Cloud background process
+
+Because these commands act as **WebSocket clients** that connect to Bluesky's streams (rather than WebSocket servers), they run on Laravel Cloud. Configure them as custom workers in the Laravel Cloud background processes settings.
+
+Add a **Custom Worker** for each command you want to run.
+
+**For Jetstream:**
+
+```bash
+php artisan bluesky:ws start
+```
+
+**For Firehose:**
+
+```bash
+php artisan bluesky:firehose start
+```
+
+<Info>
+Laravel Cloud automatically handles process lifecycle during deployments. No additional configuration beyond adding the background process is required.
+</Info>
 
 ### Tips
 

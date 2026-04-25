@@ -4,7 +4,9 @@ description: "Build and operate a Labeler server with Laravel Bluesky. Covers Ab
 ---
 
 <Warning>
-Labeler is an advanced feature. Because the server must run continuously, it is intended for developers who use Laravel Forge, Laravel Cloud, or can configure their own production server. It is not recommended for Laravel beginners. No support is provided.
+Labeler is an advanced feature. Because the server must run continuously, it is intended for developers who use Laravel Forge or can configure their own production server. It is not recommended for Laravel beginners. No support is provided.
+
+**Laravel Cloud is not supported.** A Labeler must run as a persistent WebSocket server, which is not possible within Laravel Cloud's constraints.
 </Warning>
 
 ## What is a Labeler?
@@ -47,7 +49,7 @@ To run a Labeler you need:
 - **A new Bluesky account dedicated to the Labeler** — do not use your regular account.
 - **A new Laravel project dedicated to the Labeler** — keeping projects separate is strongly recommended.
 - **A (sub)domain**
-- **A production Linux server** such as a VPS or AWS EC2. Laravel Vapor and Vercel will not work.
+- **A production Linux server** such as a VPS or AWS EC2. Laravel Cloud, Laravel Vapor, and Vercel will not work.
 
 <Info>
 If you can only use a shared server, running a Labeler will not be practical.
