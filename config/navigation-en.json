@@ -410,7 +410,9 @@
                 "en/packages/laravel-bluesky/verify",
                 "en/packages/laravel-bluesky/feed-generator",
                 "en/packages/laravel-bluesky/labeler",
-                "en/packages/laravel-bluesky/websocket"
+                "en/packages/laravel-bluesky/websocket",
+                "en/packages/laravel-bluesky/crypto",
+                "en/packages/laravel-bluesky/core"
               ]
             }
           ]
