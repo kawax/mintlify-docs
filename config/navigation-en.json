@@ -344,6 +344,8 @@
         {
           "group": "GitHub Copilot",
           "pages": [
+            "en/packages/laravel-boost-copilot-cli",
+            "en/packages/laravel-boost-phpstorm-copilot",
             {
               "group": "Laravel Copilot SDK",
               "root": "en/packages/laravel-copilot-sdk",
@@ -384,9 +386,7 @@
                 "en/packages/laravel-copilot-sdk/steering",
                 "en/packages/laravel-copilot-sdk/bare-usage"
               ]
-            },
-            "en/packages/laravel-boost-copilot-cli",
-            "en/packages/laravel-boost-phpstorm-copilot"
+            }
           ]
         },
         {
