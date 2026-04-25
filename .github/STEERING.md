@@ -58,9 +58,9 @@
  - SNSのパッケージは色々作ってるけど基本的なクライアント機能が完成したらNotificationsやSocialiteのLaravelの機能を被せて実際に使うのは通知機能での投稿ばかりなことも多い。
  - BlueskyのSocialiteは他と違うので若干難しい。詳しい説明が必要。
  - Bluesky特有機能でLaravelユーザーが作りやすいのはFeed Generator。
- - Labelerはサーバーとして動かし続ける必要があるのでLaravel ForgeやLaravel Cloudを使っているか自力で構築できる人向け。
+ - Labelerはサーバーとして動かし続ける必要があるのでLaravel Forgeを使っているか自力で構築できる人向け。Laravel Cloudは非対応だった。サンプルのlaralabelerをForgeからCloudに移行しようとしてできなかった。
  - WebSocketはもっと難しいので意図的にドキュメントを作ってないけどこっちで作る。`JetstreamServeCommand` `FirehoseServeCommand`
- - CryptoやCoreまで行くと本当の深淵。AIもない頃に他言語版と仕様を調べまくって作った。
+ - CryptoやCoreまで行くと本当の深淵。AIもない頃に他言語版と仕様を調べまくって作った。PHPでここまで実装してるパッケージが他にあるのかは知らない。Bluesky/AT Protocolの詳細な仕様まで知りたい人向け。
  - 詳細なドキュメントを作りたいけど一から調べると大変なのでDeepWikiを参照するのが良さそう。 https://deepwiki.com/invokable/laravel-bluesky
 
 仮でSNSグループに配置。index.mdxは`jp/packages/laravel-bluesky`なのでpagesに追加したり`laravel-bluesky/index`に変更は不要。内側のpagesに他のページを追加していく。
