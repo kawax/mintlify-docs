@@ -9,19 +9,19 @@ description: "An Amazon Bedrock driver for Laravel AI SDK. Supports text generat
 
 The main features are as follows.
 
-| Feature | Available with Bedrock API key only | Supported models / services |
-| --- | --- | --- |
-| Text generation / streaming | ✅ | Anthropic Claude, Amazon Nova, Meta Llama, Mistral, Cohere Command R, DeepSeek, AI21 Jamba |
-| Tool use (Function Calling) | ✅ | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R |
-| Structured output | ✅ | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R |
-| Image generation | ✅ | Stability AI (default) |
-| Audio (TTS) | ❌ | Amazon Polly |
-| Transcription (STT) | ❌ | Amazon Nova 2 Lite (Converse API AudioBlock) |
-| Embeddings | ✅ | Amazon Titan Embeddings V2 (default), Cohere Embed V3 / V4 |
-| Reranking | ❌ | Cohere Rerank 3.5, Amazon Rerank 1.0 |
+| Feature                     | Available with Bedrock API key only | Supported models / services                                                                |
+|-----------------------------|-------------------------------------|--------------------------------------------------------------------------------------------|
+| Text generation / streaming | ✅                                   | Anthropic Claude, Amazon Nova, Meta Llama, Mistral, Cohere Command R, DeepSeek, AI21 Jamba |
+| Tool use (Function Calling) | ✅                                   | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R            |
+| Structured output           | ✅                                   | Anthropic Claude, Amazon Nova, Meta Llama 3.1+, Mistral Large, Cohere Command R            |
+| Image generation            | ✅                                   | Stability AI (default)                                                                     |
+| Audio (TTS)                 | ⚠️                                  | Amazon Polly                                                                               |
+| Transcription (STT)         | ⚠️                                  | Amazon Nova 2 Lite (Converse API AudioBlock)                                               |
+| Embeddings                  | ✅                                   | Amazon Titan Embeddings V2 (default), Cohere Embed V3 / V4                                 |
+| Reranking                   | ⚠️                                  | Cohere Rerank 3.5, Amazon Rerank 1.0                                                       |
 
 <Info>
-  `❌` in this table means the feature is not available with only a Bedrock API key. It does not mean the feature itself is unsupported.
+  `⚠️` in this table means the feature is not available with only a Bedrock API key. It does not mean the feature itself is unsupported.
 </Info>
 
 <Info>
