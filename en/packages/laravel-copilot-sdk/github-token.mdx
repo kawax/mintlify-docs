@@ -1,6 +1,6 @@
 ---
 title: "GitHub token"
-description: "Switch GitHub tokens at runtime in Laravel Copilot SDK when executing stdio mode sessions per authenticated user."
+description: "Switch GitHub tokens at runtime in Laravel Copilot SDK for per-user authentication in stdio or TCP mode sessions."
 ---
 
 ## Runtime switching of GitHub tokens
@@ -15,6 +15,10 @@ If you cannot get a usable Socialite token, ask users to provide a PAT directly.
 This approach is available only in stdio mode.
 You cannot switch this in TCP mode because the Copilot CLI process stays running.
 If you set `github_token` or `use_logged_in_user` in TCP mode (`cli_url`), an error is raised.
+
+<Note>
+The "Per-session GitHub token (v0.3.0+)" section below is available in TCP mode as well.
+</Note>
 
 ## `github_token` option
 
@@ -50,6 +54,36 @@ $config = [
 ```
 
 If you set `use_logged_in_user` to `false` without `github_token`, the SDK adds `--no-auto-login`, so CLI does not auto-login.
+
+## Per-session GitHub token (v0.3.0+)
+
+Using the `gitHubToken` field in `SessionConfig`, you can specify a different GitHub token per session within the same CLI process (multi-tenant support).
+
+This token is passed as a parameter in the `session.create` JSON-RPC call, so it is **available in both stdio mode and TCP mode**. Even in TCP mode where the CLI is already running, you can switch tokens per session.
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+
+$response = Copilot::run(
+    prompt: '...',
+    config: new SessionConfig(gitHubToken: $user->github_token),
+);
+```
+
+TCP mode example:
+
+```php
+// CLI server is already running (TCP mode)
+// You can pass a different user token per session
+$response = Copilot::useTcp(url: 'tcp://127.0.0.1:12345')->run(
+    prompt: '...',
+    config: new SessionConfig(gitHubToken: $user->github_token),
+);
+```
+
+This works independently from the client-level `github_token` (the token used when launching the CLI process).
+Use this when you want to switch user tokens on a per-session basis.
 
 <Info>
 For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).

@@ -80,6 +80,10 @@ $config = new SessionConfig(
     // Custom provider
     provider: new ProviderConfig(),
 
+    // Per-session GitHub token (multi-tenant support)
+    // Specifies a token per session, separate from the client-level github_token
+    gitHubToken: $user->github_token,
+
     onPermissionRequest: function (array $request) {
         // Handle permission requests
     },
@@ -104,6 +108,9 @@ $config = new SessionConfig(
     // Enable streaming
     streaming: true,
 
+    // Whether to include sub-agent streaming events in the main stream (default: true)
+    includeSubAgentStreamingEvents: true,
+
     // Allowed built-in tools
     availableTools: ['read_file', 'write_file'],
 
@@ -127,6 +134,11 @@ $config = new SessionConfig(
             'prompt' => 'You are an expert code reviewer.',
         ],
     ],
+
+    // Default agent configuration. Applied to the built-in agent when no custom agent is selected.
+    // excludedTools: list of tools to exclude from the default agent.
+    // Custom sub-agents can still use excluded tools.
+    defaultAgent: ['excludedTools' => ['tool_name']],
 
     // Agent activated at session start. Must match customAgents.name.
     agent: 'reviewer',

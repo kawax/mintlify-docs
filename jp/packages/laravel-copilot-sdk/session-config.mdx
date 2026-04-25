@@ -77,6 +77,10 @@ $config = new SessionConfig(
     // カスタムプロバイダー
     provider: new ProviderConfig(),
 
+    // セッションごとのGitHubトークン（マルチテナント対応）
+    // クライアントレベルのgithub_tokenとは別に、セッション単位でトークンを指定できる
+    gitHubToken: $user->github_token,
+
     onPermissionRequest: function (array $request) {
         // 権限リクエストを処理
     },
@@ -101,6 +105,9 @@ $config = new SessionConfig(
     // ストリーミングを有効化
     streaming: true,
 
+    // サブエージェントのストリーミングイベントをメインストリームに含めるか (デフォルト: true)
+    includeSubAgentStreamingEvents: true,
+
     // 使用可能なビルトインツール
     availableTools: ['read_file', 'write_file'],
 
@@ -124,6 +131,11 @@ $config = new SessionConfig(
             'prompt' => 'You are an expert code reviewer.',
         ],
     ],
+
+    // デフォルトエージェントの設定。カスタムエージェントが選択されていない場合に使用されるビルトインエージェントの設定。
+    // excludedTools: デフォルトエージェントから除外するツールのリスト。
+    // カスタムサブエージェントには引き続き利用可能。
+    defaultAgent: ['excludedTools' => ['tool_name']],
 
     // セッション開始時にアクティブにするエージェントを指定。customAgentsのnameと一致する必要がある。
     agent: 'reviewer',

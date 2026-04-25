@@ -1,6 +1,6 @@
 ---
 title: "GitHubトークン"
-description: "Laravel Copilot SDK の stdio モードで、ユーザーごとの GitHub トークンを実行時に切り替える方法を説明します。"
+description: "Laravel Copilot SDK でユーザーごとの GitHub トークンを実行時に切り替える方法を説明します。"
 ---
 
 ## 認証するGitHubトークンの実行時切り替え
@@ -15,6 +15,10 @@ Socialite から使えるトークンを取得できない場合は、PAT を直
 この方法は stdio モードでのみ利用できます。
 TCP モードは Copilot CLI プロセスを起動したまま使うため、実行時に切り替えできません。
 TCP モード（`cli_url`）で `github_token` や `use_logged_in_user` を指定するとエラーになります。
+
+<Note>
+下記の「セッションごとのGitHubトークン（v0.3.0+）」は TCP モードでも利用可能です。
+</Note>
 
 ## `github_token` オプション
 
@@ -49,6 +53,36 @@ $config = [
 ```
 
 `github_token` なしで `use_logged_in_user` を `false` にすると、`--no-auto-login` フラグが追加され、CLI は自動ログインを行いません。
+
+## セッションごとのGitHubトークン（v0.3.0+）
+
+`SessionConfig` の `gitHubToken` フィールドを使うと、同一 CLI プロセス内でセッションごとに異なる GitHub トークンを指定できます（マルチテナント対応）。
+
+このトークンは `session.create` JSON-RPC のパラメーターとして渡されるため、**stdio モードと TCP モードの両方で利用可能**です。CLI がすでに起動している TCP モードでも、セッション単位でトークンを切り替えられます。
+
+```php
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+
+$response = Copilot::run(
+    prompt: '...',
+    config: new SessionConfig(gitHubToken: $user->github_token),
+);
+```
+
+TCP モードでの使用例：
+
+```php
+// CLIサーバーは起動済み（TCPモード）
+// セッションごとに異なるユーザートークンを渡せる
+$response = Copilot::useTcp(url: 'tcp://127.0.0.1:12345')->run(
+    prompt: '...',
+    config: new SessionConfig(gitHubToken: $user->github_token),
+);
+```
+
+クライアントレベルの `github_token`（CLI プロセス起動時のトークン）とは別に機能します。
+セッション単位でユーザートークンを切り替えたい場合に使用してください。
 
 <Info>
 最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
