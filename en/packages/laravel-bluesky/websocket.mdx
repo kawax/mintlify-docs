@@ -141,16 +141,6 @@ class JetstreamPostListener
 }
 ```
 
-Register the listener in your `AppServiceProvider` or event service provider.
-
-```php
-use Illuminate\Support\Facades\Event;
-use Revolution\Bluesky\Events\Jetstream\JetstreamCommitMessage;
-use App\Listeners\JetstreamPostListener;
-
-Event::listen(JetstreamCommitMessage::class, JetstreamPostListener::class);
-```
-
 ## Firehose
 
 ### Overview
@@ -220,14 +210,6 @@ class FirehosePostListener
         info("[$action] $did: $text");
     }
 }
-```
-
-```php
-use Illuminate\Support\Facades\Event;
-use Revolution\Bluesky\Events\Firehose\FirehoseCommitMessage;
-use App\Listeners\FirehosePostListener;
-
-Event::listen(FirehoseCommitMessage::class, FirehosePostListener::class);
 ```
 
 ## Configuration
