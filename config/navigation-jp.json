@@ -423,7 +423,8 @@
                 "jp/packages/laravel-bluesky/identity",
                 "jp/packages/laravel-bluesky/route",
                 "jp/packages/laravel-bluesky/verify",
-                "jp/packages/laravel-bluesky/feed-generator"
+                "jp/packages/laravel-bluesky/feed-generator",
+                "jp/packages/laravel-bluesky/labeler"
               ]
             }
           ]
