@@ -54,7 +54,7 @@
 - [ ] Testbench `package-testing.mdx` が作られてたので次はLaravel Bluesky https://github.com/invokable/laravel-bluesky
  - `docs`内に英語のドキュメントがある。AI普及前なので最低限のドキュメントしかない。
  - docs/workbench.md はBlueskyとは関係ないTestbench Workbenchのドキュメント。Workbenchの情報がなさすぎて調べた結果をとりあえずここに置いていた。こっちのサイトに移せばいいのでworkbench.mdを元に`package-testing.mdx`の続きのページを作成。
- - 残りのページは`{lang}/packages/laravel-bluesky/`内に複数ページで作成。`laravel-copilot-sdk`と同様に`{lang}/packages/laravel-bluesky/index.mdx`がURLの`{lang}/packages/laravel-bluesky`になるので`laravel-bluesky.mdx`を作ったり、`{lang}/packages/laravel-bluesky/index`を使わない。
+ - 残りのページは`{lang}/packages/laravel-bluesky/`内に複数ページで作成。
  - SNSのパッケージは色々作ってるけど基本的なクライアント機能が完成したらNotificationsやSocialiteのLaravelの機能を被せて実際に使うのは通知機能での投稿ばかりなことも多い。
  - BlueskyのSocialiteは他と違うので若干難しい。詳しい説明が必要。
  - Bluesky特有機能でLaravelユーザーが作りやすいのはFeed Generator。
@@ -62,6 +62,8 @@
  - WebSocketはもっと難しいので意図的にドキュメントを作ってないけどこっちで作る。`JetstreamServeCommand` `FirehoseServeCommand`
  - CryptoやCoreまで行くと本当の深淵。AIもない頃に他言語版と仕様を調べまくって作った。PHPでここまで実装してるパッケージが他にあるのかは知らない。Bluesky/AT Protocolの詳細な仕様まで知りたい人向け。
  - 詳細なドキュメントを作りたいけど一から調べると大変なのでDeepWikiを参照するのが良さそう。 https://deepwiki.com/invokable/laravel-bluesky
+ - DeepWikiのページは再生成された時に変わるので個別ページへのリンクは貼らない。
+ - docsにあるページは全部作れたけど元からユーザーが必要な情報が足りてないのでDeepWikiがコードまで見てまとめたページを元にもっとページを作る。
 
 仮でSNSグループに配置。index.mdxは`jp/packages/laravel-bluesky`なのでpagesに追加したり`laravel-bluesky/index`に変更は不要。内側のpagesに他のページを追加していく。
 ```json
