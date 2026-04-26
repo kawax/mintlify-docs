@@ -10,11 +10,13 @@ description: "Use Orchestra Testbench Workbench to build a realistic package dev
 Use it as a continuation of `package-testing` when you need UI checks, route verification, and seeded integration scenarios.
 
 ```mermaid
-flowchart LR
+flowchart TD
     A["Package code<br>`src/`"] --> B["Workbench<br>`workbench/`"]
-    B --> C["Routes and controllers<br>interactive checks"]
-    B --> D["Migrations and seeders<br>realistic data"]
-    B --> E["`vendor/bin/testbench serve`<br>local runtime"]
+    B --> C["WorkbenchServiceProvider<br>demo service registration"]
+    B --> D["Routes and controllers<br>interactive checks"]
+    B --> E["Migrations and seeders<br>realistic data"]
+    B --> F["`composer serve`<br>local runtime"]
+    C --> G["testbench.yaml<br>providers / build config"]
 ```
 
 ## Setup
@@ -29,6 +31,18 @@ flowchart LR
     ```bash
     vendor/bin/testbench workbench:install
     ```
+
+    This command does the following in one step:
+    - Creates the `workbench/` directory structure
+    - Adds Workbench namespaces to `composer.json` `autoload-dev`
+    - Adds build scripts to `composer.json` `scripts`
+
+    <Tip>
+    Additional options:
+    - `--force`: overwrite existing files
+    - `--basic`: minimal setup without routes and package discovery configuration
+    - `--devtool`: enable DevTool support
+    </Tip>
   </Step>
   <Step title="Build and serve">
     ```bash
@@ -44,9 +58,42 @@ flowchart LR
 `workbench:install` prepares the `workbench/` tree, `autoload-dev`, and related scripts in one step.
 </Info>
 
+After installation, `composer.json` includes the following:
+
+```json
+{
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/",
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "@clear",
+            "@prepare"
+        ],
+        "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "build": "@php vendor/bin/testbench workbench:build --ansi",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "@build",
+            "@php vendor/bin/testbench serve --ansi"
+        ]
+    }
+}
+```
+
 ## Define your environment in testbench.yaml
 
 Use `testbench.yaml` in the package root to control providers, migrations, and build steps.
+
+<Warning>
+`testbench.yaml` often contains environment-specific settings. Add it to `.gitignore` and keep a `testbench.yaml.example` template in the repository for other developers.
+</Warning>
 
 ```yaml
 providers:
@@ -59,21 +106,110 @@ migrations:
 workbench:
   start: '/'
   install: true
+  health: false
   discovers:
     web: true
     api: false
-    commands: true
+    commands: false
+    components: false
+    views: false
     config: true
   build:
+    - asset-publish
     - create-sqlite-db
+    - db-wipe
     - migrate-fresh:
         --seed: true
         --seeder: Workbench\Database\Seeders\DatabaseSeeder
+  assets:
+    - laravel-assets
 ```
 
-If you do not want to commit local settings, keep a `testbench.yaml.example` template and ignore `testbench.yaml`.
+Key configuration options:
+
+| Key | Description |
+|---|---|
+| `providers` | Service providers to load in the Workbench environment |
+| `migrations` | Migration directories to run |
+| `workbench.start` | Default URL when running `composer serve` |
+| `workbench.discovers` | Control Laravel package auto-discovery |
+| `workbench.build` | Commands to run during the build step |
+
+You can also set environment variables in `testbench.yaml`:
+
+```yaml
+env:
+  - APP_ENV=testing
+  - APP_KEY=base64:your-app-key
+  - DB_CONNECTION=sqlite
+  - DB_DATABASE=:memory:
+```
+
+## Workbench directory structure
+
+<Tree>
+  <Folder name="workbench" defaultOpen>
+    <Folder name="app" defaultOpen>
+      <Folder name="Http">
+        <Folder name="Controllers" />
+      </Folder>
+      <Folder name="Models" />
+      <Folder name="Providers">
+        <File name="WorkbenchServiceProvider.php" />
+      </Folder>
+    </Folder>
+    <Folder name="bootstrap" />
+    <Folder name="config" />
+    <Folder name="database" defaultOpen>
+      <Folder name="factories" />
+      <Folder name="migrations" />
+      <Folder name="seeders">
+        <File name="DatabaseSeeder.php" />
+      </Folder>
+    </Folder>
+    <Folder name="public" />
+    <Folder name="resources">
+      <Folder name="views" />
+    </Folder>
+    <Folder name="routes">
+      <File name="web.php" />
+      <File name="api.php" />
+      <File name="console.php" />
+    </Folder>
+    <Folder name="storage" />
+  </Folder>
+</Tree>
 
 ## Core features Workbench gives you
+
+### WorkbenchServiceProvider
+
+Create a service provider to register Workbench-specific services and wire up demo routes and views.
+
+```php
+<?php
+
+namespace Workbench\App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use Vendor\Package\SomeClass;
+use Workbench\App\Services\DemoService;
+
+class WorkbenchServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->singleton(DemoService::class);
+    }
+
+    public function boot(): void
+    {
+        SomeClass::register('demo', DemoService::class);
+        $this->loadRoutesFrom(__DIR__.'/../../routes/web.php');
+        $this->loadViewsFrom(__DIR__.'/../../resources/views', 'workbench');
+    }
+}
+```
 
 ### Routes and controllers
 
@@ -103,6 +239,25 @@ Schema::create('widgets', function (Blueprint $table) {
 });
 ```
 
+Populate test data with a seeder:
+
+```php
+<?php
+
+namespace Workbench\Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Workbench\Database\Factories\UserFactory;
+
+class DatabaseSeeder extends Seeder
+{
+    public function run(): void
+    {
+        UserFactory::new()->count(10)->create();
+    }
+}
+```
+
 ### Local runtime and console workflows
 
 Run Artisan commands through `vendor/bin/testbench`.
@@ -113,12 +268,71 @@ vendor/bin/testbench route:list
 vendor/bin/testbench migrate:fresh --seed
 ```
 
+## Testing with the WithWorkbench trait
+
+Use the `WithWorkbench` trait to apply `testbench.yaml` configuration to your automated test suite.
+
+```php
+<?php
+
+namespace Tests;
+
+use Orchestra\Testbench\Concerns\WithWorkbench;
+use Orchestra\Testbench\TestCase as Orchestra;
+
+abstract class TestCase extends Orchestra
+{
+    use WithWorkbench;
+
+    protected function getPackageProviders($app): array
+    {
+        return [
+            \Vendor\Package\Providers\YourServiceProvider::class,
+        ];
+    }
+
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('database.default', 'testing');
+        $app['config']->set('your-package.key', 'test-value');
+    }
+}
+```
+
 ## Combine Workbench with automated tests
 
 Use Workbench for interactive checks and keep your `tests/` directory for repeatable automated assertions.
 
 - Automation: regression safety in `tests/`
 - Interactive verification: end-to-end behavior in `workbench/`
+
+## Troubleshooting
+
+```bash
+# Clear and do a full rebuild
+composer clear && composer prepare && composer build
+
+# Check package discovery
+vendor/bin/testbench package:discover --ansi
+
+# Inspect configuration
+vendor/bin/testbench about
+
+# List all routes
+vendor/bin/testbench route:list
+```
+
+<AccordionGroup>
+  <Accordion title="Workbench fails to build">
+    Check `testbench.yaml` syntax and provider configuration. YAML indentation errors are a common cause.
+  </Accordion>
+  <Accordion title="Routes are not loading">
+    Verify the route file paths and the WorkbenchServiceProvider registration. Confirm that `discovers.web` is set to `true` in `testbench.yaml`.
+  </Accordion>
+  <Accordion title="Database errors">
+    Check that migration paths are correct. When using SQLite, make sure the `create-sqlite-db` build step is included.
+  </Accordion>
+</AccordionGroup>
 
 ## Related pages
 
