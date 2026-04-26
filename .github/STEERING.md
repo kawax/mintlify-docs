@@ -29,42 +29,23 @@
  - [x] 公開されたばかりのパスキーパッケージ。まだタグも付いてないけど今後使われるだろうからすばやく初期調査。 https://github.com/laravel/passkeys-server, https://github.com/laravel/passkeys
 
 ## packages ページ案
-- [x] Amazon Bedrock driver for Laravel AI SDK。https://github.com/invokable/laravel-amazon-bedrock
- - AI SDK公式ドキュメントには全く情報がないのに`ai-sdk-custom-provider`のページを作れたのは実際にカスタムプロバイダーを作っていたから。
- - 実装できるAI SDKの機能はほぼ実装し終わったのでドキュメントページを作る。
- - README.mdの情報でページは作れるはず。他のページのスタイルと合わせる。
- - 他のカスタムプロバイダーの事例は知らないので初かも。
- - BedrockでストリーミングはAWS公式のPHP用SDKでもPrismでも対応できてない。このパッケージが唯一。
 - [x] GitHub Copilot SDK for Laravel。https://github.com/invokable/laravel-copilot-sdk
  - [GitHub Copilot SDK](https://github.com/github/copilot-sdk) のLaravel版。
- - 公式SDKの機能を再現したレイヤーの上にLaravelらしいFacadeを中心にした使い方を提供している。
- - ドキュメントはREADME.mdとdocs/getting-started.mdが英語。docs/jp/内に日本語のドキュメントが大量。公式SDKに英語のドキュメントがしっかりあるので日本語中心にしか用意してない。こっちのマイパッケージで英語ドキュメントを作る。
- - 1ページでは収まらないので`{lang}/packages/laravel-copilot-sdk/`ディレクトリを作ってその中に複数ページに分けて入れる。
- - 一度では終わらないので少しずつ実行する。
- - docs/jp/内のドキュメントの英語版を先に作成。細かいドキュメントは不要かもしれないけど英語版では全部翻訳。
- - `docs/jp/steering.md`はステアリングとキューイング機能の説明なので追加対象。実際に使うことはないけど「Laravelでは使わなくていい」という情報は必要。
- - SDK側のgetting-started.mdを上で作った英語ドキュメントにリンクするように変更するのでその後に`getting-started.mdx`を作成。
- - `index.mdx` 基本的な説明とLaravel版特有機能の説明。ここまで作った各ページへのリンク。
- - 英語版は完成。
- - 最後に日本語ページを作成。日本語版は急がないので`index.mdx`と`getting-started.mdx`の日本語版だけ作って残りは後から。
- - 日本語版は元のSDKリポジトリのdocs/jp/を参照する。日→英→日と翻訳を挟むと情報が抜けすぎる。docs/jp/はGitHubまで見る人用なのでドキュメントサイト用に調整はしていい。コード内のコメントも日本語にする。
- - Laravel SDK側で追加・更新したので英語・日本語ともに反映。`agent-loop.md` `custom-agents.md` `streaming-events.md` `skills.md`は追加。`resume.md` `hooks.md`は更新。
- - 日本語版のページが完成したらnavigationの並びを英語版と揃える。読者が必要とするだろうページを上に並べている。
  - 英語・日本語の全ページ完成。今後も追加・変更はあるだろうけど管理者がIssueを作ってエージェントをアサインして対応していく。
 - [ ] Testbench `package-testing.mdx` が作られてたので次はLaravel Bluesky https://github.com/invokable/laravel-bluesky
  - `docs`内に英語のドキュメントがある。AI普及前なので最低限のドキュメントしかない。
- - docs/workbench.md はBlueskyとは関係ないTestbench Workbenchのドキュメント。Workbenchの情報がなさすぎて調べた結果をとりあえずここに置いていた。こっちのサイトに移せばいいのでworkbench.mdを元に`package-testing.mdx`の続きのページを作成。
+ - [x] docs/workbench.md はBlueskyとは関係ないTestbench Workbenchのドキュメント。Workbenchの情報がなさすぎて調べた結果をとりあえずここに置いていた。こっちのサイトに移せばいいのでworkbench.mdを元に`package-testing.mdx`の続きのページを作成。
  - 残りのページは`{lang}/packages/laravel-bluesky/`内に複数ページで作成。
  - SNSのパッケージは色々作ってるけど基本的なクライアント機能が完成したらNotificationsやSocialiteのLaravelの機能を被せて実際に使うのは通知機能での投稿ばかりなことも多い。
- - BlueskyのSocialiteは他と違うので若干難しい。詳しい説明が必要。
- - Bluesky特有機能でLaravelユーザーが作りやすいのはFeed Generator。
- - Labelerはサーバーとして動かし続ける必要があるのでLaravel Forgeを使っているか自力で構築できる人向け。Laravel Cloudは非対応だった。サンプルのlaralabelerをForgeからCloudに移行しようとしてできなかった。
- - WebSocketはもっと難しいので意図的にドキュメントを作ってないけどこっちで作る。`JetstreamServeCommand` `FirehoseServeCommand`
- - CryptoやCoreまで行くと本当の深淵。AIもない頃に他言語版と仕様を調べまくって作った。PHPでここまで実装してるパッケージが他にあるのかは知らない。Bluesky/AT Protocolの詳細な仕様まで知りたい人向け。
+ - [x] BlueskyのSocialiteは他と違うので若干難しい。詳しい説明が必要。
+ - [x] Bluesky特有機能でLaravelユーザーが作りやすいのはFeed Generator。
+ - [x] Labelerはサーバーとして動かし続ける必要があるのでLaravel Forgeを使っているか自力で構築できる人向け。Laravel Cloudは非対応だった。サンプルのlaralabelerをForgeからCloudに移行しようとしてできなかった。
+ - [x] WebSocketはもっと難しいので意図的にドキュメントを作ってないけどこっちで作る。`JetstreamServeCommand` `FirehoseServeCommand`
+ - [x] CryptoやCoreまで行くと本当の深淵。AIもない頃に他言語版と仕様を調べまくって作った。PHPでここまで実装してるパッケージが他にあるのかは知らない。Bluesky/AT Protocolの詳細な仕様まで知りたい人向け。
  - 詳細なドキュメントを作りたいけど一から調べると大変なのでDeepWikiを参照するのが良さそう。 https://deepwiki.com/invokable/laravel-bluesky
  - DeepWikiのページは再生成された時に変わるので個別ページへのリンクは貼らない。
  - docsにあるページは全部作れたけど元からユーザーが必要な情報が足りてないのでDeepWikiがコードまで見てまとめたページを元にもっとページを作る。
- - App PasswordとOAuthの認証方法の違いと実装アーキテクチャの解説。LegacyAgent/LegacySession/Bluskey::login()とOAuthAgent/OAuthSession/Bluesky::withToken()。認証方法ごとに分けてるけどその先のAPI呼び出しは共通。App Passwordは最初にLegacyと名付けたけど終了予定はないし通知ではApp Passwordの方が使いやすいので両方使うことになる。
+ - [x] App PasswordとOAuthの認証方法の違いと実装アーキテクチャの解説。LegacyAgent/LegacySession/Bluskey::login()とOAuthAgent/OAuthSession/Bluesky::withToken()。認証方法ごとに分けてるけどその先のAPI呼び出しは共通。App Passwordは最初にLegacyと名付けたけど終了予定はないし通知ではApp Passwordの方が使いやすいので両方使うことになる。
  - https://github.com/invokable/atproto-lexicon-contracts でAT Protocol公式のLexicon定義ファイルからPure PHP用のinterfaceやenumを自動生成している。これを元にさらにLaravel用のtraitを自動生成している設計。
  - Bluesky Facadeの実体はBlueskyManagerでよく使うだろうメソッドはHasShortHandトレイトですぐに使えるようにしている。
  - TextBuilderの詳細な使い方。
@@ -76,7 +57,6 @@
           "pages": [
             {
               "group": "Laravel Bluesky",
-              "root": "jp/packages/laravel-bluesky",
               "expanded": false,
               "pages": [
                 "jp/packages/laravel-bluesky/index",
