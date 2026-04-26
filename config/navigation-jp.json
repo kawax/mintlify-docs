@@ -286,6 +286,7 @@
             "jp/advanced/interacts-with-data",
             "jp/advanced/package-versioning",
             "jp/advanced/package-testing",
+            "jp/advanced/package-testing-workbench",
             "jp/advanced/package-workbench"
           ]
         },

@@ -1,0 +1,598 @@
+---
+title: "Testbench Workbench 開発ガイド"
+description: "Orchestra Testbench Workbenchを使って、ルート・コントローラ・マイグレーション・Seederを備えた完全なLaravelアプリとしてパッケージを開発・検証する方法を解説します。"
+---
+
+<Info>
+前のページ: [Orchestra TestbenchでLaravelパッケージをテストする](/jp/advanced/package-testing)
+</Info>
+
+## Workbenchとは
+
+Orchestra Testbench Workbenchは、パッケージリポジトリ内に小さな完全なLaravelアプリケーションを作り出す仕組みです。自動テスト(PHPUnit/Pest)とは別に、ブラウザやHTTPクライアントで実際にパッケージの動作を確認できます。
+
+```mermaid
+flowchart TD
+    A["パッケージ本体<br>`src/`"] --> B["Workbench<br>`workbench/`"]
+    B --> C["WorkbenchServiceProvider<br>デモ用サービス登録"]
+    B --> D["ルート・コントローラ<br>ブラウザで動作確認"]
+    B --> E["マイグレーション・Seeder<br>実データで検証"]
+    B --> F["`composer serve`<br>ローカルサーバー起動"]
+    C --> G["testbench.yaml<br>プロバイダー/ビルド設定"]
+```
+
+Workbenchを使うと次のことができます。
+
+- 実際のLaravelアプリに近い環境でパッケージを動かす
+- ルートやビューを作ってUI/APIを手動確認する
+- シーダーで現実的なデータを準備して結合テストを行う
+- `composer serve` でローカルサーバーを起動してデモアプリとして使う
+
+## インストールとセットアップ
+
+<Steps>
+  <Step title="Orchestra Testbenchをインストールする">
+    ```bash
+    composer require --dev orchestra/testbench
+    ```
+  </Step>
+  <Step title="workbench:installコマンドを実行する">
+    ```bash
+    vendor/bin/testbench workbench:install
+    ```
+
+    このコマンドは以下をまとめて行います。
+    - `workbench/` ディレクトリ構造を作成する
+    - `composer.json` の `autoload-dev` にWorkbench名前空間を追加する
+    - `composer.json` の `scripts` にビルド用コマンドを追加する
+
+    <Tip>
+    追加オプション:
+    - `--force` : 既存ファイルを上書きする
+    - `--basic` : ルート・package discovery設定を省略したシンプルな構成
+    - `--devtool` : DevToolサポートを有効化する
+    </Tip>
+  </Step>
+  <Step title="composer.jsonの設定を確認する">
+    インストール後、`composer.json` には以下が追加されています。
+
+    ```json
+    {
+        "autoload-dev": {
+            "psr-4": {
+                "Tests\\": "tests/",
+                "Workbench\\App\\": "workbench/app/",
+                "Workbench\\Database\\Factories\\": "workbench/database/factories/",
+                "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
+            }
+        },
+        "scripts": {
+            "post-autoload-dump": [
+                "@clear",
+                "@prepare"
+            ],
+            "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
+            "prepare": "@php vendor/bin/testbench package:discover --ansi",
+            "build": "@php vendor/bin/testbench workbench:build --ansi",
+            "serve": [
+                "Composer\\Config::disableProcessTimeout",
+                "@build",
+                "@php vendor/bin/testbench serve --ansi"
+            ]
+        }
+    }
+    ```
+  </Step>
+  <Step title="Workbench環境を初期化する">
+    ```bash
+    composer clear
+    composer prepare
+    composer build
+    ```
+  </Step>
+</Steps>
+
+## testbench.yamlの設定
+
+`testbench.yaml` はWorkbenchの動作を制御するメイン設定ファイルです。パッケージルートに作成します。
+
+<Warning>
+`testbench.yaml` は環境ごとに異なる設定を含むことがあるため、`.gitignore` に追加してコミット対象から外すことが推奨されます。代わりに `testbench.yaml.example` をテンプレートとしてリポジトリに含めてください。
+</Warning>
+
+### 基本設定
+
+```yaml
+providers:
+  - Vendor\Package\PackageServiceProvider
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+migrations:
+  - workbench/database/migrations
+
+workbench:
+  start: '/'
+  install: true
+  health: false
+  discovers:
+    web: true
+    api: false
+    commands: false
+    components: false
+    views: false
+    config: true
+  build:
+    - asset-publish
+    - create-sqlite-db
+    - db-wipe
+    - migrate-fresh:
+        --seed: true
+        --seeder: Workbench\Database\Seeders\DatabaseSeeder
+  assets:
+    - laravel-assets
+```
+
+### 設定オプションの説明
+
+| キー | 説明 |
+|---|---|
+| `providers` | Workbench環境で読み込むサービスプロバイダー一覧 |
+| `migrations` | 実行するマイグレーションディレクトリ |
+| `workbench.start` | `composer serve` 起動時のデフォルトURL |
+| `workbench.install` | ビルド時にパッケージのインストールを実行するか |
+| `workbench.health` | ヘルスチェックを有効にするか |
+| `workbench.discovers` | Laravelのパッケージ自動発見の対象を制御する |
+| `workbench.build` | ビルド時に実行するコマンド一覧 |
+| `workbench.assets` | 公開するアセット一覧 |
+
+### 環境変数の設定
+
+```yaml
+env:
+  - APP_ENV=testing
+  - APP_KEY=base64:your-app-key
+  - DB_CONNECTION=sqlite
+  - DB_DATABASE=:memory:
+  - YOUR_PACKAGE_CONFIG=value
+```
+
+<Tip>
+`testbench.yaml.example` をリポジトリに置いておくと、他の開発者がWorkbench環境を素早くセットアップできます。
+</Tip>
+
+## workbenchディレクトリ構造
+
+`workbench:install` を実行すると、以下のディレクトリ構造が作成されます。
+
+<Tree>
+  <Folder name="workbench" defaultOpen>
+    <Folder name="app" defaultOpen>
+      <Folder name="Http">
+        <Folder name="Controllers" />
+      </Folder>
+      <Folder name="Models" />
+      <Folder name="Providers">
+        <File name="WorkbenchServiceProvider.php" />
+      </Folder>
+    </Folder>
+    <Folder name="bootstrap" />
+    <Folder name="config" />
+    <Folder name="database" defaultOpen>
+      <Folder name="factories" />
+      <Folder name="migrations" />
+      <Folder name="seeders">
+        <File name="DatabaseSeeder.php" />
+      </Folder>
+    </Folder>
+    <Folder name="public" />
+    <Folder name="resources">
+      <Folder name="views" />
+      <Folder name="js" />
+    </Folder>
+    <Folder name="routes">
+      <File name="web.php" />
+      <File name="api.php" />
+      <File name="console.php" />
+    </Folder>
+    <Folder name="storage" />
+  </Folder>
+</Tree>
+
+## Workbenchコンポーネントの作成
+
+### WorkbenchServiceProvider
+
+Workbench専用のサービスプロバイダーを作成して、デモ用の登録処理を行います。
+
+```php
+<?php
+
+namespace Workbench\App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use Vendor\Package\SomeClass;
+use Workbench\App\Services\DemoService;
+
+class WorkbenchServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->singleton(DemoService::class);
+    }
+
+    public function boot(): void
+    {
+        // パッケージ拡張やデモ機能を登録する
+        SomeClass::register('demo', DemoService::class);
+
+        // Workbenchのルートを読み込む
+        $this->loadRoutesFrom(__DIR__.'/../../routes/web.php');
+
+        // Workbenchのビューを読み込む
+        $this->loadViewsFrom(__DIR__.'/../../resources/views', 'workbench');
+    }
+}
+```
+
+### DatabaseSeeder
+
+テストデータを生成するSeederを作成します。
+
+```php
+<?php
+
+namespace Workbench\Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Workbench\Database\Factories\UserFactory;
+
+class DatabaseSeeder extends Seeder
+{
+    public function run(): void
+    {
+        UserFactory::new()->count(10)->create();
+
+        $this->call([
+            PackageDataSeeder::class,
+        ]);
+    }
+}
+```
+
+### Modelファクトリー
+
+テスト・デモデータ生成用のファクトリーを作成します。
+
+```php
+<?php
+
+namespace Workbench\Database\Factories;
+
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Workbench\App\Models\User;
+
+class UserFactory extends Factory
+{
+    protected $model = User::class;
+
+    public function definition(): array
+    {
+        return [
+            'name' => $this->faker->name(),
+            'email' => $this->faker->unique()->safeEmail(),
+            'email_verified_at' => now(),
+            'password' => bcrypt('password'),
+        ];
+    }
+}
+```
+
+### コントローラとルート
+
+パッケージ機能を確認するためのコントローラを作成します。
+
+```php
+<?php
+
+namespace Workbench\App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Vendor\Package\Facades\YourPackage;
+
+class DemoController extends Controller
+{
+    public function index()
+    {
+        $data = YourPackage::getData();
+
+        return view('workbench::demo', compact('data'));
+    }
+
+    public function api()
+    {
+        return response()->json([
+            'package_version' => YourPackage::version(),
+            'features' => YourPackage::getFeatures(),
+        ]);
+    }
+}
+```
+
+`workbench/routes/web.php` にルートを定義します。
+
+```php
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Workbench\App\Http\Controllers\DemoController;
+
+Route::get('/', [DemoController::class, 'index']);
+Route::get('/api/demo', [DemoController::class, 'api']);
+```
+
+### コンソールコマンド
+
+`workbench/routes/console.php` でArtisanコマンドを定義できます。
+
+```php
+<?php
+
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Artisan;
+
+Artisan::command('inspire', function () {
+    $this->comment(Inspiring::quote());
+})->purpose('Display an inspiring quote');
+```
+
+Workbenchのコンソールコマンドは `vendor/bin/testbench` 経由で実行します。
+
+```bash
+vendor/bin/testbench inspire
+vendor/bin/testbench list
+```
+
+## WithWorkbenchトレイトを使ったテスト
+
+WorkbenchをテストスイートにもIntegrateできます。`WithWorkbench` トレイトを使うと、`testbench.yaml` の設定がテストにも適用されます。
+
+```php
+<?php
+
+namespace Tests;
+
+use Orchestra\Testbench\Concerns\WithWorkbench;
+use Orchestra\Testbench\TestCase as Orchestra;
+
+abstract class TestCase extends Orchestra
+{
+    use WithWorkbench;
+
+    protected function getPackageProviders($app): array
+    {
+        return [
+            \Vendor\Package\Providers\YourServiceProvider::class,
+        ];
+    }
+
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('database.default', 'testing');
+        $app['config']->set('your-package.key', 'test-value');
+    }
+}
+```
+
+### フィーチャーテストの例
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+
+class WorkbenchIntegrationTest extends TestCase
+{
+    public function test_workbench_routes_are_accessible(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+        $response->assertViewIs('workbench::demo');
+    }
+
+    public function test_package_api_integration(): void
+    {
+        $response = $this->get('/api/demo');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'package_version',
+            'features',
+        ]);
+    }
+}
+```
+
+<Info>
+`WithWorkbench` を使うと、自動テストとWorkbenchの設定を共有できるため、テスト環境と手動確認環境の一貫性を保てます。
+</Info>
+
+## 開発ワークフロー
+
+### 日常の開発サイクル
+
+```bash
+# 開発サーバーを起動する
+composer serve
+
+# 変更後にWorkbenchをリビルドする
+composer build
+
+# テストを実行する
+composer test
+```
+
+### `composer serve` の仕組み
+
+`composer serve` は内部で次の処理を順に実行します。
+
+1. `composer build` でWorkbenchアプリをビルドする
+2. `vendor/bin/testbench serve` でローカルサーバーを起動する
+
+`http://localhost:8000` でWorkbenchアプリにアクセスできます。
+
+### パッケージ開発サイクル
+
+<Steps>
+  <Step title="パッケージコードを書く">
+    `src/` 以下にパッケージのロジックを実装する。
+  </Step>
+  <Step title="testbench.yamlを更新する">
+    必要なプロバイダーやビルドステップを設定する。
+  </Step>
+  <Step title="Workbenchをビルドする">
+    ```bash
+    composer build
+    ```
+  </Step>
+  <Step title="動作を確認する">
+    Workbenchのルートやコントローラを使ってブラウザやHTTPクライアントで確認する。
+  </Step>
+  <Step title="繰り返す">
+    変更のたびに `composer build` を実行してWorkbenchを更新する。
+  </Step>
+</Steps>
+
+## 高度な設定
+
+### アセット管理
+
+フロントエンドアセットがあるパッケージの場合。
+
+```yaml
+workbench:
+  assets:
+    - laravel-assets
+    - package-assets
+  build:
+    - asset-publish
+    - npm-install
+    - npm-run-build
+```
+
+### データベース設定のカスタマイズ
+
+SQLite以外のデータベースを使う場合。
+
+```yaml
+env:
+  - DB_CONNECTION=mysql
+  - DB_HOST=127.0.0.1
+  - DB_PORT=3306
+  - DB_DATABASE=workbench_test
+  - DB_USERNAME=root
+  - DB_PASSWORD=
+
+migrations:
+  - workbench/database/migrations
+  - vendor/other-package/migrations
+```
+
+### パッケージの種類別設定例
+
+<AccordionGroup>
+  <Accordion title="API提供パッケージ">
+    ```yaml
+    workbench:
+      discovers:
+        api: true
+      build:
+        - create-sqlite-db
+        - migrate-fresh
+    ```
+  </Accordion>
+  <Accordion title="UIコンポーネントパッケージ">
+    ```yaml
+    workbench:
+      discovers:
+        views: true
+        components: true
+      assets:
+        - laravel-assets
+        - npm-install
+        - npm-run-build
+    ```
+  </Accordion>
+  <Accordion title="外部サービス連携パッケージ">
+    ```yaml
+    env:
+      - SERVICE_API_KEY=test-key
+      - SERVICE_ENDPOINT=https://api.example.com
+
+    workbench:
+      health: true
+      build:
+        - service-health-check
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## トラブルシューティング
+
+### デバッグコマンド
+
+```bash
+# クリアしてフルリビルド
+composer clear && composer prepare && composer build
+
+# パッケージ自動発見を確認する
+vendor/bin/testbench package:discover --ansi
+
+# 設定を確認する
+vendor/bin/testbench about
+
+# ルート一覧を確認する
+vendor/bin/testbench route:list
+```
+
+### よくある問題
+
+<AccordionGroup>
+  <Accordion title="Workbenchがビルドできない">
+    `testbench.yaml` の構文とプロバイダー設定を確認してください。YAMLのインデントエラーが原因になることがあります。
+  </Accordion>
+  <Accordion title="ルートが読み込まれない">
+    ルートファイルのパスとWorkbenchServiceProviderの登録を確認してください。`testbench.yaml` の `discovers.web` が `true` になっているか確認します。
+  </Accordion>
+  <Accordion title="データベースエラーが発生する">
+    マイグレーションのパスが正しいか、データベース設定が適切かを確認してください。SQLiteを使う場合は `create-sqlite-db` ビルドステップが含まれているか確認します。
+  </Accordion>
+  <Accordion title="アセットが公開されない">
+    `workbench.assets` と `workbench.build` の `asset-publish` 設定を確認してください。
+  </Accordion>
+</AccordionGroup>
+
+## ベストプラクティス
+
+- **Workbenchとパッケージコードを分離する**: `workbench/` はデモ・検証用コードのみ。パッケージロジックは `src/` に集約する
+- **環境変数は `.env` ではなく `testbench.yaml` の `env:` で管理する**
+- **`testbench.yaml.example` をリポジトリに含める**: 他の開発者がすぐにセットアップできるようにする
+- **Workbenchと自動テストを使い分ける**: 回帰テストは `tests/` で自動化し、統合的な動作確認は `workbench/` で行う
+- **composerスクリプトを活用する**: `composer serve`, `composer build` で開発作業を効率化する
+
+## 関連ページ
+
+<Columns cols={2}>
+  <Card title="Orchestra TestbenchでLaravelパッケージをテストする" icon="flask-conical" href="/jp/advanced/package-testing">
+    パッケージテスト基盤の構築方法を確認します。
+  </Card>
+  <Card title="パッケージのバージョン互換性管理" icon="git-branch" href="/jp/advanced/package-versioning">
+    LaravelとTestbenchの対応表とCIマトリクス運用を確認します。
+  </Card>
+</Columns>
+
+<Info>
+Source: [invokable/laravel-bluesky docs/workbench.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/workbench.md), [Orchestra Testbench](https://github.com/orchestral/testbench)
+</Info>
