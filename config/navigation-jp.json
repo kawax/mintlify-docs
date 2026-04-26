@@ -419,6 +419,7 @@
               "pages": [
                 "jp/packages/laravel-bluesky/index",
                 "jp/packages/laravel-bluesky/basic-client",
+                "jp/packages/laravel-bluesky/authentication",
                 "jp/packages/laravel-bluesky/socialite",
                 "jp/packages/laravel-bluesky/notification",
                 "jp/packages/laravel-bluesky/testing",
