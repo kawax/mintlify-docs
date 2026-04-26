@@ -220,6 +220,36 @@ Bluesky::withToken($session)->like($ref);
 Bluesky::withToken($session)->repost($ref);
 ```
 
+### Update your profile
+
+`upsertProfile()` fetches the current profile and persists any changes made inside the closure. Use the `Profile` object's methods to set the display name, description, and more.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Profile;
+
+Bluesky::login(config('bluesky.identifier'), config('bluesky.password'))
+    ->upsertProfile(function (Profile $profile) {
+        $profile->displayName('New display name')
+                ->description('Profile description text');
+    });
+```
+
+#### Self-labels
+
+Use `SelfLabels` to add self-labels to the account.
+
+```php
+use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Record\Profile;
+use Revolution\Bluesky\Types\SelfLabels;
+
+Bluesky::login(config('bluesky.identifier'), config('bluesky.password'))
+    ->upsertProfile(function (Profile $profile) {
+        $profile->labels(SelfLabels::make(['!no-unauthenticated']));
+    });
+```
+
 ### Call any API directly
 
 When `HasShortHand` does not have a shortcut for what you need, use `send()` or `client()`.
