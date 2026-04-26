@@ -47,6 +47,9 @@
   "styling": {
     "eyebrows": "breadcrumbs"
   },
+  "interaction": {
+    "drilldown": false
+  },
   "metadata": {
     "timestamp": true
   },

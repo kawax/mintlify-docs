@@ -74,6 +74,7 @@ Mintlifyの対応言語：https://www.mintlify.com/docs/organize/navigation#lang
 - `mint update` — update the CLI to latest version
 
 `mint broken-links`での`/llms.txt`エラーは無視していい。
+index.mdxへの`warning - "jp/packages/laravel-copilot-sdk" is referenced in the docs.json navigation but the file does not exist.`エラーは無視していい。
 
 Playwright MCPでスクリーンショットを撮ってプルリクに添付。
 

@@ -69,7 +69,7 @@
  - Bluesky Facadeの実体はBlueskyManagerでよく使うだろうメソッドはHasShortHandトレイトですぐに使えるようにしている。
  - TextBuilderの詳細な使い方。
 
-仮でSNSグループに配置。index.mdxは`jp/packages/laravel-bluesky`なのでpagesに追加したり`laravel-bluesky/index`に変更は不要。内側のpagesに他のページを追加していく。
+仮でSNSグループに配置。内側のpagesに他のページを追加していく。
 ```json
         {
           "group": "SNS",
@@ -79,6 +79,7 @@
               "root": "jp/packages/laravel-bluesky",
               "expanded": false,
               "pages": [
+                "jp/packages/laravel-bluesky/index",
                 "jp/packages/laravel-bluesky/basic-client"
               ]
             }

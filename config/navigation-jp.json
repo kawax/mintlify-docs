@@ -363,9 +363,9 @@
             "jp/packages/laravel-boost-phpstorm-copilot",
             {
               "group": "GitHub Copilot SDK for Laravel",
-              "root": "jp/packages/laravel-copilot-sdk",
               "expanded": false,
               "pages": [
+                "jp/packages/laravel-copilot-sdk/index",
                 "jp/packages/laravel-copilot-sdk/getting-started",
                 "jp/packages/laravel-copilot-sdk/auth",
                 "jp/packages/laravel-copilot-sdk/session-config",
@@ -415,9 +415,9 @@
           "pages": [
             {
               "group": "Laravel Bluesky",
-              "root": "jp/packages/laravel-bluesky",
               "expanded": false,
               "pages": [
+                "jp/packages/laravel-bluesky/index",
                 "jp/packages/laravel-bluesky/basic-client",
                 "jp/packages/laravel-bluesky/socialite",
                 "jp/packages/laravel-bluesky/notification",
