@@ -30,6 +30,7 @@
  - [x] 公開されたばかりのパスキーパッケージ。まだタグも付いてないけど今後使われるだろうからすばやく初期調査。 https://github.com/laravel/passkeys-server, https://github.com/laravel/passkeys
 
 ## packages ページ案
+- [x] Amazon Bedrock driver for Laravel AI SDK https://github.com/invokable/laravel-amazon-bedrock
 - [x] GitHub Copilot SDK for Laravel。https://github.com/invokable/laravel-copilot-sdk
  - [GitHub Copilot SDK](https://github.com/github/copilot-sdk) のLaravel版。
  - 英語・日本語の全ページ完成。今後も追加・変更はあるだろうけど管理者がIssueを作ってエージェントをアサインして対応していく。
@@ -47,9 +48,13 @@
  - DeepWikiのページは再生成された時に変わるので個別ページへのリンクは貼らない。
  - docsにあるページは全部作れたけど元からユーザーが必要な情報が足りてないのでDeepWikiがコードまで見てまとめたページを元にもっとページを作る。
  - [x] App PasswordとOAuthの認証方法の違いと実装アーキテクチャの解説。LegacyAgent/LegacySession/Bluskey::login()とOAuthAgent/OAuthSession/Bluesky::withToken()。認証方法ごとに分けてるけどその先のAPI呼び出しは共通。App Passwordは最初にLegacyと名付けたけど終了予定はないし通知ではApp Passwordの方が使いやすいので両方使うことになる。
- - https://github.com/invokable/atproto-lexicon-contracts でAT Protocol公式のLexicon定義ファイルからPure PHP用のinterfaceやenumを自動生成している。これを元にさらにLaravel用のtraitを自動生成している設計。
- - Bluesky Facadeの実体はBlueskyManagerでよく使うだろうメソッドはHasShortHandトレイトですぐに使えるようにしている。
- - TextBuilderの詳細な使い方。
+ - https://github.com/invokable/atproto-lexicon-contracts でAT Protocol公式のLexicon定義ファイルからPure PHP用のinterfaceやenumを自動生成している。これを元にさらにLaravel用のtraitを自動生成している設計。`src/Client/Concerns`
+ - [x] Bluesky Facadeの実体はBlueskyManagerでよく使うだろうメソッドはHasShortHandトレイトですぐに使えるようにしている。ShortHandを用意は公式SDKと同じ仕組み。
+ - [x] TextBuilderの詳細な使い方。
+ - [ ] AT Proto公式チュートリアルのLaravel版。 https://atproto.com/guides/bot-tutorial https://atproto.com/ja/guides/bot-tutorial 。`lex`コマンドは後から登場した仕組みでおそらくTypeScript用、laravel-blueskyパッケージでは関係ないので無視する（atproto-lexicon-contractsからの自動生成で事前に全部取り込んでる形）。他はartisanコマンドで実装、タスクスケジュールもしくはGitHub Actionsで自動実行、使用するメソッドはHasShortHandにほぼある、AIはLaravel AI SDK / laravel-amazon-bedrock。Laravelで再現する機能は揃ってるはずなので作成できる。
+  - 最初に公式チュートリアルのLaravel版である説明を記載。
+  - パート3のlabelAsBotは別artisanコマンドにする。
+  - ページの最後に他の公式チュートリアルについても少し説明。カスタムフィードはfeed-generator.mdxで十分、OAuthはSocialiteを使えばいいので公式より簡単、ソーシャルアプリ(statusphere-tutorial)はすでにLaravel版を作っている https://github.com/invokable/statusphere 、`lex`や`tap`コマンドを使ってない以前のstatusphereを元にしているので最新のチュートリアルとは少し違う。
 
 仮でSNSグループに配置。内側のpagesに他のページを追加していく。
 ```json
