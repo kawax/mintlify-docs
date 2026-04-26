@@ -428,6 +428,7 @@
                 "jp/packages/laravel-bluesky/verify",
                 "jp/packages/laravel-bluesky/feed-generator",
                 "jp/packages/laravel-bluesky/labeler",
+                "jp/packages/laravel-bluesky/bluesky-manager",
                 "jp/packages/laravel-bluesky/websocket",
                 "jp/packages/laravel-bluesky/crypto",
                 "jp/packages/laravel-bluesky/core"
