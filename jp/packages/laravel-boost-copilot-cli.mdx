@@ -40,6 +40,35 @@ copilot
 
 Copilot CLI はプロジェクトルートの `.mcp.json` を自動読み込みするため、追加設定は不要です。
 
+## カスタマイズ
+
+`config/boost.php` を公開することで、ガイドラインファイルの生成先パスを変更できます。
+
+```shell
+php artisan vendor:publish --tag=boost-config
+```
+
+`config/boost.php` に `agents` を追加します。Copilot CLI を公式の Copilot（VS Code）と揃えるには `AGENTS.md` を指定します。逆に Copilot（VS Code）側を変更することもできます。
+
+```php
+'executable_paths' => [],
+
+'agents' => [
+    // Copilot CLI
+    'copilot_cli' => [
+        'guidelines_path' => 'AGENTS.md',
+    ],
+    // Copilot(VS Code)
+    'copilot' => [
+        'guidelines_path' => '.github/instructions/laravel-boost.instructions.md',
+    ],
+],
+```
+
+<Warning>
+`agents` はドキュメントに記載されていない機能のため、バージョンアップで変更される可能性があります。
+</Warning>
+
 ## Testbench 対応（パッケージ開発者向け）
 
 このパッケージは、Laravel Boost 公式ではカバーしづらい Testbench 前提の運用に対応しやすい構成を提供します。
