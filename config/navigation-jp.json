@@ -328,6 +328,7 @@
         {
           "group": "新リポジトリ調査",
           "pages": [
+            "jp/blog/agent-detector-introduction",
             "jp/blog/maestro-introduction",
             "jp/blog/agent-skills-introduction",
             "jp/blog/laravel-ecosystem-analysis",
