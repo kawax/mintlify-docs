@@ -66,6 +66,22 @@ BLUESKY_OAUTH_PRIVATE_KEY="..."
 Bluesky の場合、`client_id` や `client_secret` の登録は不要です。秘密鍵の設定だけで OAuth 認証を使えます。
 </Info>
 
+### デフォルトのOAuthスコープ
+
+パッケージは3つの主要なユースケースをサポートするデフォルトのOAuthスコープで設定されています。
+
+1. **Socialiteログイン** — `atproto`、`account:email`、`include:app.bsky.authViewAll` でユーザー認証とメールアクセスを有効にします
+2. **投稿** — `include:app.bsky.authCreatePosts` と `blob:*/*` で投稿の作成と画像・動画のアップロードを許可します
+3. **DM通知** — `rpc:chat.bsky.convo.sendMessage` と `rpc:chat.bsky.convo.getConvoForMembers` で通知用のダイレクトメッセージ送信を有効にします
+
+`BLUESKY_OAUTH_SCOPE` 環境変数を設定することでスコープをカスタマイズできます。
+
+```dotenv
+BLUESKY_OAUTH_SCOPE="atproto account:email include:app.bsky.authViewAll"
+```
+
+利用可能なスコープの詳細については、[AT Protocol Permission Requestsドキュメント](https://atproto.com/guides/permission-requests)を参照してください。
+
 ### ローカル開発
 
 デフォルトでは `http://localhost` と `http://127.0.0.1:8000/` が設定されているため、ローカル開発では追加の設定は不要です。

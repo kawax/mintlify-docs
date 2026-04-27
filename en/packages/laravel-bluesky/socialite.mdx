@@ -66,6 +66,22 @@ BLUESKY_OAUTH_PRIVATE_KEY="..."
 For Bluesky, you don't need to register a `client_id` or `client_secret`. Setting the private key is the only required step.
 </Info>
 
+### Default OAuth scopes
+
+The package is configured with default OAuth scopes to support three main use cases:
+
+1. **Socialite Login** — `atproto`, `account:email`, and `include:app.bsky.authViewAll` enable user authentication and email access
+2. **Posting** — `include:app.bsky.authCreatePosts` and `blob:*/*` allow creating posts and uploading images/videos
+3. **DM Notifications** — `rpc:chat.bsky.convo.sendMessage` and `rpc:chat.bsky.convo.getConvoForMembers` enable sending direct messages for notifications
+
+You can customize the scopes by setting the `BLUESKY_OAUTH_SCOPE` environment variable:
+
+```dotenv
+BLUESKY_OAUTH_SCOPE="atproto account:email include:app.bsky.authViewAll"
+```
+
+For more information about available scopes, see the [AT Protocol Permission Requests documentation](https://atproto.com/guides/permission-requests).
+
 ### Local development
 
 By default, `http://localhost` and `http://127.0.0.1:8000/` are preconfigured, so no additional `.env` settings are needed for local development.
