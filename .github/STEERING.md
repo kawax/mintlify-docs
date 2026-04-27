@@ -6,10 +6,11 @@
 - マイパッケージの解説ページ。下のpackages ページ案に追加されたら対応。
 - [x] 重複ページを作り出してるのでここまでの完了したタスクを削除。公式ドキュメントを元にしたページは揃ってきた感じなので独自コンテンツを増やしていける段階。
  - 重複しても新しい情報があればプルリクの段階でページを統合して更新するように指示できるので「既存ページの再レビュー・改修」ができて問題ないかもしれない。
+- [ ] https://github.com/laravel/docs/pull/11172 MCP Apps対応で文量が多いのでmcp.mdxにも反映。
 
 ## 継続対応
 
-- 新規ページ追加、翻訳ページ追加、既存ページの再レビュー・改修のタスクをバランスよくやっていく。AI SDKのような新しい機能のページはハルシネーションが発生していて管理者が発見して修正しているのでたまに再レビューが必要。
+- 新規ページ追加、翻訳ページ追加、既存ページの再レビュー・改修のタスクをバランスよくやっていく。`laravel/docs`はちょくちょく変更されてる。
 - docs.jsonの`navigation`を全体を見て再配置。`config/`内に言語ごとに分割済み。ページを追加していくだけだと適切な分類ではなくなるのでたまに修正。
 - ページ間リンクの追加。
 
@@ -19,6 +20,13 @@
  - `package-versioning`が作られたけど今後もネタがあれば継続。
 - [x] Laravel Cloudも2025年からなので実際に使った人しか知らない情報が多い。一般的なLaravel専用PaaSって部分以上だと、Task SchedulerやバックグラウンドプロセスやNightwatch連携はForge同様に簡単、Octaneの使用が簡単、Inertia SSRの使用が簡単、WebSocketサーバーが簡単に導入可能。Laravelの高度な機能まで使い込んでる人が欲しい機能が全部揃っている。Forgeと比べて足りないのはroot権限がない。
  - 使っていくうちに新しい情報が入ったら後で追加。
+ - [ ] Hibernation 日本語だと休止かな。Laravel Cloudはサーバーが稼働中のみ課金されるので費用を抑えるには自動休止を有効にする。休止中はタスクスケジュールもキューも動かないので個人用途でタスクスケジュールで自動実行する用途では使いにくい。Httpリクエストがあれば休止から復帰するけど関係ないリクエストでも復帰する、最近追加された「Path Blocking」を有効にすれば`.php`へのリクエストなどをブロックして不要な復帰を防げる。
+```
+Blocked extensions
+.php, .php3, .php4, .php5, .php6, .php7, .php8, .phtml, .pht, .phps, .env, .git
+Blocked paths
+/wp-admin, /wp-content, /wp-includes, /wp-json
+```
 
 ## blog ページ案
 
@@ -28,6 +36,8 @@
  - [x] laravel-ecosystem-analysis: surveyor, ranger, roster
  - [x] sentinel-introduction
  - [x] 公開されたばかりのパスキーパッケージ。まだタグも付いてないけど今後使われるだろうからすばやく初期調査。 https://github.com/laravel/passkeys-server, https://github.com/laravel/passkeys
+ - [x] agent-detector はここに書く前にCommanderの判断で追加された。元はLaravelチームメンバーの個人開発パッケージをLaravel公式に移行したようだ。
+ - [ ] https://github.com/laravel/pao PAOも同様に個人から公式に移行。GitHub Copilotがプレミアムリクエストからトークン数ベースの料金に変わるので今後は必要になる。スターターキットでもデフォルトでインストールされるようになる。
 
 ## packages ページ案
 - [x] Amazon Bedrock driver for Laravel AI SDK https://github.com/invokable/laravel-amazon-bedrock
