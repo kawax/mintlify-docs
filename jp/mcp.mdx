@@ -610,6 +610,159 @@ class UserDashboardResource extends Resource
 | `#[Priority]` | float | 重要度スコア（0.0〜1.0） |
 | `#[LastModified]` | string | ISO 8601形式の最終更新日時 |
 
+## アプリ
+
+Laravel MCPは[MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview)をサポートしています。これはModel Context Protocolの拡張機能で、ツールがサポートされたホスト内のサンドボックスiframe上でインタラクティブなHTMLアプリケーションをレンダリングできるようにします。これにより、プレーンテキストのレスポンスを超えた、ダッシュボード、フォーム、ビジュアライゼーション、その他のリッチな体験を構築できます。
+
+MCPアプリは以下の2つのパーツが連携して動作します。
+
+- **アプリリソース** — アプリケーションの自己完結型HTMLを返します。
+- **ツール** — `#[RendersApp]` アトリビュートを使ってアプリリソースにリンクされます。ツールが呼び出されると、ホストがリンクされたリソースを取得してレンダリングします。
+
+### アプリリソースの作成
+
+`make:mcp-app-resource` Artisanコマンドでアプリリソースを作成できます。
+
+```shell
+php artisan make:mcp-app-resource WeatherDashboardApp
+```
+
+このコマンドは2つのファイルを作成します。`app/Mcp/Resources` 内のPHPクラスと `resources/views/mcp` 内のBladeビューです。ビュー名はクラス名から自動的に推測されます。たとえば `WeatherDashboardApp` は `mcp.weather-dashboard-app` にマッピングされます。
+
+```php
+<?php
+
+namespace App\Mcp\Resources;
+
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\AppMeta;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\AppResource;
+
+#[Description('An interactive weather dashboard.')]
+#[AppMeta]
+class WeatherDashboardApp extends AppResource
+{
+    /**
+     * Handle the app resource request.
+     */
+    public function handle(Request $request): Response
+    {
+        return Response::view('mcp.weather-dashboard-app', [
+            'title' => $this->title(),
+        ]);
+    }
+}
+```
+
+`AppResource` はベースの `Resource` クラスを継承し、MCP Apps仕様で要求される `ui://` URIスキームと `text/html;profile=mcp-app` MIMEタイプを自動的に設定します。他のリソースと同様に、サーバーの `$resources` 配列に登録する必要があります。
+
+生成されたBladeビューは `<x-mcp::app>` コンポーネントを使用します。このコンポーネントはクライアントサイドのMCP SDKがバンドルされた完全なHTMLドキュメントをレンダリングします。
+
+```blade
+<x-mcp::app :title="$title">
+    <x-slot:head>
+        <script type="module">
+        createMcpApp(async (app) => {
+            document.getElementById('run-btn').addEventListener('click', async () => {
+                const result = await app.callServerTool('get-weather-data', {});
+                document.getElementById('output').textContent = result.content[0]?.text ?? '';
+            });
+        });
+        </script>
+    </x-slot:head>
+
+    <div id="app">
+        <button id="run-btn">Refresh</button>
+        <p id="output"></p>
+    </div>
+</x-mcp::app>
+```
+
+`createMcpApp` グローバル関数はバンドルされたSDKが提供します。iframeのサーバーへの接続、ホストテーマの適用、`callServerTool`・`sendMessage`・`openLink`などのヘルパーやイベントコールバックの公開を処理します。完全なクライアントサイドAPIについては[MCP Apps仕様](https://modelcontextprotocol.io/extensions/apps/overview)を参照してください。
+
+### ツールからアプリをレンダリング
+
+アプリリソースを表示するには、`#[RendersApp]` アトリビュートを使ってツールにリンクします。ツールが呼び出されると、Laravel MCPはリソースのURIをツールのメタデータに含め、ホストがサンドボックスiframe内でアプリをレンダリングできるようにします。
+
+```php
+<?php
+
+namespace App\Mcp\Tools;
+
+use App\Mcp\Resources\WeatherDashboardApp;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Attributes\RendersApp;
+use Laravel\Mcp\Server\Tool;
+
+#[RendersApp(resource: WeatherDashboardApp::class)]
+class ShowWeatherDashboard extends Tool
+{
+    /**
+     * Handle the tool request.
+     */
+    public function handle(Request $request): Response
+    {
+        return Response::text('Weather dashboard loaded.');
+    }
+}
+```
+
+<Info>
+`AppResource` が登録されると、Laravel MCPは自動的に `io.modelcontextprotocol/ui` ケイパビリティをアドバタイズします。追加のサーバー設定は不要です。
+</Info>
+
+### アプリツールの可視性
+
+各 `#[RendersApp]` ツールは `visibility` 引数で呼び出し元を制限できます。これは、UIがデータを読み込み・更新するために呼び出すプライベートなアプリ専用ツールを、モデルからは見えないようにする場合に便利です。
+
+```php
+use Laravel\Mcp\Server\Attributes\RendersApp;
+use Laravel\Mcp\Server\Ui\Enums\Visibility;
+
+#[RendersApp(resource: WeatherDashboardApp::class, visibility: [Visibility::App])]
+class GetWeatherData extends Tool
+{
+    // ...
+}
+```
+
+`Visibility` enumには `Model` と `App` の2つのケースがあり、デフォルトは両方です。UIが直接呼び出すバックエンドアクションには `[Visibility::App]` を、UIからツールを利用不可にするには `[Visibility::Model]` を使います。
+
+### アプリの設定
+
+アプリリソースの `#[AppMeta]` アトリビュートで、iframeのContent Security Policy、ブラウザ権限、ビューの `<head>` に含めるライブラリスクリプトを設定します。
+
+```php
+use Laravel\Mcp\Server\Attributes\AppMeta;
+use Laravel\Mcp\Server\Ui\Enums\Library;
+use Laravel\Mcp\Server\Ui\Enums\Permission;
+
+#[AppMeta(
+    connectDomains: ['https://api.weather.com'],
+    permissions: [Permission::Geolocation],
+    libraries: [Library::Tailwind, Library::Alpine],
+)]
+class WeatherDashboardApp extends AppResource
+{
+    // ...
+}
+```
+
+`Library` enumには `Library::Tailwind` や `Library::Alpine` など一般的なフロントエンドライブラリのCDNスクリプトが事前設定されており、CDNオリジンは自動的にCSPにマージされます。`Permission` enumは `Camera`・`Microphone`・`Geolocation`・`ClipboardWrite` などのブラウザ権限をカバーします。
+
+<Tip>
+動的な設定が必要な場合は、`Laravel\Mcp\Server\Ui` 名前空間の `AppMeta`・`Csp`・`Permissions` フルエントビルダーを使ってリソースの `appMeta` メソッドをオーバーライドします。
+</Tip>
+
+### Boostを使ったアプリ開発
+
+Laravel MCPにはMCP Appsを構築するための専用[Boost](/jp/boost)スキルリファレンスが含まれています。Laravel Boostがインストールされていれば、AIコーディングエージェントが `mcp-development` スキルを呼び出し、アプリリソース、Bladeビュー、リンクされたツールを自動生成できます。
+
+プロトコルの完全なリファレンス（クライアントサイドAPIやスキーマの詳細を含む）については、公式の[MCP Appsドキュメント](https://modelcontextprotocol.io/extensions/apps/overview)を参照してください。
+
 ## メタデータ
 
 MCP仕様の `_meta` フィールドをツール、リソース、プロンプトのレスポンスに付加できます。
