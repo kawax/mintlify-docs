@@ -2,8 +2,6 @@
 
 Mintlifyを使ったLaravelのチュートリアルから高度な情報まで提供するドキュメントサイト。GitHub Agentic Workflowsを使って自動で更新し続ける。
 
-This is a Mintlify documentation site. Pages are MDX files with YAML frontmatter. Site configuration lives in `docs.json`.
-
 ## 大事な制限
 
 必ず公式の一次情報のみを参照する。
@@ -78,13 +76,6 @@ index.mdxへの`warning - "jp/packages/laravel-copilot-sdk" is referenced in the
 
 Playwright MCPでスクリーンショットを撮ってプルリクに添付。
 
-## Architecture
-
-- `docs.json` — central config: navigation structure, theme, logos, navbar, footer, and anchors. Every new page must be added to the `navigation` section here or it won't appear in the site.
-- `snippets/` — reusable MDX fragments imported into other pages with `<Snippet file="snippet-intro.mdx" />`.
-- `images/` and `logo/` — static assets referenced from MDX pages and `docs.json`.
-- `.mintignore` — files excluded from the Mintlify build (similar to `.gitignore` syntax). `drafts/`[copilot-instructions.md](copilot-instructions.md) and `*.draft.mdx` are ignored.
-
 ## docs.json
 
 ページが増えてきたので`$ref`を使って`navigation`を分割。言語ごとのページはそれぞれのファイルに記載。もっとページが増えたらここからさらに分割。
@@ -94,41 +85,41 @@ Playwright MCPでスクリーンショットを撮ってプルリクに添付。
 
 新しいページは基本的にはグループの一番下に追加。
 
-## Writing conventions
+## 執筆規約
 
-- Use active voice and second person ("you").
-- One idea per sentence.
-- Sentence case for headings.
-- Bold for UI elements: Click **Settings**.
-- Inline code for file names, commands, paths, and code references.
-- Lead with the goal in instructions — start with what the user wants to accomplish.
+- アクティブボイス、二人称で書く（「あなたは」「~してください」など）
+- 1つの文には1つのアイデアのみ
+- 見出しは文頭大文字（例：「このページについて」）
+- UI要素は太字：**設定** をクリック
+- ファイル名、コマンド、パス、コード参照はインラインコード
+- 指示は目的から始める — ユーザーが何を達成したいのかから始める
 
-## Page structure
+## ページの構造
 
-Every MDX page starts with YAML frontmatter containing at least `title` and `description`:
+すべてのMDXページは、最低でも `title` と `description` を含むYAMLフロントマターで始まります：
 
 ```mdx
 ---
-title: "Page title"
-description: "Brief description for SEO and navigation"
+title: "ページのタイトル"
+description: "SEOとナビゲーション用の簡潔な説明"
 ---
 ```
 
-## Mintlify components
+## Mintlifyコンポーネント
 
-Pages use Mintlify's built-in MDX components. Common ones in this repo:
+ページはMintlifyの組み込みMDXコンポーネントを使用します。このプロジェクトで使用される主なコンポーネント：
 
-- `<Card>`, `<Columns>` — layout and navigation cards
-- `<Steps>`, `<Step>` — numbered step sequences
-- `<Info>`, `<Warning>`, `<Tip>` — callout boxes
-- `<Frame>` — image wrapper with styling
-- `<Accordion>`, `<AccordionGroup>` — collapsible sections
-- `<Tree>`、`<Tree.Folder>`、`<Tree.File>` — file tree display
-- `<Snippet>` — include reusable content from `snippets/`
+- `<Card>`, `<Columns>` — レイアウトとナビゲーションカード
+- `<Steps>`, `<Step>` — 番号付きステップシーケンス
+- `<Info>`, `<Warning>`, `<Tip>` — コールアウトボックス
+- `<Frame>` — スタイル付き画像ラッパー
+- `<Accordion>`, `<AccordionGroup>` — 折りたたみセクション
+- `<Tree>`、`<Tree.Folder>`、`<Tree.File>` — ファイルツリー表示
+- `<Snippet>` — `snippets/` から再利用可能なコンテンツをインクルード
 
-https://www.mintlify.com/docs/components/index
+参考：https://www.mintlify.com/docs/components/index
 
-Do not use raw HTML for layout when a Mintlify component exists.
+Mintlifyコンポーネントが存在する場合、生HTMLはレイアウトに使用しないでください。
 
 ## Mermaid
 
@@ -137,12 +128,6 @@ Do not use raw HTML for layout when a Mintlify component exists.
 - Mermaid内での改行は`\n`ではなく`<br>`で行う。`\n`では改行されない。日本語の場合はダブルクォーテーションで囲むとより確実。`["ここで<br>改行"]`
 - ただし`erDiagram`では`<br>`でも`\n`でも改行できてない。GitHub上では改行される。Mintlifyでは改行されない。表示方法の違いなのか動作に違いがあるので`erDiagram`では改行を避ける。
 - `sequenceDiagram`では`participant App as Laravel<br>アプリ`としてダブルクォーテーションで囲まない。`<br>`で改行される。
-
-## Adding a new page
-
-1. Create an MDX file with frontmatter (`title`, `description`).
-2. Add the page path (without `.mdx` extension) to the appropriate group in `docs.json` under `navigation.tabs[].groups[].pages`.
-3. Verify with `mint dev` and `mint broken-links`.
 
 ## デプロイ
 
