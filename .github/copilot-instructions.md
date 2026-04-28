@@ -92,6 +92,8 @@ Playwright MCPでスクリーンショットを撮ってプルリクに添付。
 - config/navigation-jp.json
 - config/navigation-en.json
 
+新しいページは基本的にはグループの一番下に追加。
+
 ## Writing conventions
 
 - Use active voice and second person ("you").
