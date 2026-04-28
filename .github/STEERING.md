@@ -18,15 +18,6 @@
 
 - パッケージ開発者向けのページを増やす。管理者は大量のパッケージを作ってきて知見があるのでいくらでもネタはある。パッケージを一度作って終わりではなくLaravel・PHPのバージョンアップに合わせてメンテナンスを年単位で継続できるようになるまでのガイドを提供する。
  - `package-versioning`が作られたけど今後もネタがあれば継続。
-- [x] Laravel Cloudも2025年からなので実際に使った人しか知らない情報が多い。一般的なLaravel専用PaaSって部分以上だと、Task SchedulerやバックグラウンドプロセスやNightwatch連携はForge同様に簡単、Octaneの使用が簡単、Inertia SSRの使用が簡単、WebSocketサーバーが簡単に導入可能。Laravelの高度な機能まで使い込んでる人が欲しい機能が全部揃っている。Forgeと比べて足りないのはroot権限がない。
- - 使っていくうちに新しい情報が入ったら後で追加。
- - [ ] Hibernation 日本語だと休止かな。Laravel Cloudはサーバーが稼働中のみ課金されるので費用を抑えるには自動休止を有効にする。休止中はタスクスケジュールもキューも動かないので個人用途でタスクスケジュールで自動実行する用途では使いにくい。Httpリクエストがあれば休止から復帰するけど関係ないリクエストでも復帰する、最近追加された「Path Blocking」を有効にすれば`.php`へのリクエストなどをブロックして不要な復帰を防げる。
-```
-Blocked extensions
-.php, .php3, .php4, .php5, .php6, .php7, .php8, .phtml, .pht, .phps, .env, .git
-Blocked paths
-/wp-admin, /wp-content, /wp-includes, /wp-json
-```
 
 ## blog ページ案
 
@@ -37,34 +28,38 @@ Blocked paths
  - [x] sentinel-introduction
  - [x] 公開されたばかりのパスキーパッケージ。まだタグも付いてないけど今後使われるだろうからすばやく初期調査。 https://github.com/laravel/passkeys-server, https://github.com/laravel/passkeys
  - [x] agent-detector はここに書く前にCommanderの判断で追加された。元はLaravelチームメンバーの個人開発パッケージをLaravel公式に移行したようだ。
- - [ ] https://github.com/laravel/pao PAOも同様に個人から公式に移行。GitHub Copilotがプレミアムリクエストからトークン数ベースの料金に変わるので今後は必要になる。スターターキットでもデフォルトでインストールされるようになる。
+ - [x] https://github.com/laravel/pao PAOも同様に個人から公式に移行。GitHub Copilotがプレミアムリクエストからトークン数ベースの料金に変わるので今後は必要になる。スターターキットでもデフォルトでインストールされるようになる。
+- [x] Laravel Cloudも2025年からなので実際に使った人しか知らない情報が多い。一般的なLaravel専用PaaSって部分以上だと、Task SchedulerやバックグラウンドプロセスやNightwatch連携はForge同様に簡単、Octaneの使用が簡単、Inertia SSRの使用が簡単、WebSocketサーバーが簡単に導入可能。Laravelの高度な機能まで使い込んでる人が欲しい機能が全部揃っている。Forgeと比べて足りないのはroot権限がない。
+  - 使っていくうちに新しい情報が入ったら後で追加。
+  - [x] Hibernation 日本語だと休止かな。Laravel Cloudはサーバーが稼働中のみ課金されるので費用を抑えるには自動休止を有効にする。休止中はタスクスケジュールもキューも動かないので個人用途でタスクスケジュールで自動実行する用途では使いにくい。Httpリクエストがあれば休止から復帰するけど関係ないリクエストでも復帰する、最近追加された「Path Blocking」を有効にすれば`.php`へのリクエストなどをブロックして不要な復帰を防げる。
+  - [x] Laravel Cloudはadvancedのページ案だったのに最初にblogで作られた後、Hibernationページがadvancedに作られて離れてしまった。blogに移動して統一。blogのProducts/プロダクトグループでLaravel公式の有料サービスを扱う。
 
 ## packages ページ案
 - [x] Amazon Bedrock driver for Laravel AI SDK https://github.com/invokable/laravel-amazon-bedrock
 - [x] GitHub Copilot SDK for Laravel。https://github.com/invokable/laravel-copilot-sdk
- - [GitHub Copilot SDK](https://github.com/github/copilot-sdk) のLaravel版。
- - 英語・日本語の全ページ完成。今後も追加・変更はあるだろうけど管理者がIssueを作ってエージェントをアサインして対応していく。
+  - [GitHub Copilot SDK](https://github.com/github/copilot-sdk) のLaravel版。
+  - 英語・日本語の全ページ完成。今後も追加・変更はあるだろうけど管理者がIssueを作ってエージェントをアサインして対応していく。
 - [ ] Testbench `package-testing.mdx` が作られてたので次はLaravel Bluesky https://github.com/invokable/laravel-bluesky
- - `docs`内に英語のドキュメントがある。AI普及前なので最低限のドキュメントしかない。
- - [x] docs/workbench.md はBlueskyとは関係ないTestbench Workbenchのドキュメント。Workbenchの情報がなさすぎて調べた結果をとりあえずここに置いていた。こっちのサイトに移せばいいのでworkbench.mdを元に`package-testing.mdx`の続きのページを作成。
- - 残りのページは`{lang}/packages/laravel-bluesky/`内に複数ページで作成。
- - SNSのパッケージは色々作ってるけど基本的なクライアント機能が完成したらNotificationsやSocialiteのLaravelの機能を被せて実際に使うのは通知機能での投稿ばかりなことも多い。
- - [x] BlueskyのSocialiteは他と違うので若干難しい。詳しい説明が必要。
- - [x] Bluesky特有機能でLaravelユーザーが作りやすいのはFeed Generator。
- - [x] Labelerはサーバーとして動かし続ける必要があるのでLaravel Forgeを使っているか自力で構築できる人向け。Laravel Cloudは非対応だった。サンプルのlaralabelerをForgeからCloudに移行しようとしてできなかった。
- - [x] WebSocketはもっと難しいので意図的にドキュメントを作ってないけどこっちで作る。`JetstreamServeCommand` `FirehoseServeCommand`
- - [x] CryptoやCoreまで行くと本当の深淵。AIもない頃に他言語版と仕様を調べまくって作った。PHPでここまで実装してるパッケージが他にあるのかは知らない。Bluesky/AT Protocolの詳細な仕様まで知りたい人向け。
- - 詳細なドキュメントを作りたいけど一から調べると大変なのでDeepWikiを参照するのが良さそう。 https://deepwiki.com/invokable/laravel-bluesky
- - DeepWikiのページは再生成された時に変わるので個別ページへのリンクは貼らない。
- - docsにあるページは全部作れたけど元からユーザーが必要な情報が足りてないのでDeepWikiがコードまで見てまとめたページを元にもっとページを作る。
- - [x] App PasswordとOAuthの認証方法の違いと実装アーキテクチャの解説。LegacyAgent/LegacySession/Bluskey::login()とOAuthAgent/OAuthSession/Bluesky::withToken()。認証方法ごとに分けてるけどその先のAPI呼び出しは共通。App Passwordは最初にLegacyと名付けたけど終了予定はないし通知ではApp Passwordの方が使いやすいので両方使うことになる。
- - https://github.com/invokable/atproto-lexicon-contracts でAT Protocol公式のLexicon定義ファイルからPure PHP用のinterfaceやenumを自動生成している。これを元にさらにLaravel用のtraitを自動生成している設計。`src/Client/Concerns`
- - [x] Bluesky Facadeの実体はBlueskyManagerでよく使うだろうメソッドはHasShortHandトレイトですぐに使えるようにしている。ShortHandを用意は公式SDKと同じ仕組み。
- - [x] TextBuilderの詳細な使い方。
- - [x] AT Proto公式チュートリアルのLaravel版。 https://atproto.com/guides/bot-tutorial https://atproto.com/ja/guides/bot-tutorial 。`lex`コマンドは後から登場した仕組みでおそらくTypeScript用、laravel-blueskyパッケージでは関係ないので無視する（atproto-lexicon-contractsからの自動生成で事前に全部取り込んでる形）。他はartisanコマンドで実装、タスクスケジュールもしくはGitHub Actionsで自動実行、使用するメソッドはHasShortHandにほぼある、AIはLaravel AI SDK / laravel-amazon-bedrock。Laravelで再現する機能は揃ってるはずなので作成できる。
-  - 最初に公式チュートリアルのLaravel版である説明を記載。
-  - パート3のlabelAsBotは別artisanコマンドにする。
-  - ページの最後に他の公式チュートリアルについても少し説明。カスタムフィードはfeed-generator.mdxで十分、OAuthはSocialiteを使えばいいので公式より簡単、ソーシャルアプリ(statusphere-tutorial)はすでにLaravel版を作っている https://github.com/invokable/statusphere 、`lex`や`tap`コマンドを使ってない以前のstatusphereを元にしているので最新のチュートリアルとは少し違う。
+  - `docs`内に英語のドキュメントがある。AI普及前なので最低限のドキュメントしかない。
+  - [x] docs/workbench.md はBlueskyとは関係ないTestbench Workbenchのドキュメント。Workbenchの情報がなさすぎて調べた結果をとりあえずここに置いていた。こっちのサイトに移せばいいのでworkbench.mdを元に`package-testing.mdx`の続きのページを作成。
+  - 残りのページは`{lang}/packages/laravel-bluesky/`内に複数ページで作成。
+  - SNSのパッケージは色々作ってるけど基本的なクライアント機能が完成したらNotificationsやSocialiteのLaravelの機能を被せて実際に使うのは通知機能での投稿ばかりなことも多い。
+  - [x] BlueskyのSocialiteは他と違うので若干難しい。詳しい説明が必要。
+  - [x] Bluesky特有機能でLaravelユーザーが作りやすいのはFeed Generator。
+  - [x] Labelerはサーバーとして動かし続ける必要があるのでLaravel Forgeを使っているか自力で構築できる人向け。Laravel Cloudは非対応だった。サンプルのlaralabelerをForgeからCloudに移行しようとしてできなかった。
+  - [x] WebSocketはもっと難しいので意図的にドキュメントを作ってないけどこっちで作る。`JetstreamServeCommand` `FirehoseServeCommand`
+  - [x] CryptoやCoreまで行くと本当の深淵。AIもない頃に他言語版と仕様を調べまくって作った。PHPでここまで実装してるパッケージが他にあるのかは知らない。Bluesky/AT Protocolの詳細な仕様まで知りたい人向け。
+  - 詳細なドキュメントを作りたいけど一から調べると大変なのでDeepWikiを参照するのが良さそう。 https://deepwiki.com/invokable/laravel-bluesky
+  - DeepWikiのページは再生成された時に変わるので個別ページへのリンクは貼らない。
+  - docsにあるページは全部作れたけど元からユーザーが必要な情報が足りてないのでDeepWikiがコードまで見てまとめたページを元にもっとページを作る。
+  - [x] App PasswordとOAuthの認証方法の違いと実装アーキテクチャの解説。LegacyAgent/LegacySession/Bluskey::login()とOAuthAgent/OAuthSession/Bluesky::withToken()。認証方法ごとに分けてるけどその先のAPI呼び出しは共通。App Passwordは最初にLegacyと名付けたけど終了予定はないし通知ではApp Passwordの方が使いやすいので両方使うことになる。
+  - https://github.com/invokable/atproto-lexicon-contracts でAT Protocol公式のLexicon定義ファイルからPure PHP用のinterfaceやenumを自動生成している。これを元にさらにLaravel用のtraitを自動生成している設計。`src/Client/Concerns`
+  - [x] Bluesky Facadeの実体はBlueskyManagerでよく使うだろうメソッドはHasShortHandトレイトですぐに使えるようにしている。ShortHandを用意は公式SDKと同じ仕組み。
+  - [x] TextBuilderの詳細な使い方。
+  - [x] AT Proto公式チュートリアルのLaravel版。 https://atproto.com/guides/bot-tutorial https://atproto.com/ja/guides/bot-tutorial 。`lex`コマンドは後から登場した仕組みでおそらくTypeScript用、laravel-blueskyパッケージでは関係ないので無視する（atproto-lexicon-contractsからの自動生成で事前に全部取り込んでる形）。他はartisanコマンドで実装、タスクスケジュールもしくはGitHub Actionsで自動実行、使用するメソッドはHasShortHandにほぼある、AIはLaravel AI SDK / laravel-amazon-bedrock。Laravelで再現する機能は揃ってるはずなので作成できる。
+    - 最初に公式チュートリアルのLaravel版である説明を記載。
+    - パート3のlabelAsBotは別artisanコマンドにする。
+    - ページの最後に他の公式チュートリアルについても少し説明。カスタムフィードはfeed-generator.mdxで十分、OAuthはSocialiteを使えばいいので公式より簡単、ソーシャルアプリ(statusphere-tutorial)はすでにLaravel版を作っている https://github.com/invokable/statusphere 、`lex`や`tap`コマンドを使ってない以前のstatusphereを元にしているので最新のチュートリアルとは少し違う。
 
 仮でSNSグループに配置。内側のpagesに他のページを追加していく。
 ```json
