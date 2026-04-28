@@ -442,6 +442,23 @@
           ]
         }
       ]
+    },
+    {
+      "tab": "スターターキット",
+      "groups": [
+        {
+          "group": "Starter Kits",
+          "pages": [
+            {
+              "group": "Laravel Console Starter",
+              "pages": [
+                "jp/packages/laravel-console-starter/index",
+                "jp/packages/laravel-console-starter/tutorial"
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

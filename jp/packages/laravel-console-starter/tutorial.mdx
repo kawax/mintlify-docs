@@ -1,0 +1,517 @@
+---
+title: "チュートリアル"
+description: "Laravel Console Starterを使ったコンソールアプリの構築手順。コマンド作成、GitHub Actionsスケジューリング、通知送信、実践的なアプリ例を学びます。"
+---
+
+## はじめに
+
+このチュートリアルでは、`revolution/laravel-console-starter` を使ってカスタムartisanコマンドを持つLaravelアプリケーションを構築します。
+
+このスターターキットを使うメリット：
+
+- **迅速なセットアップ** — 複雑な設定なしにコンソールアプリ開発をすぐに始められます
+- **Laravelエコシステム** — タスクスケジューリング・データベース・通知などLaravelの豊富な機能を利用できます
+- **Artisanコマンド** — Laravelの強力なArtisanシステムで独自コマンドを簡単に作成・管理できます
+- **テスト容易性** — Laravelのテストフレームワークでコマンドのテストを記述できます
+
+## 前提条件
+
+以下のソフトウェアをインストールしてください。
+
+- PHP `^8.3`
+- Composer（[https://getcomposer.org/](https://getcomposer.org/)）
+- Laravel Installer（`composer global require laravel/installer`）
+
+## プロジェクトのセットアップ
+
+<Steps>
+  <Step title="新しいプロジェクトを作成する">
+    ターミナルで以下のコマンドを実行します。
+
+    ```bash
+    laravel new my-app --using=revolution/laravel-console-starter --no-interaction
+    ```
+
+    `my-app` ディレクトリが作成され、コンソールアプリの基本構造がセットアップされます。
+
+    インストール時に以下が自動実行されます。
+
+    - `.env.example` から `.env` ファイルの生成
+    - `php artisan key:generate` によるアプリケーションキーの設定
+
+    主なディレクトリ構造：
+
+    ```
+    my-app/
+    ├── app/Console/Commands/   # カスタムコマンドを配置
+    ├── .github/workflows/
+    │   └── cron.yml            # GitHub Actionsスケジュール例
+    ├── config/                 # アプリケーション設定
+    └── routes/console.php      # コマンド登録
+    ```
+  </Step>
+
+  <Step title="環境設定を確認する">
+    デフォルトでは、メール送信はログ出力に設定されています（`MAIL_MAILER=log`）。
+
+    実際のメール送信が必要な場合は、`.env` ファイルでMailgunやPostmark、SESなどのサービスを設定してください。
+  </Step>
+</Steps>
+
+## コンソールコマンドの作成
+
+<Steps>
+  <Step title="コマンドを生成する">
+    `make:command` Artisanコマンドで新しいコマンドを作成します。
+
+    ```bash
+    php artisan make:command YourCommandName --command=your:command
+    ```
+
+    - `YourCommandName` — 作成するコマンドのクラス名（例：`SendDailyReport`）
+    - `your:command` — コマンドの呼び出し名（例：`report:send-daily`）
+
+    `app/Console/Commands/YourCommandName.php` が生成されます。
+  </Step>
+
+  <Step title="コマンドを実装する">
+    生成されたファイルを編集してロジックを実装します。以下はHello Worldコマンドの例です。
+
+    ```php
+    <?php
+
+    namespace App\Console\Commands;
+
+    use Illuminate\Console\Command;
+    use Illuminate\Support\Facades\Log;
+
+    class HelloWorldCommand extends Command
+    {
+        protected $signature = 'hello:world';
+        protected $description = 'Displays a hello world message in the log';
+
+        public function handle()
+        {
+            Log::info('Hello, World from Artisan Command!');
+            $this->info('Hello, World message has been logged.');
+            return Command::SUCCESS;
+        }
+    }
+    ```
+
+    `$signature` でコマンドの呼び出し名を定義し、`handle()` メソッドにロジックを記述します。
+  </Step>
+
+  <Step title="コマンドを実行する">
+    ```bash
+    php artisan hello:world
+    ```
+
+    実行後、`storage/logs/laravel.log` とコンソールにメッセージが出力されます。
+  </Step>
+</Steps>
+
+## GitHub Actionsでのタスクスケジューリング
+
+GitHub Actionsを使えば、サーバーのcronジョブなしにコマンドを定期実行できます。
+
+<Steps>
+  <Step title="ワークフローファイルを確認する">
+    スターターキットには `.github/workflows/cron.yml` が事前設定済みで含まれています。
+
+    ```yaml
+    name: cron
+
+    on:
+      schedule:
+        - cron: '0 0 * * *'  # 毎日UTC午前0時
+
+    jobs:
+      cron:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: shivammathur/setup-php@v2
+            with:
+              php-version: 8.5
+              coverage: none
+          - run: composer install --no-dev -q
+          - run: cp .env.example .env
+          - run: php artisan key:generate
+          - run: php artisan inspire
+    ```
+  </Step>
+
+  <Step title="コマンドを変更する">
+    `php artisan inspire` を自分のコマンドに置き換えます。
+
+    ```yaml
+    - name: Run Command
+      run: php artisan your:command
+    ```
+
+    複数のコマンドを実行する場合：
+
+    ```yaml
+    - name: Run Commands
+      run: |
+        php artisan first:command
+        php artisan second:command
+    ```
+  </Step>
+
+  <Step title="スケジュールを調整する">
+    `cron` 式を変更して実行頻度を設定します。
+
+    | cron式 | 実行タイミング |
+    | --- | --- |
+    | `0 0 * * *` | 毎日UTC午前0時 |
+    | `0 */6 * * *` | 6時間ごと |
+    | `0 0 * * 1` | 毎週月曜日の午前0時 |
+  </Step>
+
+  <Step title="機密情報をシークレットで管理する">
+    APIキーやパスワードなどの機密情報はGitHubリポジトリシークレットを使います。
+
+    GitHubリポジトリの **Settings > Secrets and variables > Actions** でシークレットを追加し、ワークフローで参照します。
+
+    ```yaml
+    - name: Run Command with Secrets
+      run: php artisan your:command
+      env:
+        API_KEY: ${{ secrets.API_KEY }}
+        DB_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+    ```
+  </Step>
+</Steps>
+
+## 通知機能
+
+コマンドの実行結果やエラーをメール・Slackなどで通知できます。
+
+<Steps>
+  <Step title="通知クラスを作成する">
+    ```bash
+    php artisan make:notification TaskCompleted
+    ```
+
+    `app/Notifications/TaskCompleted.php` が生成されます。
+  </Step>
+
+  <Step title="通知チャネルを設定する">
+    必要に応じて設定ファイルを公開します。
+
+    ```bash
+    php artisan config:publish mail
+    php artisan config:publish services
+    ```
+  </Step>
+
+  <Step title="コマンドから通知を送信する">
+    ```php
+    <?php
+
+    namespace App\Console\Commands;
+
+    use App\Notifications\TaskCompleted;
+    use Illuminate\Console\Command;
+    use Illuminate\Support\Facades\Notification;
+
+    class ProcessDataCommand extends Command
+    {
+        protected $signature = 'data:process';
+        protected $description = 'データを処理し、完了時に通知を送信';
+
+        public function handle()
+        {
+            $this->info('データを処理中...');
+
+            // 処理ロジック...
+
+            Notification::route('mail', 'admin@example.com')
+                ->notify(new TaskCompleted('データ処理が正常に完了しました'));
+
+            return Command::SUCCESS;
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+<Info>
+詳細は[Laravel通知ドキュメント](https://laravel.com/docs/notifications)を参照してください。
+</Info>
+
+## 実践的なアプリケーション例
+
+### 例1: ウェブサイト死活監視とSlackアラート
+
+ウェブサイトがオンラインかどうかを確認し、問題が検出された場合にSlackへアラートを送信するコマンドです。
+
+<Steps>
+  <Step title="Slack通知チャンネルをインストールする">
+    ```bash
+    composer require laravel/slack-notification-channel
+    ```
+  </Step>
+
+  <Step title="コマンドと通知を作成する">
+    ```bash
+    php artisan make:command MonitorWebsites --command=monitor:websites
+    php artisan make:notification WebsiteDown
+    ```
+  </Step>
+
+  <Step title="Slackを設定する">
+    ```bash
+    php artisan config:publish services
+    ```
+
+    `.env` にSlack webhook URLを追加します。
+
+    ```
+    SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+    ```
+
+    `config/services.php` を更新します。
+
+    ```php
+    'slack' => [
+        'webhook_url' => env('SLACK_WEBHOOK_URL'),
+    ],
+    ```
+  </Step>
+
+  <Step title="通知を実装する">
+    `app/Notifications/WebsiteDown.php` を編集します。
+
+    ```php
+    <?php
+
+    namespace App\Notifications;
+
+    use Illuminate\Notifications\Messages\SlackMessage;
+    use Illuminate\Notifications\Notification;
+
+    class WebsiteDown extends Notification
+    {
+        public function __construct(
+            protected string $website,
+            protected string $error,
+        ) {}
+
+        public function via($notifiable): array
+        {
+            return ['slack'];
+        }
+
+        public function toSlack($notifiable): SlackMessage
+        {
+            return (new SlackMessage)
+                ->error()
+                ->content('ウェブサイトダウンアラート！')
+                ->attachment(function ($attachment) {
+                    $attachment->title($this->website)
+                               ->content("エラー: {$this->error}")
+                               ->timestamp(now());
+                });
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="コマンドを実装する">
+    `app/Console/Commands/MonitorWebsites.php` を編集します。
+
+    ```php
+    <?php
+
+    namespace App\Console\Commands;
+
+    use App\Notifications\WebsiteDown;
+    use Illuminate\Console\Command;
+    use Illuminate\Support\Facades\Http;
+    use Illuminate\Support\Facades\Log;
+    use Illuminate\Support\Facades\Notification;
+
+    class MonitorWebsites extends Command
+    {
+        protected $signature = 'monitor:websites {--timeout=10}';
+        protected $description = 'ウェブサイトの死活確認とダウン時のSlackアラート送信';
+
+        protected array $websites = [
+            'https://example.com',
+            'https://yourwebsite.com',
+        ];
+
+        public function handle(): int
+        {
+            $timeout = (int) $this->option('timeout');
+            $webhookUrl = config('services.slack.webhook_url');
+            $hasErrors = false;
+
+            foreach ($this->websites as $website) {
+                try {
+                    $response = Http::timeout($timeout)->get($website);
+                    if ($response->successful()) {
+                        $this->info("{$website}: オンライン ✓");
+                    } else {
+                        $error = "HTTPステータス: " . $response->status();
+                        $this->error("{$website}: ダウン ({$error})");
+                        Notification::route('slack', $webhookUrl)
+                            ->notify(new WebsiteDown($website, $error));
+                        $hasErrors = true;
+                    }
+                } catch (\Exception $e) {
+                    $this->error("{$website}: エラー ({$e->getMessage()})");
+                    Log::error("{$website} の確認に失敗", ['error' => $e->getMessage()]);
+                    Notification::route('slack', $webhookUrl)
+                        ->notify(new WebsiteDown($website, $e->getMessage()));
+                    $hasErrors = true;
+                }
+            }
+
+            return $hasErrors ? Command::FAILURE : Command::SUCCESS;
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="GitHub Actionsでスケジュール設定する">
+    `.github/workflows/cron.yml` を更新します。
+
+    ```yaml
+    name: Website Monitoring
+
+    on:
+      schedule:
+        - cron: '*/15 * * * *'  # 15分ごとに実行
+
+    jobs:
+      monitor:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: shivammathur/setup-php@v2
+            with:
+              php-version: 8.5
+          - run: composer install --no-dev -q
+          - run: cp .env.example .env
+          - run: php artisan key:generate
+          - name: Monitor Websites
+            run: php artisan monitor:websites
+            env:
+              SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    ```
+  </Step>
+</Steps>
+
+### 例2: 暗号資産ポートフォリオ更新とDiscord通知
+
+CoinGecko APIから暗号資産の価格を取得し、Discordウェブフックで更新を送信するコマンドです。
+
+<Steps>
+  <Step title="Discord通知チャンネルをインストールする">
+    ```bash
+    composer require laravel-notification-channels/discord-webhook
+    ```
+  </Step>
+
+  <Step title="コマンドと通知を作成する">
+    ```bash
+    php artisan make:command UpdateCryptoPortfolio --command=crypto:portfolio
+    php artisan make:notification CryptoPortfolioUpdate
+    ```
+  </Step>
+
+  <Step title="Discordを設定する">
+    `.env` にDiscord webhook URLを追加します。
+
+    ```
+    DISCORD_WEBHOOK=https://discord.com/api/webhooks/YOUR/WEBHOOK
+    ```
+
+    `config/services.php` を更新します。
+
+    ```php
+    'discord' => [
+        'webhook' => env('DISCORD_WEBHOOK'),
+    ],
+    ```
+  </Step>
+
+  <Step title="コマンドを実装して実行する">
+    詳細な実装については[GitHubリポジトリのチュートリアル](https://github.com/invokable/laravel-console-starter/blob/main/docs/tutorial_ja.md)を参照してください。
+
+    ```bash
+    php artisan crypto:portfolio
+    ```
+  </Step>
+</Steps>
+
+### 例3: ウェブサイトコンテンツのスクレイピングとメール通知
+
+ウェブサイトからコンテンツをスクレイピングし、結果をメールで送信するコマンドです。
+
+<Steps>
+  <Step title="コマンドと通知を作成する">
+    ```bash
+    php artisan make:command WebScraper --command=scrape:website
+    php artisan make:notification ScrapingCompleted
+    ```
+  </Step>
+
+  <Step title="メールを設定する">
+    ```bash
+    php artisan config:publish mail
+    ```
+
+    `.env` ファイルにメール設定を追加します。
+
+    ```
+    MAIL_MAILER=smtp
+    MAIL_HOST=smtp.mailtrap.io
+    MAIL_PORT=2525
+    MAIL_USERNAME=your_username
+    MAIL_PASSWORD=your_password
+    MAIL_ENCRYPTION=tls
+    MAIL_FROM_ADDRESS=your-app@example.com
+    MAIL_FROM_NAME="${APP_NAME}"
+    ```
+  </Step>
+
+  <Step title="コマンドを実装して実行する">
+    ```php
+    protected $signature = 'scrape:website {--url=https://example.com} {--email=admin@example.com}';
+
+    public function handle(): int
+    {
+        $url = $this->option('url');
+        $email = $this->option('email');
+
+        $response = Http::timeout(30)->get($url);
+
+        // コンテンツを処理して通知を送信...
+        Notification::route('mail', $email)
+            ->notify(new ScrapingCompleted(true, $url, $title, $content));
+
+        return Command::SUCCESS;
+    }
+    ```
+
+    ```bash
+    php artisan scrape:website --email=admin@example.com
+    ```
+  </Step>
+</Steps>
+
+## 次のステップ
+
+これで `revolution/laravel-console-starter` を使ったLaravelコンソールアプリケーションの基本を学びました。
+
+さらに深く学ぶために：
+
+- **Laravelドキュメントを探索する** — [Laravel公式ドキュメント](https://laravel.com/docs)でコンソールアプリを強化できる機能を確認しましょう
+- **テストを実装する** — Laravelのテストフレームワークでコマンドのテストを作成し、信頼性を確保しましょう
+- **パッケージ開発を検討する** — 複数のプロジェクトで同様のコマンドを作成するなら、再利用可能なLaravelパッケージとして公開することを検討してください
+- **最新情報を把握する** — [Laravel News](https://laravel-news.com/) や公式ブログをフォローしてベストプラクティスを常に把握しましょう
