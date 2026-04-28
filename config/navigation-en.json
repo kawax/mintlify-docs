@@ -279,6 +279,12 @@
           "pages": [
             "en/advanced/testing-pest"
           ]
+        },
+        {
+          "group": "Cloud",
+          "pages": [
+            "en/advanced/laravel-cloud-hibernation"
+          ]
         }
       ]
     },
