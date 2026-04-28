@@ -279,12 +279,6 @@
           "pages": [
             "en/advanced/testing-pest"
           ]
-        },
-        {
-          "group": "Cloud",
-          "pages": [
-            "en/advanced/laravel-cloud-hibernation"
-          ]
         }
       ]
     },
@@ -301,6 +295,7 @@
           "group": "Products",
           "pages": [
             "en/blog/laravel-cloud",
+            "en/blog/laravel-cloud-hibernation",
             "en/blog/nightwatch-introduction"
           ]
         },
@@ -328,12 +323,12 @@
         {
           "group": "New Repository Reports",
           "pages": [
-            "en/blog/agent-detector-introduction",
             "en/blog/maestro-introduction",
             "en/blog/agent-skills-introduction",
             "en/blog/laravel-ecosystem-analysis",
             "en/blog/sentinel-introduction",
             "en/blog/passkeys-introduction",
+            "en/blog/agent-detector-introduction",
             "en/blog/pao-introduction"
           ]
         },

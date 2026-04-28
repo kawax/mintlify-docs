@@ -294,12 +294,6 @@
           "pages": [
             "jp/advanced/testing-pest"
           ]
-        },
-        {
-          "group": "クラウド",
-          "pages": [
-            "jp/advanced/laravel-cloud-hibernation"
-          ]
         }
       ]
     },
@@ -316,6 +310,7 @@
           "group": "プロダクト",
           "pages": [
             "jp/blog/laravel-cloud",
+            "jp/advanced/laravel-cloud-hibernation",
             "jp/blog/nightwatch-introduction"
           ]
         },
@@ -334,12 +329,12 @@
         {
           "group": "新リポジトリ調査",
           "pages": [
-            "jp/blog/agent-detector-introduction",
             "jp/blog/maestro-introduction",
             "jp/blog/agent-skills-introduction",
             "jp/blog/laravel-ecosystem-analysis",
             "jp/blog/sentinel-introduction",
             "jp/blog/passkeys-introduction",
+            "jp/blog/agent-detector-introduction",
             "jp/blog/pao-introduction"
           ]
         },
