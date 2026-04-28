@@ -310,7 +310,7 @@
           "group": "プロダクト",
           "pages": [
             "jp/blog/laravel-cloud",
-            "jp/advanced/laravel-cloud-hibernation",
+            "jp/blog/laravel-cloud-hibernation",
             "jp/blog/nightwatch-introduction"
           ]
         },
