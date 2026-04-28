@@ -57,20 +57,20 @@
   - [x] Bluesky Facadeの実体はBlueskyManagerでよく使うだろうメソッドはHasShortHandトレイトですぐに使えるようにしている。ShortHandを用意は公式SDKと同じ仕組み。
   - [x] TextBuilderの詳細な使い方。
   - [x] AT Proto公式チュートリアルのLaravel版
+- [ ] Laravel Console Starter Kit https://github.com/invokable/laravel-console-starter
+  - パッケージではなくスターターキット。元のパッケージ版は https://github.com/invokable/laravel-slim 
+  - READMEにはAIによってアプリケーションアイデアが色々書かれてるけど要するに上のBlueskyのボットチュートリアル packages/laravel-bluesky/bot-tutorial のような **artisanコマンドをGitHub Actionsで実行して最終出力は通知機能でメールやチャットに送る** 使い方を想定している。
+  - Laravelを長く使いすぎた人がLaravelの一番便利な機能だけを追求していくとここに辿り着く。
+  - artisanコマンドなのでLaravelのエコシステムが使える。
+  - GitHub Actionsなのでサーバー不要。
+  - 他者からの入力がないのでセキュリティ的に安全。
 
-仮でSDKグループに配置。内側のpagesに他のページを追加していく。
+スターターキットグループを作って配置。
 ```json
         {
-          "group": "SDK",
+          "group": "Starter Kits",
           "pages": [
-            {
-              "group": "Laravel Bluesky",
-              "expanded": false,
-              "pages": [
-                "jp/packages/laravel-bluesky/index",
-                "jp/packages/laravel-bluesky/basic-client"
-              ]
-            }
+            "jp/packages/laravel-console-starter"
           ]
         }
 ```
