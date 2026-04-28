@@ -26,9 +26,9 @@
  - [x] agent-skills-introduction
  - [x] laravel-ecosystem-analysis: surveyor, ranger, roster
  - [x] sentinel-introduction
- - [x] 公開されたばかりのパスキーパッケージ。まだタグも付いてないけど今後使われるだろうからすばやく初期調査。 https://github.com/laravel/passkeys-server, https://github.com/laravel/passkeys
- - [x] agent-detector はここに書く前にCommanderの判断で追加された。元はLaravelチームメンバーの個人開発パッケージをLaravel公式に移行したようだ。
- - [x] https://github.com/laravel/pao PAOも同様に個人から公式に移行。GitHub Copilotがプレミアムリクエストからトークン数ベースの料金に変わるので今後は必要になる。スターターキットでもデフォルトでインストールされるようになる。
+ - [x] passkeys-introduction
+ - [x] agent-detector PAOで使っているからこれも一緒に公式に移行されたのかも。
+ - [x] pao-introduction ページ作成時点ではLaravel公式に移行直後でまだ`laravel/pao`でインストールできないけど初期調査なのでいいだろう。
 - [x] Laravel Cloudも2025年からなので実際に使った人しか知らない情報が多い。一般的なLaravel専用PaaSって部分以上だと、Task SchedulerやバックグラウンドプロセスやNightwatch連携はForge同様に簡単、Octaneの使用が簡単、Inertia SSRの使用が簡単、WebSocketサーバーが簡単に導入可能。Laravelの高度な機能まで使い込んでる人が欲しい機能が全部揃っている。Forgeと比べて足りないのはroot権限がない。
   - 使っていくうちに新しい情報が入ったら後で追加。
   - [x] Hibernation 日本語だと休止かな。Laravel Cloudはサーバーが稼働中のみ課金されるので費用を抑えるには自動休止を有効にする。休止中はタスクスケジュールもキューも動かないので個人用途でタスクスケジュールで自動実行する用途では使いにくい。Httpリクエストがあれば休止から復帰するけど関係ないリクエストでも復帰する、最近追加された「Path Blocking」を有効にすれば`.php`へのリクエストなどをブロックして不要な復帰を防げる。
