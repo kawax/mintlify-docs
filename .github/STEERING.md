@@ -5,7 +5,7 @@
 
 - マイパッケージの解説ページ。下のpackages ページ案に追加されたら対応。
 - [x] 重複ページを作り出してるのでここまでの完了したタスクを削除。公式ドキュメントを元にしたページは揃ってきた感じなので独自コンテンツを増やしていける段階。
- - 重複しても新しい情報があればプルリクの段階でページを統合して更新するように指示できるので「既存ページの再レビュー・改修」ができて問題ないかもしれない。
+  - 重複しても新しい情報があればプルリクの段階でページを統合して更新するように指示できるので「既存ページの再レビュー・改修」ができて問題ないかもしれない。
 - [x] https://github.com/laravel/docs/pull/11172 MCP Apps対応で文量が多いのでmcp.mdxにも反映。
 
 ## 継続対応
@@ -17,18 +17,18 @@
 ## advanced ページ案
 
 - パッケージ開発者向けのページを増やす。管理者は大量のパッケージを作ってきて知見があるのでいくらでもネタはある。パッケージを一度作って終わりではなくLaravel・PHPのバージョンアップに合わせてメンテナンスを年単位で継続できるようになるまでのガイドを提供する。
- - `package-versioning`が作られたけど今後もネタがあれば継続。
+  - `package-versioning`が作られたけど今後もネタがあれば継続。
 
 ## blog ページ案
 
 - https://github.com/laravel で公開された新しいリポジトリの調査。private状態で開発されてどこかのタイミングで公開される。大々的に発表されることもあるけどほとんどはドキュメントもなくリポジトリ内を見ないと何も分からない。バージョンは0.xで開発段階なことが多いのでblogで書くのは初期調査結果の情報。公式ドキュメントが公開されたら他で正式版のページを作成。
- - [x] maestro-introduction
- - [x] agent-skills-introduction
- - [x] laravel-ecosystem-analysis: surveyor, ranger, roster
- - [x] sentinel-introduction
- - [x] passkeys-introduction
- - [x] agent-detector PAOで使っているからこれも一緒に公式に移行されたのかも。
- - [x] pao-introduction ページ作成時点ではLaravel公式に移行直後でまだ`laravel/pao`でインストールできないけど初期調査なのでいいだろう。
+  - [x] maestro-introduction
+  - [x] agent-skills-introduction
+  - [x] laravel-ecosystem-analysis: surveyor, ranger, roster
+  - [x] sentinel-introduction
+  - [x] passkeys-introduction
+  - [x] agent-detector PAOで使っているからこれも一緒に公式に移行されたのかも。
+  - [x] pao-introduction ページ作成時点ではLaravel公式に移行直後でまだ`laravel/pao`でインストールできないけど初期調査なのでいいだろう。
 - [x] Laravel Cloudも2025年からなので実際に使った人しか知らない情報が多い。一般的なLaravel専用PaaSって部分以上だと、Task SchedulerやバックグラウンドプロセスやNightwatch連携はForge同様に簡単、Octaneの使用が簡単、Inertia SSRの使用が簡単、WebSocketサーバーが簡単に導入可能。Laravelの高度な機能まで使い込んでる人が欲しい機能が全部揃っている。Forgeと比べて足りないのはroot権限がない。
   - 使っていくうちに新しい情報が入ったら後で追加。
   - [x] Hibernation 日本語だと休止かな。Laravel Cloudはサーバーが稼働中のみ課金されるので費用を抑えるには自動休止を有効にする。休止中はタスクスケジュールもキューも動かないので個人用途でタスクスケジュールで自動実行する用途では使いにくい。Httpリクエストがあれば休止から復帰するけど関係ないリクエストでも復帰する、最近追加された「Path Blocking」を有効にすれば`.php`へのリクエストなどをブロックして不要な復帰を防げる。
