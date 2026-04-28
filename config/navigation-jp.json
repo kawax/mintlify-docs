@@ -414,7 +414,7 @@
           ]
         },
         {
-          "group": "SNS",
+          "group": "SDK",
           "pages": [
             {
               "group": "Laravel Bluesky",

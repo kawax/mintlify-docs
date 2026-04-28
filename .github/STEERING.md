@@ -58,10 +58,10 @@
   - [x] TextBuilderの詳細な使い方。
   - [x] AT Proto公式チュートリアルのLaravel版
 
-仮でSNSグループに配置。内側のpagesに他のページを追加していく。
+仮でSDKグループに配置。内側のpagesに他のページを追加していく。
 ```json
         {
-          "group": "SNS",
+          "group": "SDK",
           "pages": [
             {
               "group": "Laravel Bluesky",
