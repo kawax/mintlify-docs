@@ -90,7 +90,7 @@ description: "Laravel Console Starterを使ったコンソールアプリの構�
         protected $signature = 'hello:world';
         protected $description = 'Displays a hello world message in the log';
 
-        public function handle()
+        public function handle(): int
         {
             Log::info('Hello, World from Artisan Command!');
             $this->info('Hello, World message has been logged.');
