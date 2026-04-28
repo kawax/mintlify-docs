@@ -1,0 +1,165 @@
+---
+title: "Laravel Console Starter"
+description: "artisanコマンドをメインにしたLaravelスターターキット。GitHub Actionsでスケジュール実行し、通知でアウトプットを送信します。"
+---
+
+## 概要
+
+[invokable/laravel-console-starter](https://github.com/invokable/laravel-console-starter) は、カスタムartisanコマンドを中心とするLaravelアプリケーション開発を加速するスターターキットです。
+
+<Info>
+GitHubの組織名は `invokable`、Packagistのベンダー名は `revolution` です。インストールコマンドでは `revolution/laravel-console-starter` を使います。
+</Info>
+
+スタンドアロンのCLIツールを作るのではなく、Laravelフレームワークのエコシステム全体（依存性注入・通知・スケジューリング・テスト）を活用したコンソールアプリケーションを素早く構築できます。GitHub Actionsでスケジュール実行し、結果をメールやSlackなどの通知で送信するというワークフローが基本的なユースケースです。
+
+## 要件
+
+- PHP `^8.3`
+- Laravel Framework `^13.0`
+- Laravel Installer `^5.24`
+
+## インストール
+
+```bash
+laravel new --using=revolution/laravel-console-starter --no-interaction my-app
+```
+
+インストール後の主なディレクトリ構造：
+
+```
+my-app/
+├── app/Console/Commands/   # カスタムartisanコマンドを配置
+├── .github/workflows/
+│   └── cron.yml            # GitHub Actionsスケジュール例
+├── config/                 # アプリケーション設定
+└── routes/console.php      # コマンド登録
+```
+
+## 主な特徴
+
+<Columns cols={3}>
+  <Card title="コンソールアプリ特化" icon="terminal">
+    Web用のオーバーヘッドを排除し、artisanコマンド開発に集中できる構成です。
+  </Card>
+  <Card title="GitHub Actionsスケジューリング" icon="clock">
+    サーバーのcronジョブ不要。`.github/workflows/cron.yml` の設定例が最初から含まれています。
+  </Card>
+  <Card title="Laravelエコシステム活用" icon="layers">
+    通知・HTTP クライアント・テスト・DI コンテナなど、Laravelの豊富な機能をそのまま使えます。
+  </Card>
+</Columns>
+
+## クイックスタート
+
+### コマンドを作成する
+
+```bash
+php artisan make:command Hello --command=hello
+```
+
+`app/Console/Commands/Hello.php` が生成されます。`handle()` メソッドにロジックを実装し、コマンドを実行します。
+
+```bash
+php artisan hello
+```
+
+### GitHub Actionsでスケジュール実行する
+
+`.github/workflows/cron.yml` を編集して、実行するコマンドとスケジュールを設定します。
+
+```yaml
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 毎日UTC午前0時
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.5
+      - run: composer install --no-dev -q
+      - run: cp .env.example .env
+      - run: php artisan key:generate
+      - run: php artisan your:command
+```
+
+### 通知を送信する
+
+コマンドの実行結果を通知として送るには、`make:notification` でクラスを作成し、`Notification` ファサードで送信します。
+
+```bash
+php artisan make:notification TaskCompleted
+```
+
+```php
+Notification::route('mail', 'admin@example.com')
+    ->notify(new TaskCompleted('処理が完了しました'));
+```
+
+<Tip>
+通知チャネル（メール・Slack等）の設定が必要な場合は、`php artisan config:publish mail` や `php artisan config:publish services` で設定ファイルを公開してください。
+</Tip>
+
+## アプリケーションアイデア
+
+このスターターキットで構築できるアプリケーションのアイデアです。
+
+<AccordionGroup>
+  <Accordion title="監視・分析">
+    - ウェブサイト死活監視とSlackアラート
+    - サーバーリソース使用状況レポートをメール送信
+    - SSL証明書の有効期限確認と通知
+    - APIレスポンスタイム監視とアラート
+    - 競合他社の価格変動追跡とDiscord通知
+  </Accordion>
+  <Accordion title="財務・ビジネス">
+    - Google AdSense収益をメールで送信
+    - AWSコストをDiscordに通知
+    - 日次の暗号資産ポートフォリオ更新をDiscordへ
+    - 株価アラートをSlackチャンネルへ
+    - 請求書の支払期限リマインダー
+    - 月次経費レポートの生成と配信
+  </Accordion>
+  <Accordion title="データ処理・レポート">
+    - 古いログファイルのクリーンアップとストレージレポート
+    - 異なるAPI間のデータ同期と結果通知
+    - CSVデータのインポートと処理結果通知
+    - 定期的なデータエクスポートとクラウドストレージへのアップロード
+  </Accordion>
+  <Accordion title="コンテンツ・マーケティング">
+    - ウェブサイトのリンク切れ確認とレポート
+    - SEOキーワードランキング監視と変動通知
+    - ブログ投稿のパフォーマンス指標週次レポート
+    - RSSフィードのコンテンツ集計と通知
+  </Accordion>
+  <Accordion title="開発・DevOps">
+    - GitHubリポジトリの依存関係セキュリティアラート
+    - コードベースの静的解析レポート
+    - デプロイ後のアプリケーションヘルスチェック
+    - APIドキュメントの変更検知と通知
+  </Accordion>
+  <Accordion title="AI・その他">
+    - [laravel-copilot-sdk](https://github.com/invokable/laravel-copilot-sdk) を使ったAIエージェントツール
+    - [laravel/mcp](https://github.com/laravel/mcp) パッケージを使ったローカルMCPサーバー
+    - ドメイン有効期限の監視とアラート
+    - Google Trendsキーワード監視と通知
+    - パーソナルな支出カテゴリーのインサイトレポート
+  </Accordion>
+</AccordionGroup>
+
+## ドキュメント
+
+<Columns cols={2}>
+  <Card title="チュートリアル" href="/jp/packages/laravel-console-starter/tutorial" icon="book-open">
+    インストールからコマンド作成、GitHub Actionsでのスケジューリング、通知送信、実践的なアプリ例まで。
+  </Card>
+</Columns>
+
+## 参考リンク
+
+- GitHub: [invokable/laravel-console-starter](https://github.com/invokable/laravel-console-starter)
+- DeepWiki: [invokable/laravel-console-starter](https://deepwiki.com/invokable/laravel-console-starter)

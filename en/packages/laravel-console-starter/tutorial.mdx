@@ -1,0 +1,517 @@
+---
+title: "Tutorial"
+description: "Build console applications with Laravel Console Starter. Learn command creation, GitHub Actions scheduling, notifications, and practical app examples."
+---
+
+## Introduction
+
+This tutorial walks you through building a Laravel application with custom artisan commands using `revolution/laravel-console-starter`. This starter kit accelerates development of applications that primarily use artisan commands, leveraging the full Laravel framework ecosystem rather than building standalone CLI tools.
+
+Benefits of using `revolution/laravel-console-starter`:
+
+- **Quick Setup** — Start developing console applications immediately without complex configurations
+- **Laravel Ecosystem** — Use Laravel's rich features (task scheduling, database, notifications, etc.) in your console app
+- **Artisan Commands** — Leverage Laravel's powerful Artisan system to easily create and manage your own commands
+- **Testability** — Write tests for your console commands using Laravel's testing framework
+
+## Prerequisites
+
+Ensure the following software is installed before you begin.
+
+- PHP `^8.3`
+- Composer ([https://getcomposer.org/](https://getcomposer.org/))
+- Laravel Installer (`composer global require laravel/installer`)
+
+## Project Setup
+
+<Steps>
+  <Step title="Create a new project">
+    Run the following command in your terminal:
+
+    ```bash
+    laravel new my-app --using=revolution/laravel-console-starter --no-interaction
+    ```
+
+    This creates a `my-app` directory and sets up the basic console application structure.
+
+    The following happen automatically during installation:
+
+    - An `.env` file is generated from `.env.example`
+    - `php artisan key:generate` sets the application encryption key
+
+    Main directory structure:
+
+    ```
+    my-app/
+    ├── app/Console/Commands/   # Place custom commands here
+    ├── .github/workflows/
+    │   └── cron.yml            # GitHub Actions schedule example
+    ├── config/                 # Application configuration
+    └── routes/console.php      # Command registration
+    ```
+  </Step>
+
+  <Step title="Review the environment configuration">
+    By default, mail sending is configured to output to the log (`MAIL_MAILER=log`).
+
+    If you need to send actual emails, configure a service like Mailgun, Postmark, or SES in your `.env` file.
+  </Step>
+</Steps>
+
+## Creating a Console Command
+
+<Steps>
+  <Step title="Generate a command">
+    Use the `make:command` Artisan command to create a new command:
+
+    ```bash
+    php artisan make:command YourCommandName --command=your:command
+    ```
+
+    - `YourCommandName` — The class name of the command (e.g., `SendDailyReport`)
+    - `your:command` — The command name used to call it (e.g., `report:send-daily`)
+
+    This generates `app/Console/Commands/YourCommandName.php`.
+  </Step>
+
+  <Step title="Implement the command">
+    Edit the generated file to add your logic. Here is a Hello World example:
+
+    ```php
+    <?php
+
+    namespace App\Console\Commands;
+
+    use Illuminate\Console\Command;
+    use Illuminate\Support\Facades\Log;
+
+    class HelloWorldCommand extends Command
+    {
+        protected $signature = 'hello:world';
+        protected $description = 'Displays a hello world message in the log';
+
+        public function handle(): int
+        {
+            Log::info('Hello, World from Artisan Command!');
+            $this->info('Hello, World message has been logged.');
+            return Command::SUCCESS;
+        }
+    }
+    ```
+
+    The `$signature` property defines how the command is called. Write your logic in the `handle()` method.
+  </Step>
+
+  <Step title="Run the command">
+    ```bash
+    php artisan hello:world
+    ```
+
+    After execution, you can confirm the message is output to `storage/logs/laravel.log` and the console.
+  </Step>
+</Steps>
+
+## Task Scheduling with GitHub Actions
+
+Use GitHub Actions to run commands on a regular schedule — no server cron jobs required.
+
+<Steps>
+  <Step title="Review the workflow file">
+    The starter kit includes a pre-configured `.github/workflows/cron.yml`:
+
+    ```yaml
+    name: cron
+
+    on:
+      schedule:
+        - cron: '0 0 * * *'  # Daily at midnight UTC
+
+    jobs:
+      cron:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: shivammathur/setup-php@v2
+            with:
+              php-version: 8.5
+              coverage: none
+          - run: composer install --no-dev -q
+          - run: cp .env.example .env
+          - run: php artisan key:generate
+          - run: php artisan inspire
+    ```
+  </Step>
+
+  <Step title="Change the command">
+    Replace `php artisan inspire` with your own command:
+
+    ```yaml
+    - name: Run Command
+      run: php artisan your:command
+    ```
+
+    To run multiple commands:
+
+    ```yaml
+    - name: Run Commands
+      run: |
+        php artisan first:command
+        php artisan second:command
+    ```
+  </Step>
+
+  <Step title="Adjust the schedule">
+    Modify the `cron` expression to set your desired frequency:
+
+    | Cron expression | When it runs |
+    | --- | --- |
+    | `0 0 * * *` | Daily at midnight UTC |
+    | `0 */6 * * *` | Every 6 hours |
+    | `0 0 * * 1` | Weekly on Monday at midnight |
+  </Step>
+
+  <Step title="Handle sensitive information with secrets">
+    Use GitHub repository secrets for API keys, passwords, and other sensitive values.
+
+    Add secrets in your repository under **Settings > Secrets and variables > Actions**, then reference them in the workflow:
+
+    ```yaml
+    - name: Run Command with Secrets
+      run: php artisan your:command
+      env:
+        API_KEY: ${{ secrets.API_KEY }}
+        DB_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+    ```
+  </Step>
+</Steps>
+
+## Notification Feature
+
+You can notify yourself of command results or errors via email, Slack, and other channels.
+
+<Steps>
+  <Step title="Create a notification class">
+    ```bash
+    php artisan make:notification TaskCompleted
+    ```
+
+    This generates `app/Notifications/TaskCompleted.php`.
+  </Step>
+
+  <Step title="Configure notification channels">
+    Publish the relevant config files if needed:
+
+    ```bash
+    php artisan config:publish mail
+    php artisan config:publish services
+    ```
+  </Step>
+
+  <Step title="Send a notification from your command">
+    ```php
+    <?php
+
+    namespace App\Console\Commands;
+
+    use App\Notifications\TaskCompleted;
+    use Illuminate\Console\Command;
+    use Illuminate\Support\Facades\Notification;
+
+    class ProcessDataCommand extends Command
+    {
+        protected $signature = 'data:process';
+        protected $description = 'Process data and send notification when complete';
+
+        public function handle(): int
+        {
+            $this->info('Processing data...');
+
+            // Your processing logic...
+
+            Notification::route('mail', 'admin@example.com')
+                ->notify(new TaskCompleted('Data processing completed successfully'));
+
+            return Command::SUCCESS;
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+<Info>
+For full details, refer to the [Laravel Notification documentation](https://laravel.com/docs/notifications).
+</Info>
+
+## Practical Application Examples
+
+### Example 1: Website Uptime Monitoring with Slack Alerts
+
+Create a command that checks if your websites are online and sends Slack alerts when issues are detected.
+
+<Steps>
+  <Step title="Install the Slack notification channel">
+    ```bash
+    composer require laravel/slack-notification-channel
+    ```
+  </Step>
+
+  <Step title="Create the command and notification">
+    ```bash
+    php artisan make:command MonitorWebsites --command=monitor:websites
+    php artisan make:notification WebsiteDown
+    ```
+  </Step>
+
+  <Step title="Configure Slack">
+    ```bash
+    php artisan config:publish services
+    ```
+
+    Add your Slack webhook URL to `.env`:
+
+    ```
+    SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+    ```
+
+    Update `config/services.php`:
+
+    ```php
+    'slack' => [
+        'webhook_url' => env('SLACK_WEBHOOK_URL'),
+    ],
+    ```
+  </Step>
+
+  <Step title="Implement the notification">
+    Edit `app/Notifications/WebsiteDown.php`:
+
+    ```php
+    <?php
+
+    namespace App\Notifications;
+
+    use Illuminate\Notifications\Messages\SlackMessage;
+    use Illuminate\Notifications\Notification;
+
+    class WebsiteDown extends Notification
+    {
+        public function __construct(
+            protected string $website,
+            protected string $error,
+        ) {}
+
+        public function via($notifiable): array
+        {
+            return ['slack'];
+        }
+
+        public function toSlack($notifiable): SlackMessage
+        {
+            return (new SlackMessage)
+                ->error()
+                ->content('Website Down Alert!')
+                ->attachment(function ($attachment) {
+                    $attachment->title($this->website)
+                               ->content("Error: {$this->error}")
+                               ->timestamp(now());
+                });
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Implement the command">
+    Edit `app/Console/Commands/MonitorWebsites.php`:
+
+    ```php
+    <?php
+
+    namespace App\Console\Commands;
+
+    use App\Notifications\WebsiteDown;
+    use Illuminate\Console\Command;
+    use Illuminate\Support\Facades\Http;
+    use Illuminate\Support\Facades\Log;
+    use Illuminate\Support\Facades\Notification;
+
+    class MonitorWebsites extends Command
+    {
+        protected $signature = 'monitor:websites {--timeout=10}';
+        protected $description = 'Check if websites are online and send Slack alerts if they are down';
+
+        protected array $websites = [
+            'https://example.com',
+            'https://yourwebsite.com',
+        ];
+
+        public function handle(): int
+        {
+            $timeout = (int) $this->option('timeout');
+            $webhookUrl = config('services.slack.webhook_url');
+            $hasErrors = false;
+
+            foreach ($this->websites as $website) {
+                try {
+                    $response = Http::timeout($timeout)->get($website);
+                    if ($response->successful()) {
+                        $this->info("{$website}: Online ✓");
+                    } else {
+                        $error = "HTTP status: " . $response->status();
+                        $this->error("{$website}: Down ({$error})");
+                        Notification::route('slack', $webhookUrl)
+                            ->notify(new WebsiteDown($website, $error));
+                        $hasErrors = true;
+                    }
+                } catch (\Exception $e) {
+                    $this->error("{$website}: Error ({$e->getMessage()})");
+                    Log::error("Failed to check {$website}", ['error' => $e->getMessage()]);
+                    Notification::route('slack', $webhookUrl)
+                        ->notify(new WebsiteDown($website, $e->getMessage()));
+                    $hasErrors = true;
+                }
+            }
+
+            return $hasErrors ? Command::FAILURE : Command::SUCCESS;
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Schedule in GitHub Actions">
+    Update `.github/workflows/cron.yml`:
+
+    ```yaml
+    name: Website Monitoring
+
+    on:
+      schedule:
+        - cron: '*/15 * * * *'  # Every 15 minutes
+
+    jobs:
+      monitor:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v6
+          - uses: shivammathur/setup-php@v2
+            with:
+              php-version: 8.5
+          - run: composer install --no-dev -q
+          - run: cp .env.example .env
+          - run: php artisan key:generate
+          - name: Monitor Websites
+            run: php artisan monitor:websites
+            env:
+              SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    ```
+  </Step>
+</Steps>
+
+### Example 2: Cryptocurrency Portfolio Update with Discord Notifications
+
+Fetch cryptocurrency prices from the CoinGecko API and send portfolio updates to Discord via webhook.
+
+<Steps>
+  <Step title="Install the Discord notification channel">
+    ```bash
+    composer require laravel-notification-channels/discord-webhook
+    ```
+  </Step>
+
+  <Step title="Create the command and notification">
+    ```bash
+    php artisan make:command UpdateCryptoPortfolio --command=crypto:portfolio
+    php artisan make:notification CryptoPortfolioUpdate
+    ```
+  </Step>
+
+  <Step title="Configure Discord">
+    Add your Discord webhook URL to `.env`:
+
+    ```
+    DISCORD_WEBHOOK=https://discord.com/api/webhooks/YOUR/WEBHOOK
+    ```
+
+    Update `config/services.php`:
+
+    ```php
+    'discord' => [
+        'webhook' => env('DISCORD_WEBHOOK'),
+    ],
+    ```
+  </Step>
+
+  <Step title="Implement and run the command">
+    For the full implementation, see the [GitHub repository tutorial](https://github.com/invokable/laravel-console-starter/blob/main/docs/tutorial.md).
+
+    ```bash
+    php artisan crypto:portfolio
+    ```
+  </Step>
+</Steps>
+
+### Example 3: Website Content Scraping with Email Notification
+
+Create a command that scrapes content from a website and sends the results via email.
+
+<Steps>
+  <Step title="Create the command and notification">
+    ```bash
+    php artisan make:command WebScraper --command=scrape:website
+    php artisan make:notification ScrapingCompleted
+    ```
+  </Step>
+
+  <Step title="Configure mail">
+    ```bash
+    php artisan config:publish mail
+    ```
+
+    Update your `.env` with mail settings:
+
+    ```
+    MAIL_MAILER=smtp
+    MAIL_HOST=smtp.mailtrap.io
+    MAIL_PORT=2525
+    MAIL_USERNAME=your_username
+    MAIL_PASSWORD=your_password
+    MAIL_ENCRYPTION=tls
+    MAIL_FROM_ADDRESS=your-app@example.com
+    MAIL_FROM_NAME="${APP_NAME}"
+    ```
+  </Step>
+
+  <Step title="Implement and run the command">
+    ```php
+    protected $signature = 'scrape:website {--url=https://example.com} {--email=admin@example.com}';
+
+    public function handle(): int
+    {
+        $url = $this->option('url');
+        $email = $this->option('email');
+
+        $response = Http::timeout(30)->get($url);
+
+        // Process content and send notification...
+        Notification::route('mail', $email)
+            ->notify(new ScrapingCompleted(true, $url, $title, $content));
+
+        return Command::SUCCESS;
+    }
+    ```
+
+    ```bash
+    php artisan scrape:website --email=admin@example.com
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+You now know the fundamentals of building Laravel console applications with `revolution/laravel-console-starter`.
+
+To continue your journey:
+
+- **Explore Laravel's documentation** — Dive deeper into features that can enhance your console applications at [laravel.com/docs](https://laravel.com/docs)
+- **Implement testing** — Write tests for your commands using Laravel's testing framework to ensure reliability
+- **Explore package development** — Package your console commands as reusable Laravel packages if you create similar functionality across projects
+- **Stay updated** — Follow [Laravel News](https://laravel-news.com/) and the official Laravel blog to stay current with best practices

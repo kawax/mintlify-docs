@@ -425,6 +425,18 @@
               ]
             }
           ]
+        },
+        {
+          "group": "Starter Kits",
+          "pages": [
+            {
+              "group": "Laravel Console Starter",
+              "pages": [
+                "en/packages/laravel-console-starter/index",
+                "en/packages/laravel-console-starter/tutorial"
+              ]
+            }
+          ]
         }
       ]
     }

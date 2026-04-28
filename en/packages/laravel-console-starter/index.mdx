@@ -1,0 +1,165 @@
+---
+title: "Laravel Console Starter"
+description: "A Laravel starter kit focused on artisan commands. Schedule execution with GitHub Actions and send output via notifications."
+---
+
+## Overview
+
+[invokable/laravel-console-starter](https://github.com/invokable/laravel-console-starter) is a starter kit that accelerates the development of Laravel applications centered around custom artisan commands.
+
+<Info>
+The GitHub organization is `invokable`, while the Packagist vendor name is `revolution`. Use `revolution/laravel-console-starter` in the installation command.
+</Info>
+
+Rather than building standalone CLI tools, you build powerful console applications that leverage the full Laravel framework ecosystem — dependency injection, notifications, scheduling, and testing. The core workflow is to run commands on a schedule via GitHub Actions and deliver results through notifications like email or Slack.
+
+## Requirements
+
+- PHP `^8.3`
+- Laravel Framework `^13.0`
+- Laravel Installer `^5.24`
+
+## Installation
+
+```bash
+laravel new --using=revolution/laravel-console-starter --no-interaction my-app
+```
+
+Directory structure after installation:
+
+```
+my-app/
+├── app/Console/Commands/   # Place your custom artisan commands here
+├── .github/workflows/
+│   └── cron.yml            # Pre-configured GitHub Actions schedule example
+├── config/                 # Application configuration
+└── routes/console.php      # Command registration
+```
+
+## Key Features
+
+<Columns cols={3}>
+  <Card title="Console-focused" icon="terminal">
+    Removes web-specific overhead so you can focus on artisan command development.
+  </Card>
+  <Card title="GitHub Actions scheduling" icon="clock">
+    No server cron jobs needed. A `.github/workflows/cron.yml` example is included from the start.
+  </Card>
+  <Card title="Laravel ecosystem" icon="layers">
+    Use notifications, HTTP client, testing, the DI container, and all other Laravel features out of the box.
+  </Card>
+</Columns>
+
+## Quick Start
+
+### Create a command
+
+```bash
+php artisan make:command Hello --command=hello
+```
+
+This generates `app/Console/Commands/Hello.php`. Implement your logic in the `handle()` method, then run it:
+
+```bash
+php artisan hello
+```
+
+### Schedule execution with GitHub Actions
+
+Edit `.github/workflows/cron.yml` to set your command and schedule:
+
+```yaml
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.5
+      - run: composer install --no-dev -q
+      - run: cp .env.example .env
+      - run: php artisan key:generate
+      - run: php artisan your:command
+```
+
+### Send notifications
+
+Create a notification class and send it using the `Notification` facade:
+
+```bash
+php artisan make:notification TaskCompleted
+```
+
+```php
+Notification::route('mail', 'admin@example.com')
+    ->notify(new TaskCompleted('Processing completed successfully'));
+```
+
+<Tip>
+If you need to configure notification channels (mail, Slack, etc.), publish the config files with `php artisan config:publish mail` and `php artisan config:publish services`.
+</Tip>
+
+## Application Ideas
+
+Here are ideas for applications you can build with this starter kit.
+
+<AccordionGroup>
+  <Accordion title="Monitoring & Analytics">
+    - Website uptime monitoring with Slack alerts
+    - Server resource usage reports via email
+    - SSL certificate expiration checks and notifications
+    - API response time monitoring and alerts
+    - Competitor price change tracking with Discord notifications
+  </Accordion>
+  <Accordion title="Finance & Business">
+    - Send Google AdSense revenue via email
+    - Notify AWS costs to Discord
+    - Daily cryptocurrency portfolio updates to Discord
+    - Stock price alerts to Slack channels
+    - Invoice payment deadline reminders
+    - Monthly expense report generation and delivery
+  </Accordion>
+  <Accordion title="Data Processing & Reports">
+    - Old log file cleanup and storage space reports
+    - Data synchronization between different APIs with result reports
+    - CSV data import and processing result notifications
+    - Periodic data exports and uploads to cloud storage
+  </Accordion>
+  <Accordion title="Content & Marketing">
+    - Website broken link checks and reports
+    - SEO keyword ranking monitoring and change notifications
+    - Blog post performance metrics weekly reports
+    - RSS feed content aggregation and notifications
+  </Accordion>
+  <Accordion title="Development & DevOps">
+    - GitHub repository dependency security alerts
+    - Codebase static analysis reports
+    - Post-deployment application health checks
+    - API documentation change detection and notifications
+  </Accordion>
+  <Accordion title="AI & More">
+    - AI agent tools using [laravel-copilot-sdk](https://github.com/invokable/laravel-copilot-sdk)
+    - Local MCP server using the [laravel/mcp](https://github.com/laravel/mcp) package
+    - Domain expiration monitoring and alerts
+    - Google Trends keyword monitoring and notifications
+    - Personal spending category insights and reports
+  </Accordion>
+</AccordionGroup>
+
+## Documentation
+
+<Columns cols={2}>
+  <Card title="Tutorial" href="/en/packages/laravel-console-starter/tutorial" icon="book-open">
+    From installation to command creation, GitHub Actions scheduling, sending notifications, and practical app examples.
+  </Card>
+</Columns>
+
+## Links
+
+- GitHub: [invokable/laravel-console-starter](https://github.com/invokable/laravel-console-starter)
+- DeepWiki: [invokable/laravel-console-starter](https://deepwiki.com/invokable/laravel-console-starter)
