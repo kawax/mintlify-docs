@@ -1,0 +1,369 @@
+---
+title: "Laravel Nostr"
+description: "A Laravel package for the Nostr protocol. Supports key management, event operations, pool (multi-relay), NIP-05 / NIP-17, and Laravel Notifications integration."
+---
+
+## Overview
+
+[revolution/laravel-nostr](https://github.com/invokable/laravel-nostr) is a package for using the Nostr protocol from Laravel. It provides key generation and conversion, event retrieval and publishing, pool (multi-relay) support, NIP-05 profiles, NIP-17 Private Direct Messages, and Laravel Notifications integration.
+
+<Info>
+  Because the Nostr specifications are still evolving, this package is under constant development. However, the notification features are already useful as-is.
+</Info>
+
+## Drivers
+
+This package provides two drivers.
+
+| Driver | Description |
+|--------|-------------|
+| `native` | Pure PHP implementation using [nostr-php](https://github.com/nostrver-se/nostr-php). This is sufficient for most use cases. |
+| `node` | Depends on an external [WebAPI](https://github.com/kawax/nostr-vercel-api) running on Node.js. |
+
+<Tip>
+  A unique feature of the `native` driver is the `WebSocketHttpMixin` implementation. It connects to WebSocket using Laravel's HTTP client, and disconnects as soon as data is sent and received. You do not need to keep a WebSocket server running, making it accessible to any Laravel user.
+</Tip>
+
+<Info>
+  The `native` driver does not support NIP-04.
+</Info>
+
+### Setting the default driver
+
+Set the default driver in `config/nostr.php` or `.env`.
+
+```php
+// config/nostr.php
+
+'driver' => env('NOSTR_DRIVER', 'node'),
+```
+
+```dotenv
+NOSTR_DRIVER=native
+```
+
+If you do not specify a driver, the default will be used.
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+Nostr::event()->list();
+```
+
+You can also specify the driver explicitly.
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+Nostr::driver('node')->event()->list();
+Nostr::node()->event()->list();
+
+Nostr::driver('native')->event()->list();
+Nostr::native()->event()->list();
+```
+
+## Installation
+
+<Steps>
+  <Step title="Install the package">
+    ```bash
+    composer require revolution/laravel-nostr
+    ```
+  </Step>
+  <Step title="Publish the configuration file">
+    ```bash
+    php artisan vendor:publish --tag=nostr-config
+    ```
+  </Step>
+</Steps>
+
+## Key management
+
+### Generate new keys
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+use Illuminate\Http\Client\Response;
+
+/** @var Response $response */
+$response = Nostr::key()->generate();
+$keys = $response->json();
+// [
+//     'sk'   => 'sk...',
+//     'nsec' => 'nsec...',
+//     'pk'   => 'pk...',
+//     'npub' => 'npub...',
+// ]
+```
+
+### Convert keys
+
+Convert from nsec:
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::key()->fromNsec(nsec: 'nsec');
+$keys = $response->json();
+// ['sk' => '...', 'nsec' => '...', 'pk' => '...', 'npub' => '...']
+```
+
+Convert from secret key:
+
+```php
+$response = Nostr::key()->fromSecretKey(sk: 'sk');
+```
+
+Convert from npub (public key only):
+
+```php
+$response = Nostr::key()->fromNpub(npub: 'npub');
+$keys = $response->json();
+// ['pk' => '...', 'npub' => '...']
+```
+
+Convert from public key:
+
+```php
+$response = Nostr::key()->fromPublicKey(pk: 'pk');
+```
+
+## Getting events
+
+### Get multiple events
+
+```php
+use Illuminate\Http\Client\Response;
+use Revolution\Nostr\Facades\Nostr;
+use Revolution\Nostr\Filter;
+use Revolution\Nostr\Kind;
+
+$filter = Filter::make(
+    authors: ['my pk'],
+    kinds: [Kind::Text],
+    limit: 10,
+);
+
+/** @var Response $response */
+$response = Nostr::event()->list(filter: $filter);
+$events = $response->json('events');
+// [
+//     ['id' => '...1', 'kind' => 1, 'content' => '...'],
+//     ['id' => '...2', 'kind' => 1, 'content' => '...'],
+// ]
+```
+
+### Get one event
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+use Revolution\Nostr\Filter;
+use Revolution\Nostr\Kind;
+
+$filter = Filter::make(
+    authors: ['my pk'],
+    kinds: [Kind::Metadata],
+);
+
+$response = Nostr::event()->get(filter: $filter);
+$event = $response->json('event');
+// ['id' => '...', 'kind' => 0, 'content' => '{name: ""}']
+```
+
+## Publishing events
+
+### Publish to a single relay
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+use Revolution\Nostr\Event;
+use Revolution\Nostr\Kind;
+
+$event = Event::make(
+    kind: Kind::Text,
+    content: 'hello',
+    created_at: now()->timestamp,
+    tags: [],
+);
+
+$sk = 'my sk';
+
+$response = Nostr::event()->publish(event: $event, sk: $sk);
+
+if ($response->successful()) {
+    $event = $response->json('event');
+}
+```
+
+### Publish to multiple relays (pool)
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+use Revolution\Nostr\Event;
+use Revolution\Nostr\Kind;
+
+$event = Event::make(
+    kind: Kind::Text,
+    content: 'test',
+    created_at: now()->timestamp,
+    tags: [],
+);
+
+$responses = Nostr::pool()->publish(event: $event, sk: 'my sk');
+// $responses is array<string, Response>
+// ['wss://relay1' => $response, 'wss://relay2' => $response]
+
+foreach ($responses as $relay => $response) {
+    if ($response->failed()) {
+        dump($relay . ' : ' . $response->body());
+    }
+}
+```
+
+## Relay server configuration
+
+### Which relay servers are used?
+
+When using `Nostr::event()` alone, the first relay in `config/nostr.php` is used. When using `Nostr::pool()`, all relays in the configuration are used.
+
+### Change relay server at runtime
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::event()->withRelay('wss://')->...;
+```
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::pool()->withRelays(['wss://', 'wss://'])->...;
+```
+
+## NIP-05 profile
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$profile = Nostr::nip05()->profile('user@localhost');
+// [
+//     'user'   => 'user@localhost',
+//     'pubkey' => 'pk',
+//     'relays' => [],
+// ]
+```
+
+## NIP-17 Private Direct Messages
+
+<Info>
+  NIP-17 is only supported in the `native` driver.
+</Info>
+
+### Send a private direct message
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::driver('native')
+    ->nip17()
+    ->sendDirectMessage(
+        sk: 'sender-secret-key',
+        pk: 'receiver-public-key',
+        message: 'Hello, this is a private message!'
+    );
+```
+
+### Decrypt a received private direct message
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::driver('native')
+    ->nip17()
+    ->decryptDirectMessage(
+        giftWrap: $receivedGiftWrap,
+        sk: 'receiver-secret-key'
+    );
+
+$decryptedMessage = $response->json();
+```
+
+## Laravel Notifications
+
+Use `NostrChannel` to send messages to Nostr through Laravel Notifications.
+
+### Notification class
+
+```php
+use Illuminate\Notifications\Notification;
+use Revolution\Nostr\Notifications\NostrChannel;
+use Revolution\Nostr\Notifications\NostrMessage;
+use Revolution\Nostr\Tags\HashTag;
+
+class TestNotification extends Notification
+{
+    public function via(object $notifiable): array
+    {
+        return [
+            'mail',
+            NostrChannel::class,
+        ];
+    }
+
+    public function toNostr(object $notifiable): NostrMessage
+    {
+        return new NostrMessage(
+            // '#laravel' in content is for human display; the HashTag in tags is for protocol-level filtering
+            content: 'hello #laravel',
+            tags: [
+                HashTag::make(t: 'laravel'),
+            ],
+        );
+    }
+}
+```
+
+### On-demand notifications
+
+```php
+use Illuminate\Support\Facades\Notification;
+use Revolution\Nostr\Notifications\NostrRoute;
+
+Notification::route('nostr', NostrRoute::to(sk: 'sk'))
+    ->notify(new TestNotification());
+```
+
+### User model integration
+
+```php
+use Illuminate\Notifications\Notifiable;
+use Revolution\Nostr\Notifications\NostrRoute;
+
+class User
+{
+    use Notifiable;
+
+    public function routeNotificationForNostr($notification): NostrRoute
+    {
+        return NostrRoute::to(sk: $this->sk, relays: ['wss://']);
+    }
+}
+```
+
+```php
+$user->notify(new TestNotification());
+```
+
+### Relay servers for notifications
+
+By default, all relays in `config/nostr.php` are used. Specify relays in `NostrRoute` to change them at runtime.
+
+```php
+use Revolution\Nostr\Notifications\NostrRoute;
+
+return NostrRoute::to(sk: 'sk', relays: ['wss://', 'wss://']);
+```
+
+<Info>
+  For the latest information, see the [GitHub repository](https://github.com/invokable/laravel-nostr).
+</Info>
