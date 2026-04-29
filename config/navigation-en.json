@@ -418,7 +418,8 @@
                 "en/packages/laravel-bluesky/core"
               ]
             },
-            "en/packages/laravel-nostr"
+            "en/packages/laravel-nostr",
+            "en/packages/laravel-notification-discord-webhook"
           ]
         },
         {
