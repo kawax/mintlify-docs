@@ -6,7 +6,6 @@
 - マイパッケージの解説ページ。下のpackages ページ案に追加されたら対応。
 - [x] 重複ページを作り出してるのでここまでの完了したタスクを削除。公式ドキュメントを元にしたページは揃ってきた感じなので独自コンテンツを増やしていける段階。
   - 重複しても新しい情報があればプルリクの段階でページを統合して更新するように指示できるので「既存ページの再レビュー・改修」ができて問題ないかもしれない。
-- [x] https://github.com/laravel/docs/pull/11172 MCP Apps対応で文量が多いのでmcp.mdxにも反映。
 
 ## 継続対応
 
@@ -39,7 +38,7 @@
 - [x] GitHub Copilot SDK for Laravel。https://github.com/invokable/laravel-copilot-sdk
   - [GitHub Copilot SDK](https://github.com/github/copilot-sdk) のLaravel版。
   - 英語・日本語の全ページ完成。今後も追加・変更はあるだろうけど管理者がIssueを作ってエージェントをアサインして対応していく。
-- [ ] Testbench `package-testing.mdx` が作られてたので次はLaravel Bluesky https://github.com/invokable/laravel-bluesky
+- [x] Testbench `package-testing.mdx` が作られてたので次はLaravel Bluesky https://github.com/invokable/laravel-bluesky
   - `docs`内に英語のドキュメントがある。AI普及前なので最低限のドキュメントしかない。
   - [x] docs/workbench.md はBlueskyとは関係ないTestbench Workbenchのドキュメント。Workbenchの情報がなさすぎて調べた結果をとりあえずここに置いていた。こっちのサイトに移せばいいのでworkbench.mdを元に`package-testing.mdx`の続きのページを作成。
   - 残りのページは`{lang}/packages/laravel-bluesky/`内に複数ページで作成。
@@ -57,20 +56,11 @@
   - [x] Bluesky Facadeの実体はBlueskyManagerでよく使うだろうメソッドはHasShortHandトレイトですぐに使えるようにしている。ShortHandを用意は公式SDKと同じ仕組み。
   - [x] TextBuilderの詳細な使い方。
   - [x] AT Proto公式チュートリアルのLaravel版
-- [ ] Laravel Console Starter Kit https://github.com/invokable/laravel-console-starter
+- [x] Laravel Console Starter Kit https://github.com/invokable/laravel-console-starter
   - パッケージではなくスターターキット。元のパッケージ版は https://github.com/invokable/laravel-slim 
-  - READMEにはAIによってアプリケーションアイデアが色々書かれてるけど要するに上のBlueskyのボットチュートリアル packages/laravel-bluesky/bot-tutorial のような **artisanコマンドをGitHub Actionsで実行して最終出力は通知機能でメールやチャットに送る** 使い方を想定している。
-  - Laravelを長く使いすぎた人がLaravelの一番便利な機能だけを追求していくとここに辿り着く。
-  - artisanコマンドなのでLaravelのエコシステムが使える。
-  - GitHub Actionsなのでサーバー不要。
-  - 他者からの入力がないのでセキュリティ的に安全。
-
-スターターキットグループを作って配置。
-```json
-        {
-          "group": "Starter Kits",
-          "pages": [
-            "jp/packages/laravel-console-starter"
-          ]
-        }
-```
+- [ ] Laravel Nostr https://github.com/invokable/laravel-nostr
+  - 次はNostr。Blueskyの前に作ってたけどここで楕円曲線暗号やWebSocketが出てきていたのでBlueskyパッケージも作ることができた。Blueskyみたいに難しい概念を隠してないので一般的に使われないだろうからBasic clientと通知機能と一段階ハイレベルな`Social` Facadeくらいしか作ってない。
+  - `docs/basic-client.md`と`docs/notification.md`の2ファイルあるけどまとめて1ページで作成。
+  - 当初はPHPのみでの実装が不可能だったので「node.jsで作ったWeb APIを呼び出す`node`ドライバー」とその後登場した「PHPネイティブに動作する`native`ドライバー」の2つがある。今はもうnativeだけで十分なのでここの説明は軽く。
+  - 独自実装で他であまり見ないのは`src/Client/Native/WebSocketHttpMixin.php`のLaravelのHttpクライアントでWebSocketに接続する仕組み。データを送受信したらすぐに切断してるのでWebSocketを起動し続ける必要がなく、Laravelユーザーなら誰でも使える使用方法。
+  - `SDK`グループのBlueskyの下に配置。ネストせず1ページ。
