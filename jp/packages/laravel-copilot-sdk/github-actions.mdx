@@ -1,6 +1,7 @@
 ---
-title: "GitHub Actions"
+title: "GitHub Actions - GitHub Copilot SDK for Laravel"
 description: "Laravel Copilot SDK を GitHub Actions で使うための Copilot CLI インストールとトークン認証設定を説明します。"
+sidebarTitle: "GitHub Actions"
 ---
 
 ## GitHub Actions での使い方
@@ -31,8 +32,8 @@ GitHub Actions では stdio モードで使うのが一般的です。
 
 GitHub CLI 2.86.0 で Copilot のインストール機能が追加されました。普通の GitHub Actions 環境では `gh` コマンドがプリインストールされているので追加のインストール不要で使えます。おそらく最初に `gh copilot ...` コマンドが実行された時に Copilot が自動でインストールされるので `gh copilot version` だけ実行します。
 
-> gh version 2.86.0 (2026-01-21)  
-> https://github.com/cli/cli/releases/tag/v2.86.0  
+> gh version 2.86.0 (2026-01-21)
+> https://github.com/cli/cli/releases/tag/v2.86.0
 > ✓ Copilot CLI installed successfully
 
 ```yaml

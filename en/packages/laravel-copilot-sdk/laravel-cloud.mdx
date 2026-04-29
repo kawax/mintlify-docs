@@ -1,6 +1,7 @@
 ---
-title: "Laravel Cloud"
+title: "Laravel Cloud - GitHub Copilot SDK for Laravel"
 description: "Run Laravel Copilot SDK on Laravel Cloud with Copilot CLI installation, environment variables, and stdio or TCP mode guidance."
+sidebarTitle: "Laravel Cloud"
 ---
 
 ## Usage in Laravel Cloud
@@ -28,7 +29,7 @@ If you use the default stdio mode, this installation is enough.
 
 ## Operating in TCP mode
 
-In **App cluster > Background processes > Custom worker**, set `/var/www/.local/bin/copilot --headless --port 12345`.  
+In **App cluster > Background processes > Custom worker**, set `/var/www/.local/bin/copilot --headless --port 12345`.
 It keeps running as a background process and automatically restarts on deployment.
 
 You can choose any port.
@@ -40,7 +41,7 @@ COPILOT_URL=tcp://127.0.0.1:12345
 # COPILOT_CLI_PATH is unnecessary in TCP mode. If both are set, TCP mode takes priority.
 ```
 
-Because it keeps running continuously, memory usage is high, so you may need a server with at least 2 GiB RAM.  
+Because it keeps running continuously, memory usage is high, so you may need a server with at least 2 GiB RAM.
 If you use it inside HTTP requests, it often fails because it does not finish within 60 seconds, so use queues instead.
 
 TCP mode on Laravel Cloud is not very practical, so stdio mode is recommended.
