@@ -1,0 +1,233 @@
+---
+title: "Laravel Notification for Discord(Webhook)"
+description: "Discord Webhook を使って Laravel から簡単に通知を送れるパッケージ。Bot なし、WebSocket なし、Webhook URL を設定するだけで即使える。"
+---
+
+## 概要
+
+[revolution/laravel-notification-discord-webhook](https://github.com/invokable/laravel-notification-discord-webhook) は、Discord Webhook を使って Laravel Notifications から Discord に通知を送るパッケージです。
+
+Discord の正式な Bot API は WebSocket 接続を維持する必要があり、セットアップが複雑です。Webhook なら URL を取得するだけで通知を送れます。チームの Discord チャンネルにアプリのイベントを通知したいだけであれば、Webhook が最適な選択です。
+
+<Info>
+  このパッケージは PHP 8.3 以上、Laravel 12.0 以上が必要です。
+</Info>
+
+## インストール
+
+```shell
+composer require revolution/laravel-notification-discord-webhook
+```
+
+## 設定
+
+### Discord の Webhook URL を取得する
+
+Discord サーバーの **設定 → 連携サービス → ウェブフック** から Webhook URL を作成できます。詳細は [Discord の公式ガイド](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) を参照してください。
+
+### config/services.php
+
+```php
+'discord' => [
+    'webhook' => env('DISCORD_WEBHOOK'),
+],
+```
+
+### .env
+
+```dotenv
+DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+```
+
+## 基本的な使い方
+
+### Notification クラスを作成する
+
+`toDiscordWebhook()` メソッドを実装し、`via()` で `DiscordChannel::class` を返します。
+
+```php
+<?php
+
+namespace App\Notifications;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Notification;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordChannel;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordMessage;
+
+class DiscordNotification extends Notification implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(protected string $content)
+    {
+        //
+    }
+
+    public function via($notifiable): array
+    {
+        return [DiscordChannel::class];
+    }
+
+    public function toDiscordWebhook(object $notifiable): DiscordMessage
+    {
+        return DiscordMessage::create(content: $this->content);
+    }
+}
+```
+
+## 送信パターン
+
+### On-Demand 通知
+
+特定のユーザーモデルに紐づけずに通知を送る場合は、`Notification::route()` を使います。
+
+```php
+use Illuminate\Support\Facades\Notification;
+
+Notification::route('discord-webhook', config('services.discord.webhook'))
+            ->notify(new DiscordNotification('デプロイが完了しました。'));
+```
+
+### User モデルからの通知
+
+User ごとに異なる Webhook URL を使う場合は、`routeNotificationForDiscordWebhook()` を定義します。
+
+```php
+use Illuminate\Notifications\Notifiable;
+
+class User extends Authenticatable
+{
+    use Notifiable;
+
+    public function routeNotificationForDiscordWebhook($notification): string
+    {
+        return $this->discord_webhook;
+    }
+}
+```
+
+```php
+$user->notify(new DiscordNotification('テスト通知'));
+```
+
+## メッセージタイプ
+
+### テキストメッセージ
+
+最もシンプルな送信方法です。
+
+```php
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create(content: $this->content);
+}
+```
+
+### Embed メッセージ
+
+`DiscordEmbed` を使うとタイトルや URL を含むリッチな表示ができます。
+
+```php
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordMessage;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordEmbed;
+
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create()
+                          ->embed(
+                              DiscordEmbed::make(
+                                  title: 'INFO',
+                                  description: $this->content,
+                                  url: route('home'),
+                              )
+                          );
+}
+```
+
+### ファイル添付
+
+`DiscordAttachment` を使うとファイルを添付して送信できます。`content`（ファイルの中身）と `filename` が必須です。
+
+```php
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordMessage;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordAttachment;
+use Illuminate\Support\Facades\Storage;
+
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create()
+        ->file(
+            DiscordAttachment::make(
+                content: Storage::get('test.png'),
+                filename: 'test.png',
+                description: 'test',
+                filetype: 'image/png'
+            )
+        );
+}
+```
+
+### Embed 内でのファイル参照
+
+Embed の `image` や `thumbnail` に添付ファイルを `attachment://ファイル名` で参照できます。
+
+```php
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordMessage;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordAttachment;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordEmbed;
+use Illuminate\Support\Facades\Storage;
+
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create()
+                          ->embed(
+                              DiscordEmbed::make(
+                                  title: 'test',
+                                  description: $this->content,
+                                  image: 'attachment://test.jpg',
+                                  thumbnail: 'attachment://test2.jpg',
+                              )
+                          )
+                          ->file(DiscordAttachment::make(
+                              content: Storage::get('test.jpg'),
+                              filename: 'test.jpg',
+                              description: 'test',
+                              filetype: 'image/jpg'
+                          ))
+                          ->file(new DiscordAttachment(
+                              content: Storage::get('test2.jpg'),
+                              filename: 'test2.jpg',
+                              description: 'test2',
+                              filetype: 'image/jpg'
+                          ));
+}
+```
+
+### 任意のペイロードを送信する
+
+`->with()` を使うと、Discord Webhook の任意のパラメータを直接指定できます。
+
+```php
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create()
+                          ->with([
+                              'content' => $this->content,
+                              'embeds' => [[]],
+                          ]);
+}
+```
+
+<Tip>
+  `->with()` で指定できるパラメータの詳細は [Discord の公式 API ドキュメント](https://discord.com/developers/docs/resources/webhook#execute-webhook) を参照してください。
+</Tip>
+
+## まとめ
+
+Discord Bot は強力ですが、単に通知を送るだけであれば Webhook がずっとシンプルです。このパッケージを使えば、Laravel の通知システムとシームレスに統合して、チームの Discord チャンネルにアプリのイベントをすばやく通知できます。
+
+<Info>
+  最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-notification-discord-webhook) を参照してください。
+</Info>

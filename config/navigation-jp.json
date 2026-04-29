@@ -433,7 +433,8 @@
                 "jp/packages/laravel-bluesky/core"
               ]
             },
-            "jp/packages/laravel-nostr"
+            "jp/packages/laravel-nostr",
+            "jp/packages/laravel-notification-discord-webhook"
           ]
         },
         {

@@ -1,0 +1,233 @@
+---
+title: "Laravel Notification for Discord(Webhook)"
+description: "A Laravel package for sending notifications to Discord via Webhook. No Bot, no WebSocket — just configure a Webhook URL and start sending."
+---
+
+## Overview
+
+[revolution/laravel-notification-discord-webhook](https://github.com/invokable/laravel-notification-discord-webhook) is a Laravel notification channel that delivers notifications to Discord using Webhooks.
+
+Discord's official Bot API requires maintaining a persistent WebSocket connection, which adds complexity to your setup. With a Webhook, you only need a URL — no Bot token, no gateway, no background process. If your goal is simply to notify a Discord channel about application events, a Webhook is the right tool for the job.
+
+<Info>
+  This package requires PHP 8.3 or higher and Laravel 12.0 or higher.
+</Info>
+
+## Installation
+
+```shell
+composer require revolution/laravel-notification-discord-webhook
+```
+
+## Configuration
+
+### Get a Webhook URL from Discord
+
+Create a Webhook URL from your Discord server's **Settings → Integrations → Webhooks**. See the [Discord official guide](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) for detailed instructions.
+
+### config/services.php
+
+```php
+'discord' => [
+    'webhook' => env('DISCORD_WEBHOOK'),
+],
+```
+
+### .env
+
+```dotenv
+DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+```
+
+## Basic usage
+
+### Create a Notification class
+
+Implement the `toDiscordWebhook()` method and return `DiscordChannel::class` from `via()`.
+
+```php
+<?php
+
+namespace App\Notifications;
+
+use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Notification;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordChannel;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordMessage;
+
+class DiscordNotification extends Notification implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(protected string $content)
+    {
+        //
+    }
+
+    public function via($notifiable): array
+    {
+        return [DiscordChannel::class];
+    }
+
+    public function toDiscordWebhook(object $notifiable): DiscordMessage
+    {
+        return DiscordMessage::create(content: $this->content);
+    }
+}
+```
+
+## Sending notifications
+
+### On-Demand notification
+
+Use `Notification::route()` to send a notification without tying it to a specific notifiable model.
+
+```php
+use Illuminate\Support\Facades\Notification;
+
+Notification::route('discord-webhook', config('services.discord.webhook'))
+            ->notify(new DiscordNotification('Deployment complete.'));
+```
+
+### Notification from a User model
+
+To support per-user Webhook URLs, define `routeNotificationForDiscordWebhook()` on your model.
+
+```php
+use Illuminate\Notifications\Notifiable;
+
+class User extends Authenticatable
+{
+    use Notifiable;
+
+    public function routeNotificationForDiscordWebhook($notification): string
+    {
+        return $this->discord_webhook;
+    }
+}
+```
+
+```php
+$user->notify(new DiscordNotification('Test notification'));
+```
+
+## Message types
+
+### Text message
+
+The simplest way to send a message.
+
+```php
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create(content: $this->content);
+}
+```
+
+### Embed message
+
+Use `DiscordEmbed` to create a rich embed with a title, description, and URL.
+
+```php
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordMessage;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordEmbed;
+
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create()
+                          ->embed(
+                              DiscordEmbed::make(
+                                  title: 'INFO',
+                                  description: $this->content,
+                                  url: route('home'),
+                              )
+                          );
+}
+```
+
+### File attachment
+
+Use `DiscordAttachment` to attach a file. Both `content` (raw file bytes) and `filename` are required.
+
+```php
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordMessage;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordAttachment;
+use Illuminate\Support\Facades\Storage;
+
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create()
+        ->file(
+            DiscordAttachment::make(
+                content: Storage::get('test.png'),
+                filename: 'test.png',
+                description: 'test',
+                filetype: 'image/png'
+            )
+        );
+}
+```
+
+### Referencing attachments in an embed
+
+You can reference an attached file inside an embed's `image` or `thumbnail` using the `attachment://filename` syntax.
+
+```php
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordMessage;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordAttachment;
+use Revolution\Laravel\Notification\DiscordWebhook\DiscordEmbed;
+use Illuminate\Support\Facades\Storage;
+
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create()
+                          ->embed(
+                              DiscordEmbed::make(
+                                  title: 'test',
+                                  description: $this->content,
+                                  image: 'attachment://test.jpg',
+                                  thumbnail: 'attachment://test2.jpg',
+                              )
+                          )
+                          ->file(DiscordAttachment::make(
+                              content: Storage::get('test.jpg'),
+                              filename: 'test.jpg',
+                              description: 'test',
+                              filetype: 'image/jpg'
+                          ))
+                          ->file(new DiscordAttachment(
+                              content: Storage::get('test2.jpg'),
+                              filename: 'test2.jpg',
+                              description: 'test2',
+                              filetype: 'image/jpg'
+                          ));
+}
+```
+
+### Send any payload
+
+Use `->with()` to pass arbitrary parameters directly to the Discord Webhook API.
+
+```php
+public function toDiscordWebhook(object $notifiable): DiscordMessage
+{
+    return DiscordMessage::create()
+                          ->with([
+                              'content' => $this->content,
+                              'embeds' => [[]],
+                          ]);
+}
+```
+
+<Tip>
+  For all available parameters, refer to the [Discord Webhook API documentation](https://discord.com/developers/docs/resources/webhook#execute-webhook).
+</Tip>
+
+## Summary
+
+A Discord Bot is powerful but overkill when you only need to send notifications. With this package, you can integrate Discord notifications into the standard Laravel notification system in minutes — no Bot token, no gateway connection, just a Webhook URL and a Notification class.
+
+<Info>
+  For the latest information, refer to the [GitHub repository](https://github.com/invokable/laravel-notification-discord-webhook).
+</Info>
