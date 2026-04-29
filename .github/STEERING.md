@@ -64,3 +64,11 @@
   - 当初はPHPのみでの実装が不可能だったので「node.jsで作ったWeb APIを呼び出す`node`ドライバー」とその後登場した「PHPネイティブに動作する`native`ドライバー」の2つがある。今はもうnativeだけで十分なのでここの説明は軽く。
   - 独自実装で他であまり見ないのは`src/Client/Native/WebSocketHttpMixin.php`のLaravelのHttpクライアントでWebSocketに接続する仕組み。データを送受信したらすぐに切断してるのでWebSocketを起動し続ける必要がなく、Laravelユーザーなら誰でも使える使用方法。
   - `SDK`グループのBlueskyの下に配置。ネストせず1ページ。
+- [ ] Laravel Notification for Discord(Webhook) https://github.com/invokable/laravel-notification-discord-webhook
+  - Discordに通知する単機能パッケージのWebhook版。
+  - いつもの投稿のためのBasic client＋通知機能ではなく、Webhookなのでいきなり通知が可能。
+  - 本来のDiscord APIはWebSocketが必要で複雑だけどWebhook版は一切不要で簡単。
+  - 仮で`SDK`グループに追加。
+- [ ] Socialite for Discord https://github.com/invokable/socialite-discord
+  - Socialite用のDiscordドライバー。Socialiteドライバーを作るのは簡単なのでOAuth機能があり自分で使うことがあるサービスならすぐに作っている。
+  - `jp/socialite.mdx`で公式ドキュメントにあるSocialite Providersの記述を全部消して`Socialite::extend()`で拡張する正規の方法を書いてるのは確実にこの方法が正しいから。Socialite Providersにすでに同じドライバーがあっても関係なく自分で作っている。
