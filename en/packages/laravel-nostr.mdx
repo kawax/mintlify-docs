@@ -313,6 +313,7 @@ class TestNotification extends Notification
     public function toNostr(object $notifiable): NostrMessage
     {
         return new NostrMessage(
+            // '#laravel' in content is for human display; the HashTag in tags is for protocol-level filtering
             content: 'hello #laravel',
             tags: [
                 HashTag::make(t: 'laravel'),

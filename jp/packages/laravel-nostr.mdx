@@ -313,6 +313,7 @@ class TestNotification extends Notification
     public function toNostr(object $notifiable): NostrMessage
     {
         return new NostrMessage(
+            // content 内の #laravel は表示用、tags の HashTag はプロトコルレベルの分類用
             content: 'hello #laravel',
             tags: [
                 HashTag::make(t: 'laravel'),
