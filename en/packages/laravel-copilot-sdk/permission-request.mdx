@@ -163,7 +163,7 @@ Artisan::command('copilot:chat', function () {
 Other than `kind` and `toolCallId`, fields vary by `kind`.
 
 ```text
-kind: "shell" | "write" | "mcp" | "read" | "url" | "custom-tool"
+kind: "shell" | "write" | "mcp" | "read" | "url" | "custom-tool" | "memory" | "hook"
 ```
 
 ```php
@@ -240,7 +240,7 @@ if ($confirm) {
 | `userNotAvailable()` | `user-not-available` | User cannot respond (non-interactive environment, etc.) |
 | `noResult()` | `no-result` | Handler cannot return a result (skip RPC call) |
 
-If you prefer `Laravel\Prompts\select` over `Laravel\Prompts\confirm`, use `PermissionRequestResultKind::select()` for options. It includes 5 `PermissionDecisionKind` options to present to the user.
+If you prefer `Laravel\Prompts\select` over `Laravel\Prompts\confirm`, use `PermissionRequestResultKind::select()` for options.
 
 ```php
 use Revolution\Copilot\Support\PermissionRequestResultKind;
