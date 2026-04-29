@@ -417,7 +417,8 @@
                 "en/packages/laravel-bluesky/crypto",
                 "en/packages/laravel-bluesky/core"
               ]
-            }
+            },
+            "en/packages/laravel-nostr"
           ]
         },
         {

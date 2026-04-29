@@ -1,0 +1,368 @@
+---
+title: "Laravel Nostr"
+description: "Nostr プロトコル用 Laravel パッケージ。Key 管理、イベント操作、pool 対応、NIP-05 / NIP-17、Laravel Notifications 統合。"
+---
+
+## 概要
+
+[revolution/laravel-nostr](https://github.com/invokable/laravel-nostr) は、Nostr プロトコルを Laravel から利用するためのパッケージです。Key の生成・変換、イベントの取得・発行、pool（複数リレー）対応、NIP-05 プロフィール、NIP-17 Private Direct Messages、そして Laravel Notifications との統合を提供します。
+
+<Info>
+  Nostr の仕様はまだ進化中のため、このパッケージも継続的に開発されています。通知機能はすでに実用的に使えます。
+</Info>
+
+## ドライバー
+
+このパッケージには 2 つのドライバーがあります。
+
+| ドライバー | 説明 |
+|----------|------|
+| `native` | PHP のみで動作する実装。[nostr-php](https://github.com/nostrver-se/nostr-php) を使用。現在はこちらで十分。 |
+| `node` | 外部 [WebAPI](https://github.com/kawax/nostr-vercel-api)（Node.js）に依存する実装。 |
+
+<Tip>
+  `native` ドライバーのユニークな点は `WebSocketHttpMixin` の実装です。Laravel の HTTP クライアントで WebSocket に接続し、データを送受信したらすぐに切断します。WebSocket サーバーを起動し続ける必要がなく、Laravel ユーザーなら誰でも使える設計になっています。
+</Tip>
+
+<Info>
+  `native` ドライバーは NIP-04 には対応していません。
+</Info>
+
+### デフォルトドライバーの設定
+
+`config/nostr.php` または `.env` で設定します。
+
+```php
+// config/nostr.php
+
+'driver' => env('NOSTR_DRIVER', 'node'),
+```
+
+```dotenv
+NOSTR_DRIVER=native
+```
+
+ドライバーを指定しない場合はデフォルトのドライバーが使われます。
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+Nostr::event()->list();
+```
+
+ドライバーを明示的に指定することもできます。
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+Nostr::driver('node')->event()->list();
+Nostr::node()->event()->list();
+
+Nostr::driver('native')->event()->list();
+Nostr::native()->event()->list();
+```
+
+## インストール
+
+<Steps>
+  <Step title="パッケージをインストールする">
+    ```bash
+    composer require revolution/laravel-nostr
+    ```
+  </Step>
+  <Step title="設定ファイルを公開する">
+    ```bash
+    php artisan vendor:publish --tag=nostr-config
+    ```
+  </Step>
+</Steps>
+
+## Key 管理
+
+### Key を生成する
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+use Illuminate\Http\Client\Response;
+
+/** @var Response $response */
+$response = Nostr::key()->generate();
+$keys = $response->json();
+// [
+//     'sk'   => 'sk...',
+//     'nsec' => 'nsec...',
+//     'pk'   => 'pk...',
+//     'npub' => 'npub...',
+// ]
+```
+
+### Key を変換する
+
+nsec から変換します。
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::key()->fromNsec(nsec: 'nsec');
+$keys = $response->json();
+// ['sk' => '...', 'nsec' => '...', 'pk' => '...', 'npub' => '...']
+```
+
+Secret Key から変換します。
+
+```php
+$response = Nostr::key()->fromSecretKey(sk: 'sk');
+```
+
+npub から変換します（公開鍵のみ）。
+
+```php
+$response = Nostr::key()->fromNpub(npub: 'npub');
+$keys = $response->json();
+// ['pk' => '...', 'npub' => '...']
+```
+
+Public Key から変換します。
+
+```php
+$response = Nostr::key()->fromPublicKey(pk: 'pk');
+```
+
+## イベントの取得
+
+### 複数イベントを取得する
+
+```php
+use Illuminate\Http\Client\Response;
+use Revolution\Nostr\Facades\Nostr;
+use Revolution\Nostr\Filter;
+use Revolution\Nostr\Kind;
+
+$filter = Filter::make(
+    authors: ['my pk'],
+    kinds: [Kind::Text],
+    limit: 10,
+);
+
+/** @var Response $response */
+$response = Nostr::event()->list(filter: $filter);
+$events = $response->json('events');
+// [
+//     ['id' => '...1', 'kind' => 1, 'content' => '...'],
+//     ['id' => '...2', 'kind' => 1, 'content' => '...'],
+// ]
+```
+
+### 1 件のイベントを取得する
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+use Revolution\Nostr\Filter;
+use Revolution\Nostr\Kind;
+
+$filter = Filter::make(
+    authors: ['my pk'],
+    kinds: [Kind::Metadata],
+);
+
+$response = Nostr::event()->get(filter: $filter);
+$event = $response->json('event');
+// ['id' => '...', 'kind' => 0, 'content' => '{name: ""}']
+```
+
+## イベントの発行
+
+### 単一リレーに発行する
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+use Revolution\Nostr\Event;
+use Revolution\Nostr\Kind;
+
+$event = Event::make(
+    kind: Kind::Text,
+    content: 'hello',
+    created_at: now()->timestamp,
+    tags: [],
+);
+
+$sk = 'my sk';
+
+$response = Nostr::event()->publish(event: $event, sk: $sk);
+
+if ($response->successful()) {
+    $event = $response->json('event');
+}
+```
+
+### 複数リレーに発行する（pool）
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+use Revolution\Nostr\Event;
+use Revolution\Nostr\Kind;
+
+$event = Event::make(
+    kind: Kind::Text,
+    content: 'test',
+    created_at: now()->timestamp,
+    tags: [],
+);
+
+$responses = Nostr::pool()->publish(event: $event, sk: 'my sk');
+// $responses は array<string, Response>
+// ['wss://relay1' => $response, 'wss://relay2' => $response]
+
+foreach ($responses as $relay => $response) {
+    if ($response->failed()) {
+        dump($relay . ' : ' . $response->body());
+    }
+}
+```
+
+## リレーサーバーの設定
+
+### 使用されるリレーサーバー
+
+`Nostr::event()` のみを使う場合は `config/nostr.php` の最初のリレーが使われます。`Nostr::pool()` を使う場合は設定内のすべてのリレーが対象になります。
+
+### 実行時にリレーを変更する
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::event()->withRelay('wss://')->...;
+```
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::pool()->withRelays(['wss://', 'wss://'])->...;
+```
+
+## NIP-05 プロフィール
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$profile = Nostr::nip05()->profile('user@localhost');
+// [
+//     'user'   => 'user@localhost',
+//     'pubkey' => 'pk',
+//     'relays' => [],
+// ]
+```
+
+## NIP-17 Private Direct Messages
+
+<Info>
+  NIP-17 は `native` ドライバーのみ対応しています。
+</Info>
+
+### プライベートメッセージを送信する
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::driver('native')
+    ->nip17()
+    ->sendDirectMessage(
+        sk: 'sender-secret-key',
+        pk: 'receiver-public-key',
+        message: 'Hello, this is a private message!'
+    );
+```
+
+### プライベートメッセージを復号する
+
+```php
+use Revolution\Nostr\Facades\Nostr;
+
+$response = Nostr::driver('native')
+    ->nip17()
+    ->decryptDirectMessage(
+        giftWrap: $receivedGiftWrap,
+        sk: 'receiver-secret-key'
+    );
+
+$decryptedMessage = $response->json();
+```
+
+## Laravel Notifications
+
+`NostrChannel` を使うと、Laravel Notifications から Nostr にメッセージを送信できます。
+
+### Notification クラス
+
+```php
+use Illuminate\Notifications\Notification;
+use Revolution\Nostr\Notifications\NostrChannel;
+use Revolution\Nostr\Notifications\NostrMessage;
+use Revolution\Nostr\Tags\HashTag;
+
+class TestNotification extends Notification
+{
+    public function via(object $notifiable): array
+    {
+        return [
+            'mail',
+            NostrChannel::class,
+        ];
+    }
+
+    public function toNostr(object $notifiable): NostrMessage
+    {
+        return new NostrMessage(
+            content: 'hello #laravel',
+            tags: [
+                HashTag::make(t: 'laravel'),
+            ],
+        );
+    }
+}
+```
+
+### オンデマンド通知
+
+```php
+use Illuminate\Support\Facades\Notification;
+use Revolution\Nostr\Notifications\NostrRoute;
+
+Notification::route('nostr', NostrRoute::to(sk: 'sk'))
+    ->notify(new TestNotification());
+```
+
+### User モデルへの統合
+
+```php
+use Illuminate\Notifications\Notifiable;
+use Revolution\Nostr\Notifications\NostrRoute;
+
+class User
+{
+    use Notifiable;
+
+    public function routeNotificationForNostr($notification): NostrRoute
+    {
+        return NostrRoute::to(sk: $this->sk, relays: ['wss://']);
+    }
+}
+```
+
+```php
+$user->notify(new TestNotification());
+```
+
+### 通知で使うリレーサーバー
+
+デフォルトでは `config/nostr.php` のすべてのリレーが使われます。`NostrRoute` でリレーを指定すると実行時に変更できます。
+
+```php
+use Revolution\Nostr\Notifications\NostrRoute;
+
+return NostrRoute::to(sk: 'sk', relays: ['wss://', 'wss://']);
+```
+
+<Info>
+  最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-nostr) を参照してください。
+</Info>
