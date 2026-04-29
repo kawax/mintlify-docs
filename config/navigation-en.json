@@ -393,12 +393,6 @@
           ]
         },
         {
-          "group": "AI SDK",
-          "pages": [
-            "en/packages/laravel-amazon-bedrock"
-          ]
-        },
-        {
           "group": "SDK",
           "pages": [
             {
@@ -424,6 +418,12 @@
                 "en/packages/laravel-bluesky/core"
               ]
             }
+          ]
+        },
+        {
+          "group": "AI SDK",
+          "pages": [
+            "en/packages/laravel-amazon-bedrock"
           ]
         },
         {
