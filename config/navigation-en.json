@@ -419,7 +419,8 @@
               ]
             },
             "en/packages/laravel-nostr",
-            "en/packages/laravel-notification-discord-webhook"
+            "en/packages/laravel-notification-discord-webhook",
+            "en/packages/socialite-discord"
           ]
         },
         {

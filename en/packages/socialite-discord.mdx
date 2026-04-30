@@ -1,0 +1,162 @@
+---
+title: "Socialite for Discord"
+description: "A Laravel Socialite driver for Discord OAuth2 authentication."
+---
+
+## Overview
+
+[revolution/socialite-discord](https://github.com/invokable/socialite-discord) is a driver package that adds Discord OAuth2 support to Laravel Socialite.
+
+Discord is not included among Socialite's built-in providers. Install this package and you can immediately use `Socialite::driver('discord')` to add Discord login to your application.
+
+<Info>
+  For a general guide on Laravel Socialite, see the [Socialite guide](/en/socialite).
+</Info>
+
+## Installation
+
+```shell
+composer require revolution/socialite-discord
+```
+
+## Configuration
+
+### Register your app in the Discord Developer Portal
+
+Create an application in the [Discord Developer Portal](https://discord.com/developers/applications) and retrieve the Client ID and Client Secret from the **OAuth2** section. Add your callback URL (e.g. `https://example.com/auth/discord/callback`) to the **Redirects** list.
+
+### config/services.php
+
+```php
+'discord' => [
+    'client_id'     => env('DISCORD_CLIENT_ID'),
+    'client_secret' => env('DISCORD_CLIENT_SECRET'),
+    'redirect'      => env('DISCORD_REDIRECT'),
+],
+```
+
+### .env
+
+```dotenv
+DISCORD_CLIENT_ID=your-client-id
+DISCORD_CLIENT_SECRET=your-client-secret
+DISCORD_REDIRECT=https://example.com/auth/discord/callback
+```
+
+## Basic usage
+
+<Steps>
+  <Step title="Define routes">
+    Add a redirect route and a callback route to `routes/web.php`.
+
+    ```php
+    use App\Http\Controllers\SocialiteController;
+
+    Route::get('auth/discord', [SocialiteController::class, 'login']);
+    Route::get('auth/discord/callback', [SocialiteController::class, 'callback']);
+    ```
+  </Step>
+  <Step title="Create the controller">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use Laravel\Socialite\Facades\Socialite;
+
+    class SocialiteController extends Controller
+    {
+        public function login()
+        {
+            return Socialite::driver('discord')->redirect();
+        }
+
+        public function callback()
+        {
+            $discordUser = Socialite::driver('discord')->user();
+
+            // $discordUser->getId()        Discord user ID
+            // $discordUser->getName()      Username
+            // $discordUser->getEmail()     Email address (requires email scope)
+            // $discordUser->getAvatar()    Avatar URL
+            // $discordUser->token          Access token
+
+            $user = \App\Models\User::updateOrCreate(
+                ['discord_id' => $discordUser->getId()],
+                ['name' => $discordUser->getName()]
+            );
+
+            \Illuminate\Support\Facades\Auth::login($user);
+
+            return redirect('/dashboard');
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Scopes
+
+Discord OAuth2 uses scopes to control which data your application can access. The default scope is `identify` only.
+
+```php
+public function login()
+{
+    return Socialite::driver('discord')
+                    ->setScopes(['identify', 'email', 'guilds', 'guilds.join'])
+                    ->redirect();
+}
+```
+
+Common scopes:
+
+| Scope | Data available |
+| --- | --- |
+| `identify` | User ID, username, avatar (default) |
+| `email` | Email address |
+| `guilds` | List of servers the user belongs to |
+| `guilds.join` | Permission to add the user to a server |
+
+<Tip>
+  For a full list of scopes, see the [Discord OAuth2 documentation](https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes).
+</Tip>
+
+## Saving the user and logging in
+
+A typical callback implementation that persists the user to the database and logs them in:
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Laravel\Socialite\Facades\Socialite;
+
+public function callback()
+{
+    $discordUser = Socialite::driver('discord')->user();
+
+    $user = User::updateOrCreate(
+        ['discord_id' => $discordUser->getId()],
+        [
+            'name'          => $discordUser->getName(),
+            'email'         => $discordUser->getEmail(),
+            'discord_token' => $discordUser->token,
+        ]
+    );
+
+    Auth::login($user);
+
+    return redirect('/dashboard');
+}
+```
+
+<Warning>
+  The `email` scope is required to retrieve an email address. Without it, `getEmail()` may return `null`.
+</Warning>
+
+## Comparison with other Socialite drivers
+
+This package is implemented using `Socialite::extend()`, the official method for adding custom drivers. It exposes the same API as any built-in provider. For details on how custom providers work and how `Socialite::extend()` is used, see the [Socialite guide](/en/socialite).
+
+<Info>
+  For the latest information, refer to the [GitHub repository](https://github.com/invokable/socialite-discord).
+</Info>
