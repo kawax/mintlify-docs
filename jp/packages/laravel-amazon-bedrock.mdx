@@ -1,36 +1,44 @@
 ---
 title: "Laravel AI SDK 用の Amazon Bedrock ドライバー"
-description: "Laravel AI SDK 用の Amazon Bedrock ドライバー。テキスト生成、ストリーミング、ツール使用、会話履歴、構造化出力、埋め込み、画像生成、音声、文字起こし、リランキングをサポートします。"
+description: "Laravel AI SDK 用の Amazon Bedrock ドライバー。テキスト生成、ストリーミング、ツール使用、構造化出力、ファイル添付、会話履歴、埋め込み、画像生成、音声（TTS）、リランキングをサポートします。"
 ---
 
 ## 概要
 
 [revolution/laravel-amazon-bedrock](https://github.com/invokable/laravel-amazon-bedrock) は、[Laravel AI SDK](https://laravel.com/docs/ai-sdk) で Amazon Bedrock を使うためのドライバーです。Bedrock の複数モデルを Laravel AI SDK の統一 API で扱えます。
 
-README で公開されている主な対応機能は次のとおりです。
-
-| 機能                      | Bedrock API キーのみで利用可 | 対応モデル / サービス                                                                     |
-|-------------------------|----------------------|----------------------------------------------------------------------------------|
-| テキスト生成 / ストリーミング        | ✅                    | Anthropic Claude (via Invoke), Amazon Nova, ほとんどの Bedrock モデル (via Converse API) |
-| ツール使用（Function Calling） | ✅                    |                                                                                  |
-| 構造化出力                   | ✅                    |                                                                                  |
-| 画像生成                    | ✅                    | Stability AI（既定）                                                                 |
-| 音声（TTS）                 | ⚠️                   | Amazon Polly                                                                     |
-| 文字起こし（STT）              | ⚠️                   | Amazon Nova 2 Lite（Converse API AudioBlock）                                      |
-| 埋め込み                    | ✅                    | Amazon Titan Embeddings V2（既定）, Cohere Embed V3 / V4                             |
-| リランキング                  | ⚠️                   | Cohere Rerank 3.5, Amazon Rerank 1.0                                             |
+| 機能                      | Bedrock API キーのみで利用可 | 対応モデル / サービス                                                                          |
+|-------------------------|----------------------|---------------------------------------------------------------------------------------|
+| テキスト生成 / ストリーミング        | ✅                    | Anthropic Claude、Amazon Nova、その他ほとんどの Bedrock モデル（すべて Converse API 経由）                |
+| ツール使用（Function Calling） | ✅                    |                                                                                       |
+| 構造化出力                   | ✅                    |                                                                                       |
+| ファイル添付                  | ✅                    | 画像、ドキュメント、音声、動画を Converse API 経由で添付（モデルごとに対応形式は異なる）                                  |
+| 画像生成                    | ✅                    | Stability AI（既定）、Amazon Nova Canvas（非推奨）                                              |
+| 音声（TTS）                 | ⚠️                   | Amazon Polly（generative / neural / long-form / standard エンジン）                         |
+| 文字起こし（STT）              | ❌                    | 未サポート                                                                                 |
+| 埋め込み                    | ✅                    | Amazon Titan Embeddings V2（既定）、Cohere Embed English/Multilingual V3、Cohere Embed V4（バッチ対応） |
+| リランキング                  | ⚠️                   | Cohere Rerank 3.5、Amazon Rerank 1.0                                                   |
+| ファイル                    | ⚠️                   | テキスト生成でローカルファイル添付に対応。サーバー側へのアップロードや `fromId()` は未対応                                  |
 
 <Info>
   表の `⚠️` は「機能自体が未対応」ではなく「Bedrock API キーのみでは利用できない」ことを示します。
 </Info>
 
-<Info>
-  認証方式は 3 つです。Bedrock API キー、AWS IAM クレデンシャル（SigV4）、デフォルト AWS クレデンシャルチェーン（IAM ロール等）を選べます。
-</Info>
+主な特徴は次のとおりです。
+
+- **認証**: Bedrock API キー、AWS IAM クレデンシャル（SigV4）、デフォルト AWS クレデンシャルチェーン（IAM ロール、インスタンスプロファイル等）から選べます。
+- **フェイルオーバー**: AI SDK のマルチプロバイダーフェイルオーバーに対応。レート制限（429）、過負荷（503、529）、クレジット系エラーはフェイルオーバー可能な例外にマッピングされます。
+- **キャッシュ制御**: [Bedrock Converse API](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html) のシステムプロンプトに ephemeral キャッシュを常時有効化。
+- **統一 API**: Anthropic Claude、Amazon Nova、Meta Llama、Mistral など全モデルを Bedrock Converse API 経由で統一インターフェースで扱えます。
 
 <Info>
-  Laravel AI SDK v0.6.3 で Bedrock API キーを使った Text・Image・Embeddings の公式対応が追加されました。このパッケージは Amazon Polly を利用した音声（TTS）、文字起こし、リランキングなど公式統合では利用できない機能もサポートしているため、引き続き公開を継続しています。
+  Laravel AI SDK v0.6.3 で Bedrock API キーを使った Text・Image・Embeddings の公式対応が追加されました。このパッケージは Amazon Polly を利用した音声（TTS）やリランキングなど公式統合では利用できない機能もサポートしているため、引き続き公開を継続しています。
 </Info>
+
+## 必要要件
+
+- PHP >= 8.3
+- Laravel >= 12.x
 
 ## インストール
 
@@ -57,7 +65,6 @@ README で公開されている主な対応機能は次のとおりです。
 'default_for_audio' => 'amazon-bedrock',
 'default_for_embeddings' => 'amazon-bedrock',
 'default_for_reranking' => 'amazon-bedrock',
-'default_for_transcription' => 'amazon-bedrock',
 ```
 
 ### Option 1: Bedrock API キー
@@ -66,7 +73,7 @@ README で公開されている主な対応機能は次のとおりです。
 'providers' => [
     'amazon-bedrock' => [
         'driver' => 'amazon-bedrock',
-        'key' => env('AWS_BEDROCK_API_KEY', ''),
+        'key'    => env('AWS_BEDROCK_API_KEY', ''),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 ],
@@ -77,19 +84,23 @@ AWS_BEDROCK_API_KEY=your_api_key
 AWS_DEFAULT_REGION=us-east-1
 ```
 
+Bedrock API キーは AWS マネジメントコンソールから取得します。
+
 <Warning>
   Bedrock API キーは Bedrock Runtime API 専用です。`bedrock-agent-runtime` を使うリランキングや Amazon Polly（TTS）では使えません。これらは SigV4 またはデフォルト AWS クレデンシャルチェーンを使ってください。
 </Warning>
 
 ### Option 2: AWS IAM クレデンシャル（SigV4）
 
+[Signature Version 4](https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html) で署名する AWS アクセスキーとシークレットキーを使います。
+
 ```php
 'providers' => [
     'amazon-bedrock' => [
         'driver' => 'amazon-bedrock',
-        'key' => env('AWS_ACCESS_KEY_ID'),
+        'key'    => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        'token' => env('AWS_SESSION_TOKEN'),
+        'token'  => env('AWS_SESSION_TOKEN'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 ],
@@ -97,8 +108,8 @@ AWS_DEFAULT_REGION=us-east-1
 
 ```dotenv
 AWS_ACCESS_KEY_ID=AKIA...
-AWS_SECRET_ACCESS_KEY=...
-AWS_SESSION_TOKEN= # 任意
+AWS_SECRET_ACCESS_KEY=wJalr...
+AWS_SESSION_TOKEN= # 任意（STS 一時クレデンシャル用）
 AWS_DEFAULT_REGION=us-east-1
 ```
 
@@ -108,6 +119,8 @@ AWS_DEFAULT_REGION=us-east-1
 
 ### Option 3: デフォルト AWS クレデンシャルチェーン（IAM ロール）
 
+EC2 / ECS / Lambda など IAM ロールがある環境では、`key` と `secret` を省略して [デフォルトの AWS クレデンシャルプロバイダーチェーン](https://docs.aws.amazon.com/sdkref/latest/guide/standardized-credentials.html) を使えます。
+
 ```php
 'providers' => [
     'amazon-bedrock' => [
@@ -121,14 +134,40 @@ AWS_DEFAULT_REGION=us-east-1
 AWS_DEFAULT_REGION=us-east-1
 ```
 
-<Info>
-  EC2 / ECS / Lambda など IAM ロールがある環境では、この方法が安全です。
-</Info>
+デフォルトのクレデンシャルチェーンは、環境変数、共有クレデンシャルファイル（`~/.aws/credentials`）、ECS タスクロール、EC2 インスタンスプロファイルなどから自動で解決します。
 
-## 基本的な使い方
+### 任意の設定キー
+
+| キー                             | 説明                            | 既定値                                               |
+|--------------------------------|-------------------------------|---------------------------------------------------|
+| `secret`                       | AWS シークレットアクセスキー（SigV4）       | —                                                 |
+| `token`                        | AWS セッショントークン（SigV4）          | —                                                 |
+| `timeout`                      | HTTP リクエストタイムアウト（秒）           | 30                                                |
+| `max_tokens`                   | 1 リクエスト当たりの既定 max tokens      | 8096                                              |
+| `models.text.default`          | 既定のテキストモデル                    | `global.anthropic.claude-sonnet-4-6`              |
+| `models.text.cheapest`         | 最安テキストモデル                     | `global.anthropic.claude-haiku-4-5-20251001-v1:0` |
+| `models.text.smartest`         | 最高性能テキストモデル                   | `global.anthropic.claude-opus-4-7`                |
+| `models.embeddings.default`    | 既定の埋め込みモデル                    | `amazon.titan-embed-text-v2:0`                    |
+| `models.embeddings.dimensions` | 既定の埋め込み次元数                    | `1024`                                            |
+| `models.image.default`         | 既定の画像モデル                      | `stability.stable-image-core-v1:1`                |
+| `models.audio.default`         | 既定の音声（TTS）エンジン                | `generative`                                      |
+| `models.reranking.default`     | 既定のリランキングモデル                  | `cohere.rerank-v3-5:0`                            |
+
+## テキスト生成
+
+### Agent クラス
+
+Artisan コマンドで Agent クラスを作成します。
+
+```bash
+php artisan make:agent BedrockAgent
+```
 
 ```php
-use App\Ai\Agents\BedrockAgent;
+<?php
+
+namespace App\Ai\Agents;
+
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Promptable;
 
@@ -141,26 +180,62 @@ class BedrockAgent implements Agent
         return 'あなたはソフトウェア開発の専門家です。';
     }
 }
+```
 
-$response = (new BedrockAgent)->prompt('Laravel 13 の新機能を要約してください。');
+```php
+use App\Ai\Agents\BedrockAgent;
+
+$response = (new BedrockAgent)->prompt('Laravel について教えてください。');
 
 echo $response->text;
 ```
 
-## ストリーミング
+### Anonymous Agent
 
-Bedrock のストリーミングを Laravel AI SDK 経由で使えます。
+クラスを作らずに手早く使う場合は `agent()` ヘルパーを利用します。
+
+```php
+use function Laravel\Ai\agent;
+
+$response = agent(
+    instructions: 'あなたはソフトウェア開発の専門家です。',
+)->prompt('Laravel について教えてください。');
+
+echo $response->text;
+```
+
+### ストリーミング
 
 ```php
 use App\Ai\Agents\BedrockAgent;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/stream', function () {
-    return (new BedrockAgent)->stream('Laravel 13 について教えてください。');
+    return (new BedrockAgent)->stream('Laravel について教えてください。');
 });
 ```
 
-## ツール使用（Function Calling）
+イベントを手動で扱うこともできます。
+
+```php
+use Laravel\Ai\Streaming\Events\TextDelta;
+
+use function Laravel\Ai\agent;
+
+$stream = agent(
+    instructions: 'あなたはソフトウェア開発の専門家です。',
+)->stream('Laravel について教えてください。');
+
+foreach ($stream as $event) {
+    if ($event instanceof TextDelta) {
+        echo $event->delta;
+    }
+}
+```
+
+### ツール使用（Function Calling）
+
+生成中に呼び出されるツールを定義します。
 
 ```php
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -177,18 +252,22 @@ class GetWeather implements Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'city' => $schema->string()->required(),
+            'city' => $schema->string()->required()->description('都市名'),
         ];
     }
 
     public function handle(Request $request): string
     {
-        return json_encode(['city' => $request['city'], 'condition' => 'sunny']);
+        // ここで天気 API を呼び出す
+        return json_encode(['temperature' => 22, 'condition' => 'sunny']);
     }
 }
 ```
 
+Agent から利用します。
+
 ```php
+use App\Ai\Tools\GetWeather;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Promptable;
@@ -213,11 +292,67 @@ $response = (new WeatherAgent)->prompt('東京の天気は？');
 echo $response->text;
 ```
 
-## 会話履歴
-
-`Conversational` インターフェースを実装すると、過去のメッセージを各プロンプトに含められます。
+Anonymous Agent でも使えます。
 
 ```php
+use function Laravel\Ai\agent;
+
+$response = agent(
+    instructions: 'あなたは天気アシスタントです。',
+    tools: [new GetWeather],
+    maxSteps: 5,
+)->prompt('東京の天気は？');
+```
+
+ストリーミングでもツール呼び出しは動作します。SDK が自動でツールを実行し、最終的なテキスト応答が出るまで会話を継続します。
+
+### ファイル添付
+
+`attachments` パラメーターで画像、ドキュメント、音声、動画ファイルをプロンプトに添付できます。Bedrock Converse API が添付ブロックを処理しますが、実際にどの形式が使えるかはモデルに依存します（例: Anthropic Claude は画像とドキュメントのみ対応）。
+
+```php
+use Laravel\Ai\Files\Document;
+use Laravel\Ai\Files\Image;
+
+use function Laravel\Ai\agent;
+
+// ローカルパスの画像を添付
+$response = agent(
+    instructions: 'あなたは便利なアシスタントです。',
+)->prompt('この画像を説明してください。', attachments: [
+    Image::fromPath('/path/to/photo.jpg'),
+]);
+
+// URL のドキュメントを添付
+$response = agent(
+    instructions: 'あなたは便利なアシスタントです。',
+)->prompt('このドキュメントを要約してください。', attachments: [
+    Document::fromUrl('https://example.com/report.pdf'),
+]);
+
+// 文字列から添付（明示的にフォーマット指定）
+$response = agent(
+    instructions: 'あなたは便利なアシスタントです。',
+)->prompt('このテキストを分析してください。', attachments: [
+    Document::fromString($csvContent, 'text/csv')->as('data.csv'),
+]);
+```
+
+サポートされている添付タイプは `Laravel\Ai\Files\*` の `Image`、`Document`、`Audio` です。動画は `Illuminate\Http\UploadedFile` 経由で添付できます。
+
+<Info>
+  サーバー側のファイルアップロード（`Document::fromPath()->put()`）や ID 経由の再利用（`Document::fromId()`）は Bedrock では未対応です。
+</Info>
+
+### 会話履歴
+
+複数ターンの会話を維持するには Agent クラスで `Conversational` インターフェースを実装します。`messages()` で過去の会話メッセージを返すと、各プロンプトに自動で含まれます。
+
+```php
+<?php
+
+namespace App\Ai\Agents;
+
 use App\Models\ChatHistory;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
@@ -232,7 +367,7 @@ class ChatAgent implements Agent, Conversational
 
     public function instructions(): string
     {
-        return 'あなたは役に立つアシスタントです。';
+        return 'あなたは便利なアシスタントです。';
     }
 
     public function messages(): iterable
@@ -242,16 +377,62 @@ class ChatAgent implements Agent, Conversational
             ->limit(20)
             ->get()
             ->reverse()
-            ->map(fn ($message) => new Message($message->role, $message->content))
+            ->map(fn ($m) => new Message($m->role, $m->content))
             ->all();
     }
 }
-
-$response = (new ChatAgent(auth()->id()))->prompt('前回の内容を要約してください。');
-echo $response->text;
 ```
 
-## 構造化出力
+```php
+$response = (new ChatAgent(auth()->id()))->prompt('前回何を話していましたか？');
+```
+
+#### `RemembersConversations` で自動保存
+
+`messages()` を自分で実装したくない場合は `RemembersConversations` トレイトで完全自動の会話保存を利用できます。AI SDK のデータベーステーブルが必要なので、先に `php artisan vendor:publish --provider="Laravel\Ai\AiServiceProvider" && php artisan migrate` を実行してください。
+
+```php
+<?php
+
+namespace App\Ai\Agents;
+
+use Laravel\Ai\Concerns\RemembersConversations;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Promptable;
+
+class ChatAgent implements Agent, Conversational
+{
+    use Promptable, RemembersConversations;
+
+    public function instructions(): string
+    {
+        return 'あなたは便利なアシスタントです。';
+    }
+}
+```
+
+新しい会話を開始します。
+
+```php
+$response = (new ChatAgent)->forUser($user)->prompt('こんにちは！');
+
+$conversationId = $response->conversationId;
+```
+
+既存の会話を継続します。
+
+```php
+$response = (new ChatAgent)
+    ->continue($conversationId, as: $user)
+    ->prompt('もっと詳しく教えてください。');
+```
+
+Bedrock ドライバーは Bedrock Converse API リクエストに会話履歴を自動で含めるため、対応する全モデルでマルチターン会話のコンテキストを利用できます。
+
+### 構造化出力
+
+`HasStructuredOutput` インターフェースを実装すると、型付きの応答を取得できます。
 
 ```php
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -265,97 +446,440 @@ class ExtractPerson implements Agent, HasStructuredOutput
 
     public function instructions(): string
     {
-        return '文章から人物情報を抽出してください。';
+        return '与えられた文章から人物情報を抽出してください。';
     }
 
     public function schema(JsonSchema $schema): array
     {
         return [
-            'name' => $schema->string(),
-            'age' => $schema->integer(),
+            'name' => $schema->string()->description('人物のフルネーム'),
+            'age' => $schema->integer()->description('年齢'),
+            'occupation' => $schema->string()->description('職業'),
         ];
     }
 }
 
-$response = (new ExtractPerson)->prompt('Alice is 25 years old.');
-echo $response['name'];
+$response = (new ExtractPerson)->prompt('John は 30 歳のソフトウェアエンジニアです。');
+
+echo $response['name'];       // "John"
+echo $response['age'];        // 30
+echo $response['occupation']; // "software engineer"
+```
+
+Anonymous Agent でも構造化出力が使えます。
+
+```php
+use function Laravel\Ai\agent;
+
+$response = agent(
+    instructions: '与えられた文章から人物情報を抽出してください。',
+    schema: fn (JsonSchema $schema) => [
+        'name' => $schema->string()->description('人物のフルネーム'),
+        'age' => $schema->integer()->description('年齢'),
+    ],
+)->prompt('Alice is 25 years old.');
+
+echo $response['name']; // "Alice"
+echo $response['age'];  // 25
+```
+
+内部的にはスキーマに沿った値を返させる合成ツール（`output_structured_data`）を作成しています。この方式は Converse API 経由で Bedrock 上の全モデルと互換性があります。
+
+### Converse API（全モデル）
+
+すべてのテキスト生成とストリーミングは [Bedrock Converse API](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html) 経由で実行されます。Anthropic Claude も含めて統一されており、Amazon Nova、Meta Llama、Mistral、Cohere、DeepSeek など、Bedrock 上の各種モデルを同じインターフェースで利用できます。
+
+```php
+use function Laravel\Ai\agent;
+
+// Anthropic Claude（Converse API 経由）
+$response = agent(
+    instructions: 'あなたはソフトウェア開発の専門家です。',
+    model: 'global.anthropic.claude-sonnet-4-6',
+)->prompt('Laravel について教えてください。');
+
+// Amazon Nova
+$response = agent(
+    instructions: 'あなたは便利なアシスタントです。',
+    model: 'amazon.nova-pro-v1:0',
+)->prompt('AWS について教えてください。');
+
+// Meta Llama
+$response = agent(
+    instructions: 'あなたは便利なアシスタントです。',
+    model: 'meta.llama3-1-70b-instruct-v1:0',
+)->prompt('量子コンピューティングを説明してください。');
+
+// Mistral
+$response = agent(
+    instructions: 'あなたは便利なアシスタントです。',
+    model: 'mistral.mistral-large-2402-v1:0',
+)->prompt('コーディングについての俳句を書いてください。');
+
+// Cohere Command R+
+$response = agent(
+    instructions: 'あなたは便利なアシスタントです。',
+    model: 'cohere.command-r-plus-v1:0',
+)->prompt('このテキストを要約してください。');
+
+// DeepSeek R1
+$response = agent(
+    instructions: 'あなたは便利なアシスタントです。',
+    model: 'deepseek.r1-v1:0',
+)->prompt('この数学の問題を解いてください。');
+```
+
+ストリーミング、ツール使用、構造化出力、ファイル添付は、それらをサポートしているモデルで動作します。詳細は [Bedrock 対応モデル一覧](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference-supported-models-features.html) を参照してください。
+
+### Provider Options
+
+`anthropic_version` などの Bedrock 固有オプションを渡すには `HasProviderOptions` を実装します。
+
+```php
+<?php
+
+namespace App\Ai\Agents;
+
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasProviderOptions;
+use Laravel\Ai\Enums\Lab;
+use Laravel\Ai\Promptable;
+
+class BedrockAgent implements Agent, HasProviderOptions
+{
+    use Promptable;
+
+    public function instructions(): string
+    {
+        return 'あなたはソフトウェア開発の専門家です。';
+    }
+
+    public function providerOptions(Lab|string $provider): array
+    {
+        return [
+            'top_p' => 0.9,
+        ];
+    }
+}
+```
+
+サポートされる Provider Options:
+
+| オプション                          | 説明                                | 既定値 |
+|--------------------------------|-----------------------------------|-----|
+| `top_k`                        | Top-K サンプリングパラメーター                | —   |
+| `top_p`                        | Top-P（nucleus）サンプリングパラメーター       | —   |
+| `additionalModelRequestFields` | Converse API のモデル固有追加パラメーター      | —   |
+
+### Agent の設定属性
+
+PHP 属性でテキスト生成のオプションを設定できます。
+
+```php
+use Laravel\Ai\Attributes\MaxTokens;
+use Laravel\Ai\Attributes\Temperature;
+use Laravel\Ai\Attributes\Timeout;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Promptable;
+
+#[MaxTokens(4096)]
+#[Temperature(0.7)]
+#[Timeout(120)]
+class BedrockAgent implements Agent
+{
+    use Promptable;
+
+    // ...
+}
 ```
 
 ## 画像生成
 
-Stability AI を使った画像生成例です。
+Stability AI モデル（既定）または Amazon Nova Canvas を使って画像を生成します。
 
 ```php
 use Laravel\Ai\Image;
 use Revolution\Amazon\Bedrock\Bedrock;
 
-$response = Image::of('桜の下を歩く猫')
-    ->square()
-    ->generate(provider: Bedrock::KEY);
+// 既定で Stability AI Stable Image Core を使用
+$response = Image::of('かわいいスチームパンクのロボット')->generate(provider: Bedrock::KEY);
 
+// 最初の画像を取得
+$image = $response->firstImage();
+
+// ディスクに保存
 $response->store('images', 's3');
+
+// HTML の <img> タグとして出力
+echo $response->toHtml('スチームパンクのロボット');
+```
+
+利用できる Stability AI モデル（すべて `us-west-2` リージョンが必要）:
+
+```php
+// Stable Image Core — 高速・低コスト（既定）
+$response = Image::of('風景')
+    ->generate(provider: Bedrock::KEY, model: 'stability.stable-image-core-v1:1');
+
+// Stable Diffusion 3.5 Large — 高品質・大量生成
+$response = Image::of('ポートレート')
+    ->generate(provider: Bedrock::KEY, model: 'stability.sd3-5-large-v1:0');
+
+// Stable Image Ultra — 超リアル・最高品質
+$response = Image::of('高級感のある製品')
+    ->generate(provider: Bedrock::KEY, model: 'stability.stable-image-ultra-v1:1');
+```
+
+<Info>
+  Stability AI の画像モデルは `us-west-2` でのみ利用可能です。これらのモデルを使うときは `AWS_DEFAULT_REGION=us-west-2` を設定してください。
+</Info>
+
+### Stability AI による画像編集
+
+Stability AI Image Services の編集系モデルも `attachments()` メソッドで利用できます。入力画像を渡し、編集モデルで変換します。
+
+```php
+use Laravel\Ai\Files\Image as ImageFile;
+use Laravel\Ai\Image;
+use Revolution\Amazon\Bedrock\Bedrock;
+
+$inputImage = ImageFile::fromPath('/path/to/photo.jpg');
+
+// Inpaint — マスクやアルファチャンネルで領域を塗り替え
+$response = Image::of('背景を森に置き換えてください')
+    ->attachments([$inputImage])
+    ->generate(provider: Bedrock::KEY, model: 'stability.stable-image-inpaint-v1:0');
+
+// Erase — 不要な要素を削除
+$response = Image::of('')
+    ->attachments([$inputImage])
+    ->generate(provider: Bedrock::KEY, model: 'stability.stable-image-erase-object-v1:0');
+
+// 背景を削除して被写体だけを切り抜き
+$response = Image::of('')
+    ->attachments([$inputImage])
+    ->generate(provider: Bedrock::KEY, model: 'stability.stable-image-remove-background-v1:0');
+
+// Search and Replace — プロンプトで指定したオブジェクトを置き換え
+$response = Image::of('猫')
+    ->attachments([$inputImage])
+    ->generate(provider: Bedrock::KEY, model: 'stability.stable-image-search-replace-v1:0');
+
+// Style Transfer — プロンプトのスタイルを適用
+$response = Image::of('油絵風')
+    ->attachments([$inputImage])
+    ->generate(provider: Bedrock::KEY, model: 'stability.stable-style-transfer-v1:0');
+```
+
+利用できる Stability AI 編集モデル（すべて `us-east-1`、`us-east-2`、`us-west-2` で利用可能）:
+
+| Model ID                                        | 説明                              |
+|-------------------------------------------------|---------------------------------|
+| `stability.stable-image-inpaint-v1:0`           | Inpaint — 選択領域の塗り替え             |
+| `stability.stable-outpaint-v1:0`                | Outpaint — 画像を境界外に拡張            |
+| `stability.stable-image-erase-object-v1:0`      | Erase — オブジェクトを削除               |
+| `stability.stable-image-remove-background-v1:0` | 背景の削除                           |
+| `stability.stable-image-search-replace-v1:0`    | Search and Replace — オブジェクトの置換  |
+| `stability.stable-image-search-recolor-v1:0`    | Search and Recolor — オブジェクトの色変更 |
+| `stability.stable-image-style-guide-v1:0`       | Style Guide — リファレンス画像でスタイルを適用  |
+| `stability.stable-style-transfer-v1:0`          | Style Transfer — 画風を転送          |
+| `stability.stable-image-control-sketch-v1:0`    | Control Sketch — スケッチから生成       |
+| `stability.stable-image-control-structure-v1:0` | Control Structure — 構造に従って生成    |
+| `stability.stable-creative-upscale-v1:0`        | Creative Upscale — 補完しながらアップスケール |
+| `stability.stable-conservative-upscale-v1:0`    | Conservative Upscale — 細部を保持    |
+| `stability.stable-fast-upscale-v1:0`            | Fast Upscale — 軽量な 4 倍アップスケール   |
+
+Amazon Nova Canvas もサポートしていますが、AWS により非推奨化が進んでいます。
+
+```php
+// Nova Canvas（非推奨。us-east-1、ap-northeast-1、eu-west-1 で利用可能）
+$response = Image::of('夕焼け')
+    ->size('3:2')           // '1:1', '3:2', '2:3'
+    ->quality('high')       // 'low', 'medium', 'high'（Nova Canvas のみ）
+    ->generate(provider: Bedrock::KEY, model: 'amazon.nova-canvas-v1:0');
 ```
 
 ## 音声（TTS）
 
-Amazon Polly を使った音声生成例です。
+[Amazon Polly](https://docs.aws.amazon.com/polly/latest/dg/what-is.html) を使ってテキストから音声を生成します。
 
 ```php
 use Laravel\Ai\Audio;
 use Revolution\Amazon\Bedrock\Bedrock;
 
-$response = Audio::of('Laravel で音声を生成します。')
-    ->voice('Joanna')
-    ->generate(provider: Bedrock::KEY);
+$response = Audio::of('Laravel でコーディングするのが大好きです。')->generate(provider: Bedrock::KEY);
 
-$path = $response->storeAs('voice.mp3');
+$rawContent = (string) $response;
 ```
 
-## 文字起こし（STT）
-
-Nova 2 Lite を使った文字起こし例です。
+男声 / 女声を指定できます。
 
 ```php
-use Laravel\Ai\Transcription;
-use Revolution\Amazon\Bedrock\Bedrock;
+$response = Audio::of('Laravel でコーディングするのが大好きです。')
+    ->female()
+    ->generate(provider: 'bedrock');
 
-$response = Transcription::fromPath('/path/to/audio.mp3')
+$response = Audio::of('Laravel でコーディングするのが大好きです。')
+    ->male()
     ->generate(provider: Bedrock::KEY);
-
-echo $response->text;
 ```
 
+特定の [Polly ボイス](https://docs.aws.amazon.com/polly/latest/dg/voicelist.html) を指定します。
+
+```php
+$response = Audio::of('Laravel でコーディングするのが大好きです。')
+    ->voice('Joanna')
+    ->generate(provider: Bedrock::KEY);
+```
+
+生成された音声を保存します。
+
+```php
+$response = Audio::of('Laravel でコーディングするのが大好きです。')->generate(provider: Bedrock::KEY);
+
+$path = $response->store();
+$path = $response->storeAs('audio.mp3');
+```
+
+エンジン（モデル）を指定することもできます。
+
+```php
+// generative（既定）、neural、long-form、standard
+$response = Audio::of('Laravel でコーディングするのが大好きです。')
+    ->generate(provider: Bedrock::KEY, model: 'neural');
+```
+
+**既定ボイス:** `default-female` → Ruth、`default-male` → Matthew（どちらも generative エンジンに対応）。
+
+<Warning>
+  Amazon Polly は Bedrock とは別の AWS サービスです。Bedrock API キー（bearer token）は Polly では使えません。AWS IAM クレデンシャル（SigV4）またはデフォルト AWS クレデンシャルチェーンを使ってください。
+</Warning>
+
 ## 埋め込み
+
+Amazon Titan Embeddings V2 を使ってベクトル埋め込みを生成します。
 
 ```php
 use Laravel\Ai\Embeddings;
 use Revolution\Amazon\Bedrock\Bedrock;
 
-$response = Embeddings::for(['Laravel', 'Bedrock'])
-    ->dimensions(1024)
-    ->generate(provider: Bedrock::KEY, model: 'amazon.titan-embed-text-v2:0');
+$response = Embeddings::for(['Hello world', 'Foo bar'])->generate(provider: Bedrock::KEY);
 
+// 最初の埋め込みベクトル
 $vector = $response->first();
+
+// 全ての埋め込みを反復処理
+foreach ($response as $embedding) {
+    // $embedding は float の配列
+}
+
+echo $response->tokens; // 合計トークン数
 ```
 
+次元数を指定できます（Titan Embeddings V2 は 256、512、1024）。
+
+```php
+$response = Embeddings::for(['Hello world'])->dimensions(512)->generate(provider: Bedrock::KEY);
+```
+
+カスタムモデルを指定する例。
+
+```php
+$response = Embeddings::for(['Hello world'])
+    ->dimensions(1024)
+    ->generate(provider: Bedrock::KEY, model: 'amazon.titan-embed-text-v2:0');
+```
+
+### Cohere Embed モデル
+
+Cohere Embed モデルは自動検出され、バッチ API を使用します。Titan が入力ごとに HTTP リクエストを送るのに対し、Cohere は全入力を 1 リクエストにまとめるため、複数テキストを処理する場合に効率的です。
+
+```php
+// Cohere Embed English V3
+$response = Embeddings::for(['Hello world', 'Foo bar'])
+    ->dimensions(1024)
+    ->generate(provider: Bedrock::KEY, model: 'cohere.embed-english-v3');
+
+// Cohere Embed Multilingual V3
+$response = Embeddings::for(['Hello', 'こんにちは'])
+    ->dimensions(1024)
+    ->generate(provider: Bedrock::KEY, model: 'cohere.embed-multilingual-v3');
+
+// Cohere Embed V4（出力次元 256〜1536 を設定可能）
+$response = Embeddings::for(['Hello world'])
+    ->dimensions(512)
+    ->generate(provider: Bedrock::KEY, model: 'cohere.embed-v4');
+```
+
+<Info>
+  Cohere Embed モデルはトークン数を返さないため、`$response->tokens` は常に `0` です。
+</Info>
+
 ## リランキング
+
+Cohere Rerank 3.5 や Amazon Rerank 1.0 を使い、クエリとの関連度でドキュメントを並べ替えます。
 
 ```php
 use Laravel\Ai\Reranking;
 use Revolution\Amazon\Bedrock\Bedrock;
 
 $response = Reranking::of([
-    'Laravel is a PHP framework.',
-    'Bedrock provides foundation models.',
-    'Laravel AI SDK gives a unified API.',
-])->limit(2)->rerank(
-    query: 'Laravel と AI の説明',
-    provider: Bedrock::KEY
-);
+    'Laravel は PHP の Web フレームワークです。',
+    'Python はプログラミング言語です。',
+    'Laravel は Web 開発のためのエレガントな構文を提供します。',
+])->rerank(query: 'Laravel とは何ですか？', provider: Bedrock::KEY);
 
+// もっとも関連度の高いドキュメント
 echo $response->first()->document;
+echo $response->first()->score;
+
+// すべてを並べ替え順に取得
+foreach ($response as $result) {
+    echo "{$result->index}: {$result->document} ({$result->score})\n";
+}
+
+// 件数を制限
+$response = Reranking::of([...])
+    ->limit(2)
+    ->rerank(query: 'Laravel とは？', provider: Bedrock::KEY);
+```
+
+カスタムモデルを指定する例。
+
+```php
+$response = Reranking::of([...])
+    ->rerank(query: '検索クエリ', provider: Bedrock::KEY, model: 'amazon.rerank-v1:0');
 ```
 
 <Info>
-    最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-amazon-bedrock) を参照してください。
+  リランキング API は `bedrock-agent-runtime` エンドポイントを使います（`bedrock-runtime` ではありません）。Amazon Rerank 1.0 は `us-east-1` で利用できないため、そのリージョンでは Cohere Rerank 3.5 を使ってください。
+</Info>
+
+## テスト
+
+AI SDK の標準的なテスト機能をそのまま利用できます。
+
+公式ドキュメントには記載がありませんが、`agent()` ヘルパーで作った Anonymous Agent は `AnonymousAgent::fake()`、構造化出力版は `StructuredAnonymousAgent::fake()` でモックできます。
+
+```php
+use Laravel\Ai\AnonymousAgent;
+use Laravel\Ai\Prompts\AgentPrompt;
+
+use function Laravel\Ai\agent;
+
+it('can generate text', function () {
+    AnonymousAgent::fake();
+
+    $response = agent(
+        instructions: 'あなたはソフトウェア開発の専門家です。',
+    )->prompt('Laravel について教えてください。');
+
+    AnonymousAgent::assertPrompted(function (AgentPrompt $prompt) {
+        return $prompt->contains('Laravel');
+    });
+});
+```
+
+<Info>
+  最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-amazon-bedrock) を参照してください。
 </Info>
