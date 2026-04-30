@@ -73,15 +73,22 @@ DISCORD_REDIRECT=https://example.com/auth/discord/callback
 
         public function callback()
         {
-            $user = Socialite::driver('discord')->user();
+            $discordUser = Socialite::driver('discord')->user();
 
-            // $user->getId()        Discord ユーザー ID
-            // $user->getName()      ユーザー名
-            // $user->getEmail()     メールアドレス
-            // $user->getAvatar()    アバター URL
-            // $user->token          アクセストークン
+            // $discordUser->getId()        Discord ユーザー ID
+            // $discordUser->getName()      ユーザー名
+            // $discordUser->getEmail()     メールアドレス（email スコープが必要）
+            // $discordUser->getAvatar()    アバター URL
+            // $discordUser->token          アクセストークン
 
-            dd($user);
+            $user = \App\Models\User::updateOrCreate(
+                ['discord_id' => $discordUser->getId()],
+                ['name' => $discordUser->getName()]
+            );
+
+            \Illuminate\Support\Facades\Auth::login($user);
+
+            return redirect('/dashboard');
         }
     }
     ```

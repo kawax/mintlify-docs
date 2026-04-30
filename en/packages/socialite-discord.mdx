@@ -73,15 +73,22 @@ DISCORD_REDIRECT=https://example.com/auth/discord/callback
 
         public function callback()
         {
-            $user = Socialite::driver('discord')->user();
+            $discordUser = Socialite::driver('discord')->user();
 
-            // $user->getId()        Discord user ID
-            // $user->getName()      Username
-            // $user->getEmail()     Email address
-            // $user->getAvatar()    Avatar URL
-            // $user->token          Access token
+            // $discordUser->getId()        Discord user ID
+            // $discordUser->getName()      Username
+            // $discordUser->getEmail()     Email address (requires email scope)
+            // $discordUser->getAvatar()    Avatar URL
+            // $discordUser->token          Access token
 
-            dd($user);
+            $user = \App\Models\User::updateOrCreate(
+                ['discord_id' => $discordUser->getId()],
+                ['name' => $discordUser->getName()]
+            );
+
+            \Illuminate\Support\Facades\Auth::login($user);
+
+            return redirect('/dashboard');
         }
     }
     ```
