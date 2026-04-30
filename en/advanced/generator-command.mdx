@@ -222,12 +222,16 @@ class HandlerMakeCommandTest extends TestCase
         return [PackageServiceProvider::class];
     }
 
+    protected function tearDown(): void
+    {
+        File::deleteDirectory(app_path('Handlers'));
+
+        parent::tearDown();
+    }
+
     public function test_make_handler_creates_file(): void
     {
         $path = app_path('Handlers/OrderHandler.php');
-
-        // clean up after the test
-        $this->afterApplicationCreated(fn () => File::delete($path));
 
         $this->artisan('make:handler', ['name' => 'OrderHandler'])
             ->assertSuccessful();
@@ -243,8 +247,6 @@ class HandlerMakeCommandTest extends TestCase
         File::ensureDirectoryExists(dirname($path));
         File::put($path, '<?php // existing');
 
-        $this->afterApplicationCreated(fn () => File::delete($path));
-
         $this->artisan('make:handler', ['name' => 'OrderHandler'])
             ->assertFailed();
     }
@@ -252,7 +254,7 @@ class HandlerMakeCommandTest extends TestCase
 ```
 
 <Warning>
-Generator commands write to the real filesystem. Always clean up generated files in `afterApplicationCreated()` or `tearDown()` so tests do not leave artefacts behind.
+Generator commands write to the real filesystem. Use `tearDown()` for cleanup so it runs even when a test fails midway.
 </Warning>
 
 ## Related pages

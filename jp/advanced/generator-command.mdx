@@ -224,12 +224,16 @@ class HandlerMakeCommandTest extends TestCase
         return [PackageServiceProvider::class];
     }
 
+    protected function tearDown(): void
+    {
+        File::deleteDirectory(app_path('Handlers'));
+
+        parent::tearDown();
+    }
+
     public function test_make_handler_creates_file(): void
     {
         $path = app_path('Handlers/OrderHandler.php');
-
-        // テスト後にファイルを削除する
-        $this->afterApplicationCreated(fn () => File::delete($path));
 
         $this->artisan('make:handler', ['name' => 'OrderHandler'])
             ->assertSuccessful();
@@ -245,8 +249,6 @@ class HandlerMakeCommandTest extends TestCase
         File::ensureDirectoryExists(dirname($path));
         File::put($path, '<?php // existing');
 
-        $this->afterApplicationCreated(fn () => File::delete($path));
-
         $this->artisan('make:handler', ['name' => 'OrderHandler'])
             ->assertFailed();
     }
@@ -254,7 +256,7 @@ class HandlerMakeCommandTest extends TestCase
 ```
 
 <Warning>
-テスト内でファイルを生成すると実際のファイルシステムに書き込まれます。`afterApplicationCreated()` または `tearDown()` で必ずクリーンアップしてください。
+Generator コマンドは実際のファイルシステムに書き込みます。`tearDown()` で必ずクリーンアップしてください。テストが途中で失敗した場合でも確実に実行されます。
 </Warning>
 
 ## 関連ページ
