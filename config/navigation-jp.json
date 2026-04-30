@@ -434,7 +434,8 @@
               ]
             },
             "jp/packages/laravel-nostr",
-            "jp/packages/laravel-notification-discord-webhook"
+            "jp/packages/laravel-notification-discord-webhook",
+            "jp/packages/socialite-discord"
           ]
         },
         {

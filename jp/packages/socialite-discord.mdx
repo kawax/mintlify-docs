@@ -1,0 +1,155 @@
+---
+title: "Socialite for Discord"
+description: "Discord OAuth2 認証を Laravel Socialite で実装するドライバーパッケージ。"
+---
+
+## 概要
+
+[revolution/socialite-discord](https://github.com/invokable/socialite-discord) は、Discord OAuth2 認証を Laravel Socialite で利用できるようにするドライバーパッケージです。
+
+Laravel Socialite の組み込みプロバイダーには Discord が含まれていません。このパッケージをインストールするだけで、`Socialite::driver('discord')` を使った Discord ログインをアプリに追加できます。
+
+<Info>
+  Laravel Socialite 自体の使い方については [Socialite ガイド](/jp/socialite) を参照してください。
+</Info>
+
+## インストール
+
+```shell
+composer require revolution/socialite-discord
+```
+
+## 設定
+
+### Discord Developer Portal でアプリを登録する
+
+[Discord Developer Portal](https://discord.com/developers/applications) でアプリケーションを作成し、**OAuth2** セクションから Client ID と Client Secret を取得します。**Redirects** にコールバック URL（例: `https://example.com/auth/discord/callback`）を追加してください。
+
+### config/services.php
+
+```php
+'discord' => [
+    'client_id'     => env('DISCORD_CLIENT_ID'),
+    'client_secret' => env('DISCORD_CLIENT_SECRET'),
+    'redirect'      => env('DISCORD_REDIRECT'),
+],
+```
+
+### .env
+
+```dotenv
+DISCORD_CLIENT_ID=your-client-id
+DISCORD_CLIENT_SECRET=your-client-secret
+DISCORD_REDIRECT=https://example.com/auth/discord/callback
+```
+
+## 基本的な使い方
+
+<Steps>
+  <Step title="ルートを定義する">
+    `routes/web.php` にリダイレクト用とコールバック用の2つのルートを追加します。
+
+    ```php
+    use App\Http\Controllers\SocialiteController;
+
+    Route::get('auth/discord', [SocialiteController::class, 'login']);
+    Route::get('auth/discord/callback', [SocialiteController::class, 'callback']);
+    ```
+  </Step>
+  <Step title="コントローラーを作成する">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use Laravel\Socialite\Facades\Socialite;
+
+    class SocialiteController extends Controller
+    {
+        public function login()
+        {
+            return Socialite::driver('discord')->redirect();
+        }
+
+        public function callback()
+        {
+            $user = Socialite::driver('discord')->user();
+
+            // $user->getId()        Discord ユーザー ID
+            // $user->getName()      ユーザー名
+            // $user->getEmail()     メールアドレス
+            // $user->getAvatar()    アバター URL
+            // $user->token          アクセストークン
+
+            dd($user);
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## スコープの設定
+
+Discord OAuth2 では取得する権限をスコープで指定します。デフォルトのスコープは `identify` のみです。
+
+```php
+public function login()
+{
+    return Socialite::driver('discord')
+                    ->setScopes(['identify', 'email', 'guilds', 'guilds.join'])
+                    ->redirect();
+}
+```
+
+主なスコープの一覧:
+
+| スコープ | 取得できる情報 |
+| --- | --- |
+| `identify` | ユーザー ID、ユーザー名、アバター（デフォルト） |
+| `email` | メールアドレス |
+| `guilds` | 参加しているサーバー一覧 |
+| `guilds.join` | ユーザーをサーバーに追加する権限 |
+
+<Tip>
+  すべてのスコープは [Discord OAuth2 ドキュメント](https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes) を参照してください。
+</Tip>
+
+## ユーザーの保存とログイン
+
+コールバックルートでユーザー情報を取得し、データベースに保存してからログインする典型的な実装例です。
+
+```php
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Laravel\Socialite\Facades\Socialite;
+
+public function callback()
+{
+    $discordUser = Socialite::driver('discord')->user();
+
+    $user = User::updateOrCreate(
+        ['discord_id' => $discordUser->getId()],
+        [
+            'name'          => $discordUser->getName(),
+            'email'         => $discordUser->getEmail(),
+            'discord_token' => $discordUser->token,
+        ]
+    );
+
+    Auth::login($user);
+
+    return redirect('/dashboard');
+}
+```
+
+<Warning>
+  `email` を取得するには `email` スコープが必要です。スコープを指定しない場合、`getEmail()` は `null` を返すことがあります。
+</Warning>
+
+## 他の Socialite ドライバーとの比較
+
+このパッケージは `Socialite::extend()` を使った正規の方法で実装されており、組み込みプロバイダーとまったく同じ API で使えます。カスタムプロバイダーの仕組みや `Socialite::extend()` の詳細については [Socialite ガイド](/jp/socialite) を参照してください。
+
+<Info>
+  最新情報は [GitHub リポジトリ](https://github.com/invokable/socialite-discord) を参照してください。
+</Info>
