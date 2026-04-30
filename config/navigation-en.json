@@ -271,7 +271,8 @@
             "en/advanced/interacts-with-data",
             "en/advanced/package-versioning",
             "en/advanced/package-testing",
-            "en/advanced/package-workbench"
+            "en/advanced/package-workbench",
+            "en/advanced/generator-command"
           ]
         },
         {
