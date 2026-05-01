@@ -349,6 +349,12 @@
           ]
         },
         {
+          "group": "フロントエンド",
+          "pages": [
+            "jp/blog/vue-introduction"
+          ]
+        },
+        {
           "group": "環境構築",
           "pages": [
             "jp/blog/mac-setup",
