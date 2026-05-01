@@ -37,14 +37,6 @@
 - [ ] Svelteの紹介ページ。Svelte版スターターキットの登場は2026年なので一番新しい。Laravelユーザーにはほとんど知られてない。
 
 ## packages ページ案
-- [x] Amazon Bedrock driver for Laravel AI SDK https://github.com/invokable/laravel-amazon-bedrock
-- [x] GitHub Copilot SDK for Laravel。https://github.com/invokable/laravel-copilot-sdk
-  - [GitHub Copilot SDK](https://github.com/github/copilot-sdk) のLaravel版。
-  - 英語・日本語の全ページ完成。今後も追加・変更はあるだろうけど管理者がIssueを作ってエージェントをアサインして対応していく。
-- [x] Laravel Bluesky https://github.com/invokable/laravel-bluesky
-- [x] Laravel Console Starter Kit https://github.com/invokable/laravel-console-starter
-  - パッケージではなくスターターキット。元のパッケージ版は https://github.com/invokable/laravel-slim 
-- [x] Laravel Nostr https://github.com/invokable/laravel-nostr
 - [x] Laravel Notification for Discord(Webhook) https://github.com/invokable/laravel-notification-discord-webhook
   - Discordに通知する単機能パッケージのWebhook版。
   - いつもの投稿のためのBasic client＋通知機能ではなく、Webhookなのでいきなり通知が可能。
