@@ -1,0 +1,108 @@
+---
+title: "Advanced Topics"
+description: "Advanced guides on Laravel internals and package development. Deep dives into design patterns, framework source code, and tools for package authors."
+---
+
+## Overview
+
+This section covers topics that go beyond the official documentation — areas where you need to read the framework source code to fully understand what's happening. It also serves as a resource for package authors who want to leverage Laravel's internal APIs and extension points.
+
+## Package Development
+
+<CardGroup cols={2}>
+  <Card title="Laravel Package Development" icon="package" href="/en/advanced/package-development">
+    A comprehensive guide to developing Laravel packages, covering service providers, publishing config/views/migrations, facades, auto-discovery, and deferred loading.
+  </Card>
+  <Card title="Testing Laravel packages with Orchestra Testbench" icon="flask" href="/en/advanced/package-testing">
+    Set up Orchestra Testbench for Laravel package testing and verify service providers, facades, configuration, and database behavior.
+  </Card>
+  <Card title="Develop Laravel packages with Testbench Workbench" icon="wrench" href="/en/advanced/package-workbench">
+    Use Testbench Workbench to build a realistic package development environment with routes, migrations, and a local app runtime.
+  </Card>
+  <Card title="Package Version Compatibility Management" icon="code-branch" href="/en/advanced/package-versioning">
+    Practical guide to maintaining package compatibility across Laravel and PHP major versions, including composer.json updates and GitHub Actions test matrices.
+  </Card>
+  <Card title="GeneratorCommand — Implementing custom make: commands" icon="terminal" href="/en/advanced/generator-command">
+    Extend GeneratorCommand to provide your own `make:` commands in a Laravel package, covering stubs, namespace control, and testing.
+  </Card>
+</CardGroup>
+
+## Framework Internals
+
+<CardGroup cols={2}>
+  <Card title="Application Structure in Laravel 11 and Later" icon="sitemap" href="/en/advanced/app-structure">
+    A deep dive into the Slim Application Skeleton, covering Application::configure() through ApplicationBuilder internals.
+  </Card>
+  <Card title="The Macroable Trait" icon="puzzle-piece" href="/en/advanced/macroable">
+    How to add custom methods to existing Laravel classes using Macroable, without modifying core code.
+  </Card>
+  <Card title="The Conditionable Trait" icon="git-branch" href="/en/advanced/conditionable">
+    How when() and unless() work internally, and patterns for keeping method chains clean with conditional logic.
+  </Card>
+  <Card title="Illuminate\\Support\\Manager — anatomy of the driver system" icon="layers" href="/en/advanced/manager">
+    The abstract base class behind Laravel's driver system. Learn to register custom drivers, extend built-in managers, and use MultipleInstanceManager.
+  </Card>
+  <Card title="The Pipeline Pattern" icon="arrow-right-arrow-left" href="/en/advanced/pipeline">
+    How Illuminate\\Pipeline\\Pipeline works, and how to compose multi-step processing chains with the pipeline pattern.
+  </Card>
+  <Card title="The InteractsWithData trait" icon="database" href="/en/advanced/interacts-with-data">
+    Design of InteractsWithData and how to add Laravel-style data access APIs to your own package classes.
+  </Card>
+  <Card title="tap() Helper and the Tappable Trait" icon="hand-point-right" href="/en/advanced/tap">
+    How to use Laravel's tap() helper and the Tappable trait, including practical implementation patterns.
+  </Card>
+  <Card title="PHP Attributes" icon="tag" href="/en/advanced/php-attributes">
+    Use PHP attributes introduced and enhanced in Laravel 13 to declare job and model configuration in a more expressive way.
+  </Card>
+</CardGroup>
+
+## Eloquent Deep Dives
+
+<CardGroup cols={2}>
+  <Card title="Eloquent Custom Casts" icon="arrows-rotate" href="/en/advanced/eloquent-casts">
+    Implement CastsAttributes for custom casts. Covers Value Object casts, inbound-only casts, cast parameters, and the Castable pattern.
+  </Card>
+  <Card title="Eloquent Observers and Model Events" icon="eye" href="/en/advanced/eloquent-observers">
+    How Eloquent model events work and how to use Observer classes to handle them centrally. Includes the #[ObservedBy] attribute.
+  </Card>
+  <Card title="Eloquent Scopes" icon="filter" href="/en/advanced/eloquent-scopes">
+    How local and global scopes work, with a look at SoftDeletingScope internals and practical patterns for multi-tenancy and publish/draft filtering.
+  </Card>
+  <Card title="Collection Deep Dive" icon="layer-group" href="/en/advanced/collection-deep-dive">
+    Laravel Collection internals: historical evolution, class structure, PHPDoc generics, and a practical source-reading path.
+  </Card>
+  <Card title="Higher Order Messages" icon="message" href="/en/advanced/higher-order-messages">
+    How HigherOrderCollectionProxy enables the $collection->map->method() syntax, and practical patterns for Eloquent collections.
+  </Card>
+</CardGroup>
+
+## MCP & AI
+
+<CardGroup cols={2}>
+  <Card title="Building an MCP Server with Laravel" icon="server" href="/en/advanced/mcp-server">
+    Build a production-ready MCP server using the laravel/mcp package. Covers tools, resources, prompts, authentication, testing, and deployment.
+  </Card>
+  <Card title="Creating a Custom Provider for AI SDK" icon="robot" href="/en/advanced/ai-sdk-custom-provider">
+    Understand the Laravel AI SDK source code and implement custom providers for AI services not supported out of the box.
+  </Card>
+  <Card title="Creating a Custom Agent for Boost" icon="wand-magic-sparkles" href="/en/advanced/boost-custom-agent">
+    Deep dive into Laravel Boost's extension architecture and implement custom agents using the SupportsGuidelines, SupportsMcp, and SupportsSkills contracts.
+  </Card>
+</CardGroup>
+
+## Auth, Validation & More
+
+<CardGroup cols={2}>
+  <Card title="Custom Authentication Guards" icon="shield" href="/en/advanced/custom-auth-guard">
+    Implement the Guard and StatefulGuard interfaces to build custom authentication guards, from API token auth to multi-guard applications.
+  </Card>
+  <Card title="Custom Validation Rules" icon="check-circle" href="/en/advanced/custom-validation-rules">
+    Extend Laravel's validation with rule objects and closures, from basic implementations to advanced data-aware and validator-aware rules.
+  </Card>
+  <Card title="Rate Limiting" icon="gauge" href="/en/advanced/rate-limiting">
+    Configure custom rate limiters with the RateLimiter facade, apply them to routes, and handle high-traffic scenarios with Redis-backed limiting.
+  </Card>
+  <Card title="Advanced Testing with Pest" icon="vial" href="/en/advanced/testing-pest">
+    Master Pest: the Expectation API, datasets, mocking, HTTP fakes, and architecture tests for well-structured codebases.
+  </Card>
+</CardGroup>

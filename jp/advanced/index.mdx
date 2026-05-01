@@ -1,0 +1,108 @@
+---
+title: "応用トピック"
+description: "フレームワークのコードを読まないと分からない機能やパッケージ開発者向けの上級ガイド。デザインパターン、内部実装の解説、パッケージ開発に必要な知識を網羅します。"
+---
+
+## 概要
+
+このセクションでは、公式ドキュメントだけでは分からないLaravelの内部実装や、パッケージ開発に特化した上級トピックを扱います。ソースコードを読み解きながら、実践的な設計パターンや拡張方法を解説します。
+
+## パッケージ開発
+
+<CardGroup cols={2}>
+  <Card title="Laravelパッケージ開発" icon="package" href="/jp/advanced/package-development">
+    サービスプロバイダーを核としたパッケージ開発の基礎から、設定・ビュー・マイグレーションの公開まで網羅します。
+  </Card>
+  <Card title="Orchestra TestbenchでLaravelパッケージをテストする" icon="flask" href="/jp/advanced/package-testing">
+    Orchestra Testbenchを使ってパッケージのテスト環境を構築し、サービスプロバイダー・ファサード・DBを検証します。
+  </Card>
+  <Card title="Testbench Workbenchでパッケージ開発を進める" icon="wrench" href="/jp/advanced/package-workbench">
+    実アプリに近い検証環境を作り、ルート・マイグレーション・サービス起動を備えた開発フローを構築します。
+  </Card>
+  <Card title="パッケージのバージョン互換性管理" icon="code-branch" href="/jp/advanced/package-versioning">
+    LaravelとPHPのバージョンアップに対応するパッケージメンテナンス戦略とGitHub Actionsのテストマトリクス設定。
+  </Card>
+  <Card title="GeneratorCommand — カスタム make: コマンドの実装" icon="terminal" href="/jp/advanced/generator-command">
+    パッケージ独自の `make:` コマンドをGeneratorCommandを継承して実装する方法を解説します。
+  </Card>
+</CardGroup>
+
+## フレームワーク内部
+
+<CardGroup cols={2}>
+  <Card title="Laravel 11以降のアプリケーション構造" icon="sitemap" href="/jp/advanced/app-structure">
+    Slim Application Skeletonの全貌と、Application::configure()からApplicationBuilderまでの内部実装を解説します。
+  </Card>
+  <Card title="Macroableトレイト" icon="puzzle-piece" href="/jp/advanced/macroable">
+    既存のLaravelクラスに独自メソッドを追加するMacroableトレイトの仕組みと活用パターン。
+  </Card>
+  <Card title="Conditionableトレイト" icon="git-branch" href="/jp/advanced/conditionable">
+    when()/unless()メソッドの内部実装と、流暢なAPIを設計するための活用パターン。
+  </Card>
+  <Card title="Illuminate\\Support\\Manager — ドライバーシステムの解剖" icon="layers" href="/jp/advanced/manager">
+    Laravel 4.0から続くドライバーシステムの核心クラス。カスタムドライバーの登録方法からMultipleInstanceManagerまで。
+  </Card>
+  <Card title="Pipelineパターン" icon="arrow-right-arrow-left" href="/jp/advanced/pipeline">
+    Illuminate\\Pipeline\\Pipelineクラスの仕組みと、複数の処理ステップをチェーンで構成するパターン。
+  </Card>
+  <Card title="InteractsWithDataトレイト" icon="database" href="/jp/advanced/interacts-with-data">
+    パッケージ開発で自前クラスにデータアクセスAPIを実装するためのトレイト設計を解説します。
+  </Card>
+  <Card title="tap() ヘルパーと Tappable トレイト" icon="hand-point-right" href="/jp/advanced/tap">
+    Laravelのtap()ヘルパーとTappableトレイトの使い方と実装パターン。
+  </Card>
+  <Card title="PHPアトリビュート" icon="tag" href="/jp/advanced/php-attributes">
+    Laravel 13で導入・強化されたPHPアトリビュートを使って、ジョブやモデルの設定を宣言的に記述する方法。
+  </Card>
+</CardGroup>
+
+## Eloquent 深掘り
+
+<CardGroup cols={2}>
+  <Card title="Eloquentのカスタムキャスト" icon="arrows-rotate" href="/jp/advanced/eloquent-casts">
+    CastsAttributesインターフェースを実装したカスタムキャスト。Value Objectパターン、インバウンドキャスト、Castablesも紹介。
+  </Card>
+  <Card title="Eloquent Observers とモデルイベント" icon="eye" href="/jp/advanced/eloquent-observers">
+    Eloquentモデルが発火するイベントの仕組みと、Observerクラスによるイベントの一元管理。
+  </Card>
+  <Card title="Eloquentのスコープ" icon="filter" href="/jp/advanced/eloquent-scopes">
+    ローカルスコープとグローバルスコープの仕組み。SoftDeletingScopeなどの内部実装から実践的なユースケースまで。
+  </Card>
+  <Card title="Collection Deep Dive" icon="layer-group" href="/jp/advanced/collection-deep-dive">
+    Laravel Collectionの実装を、歴史・クラス構造・PHPDoc Generics・読み進め方の観点で解説します。
+  </Card>
+  <Card title="コレクションの高階メッセージ" icon="message" href="/jp/advanced/higher-order-messages">
+    コレクションの高階メッセージ(Higher-order Messages)の仕組みと実践的な使い方。
+  </Card>
+</CardGroup>
+
+## MCP・AI
+
+<CardGroup cols={2}>
+  <Card title="LaravelでMCPサーバーを作る" icon="server" href="/jp/advanced/mcp-server">
+    laravel/mcpパッケージを使って本番運用できるMCPサーバーを構築する。ツール・リソース・プロンプトの実装から認証まで。
+  </Card>
+  <Card title="AI SDKのカスタムプロバイダーを作る" icon="robot" href="/jp/advanced/ai-sdk-custom-provider">
+    Laravel AI SDKのソースコードを読み解き、標準で提供されていないAIサービスに対応するカスタムプロバイダーを実装。
+  </Card>
+  <Card title="Boostのカスタムエージェントを作る" icon="wand-magic-sparkles" href="/jp/advanced/boost-custom-agent">
+    Laravel Boostの拡張アーキテクチャを深掘りし、カスタムエージェントを作成する方法を解説します。
+  </Card>
+</CardGroup>
+
+## 認証・バリデーション・その他
+
+<CardGroup cols={2}>
+  <Card title="カスタム認証ガードの実装" icon="shield" href="/jp/advanced/custom-auth-guard">
+    Guard・StatefulGuardインターフェースを実装してカスタム認証ガードを作る方法をソースコードレベルで解説。
+  </Card>
+  <Card title="カスタムバリデーションルール" icon="check-circle" href="/jp/advanced/custom-validation-rules">
+    ルールオブジェクトやクロージャでバリデーション機能を拡張する方法を内部実装まで踏み込んで解説。
+  </Card>
+  <Card title="レート制限のカスタマイズ" icon="gauge" href="/jp/advanced/rate-limiting">
+    RateLimiterファサードを深掘りし、ユーザー別・プラン別・IPアドレス別のカスタムレート制限を実装。
+  </Card>
+  <Card title="Pestを使った高度なテスト" icon="vial" href="/jp/advanced/testing-pest">
+    Expectation API・データセット・フェイク・Mockeryまで、Pestの高度な使い方を体系的に解説。
+  </Card>
+</CardGroup>
