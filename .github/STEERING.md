@@ -45,3 +45,11 @@
 - [x] Socialite for Discord https://github.com/invokable/socialite-discord
   - Socialite用のDiscordドライバー。Socialiteドライバーを作るのは簡単なのでOAuth機能があり自分で使うことがあるサービスならすぐに作っている。
   - `jp/socialite.mdx`で公式ドキュメントにあるSocialite Providersの記述を全部消して`Socialite::extend()`で拡張する正規の方法を書いてるのは確実にこの方法が正しいから。Socialite Providersにすでに同じドライバーがあっても関係なく自分で作っている。
+- [ ] LINE SDK for Laravel https://github.com/invokable/laravel-line-sdk
+  - LINE公式SDKはOpenAPIから自動生成して作られてるのかとんでもなく使いにくい。Laravel用に使いやすくしたパッケージ。
+  - READMEとdocs内に英語のドキュメントがある。
+  - いつもの通知とSocialite。以前はLINE Notifyがあって無料で便利に通知が送れたけどサービス終了したのでLINE Notify対応は削除済み。
+  - 基本はBot Facadeから公式SDKのクラスに委譲してる形式。`Bot::reply()`辺りが独自設計。LINEは一方的にメッセージを送るのは制限されてるけど返信なら自由なのでreplyを便利にすると効率がいい。
+  - LINEからのメッセージはWebhookで受信。ルートもコントローラーも検証ミドルウェアもパッケージで用意している。Webhookで受信したらLaravelのイベントが発行されるのでユーザー側はイベントリスナーで処理を行えばいい。リスナーのstubも用意してるので `MessageListener.php` を書き換えるだけですぐに使える。
+  - WebhookControllerの引数をWebhookHandler interfaceにしてサービスコンテナで実際の処理をWebhookEventDispatcher、WebhookLogHandler、WebhookNullHandlerから選んだり自由に変更できるようにしているのはLaravelらしい設計。
+  - 使いやすさに全振りしてたので今見ても分かりやすい。
