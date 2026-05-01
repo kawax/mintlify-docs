@@ -1,0 +1,105 @@
+---
+title: "ブログ"
+description: "機能ごとに分けられない記事のまとめ。新バージョンの紹介やアップグレードガイド、ツール・パッケージの初期調査、開発環境の構築など幅広いトピックを扱います。"
+---
+
+## 概要
+
+このセクションでは、特定のLaravel機能に絞り込めない記事をまとめています。新バージョンのリリース情報やアップグレードガイド、公式パッケージの初期調査、開発環境のセットアップなど、実際の開発現場で役立つ幅広いトピックをカバーします。
+
+## アップグレードガイド
+
+<CardGroup cols={2}>
+  <Card title="Laravel 12 から 13 へのアップグレードガイド" icon="arrow-up" href="/jp/blog/upgrade-12-to-13">
+    Laravel 12 から 13 へのアップグレード手順、破壊的変更、非推奨機能、新機能のハイライトを解説します。
+  </Card>
+  <Card title="Laravel 11から12へのアップグレードガイド" icon="arrow-up" href="/jp/blog/upgrade-11-to-12">
+    Laravel 11 から 12 へのアップグレード手順と主な変更点を解説します。
+  </Card>
+  <Card title="Laravel 10 から 11 へのアップグレード" icon="arrow-up" href="/jp/blog/upgrade-10-to-11">
+    Laravel 10 から 11 へのアップグレード手順と主要な変更点の解説。
+  </Card>
+  <Card title="Laravel 9 から 10 へのアップグレード" icon="arrow-up" href="/jp/blog/upgrade-9-to-10">
+    Laravel 9.x から 10.x へのアップグレード手順と主要な変更点の解説。
+  </Card>
+</CardGroup>
+
+## 新バージョン・新機能
+
+<CardGroup cols={2}>
+  <Card title="Laravel 13 新機能まとめ" icon="star" href="/jp/blog/laravel-13-new-features">
+    2026年3月にリリースされたLaravel 13の主要な新機能と改善点を解説します。
+  </Card>
+  <Card title="Laravel新コード解析エコシステム" icon="magnifying-glass" href="/jp/blog/laravel-ecosystem-analysis">
+    surveyor・ranger・rosterの3つのパッケージで構成される静的解析エコシステムを紹介します。
+  </Card>
+</CardGroup>
+
+## 公式パッケージ・ツール
+
+<CardGroup cols={2}>
+  <Card title="Inertia.jsでSPAを構築する" icon="layer-group" href="/jp/blog/inertia-introduction">
+    APIなしでSPAを実現するInertia.js v3を紹介。LaravelバックエンドとVue/React/Svelteをつなぐ仕組みを解説します。
+  </Card>
+  <Card title="⚡Livewire 4入門" icon="bolt" href="/jp/blog/livewire-introduction">
+    JavaScriptを書かずにインタラクティブなUIを構築できるLivewire 4の使い方をインストールから実践例まで解説。
+  </Card>
+  <Card title="Laravel Telescope 入門" icon="telescope" href="/jp/blog/telescope-introduction">
+    HTTPリクエストからN+1問題の発見まで、開発効率を大きく変えるデバッグ・モニタリングツールの使い方。
+  </Card>
+  <Card title="Laravel Pennantで機能フラグを実装する" icon="flag" href="/jp/blog/laravel-pennant">
+    段階的ロールアウト・A/Bテスト・ベータ機能の管理を実現する公式機能フラグパッケージの解説。
+  </Card>
+  <Card title="Laravel Nightwatch 入門" icon="moon" href="/jp/blog/nightwatch-introduction">
+    Telescope・Pulseとの違い、インストール方法、無料プランで実用的に使うための設定を解説します。
+  </Card>
+  <Card title="Pest PHPで始めるLaravelテスト" icon="vial" href="/jp/blog/pest-introduction">
+    Laravel 11からデフォルトになったPest PHPをシニアエンジニア視点で紹介。PHPUnitとの違い・移行コストも解説。
+  </Card>
+  <Card title="Laravel Cloud — Laravel専用PaaSの全貌" icon="cloud" href="/jp/blog/laravel-cloud">
+    2025年に登場したLaravel Cloud。Forgeとの違い、得意なこと・苦手なこと、実際に使うメリットを解説。
+  </Card>
+  <Card title="Laravel Cloud Hibernation（自動休止）" icon="pause" href="/jp/blog/laravel-cloud-hibernation">
+    Laravel Cloudの自動休止機能の仕組み、有効化方法、制限事項、Path Blockingによる不要な復帰防止を解説。
+  </Card>
+  <Card title="Blaze パッケージの紹介" icon="fire" href="/jp/blog/blaze-introduction">
+    Livewire公式のBlazeを使ってBlade コンポーネント描画を高速化する方法を解説します。
+  </Card>
+  <Card title="Laravel Maestro — スターターキット開発のオーケストレーター" icon="music" href="/jp/blog/maestro-introduction">
+    複数のスターターキットバリアントを一つのモノレポで管理するMaestroの仕組みを解説します。
+  </Card>
+  <Card title="Laravel Sentinel — ルート保護ミドルウェアの調査" icon="shield-halved" href="/jp/blog/sentinel-introduction">
+    ドライバーベースのルート保護ミドルウェアとして、管理ツールをどのように守るのかを解説します。
+  </Card>
+  <Card title="Laravel Wayfinderの紹介" icon="compass" href="/jp/blog/wayfinder-introduction">
+    ZiggyからInertiaスターターキットで採用されたLaravel Wayfinderを解説します。TypeScriptフロントエンドと型安全につなぐ仕組み。
+  </Card>
+  <Card title="Laravel Passkeys 初期調査" icon="key" href="/jp/blog/passkeys-introduction">
+    passkeys-server（PHP）と @laravel/passkeys（npm）を初期調査。インストールから設定・フロントエンドAPIまで整理します。
+  </Card>
+</CardGroup>
+
+## AI・エージェント
+
+<CardGroup cols={2}>
+  <Card title="Laravel Agent Detector — AIエージェント検出パッケージ" icon="robot" href="/jp/blog/agent-detector-introduction">
+    Claude、Copilot、Cursorなど主要AIエージェントの実行環境を検出するLaravel公式パッケージの解説。
+  </Card>
+  <Card title="laravel/agent-skills — Laravel公式AIエージェントスキル集" icon="wand-magic-sparkles" href="/jp/blog/agent-skills-introduction">
+    Claude Code・Cursor向けのプラグインとして提供されるスキルの概要、インストール方法、各スキルの詳細を解説。
+  </Card>
+  <Card title="Laravel PAO — AIエージェント向け出力最適化ツール" icon="compress" href="/jp/blog/pao-introduction">
+    PHPUnit・Pest・PHPStan・Artisanの出力をJSON形式に圧縮し、トークン消費を最大99.8%削減するパッケージ。
+  </Card>
+</CardGroup>
+
+## 開発環境・ツール
+
+<CardGroup cols={2}>
+  <Card title="HomebrewでPHPとComposerとNode.jsをインストールする(macOS)" icon="apple" href="/jp/blog/mac-setup">
+    macOSでHomebrewを使いPHP・Composer・Node.jsをインストールし、Laravel開発環境を整えるステップバイステップガイド。
+  </Card>
+  <Card title="WSLでPHPとComposerとNode.jsをインストールする(Windows)" icon="windows" href="/jp/blog/windows-setup">
+    Windows 10/11でWSL 2を使いPHP・Composer・Node.jsをインストールし、Laravel開発環境を整えるガイド。
+  </Card>
+</CardGroup>
