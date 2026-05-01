@@ -334,6 +334,12 @@
           ]
         },
         {
+          "group": "Frontend",
+          "pages": [
+            "en/blog/vue-introduction"
+          ]
+        },
+        {
           "group": "Environment Setup",
           "pages": [
             "en/blog/mac-setup",
