@@ -193,6 +193,90 @@ resources/js/
 
 Vue の Single File Component（SFC）に似た構造ですが、テンプレートとスクリプトの記述量が少ないのが特徴です。`<style>` はデフォルトでスコープが限定されているため、クラス名の衝突を気にする必要がありません。
 
+### テンプレート構文
+
+#### 変数展開と式
+
+テンプレート内では `{}` を使って JavaScript の値や式を埋め込みます。
+
+```svelte
+<script lang="ts">
+    let name = $state('世界')
+    let count = $state(3)
+</script>
+
+<p>こんにちは、{name}!</p>
+<p>2倍は {count * 2}</p>
+```
+
+#### `{#if}` — 条件分岐
+
+```svelte
+<script lang="ts">
+    let isLoggedIn = $state(false)
+    let role = $state('editor')
+</script>
+
+{#if isLoggedIn}
+    <p>ようこそ！</p>
+{:else if role === 'admin'}
+    <p>管理者としてログイン中</p>
+{:else}
+    <a href="/login">ログイン</a>
+{/if}
+```
+
+Vue の `v-if` / `v-else`、React の三項演算子に相当します。
+
+#### `{#each}` — リスト描画
+
+```svelte
+<script lang="ts">
+    type Post = { id: number; title: string }
+    let posts = $state<Post[]>([
+        { id: 1, title: '最初の投稿' },
+        { id: 2, title: '2番目の投稿' },
+    ])
+</script>
+
+<ul>
+    {#each posts as post (post.id)}
+        <li>{post.title}</li>
+    {/each}
+</ul>
+```
+
+`(post.id)` はキー指定で、効率的な差分更新に使われます。Vue の `v-for` / React の `Array.map()` に相当します。
+
+#### `bind:` — 双方向バインディング
+
+`bind:value` を使うと、フォーム要素の値とリアクティブ変数を双方向に同期できます。
+
+```svelte
+<script lang="ts">
+    let title = $state('')
+    let agreed = $state(false)
+    let role = $state('viewer')
+</script>
+
+<!-- テキスト入力 -->
+<input bind:value={title} type="text" />
+<p>入力中: {title}</p>
+
+<!-- チェックボックス -->
+<input bind:checked={agreed} type="checkbox" />
+<p>同意: {agreed}</p>
+
+<!-- セレクトボックス -->
+<select bind:value={role}>
+    <option value="viewer">閲覧者</option>
+    <option value="editor">編集者</option>
+    <option value="admin">管理者</option>
+</select>
+```
+
+Vue の `v-model` に相当します。React では `onChange` ハンドラを手書きする必要がありましたが、Svelte では `bind:` で宣言的に書けます。
+
 ---
 
 ## ページコンポーネントの基本

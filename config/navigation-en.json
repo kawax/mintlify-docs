@@ -337,7 +337,8 @@
           "group": "Frontend",
           "pages": [
             "en/blog/vue-introduction",
-            "en/blog/react-introduction"
+            "en/blog/react-introduction",
+            "en/blog/svelte-introduction"
           ]
         },
         {
