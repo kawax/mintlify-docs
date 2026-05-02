@@ -228,6 +228,8 @@ type Post = {
 type Props = {
     posts: {
         data: Post[]
+        // paginate(10) はページネーション情報も含むオブジェクトを返す
+        // current_page, last_page, per_page, total なども利用可能
     }
 }
 
@@ -491,6 +493,7 @@ export default function Timer() {
 
 ```tsx
 import { useMemo, useCallback } from 'react'
+import { router } from '@inertiajs/react'
 
 type Post = { id: number; title: string; published: boolean }
 type Props = { posts: Post[] }
@@ -504,7 +507,7 @@ export default function PostsList({ posts }: Props) {
 
     // 関数をメモ化（依存値が変わらない限り再生成しない）
     const handleClick = useCallback((id: number) => {
-        console.log(`Post ${id} clicked`)
+        router.visit(`/posts/${id}`)
     }, [])
 
     return (
