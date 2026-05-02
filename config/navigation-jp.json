@@ -352,7 +352,8 @@
           "group": "フロントエンド",
           "pages": [
             "jp/blog/vue-introduction",
-            "jp/blog/react-introduction"
+            "jp/blog/react-introduction",
+            "jp/blog/svelte-introduction"
           ]
         },
         {
