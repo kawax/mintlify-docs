@@ -336,7 +336,8 @@
         {
           "group": "Frontend",
           "pages": [
-            "en/blog/vue-introduction"
+            "en/blog/vue-introduction",
+            "en/blog/react-introduction"
           ]
         },
         {
