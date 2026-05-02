@@ -103,16 +103,17 @@ laravel new my-app
 composer require inertiajs/inertia-laravel
 
 # クライアントサイド（JavaScript）
-npm install @inertiajs/svelte svelte
+npm install @inertiajs/svelte @inertiajs/vite svelte
 npm install --save-dev @sveltejs/vite-plugin-svelte svelte-check typescript
 ```
 
-次に、`vite.config.ts` に Svelte プラグインを追加します。
+次に、`vite.config.ts` に Svelte プラグインと Inertia Vite プラグインを追加します。
 
 ```ts
 import { defineConfig } from 'vite'
 import laravel from 'laravel-vite-plugin'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import inertia from '@inertiajs/vite'
 
 export default defineConfig({
     plugins: [
@@ -121,19 +122,18 @@ export default defineConfig({
             refresh: true,
         }),
         svelte(),
+        inertia(),
     ],
 })
 ```
 
-`resources/js/app.ts` で Inertia アプリを起動します。
+`resources/js/app.ts` で Inertia アプリを起動します。`@inertiajs/vite` プラグインがページの自動解決とマウントを行うため、最小限のエントリーポイントだけで済みます。
 
 ```ts
 import { createInertiaApp } from '@inertiajs/svelte'
 
 createInertiaApp()
 ```
-
-`@inertiajs/vite` プラグインを使うと、ページの自動解決とマウントが行われるため、最小限のエントリーポイントだけで済みます。
 
 <Info>
   手動インストールの詳細（ルートテンプレートの設定やミドルウェアの登録など）は [Inertia 公式ドキュメント](https://inertiajs.com/installation) を参照してください。
