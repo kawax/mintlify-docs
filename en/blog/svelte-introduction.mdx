@@ -367,6 +367,73 @@ It looks like a plain `<a>` tag, but Inertia swaps only the page component under
 
 ---
 
+## `Form` Component
+
+The `<Form>` component from `@inertiajs/svelte` is the recommended form-submission style used in the starter kit's authentication pages. You specify `action` and `method` as props and write the form body using a **`{#snippet}`**.
+
+### Basic usage
+
+```svelte
+<script lang="ts">
+    import { Form } from '@inertiajs/svelte'
+</script>
+
+<Form action="/posts" method="post" class="flex flex-col gap-4">
+    {#snippet children({ errors, processing })}
+        <div>
+            <label for="title">Title</label>
+            <input id="title" name="title" type="text" required />
+            {#if errors.title}
+                <p class="error">{errors.title}</p>
+            {/if}
+        </div>
+
+        <div>
+            <label for="content">Content</label>
+            <textarea id="content" name="content"></textarea>
+            {#if errors.content}
+                <p class="error">{errors.content}</p>
+            {/if}
+        </div>
+
+        <button type="submit" disabled={processing}>
+            {processing ? 'Submitting...' : 'Create post'}
+        </button>
+    {/snippet}
+</Form>
+```
+
+`{#snippet children({ errors, processing })}` is Svelte's snippet syntax — the content block passed into a component (equivalent to Vue slots or React render props). `errors` and `processing` are computed and injected automatically by the `Form` component. Form fields use the native `name` attribute instead of `bind:value`, so the browser's standard form data collection handles serialisation.
+
+### Starter kit pattern
+
+The starter kit uses [Wayfinder](https://github.com/laravel/wayfinder) to manage routes as objects. `store.form()` returns an object containing `action` and `method` which is spread onto `<Form>`.
+
+```svelte
+<script lang="ts">
+    import { Form } from '@inertiajs/svelte'
+    import { store } from '@/routes/login'
+</script>
+
+<Form
+    {...store.form()}
+    resetOnSuccess={['password']}
+    class="flex flex-col gap-6"
+>
+    {#snippet children({ errors, processing })}
+        <!-- form body -->
+    {/snippet}
+</Form>
+```
+
+`resetOnSuccess` lists fields to clear after a successful submission — useful for password fields that should be emptied after the form is sent.
+
+<Info>
+  Without Wayfinder, passing the URL directly (`action="/login"`) works just the same.
+</Info>
+
+---
+
 ## `useForm` Hook
 
 Use the `useForm` hook from `@inertiajs/svelte` for form handling. It manages form state, submission, and validation error display with minimal code.

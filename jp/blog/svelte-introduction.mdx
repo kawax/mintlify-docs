@@ -367,6 +367,73 @@ Svelte 5 では `$props()` ルーンを使って props を受け取ります。
 
 ---
 
+## `Form` コンポーネント
+
+`@inertiajs/svelte` が提供する `<Form>` コンポーネントは、スターターキットの認証画面で使われているフォーム送信の推奨スタイルです。`action` と `method` を props で指定し、内部を **`{#snippet}`** で記述します。
+
+### 基本的な使い方
+
+```svelte
+<script lang="ts">
+    import { Form } from '@inertiajs/svelte'
+</script>
+
+<Form action="/posts" method="post" class="flex flex-col gap-4">
+    {#snippet children({ errors, processing })}
+        <div>
+            <label for="title">タイトル</label>
+            <input id="title" name="title" type="text" required />
+            {#if errors.title}
+                <p class="error">{errors.title}</p>
+            {/if}
+        </div>
+
+        <div>
+            <label for="content">本文</label>
+            <textarea id="content" name="content"></textarea>
+            {#if errors.content}
+                <p class="error">{errors.content}</p>
+            {/if}
+        </div>
+
+        <button type="submit" disabled={processing}>
+            {processing ? '送信中...' : '投稿する'}
+        </button>
+    {/snippet}
+</Form>
+```
+
+`{#snippet children({ errors, processing })}` は Svelte のスニペット構文で、コンポーネントに渡すコンテンツブロックです（Vue のスロットや React の render props に相当）。`errors` と `processing` は `Form` コンポーネントが自動で算出して渡してくれます。フォームフィールドには `bind:value` ではなく HTML ネイティブの `name` 属性を使い、ブラウザの標準フォームデータ収集が機能します。
+
+### スターターキットのパターン
+
+スターターキットは [Wayfinder](https://github.com/laravel/wayfinder) を使ってルートをオブジェクトとして管理しています。`store.form()` はルートオブジェクトの `action` と `method` を含むオブジェクトを返し、`<Form>` に spread します。
+
+```svelte
+<script lang="ts">
+    import { Form } from '@inertiajs/svelte'
+    import { store } from '@/routes/login'
+</script>
+
+<Form
+    {...store.form()}
+    resetOnSuccess={['password']}
+    class="flex flex-col gap-6"
+>
+    {#snippet children({ errors, processing })}
+        <!-- フォームの中身 -->
+    {/snippet}
+</Form>
+```
+
+`resetOnSuccess` に指定したフィールドは、送信成功時に自動でリセットされます。パスワードフィールドなど送信後に空にしたいフィールドに指定します。
+
+<Info>
+  Wayfinder を使わない場合は `action="/login"` のように直接 URL を渡せば同じように動作します。
+</Info>
+
+---
+
 ## `useForm` フック
 
 フォーム処理には `@inertiajs/svelte` の `useForm` フックを使います。フォームの状態管理・送信・バリデーションエラー表示がシンプルに実装できます。
