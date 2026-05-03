@@ -150,7 +150,7 @@ Laravel 10 + Breeze（Blade スタック）で作成したプロジェクトを 
 
         ```php
         ->withMiddleware(function (Middleware $middleware) {
-        // グローバルミドルウェアの追加
+            // グローバルミドルウェアの追加
             $middleware->append(\App\Http\Middleware\MyCustomMiddleware::class);
 
             // web グループにミドルウェアを追加
