@@ -8,6 +8,16 @@ sidebarTitle: "Webhook / Bot"
 
 パッケージはWebhookルーティングとコントローラーを提供しています。
 
+```mermaid
+flowchart TD
+    A["ユーザーがメッセージを送信"] --> B["LINEがWebhookで送信"]
+    B --> C["`line.webhook` ルートで受信"]
+    C --> D["`ValidateSignature` ミドルウェアで検証"]
+    D --> E["`WebhookController`"]
+    E --> F["`WebhookEventDispatcher` から<br>Laravelイベントをディスパッチ"]
+    F --> G["イベントリスナーで返信"]
+```
+
 ### Webhook URL
 
 デフォルトのWebhook URLは次のとおりです。
