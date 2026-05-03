@@ -444,7 +444,17 @@
             },
             "jp/packages/laravel-nostr",
             "jp/packages/laravel-notification-discord-webhook",
-            "jp/packages/socialite-discord"
+            "jp/packages/socialite-discord",
+            {
+              "group": "LINE SDK for Laravel",
+              "expanded": false,
+              "pages": [
+                "jp/packages/laravel-line-sdk/index",
+                "jp/packages/laravel-line-sdk/bot",
+                "jp/packages/laravel-line-sdk/notification",
+                "jp/packages/laravel-line-sdk/socialite"
+              ]
+            }
           ]
         },
         {
