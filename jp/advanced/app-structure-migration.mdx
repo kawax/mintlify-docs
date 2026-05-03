@@ -29,7 +29,7 @@ sidebarTitle: "移行ガイド"
 
 このガイドでは、以下の状態を前提とします。
 
-- **Laravel バージョンアップが完了している**（`laravel/framework ^11.0` 以上）
+- **Laravel バージョンアップが完了している**（`laravel/framework ^11.0` 以降）
 - 既存のテストがすべて通っている
 - Laravel 11 以降のアプリケーション構造（[Laravel 11 以降のアプリケーション構造](/jp/advanced/app-structure)を参照）を理解している
 
@@ -248,6 +248,9 @@ Laravel 10 + Breeze（Blade スタック）で作成したプロジェクトを 
     カスタマイズがある場合は `bootstrap/app.php` の `withExceptions()` に移植してから削除します。
 
     ```php
+    use Throwable;
+    use Illuminate\Http\Request;
+
     ->withExceptions(function (Exceptions $exceptions) {
         // 例外レポートのカスタマイズ
         $exceptions->report(function (Throwable $e) {
