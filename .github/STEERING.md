@@ -27,7 +27,16 @@
   - app/Http/Middlewareがなくてミドルウェアの設定を変更できない：bootstrap/app.phpでの設定に変更。
   - app/Http/Kernel.phpがなくてミドルウェアを追加できない：bootstrap/app.phpでの設定に変更。
   - `$this->middleware()`がないのでコントローラー内でのミドルウェアの指定ができない：リリースノート・アップグレードガイドには書いてないけど使い方が変わっている。`HasMiddleware`を指定して`middleware()`メソッドで指定、もしくはLaravel13なら`Attributes`での指定もできる。 https://laravel.com/docs/13.x/controllers#controller-middleware 。コントローラー内で指定よりルーティングで指定するほうがおすすめ。
-  - コントローラーに`$this->authorizeResource()`がない：実はこれだけ簡単な代替手段がない。公式ドキュメントからも完全に削除されている。ベースコントローラー(`Illuminate\Routing\Controller`)と`AuthorizesRequests`に依存しているので`App\Http\Controllers\Controller`をLaravel10仕様に戻すしかない。
+  - コントローラーに`$this->authorizeResource()`がない：実はこれだけ簡単な代替手段がない。公式ドキュメントからも完全に削除されている。ベースコントローラー(`Illuminate\Routing\Controller`)と`AuthorizesRequests`に依存しているので`App\Http\Controllers\Controller`をLaravel10仕様に戻すしかない。Laravel13なら`Authorize`Attributesを使ってメソッドごとに設定するのがベストなはず。
+```php
+use Illuminate\Routing\Attributes\Controllers\Authorize;
+ 
+#[Authorize('update', 'post')]
+public function update(Post $post)
+{
+    // The current user may update the post...
+}
+```
   - app/Console/Kernel.phpがなくてScheduleの設定ができない：routes/console.phpもしくはbootstrap/app.phpでの設定に変わった。
   - イベントとリスナーの登録方法が分からない：イベントクラスとhandle()にイベントを指定したリスナーを作るだけで自動で登録されるので手動登録は不要。
   - config/app.phpへのサービスプロバイダー追加方法が分からない：bootstrap/providers.phpへの追加に変わった。
