@@ -24,11 +24,8 @@ network:
   allowed:
     - defaults
     - laravel.com
-    - "*.laravel.com"
     - inertiajs.com
     - fluxui.dev
-    - kawax.biz
-    - mintlify.com
 
 safe-outputs:
   create-issue:
