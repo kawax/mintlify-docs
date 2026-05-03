@@ -51,6 +51,7 @@ Illuminate\Foo\FooServiceProvider::class => Bar\BarServiceProvider::class,
   - routes/api.phpがない：API関連の機能は必要な人だけ追加するように変わったので個別にインストールする。php artisan install:api
   - routes/channels.phpがない：ブロードキャストも同じく個別にインストールする。php artisan install:broadcasting
   - 途中参加したプロジェクトでの判別方法。`bootstrap/app.php`を見て`return Application::configure(...`ならLaravel11以降に作られたプロジェクト、もしくは新構造に移行したプロジェクト。違うなら旧構造のままアップグレードしたプロジェクト。
+  - 日本語版はOKなので英語ページを作成。 advanced/app-structure-faq.mdx
 
 ## blog ページ案
 
