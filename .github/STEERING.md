@@ -72,12 +72,6 @@ Illuminate\Foo\FooServiceProvider::class => Bar\BarServiceProvider::class,
 - [x] Svelteの紹介ページ
 
 ## packages ページ案
-- [x] Laravel Notification for Discord(Webhook) https://github.com/invokable/laravel-notification-discord-webhook
-  - Discordに通知する単機能パッケージのWebhook版。
-  - いつもの投稿のためのBasic client＋通知機能ではなく、Webhookなのでいきなり通知が可能。
-  - 本来のDiscord APIはWebSocketが必要で複雑だけどWebhook版は一切不要で簡単。
-  - 仮で`SDK`グループに追加。
-- [x] Socialite for Discord https://github.com/invokable/socialite-discord
-  - Socialite用のDiscordドライバー。Socialiteドライバーを作るのは簡単なのでOAuth機能があり自分で使うことがあるサービスならすぐに作っている。
-  - `jp/socialite.mdx`で公式ドキュメントにあるSocialite Providersの記述を全部消して`Socialite::extend()`で拡張する正規の方法を書いてるのは確実にこの方法が正しいから。Socialite Providersにすでに同じドライバーがあっても関係なく自分で作っている。
-- [x] LINE SDK for Laravel https://github.com/invokable/laravel-line-sdk
+- [x] Laravel Notification for Discord(Webhook)
+- [x] Socialite for Discord
+- [x] LINE SDK for Laravel
