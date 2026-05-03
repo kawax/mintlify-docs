@@ -3,7 +3,6 @@
 このファイルは人間が編集し、「今後はこういうページを増やす」や「このページが間違ってるので修正」の細かい指示を出すためのものです。
 対応が終わったら`[x]`で完了。
 
-- マイパッケージの解説ページ。下のpackages ページ案に追加されたら対応。
 - [x] 重複ページを作り出してるのでここまでの完了したタスクを削除。公式ドキュメントを元にしたページは揃ってきた感じなので独自コンテンツを増やしていける段階。
   - 重複しても新しい情報があればプルリクの段階でページを統合して更新するように指示できるので「既存ページの再レビュー・改修」ができて問題ないかもしれない。
 
@@ -40,9 +39,9 @@
   - 使っていくうちに新しい情報が入ったら後で追加。
   - [x] Hibernation
   - [x] Laravel Cloudはadvancedのページ案だったのに最初にblogで作られた後、Hibernationページがadvancedに作られて離れてしまった。blogに移動して統一。blogのProducts/プロダクトグループでLaravel公式の有料サービスを扱う。
-- [x] Vueの紹介ページ。Laravel5.3(2016年)の頃からしばらくはVueが標準搭載だったのでLaravelユーザーには一番馴染みがある。blogタブ内に「フロントエンド」グループを追加して3ページを配置。全部InertiaなのでInertiaで使う時に必要な基礎知識な内容。
-- [x] Reactの紹介ページ。Laravelでは`laravel/ui`が分離された時にReact版も登場(2019年)、Breezeの途中でInertia React版が追加(2021年)。JetstreamにはReact版は追加されなかったので歴史はやや浅め。`laravel/ui`で対応してたのを忘れるくらい影が薄かった。現行のスターターキットでは最初からVueとReactが同時対応なので今は同列もしくはReactが優先の扱い。
-- [x] Svelteの紹介ページ。Svelte版スターターキットの登場は2026年なので一番新しい。Laravelユーザーにはほとんど知られてない。スターターキットから使うならVue/React/Svelteどれを使ってもshadcnベースのコンポーネントライブラリを使うだけなので基礎知識さえあれば使っていけるはず。
+- [x] Vueの紹介ページ
+- [x] Reactの紹介ページ
+- [x] Svelteの紹介ページ
 
 ## packages ページ案
 - [x] Laravel Notification for Discord(Webhook) https://github.com/invokable/laravel-notification-discord-webhook
