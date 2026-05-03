@@ -20,7 +20,7 @@
   - Laravel11リリース当時に記事を書いてたけどもう消えてるので再生成。今調べても正確な記事は書けないので日本語版だけ作成して管理者が修正→その後に英語版を作る。PC内には当時の記事ファイルが残ってたので修正できる。
   - Laravel10+Breeze bladeスタックで新規プロジェクトを作ってからBreezeのままLaravel11にアップグレードする例。
   - 最初に警告として公式ドキュメントでは全く推奨してないこと、フレームワーク内部まで詳しい人以外はやめたほうがいいこと、旧構造のままでもLaravel13までアップグレードできていて今後もサポート終了予定はないことを書いておく。
-  - 日本語版はOKなので英語ページを作成。
+  - 日本語版はOKなので英語ページを作成。advanced/app-structure-migration.mdx
 - [ ] Laravel11以降の新構造のFAQページ。Laravel11以降に新しく使い始めた人向けの質問と回答集。旧構造のままLaravel12や13を使ってることも多いだろうから既存プロジェクトに途中参加した人は戸惑う。逆に古い本で勉強した人が新構造を見ても戸惑う。Laravel11リリースから時間が経ってるけど今も新旧構造が混在してるなら必要な情報。これも当時の記事ファイルがあり修正できるので日本語ページから作成。
   - configファイルが少ない：変更することが少ないconfigファイルが削除された。新構造しか知らない人には非常に分かりにくい部分だけど「ファイルはないけどフレームワーク内のconfigファイルが使われる」「プロジェクトのconfigファイルとフレームワーク内のconfigファイルがマージされて使われる。プロジェクト側が優先。」
   - コントローラーで`$this->validate()`や`$this->authorize()`が使えない：ベースコントローラー(`Illuminate\Routing\Controller`)を継承せず`ValidatesRequests`や`AuthorizesRequests`もない空のコントローラーになったので代わりに`$request->validate()`や`Gate::authorize()`を使う。[Laravel10のApp\Http\Controllers\Controller](https://github.com/laravel/laravel/blob/10.x/app/Http/Controllers/Controller.php)、[Laravel11のApp\Http\Controllers\Controller](https://github.com/laravel/laravel/blob/11.x/app/Http/Controllers/Controller.php)。よく使うなら`App\Http\Controllers\Controller`をLaravel10と同様に戻してもいい。
