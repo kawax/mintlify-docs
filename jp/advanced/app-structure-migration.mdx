@@ -468,7 +468,7 @@ Laravel 10 + Breeze（Blade スタック）で作成したプロジェクトを 
         |---|---|
         | `$this->validate($request, $rules)` | `$request->validate($rules)` |
         | `$this->authorize('update', $post)` | `Gate::authorize('update', $post)` |
-        | `$this->authorizeResource(Post::class)` | コンストラクターで `Gate::authorize()` |
+        | `$this->authorizeResource(Post::class)` | 代替手段はないので`App\Http\Controllers\Controller`をLaravel10仕様に戻します |
 
         既存のコントローラーがトレイトのメソッドを使っている場合は、各コントローラーを修正するか、トレイトを `Controller`
         ベースクラスに残すかを選択できます。一度にすべてを変更しなくても動作はします。
