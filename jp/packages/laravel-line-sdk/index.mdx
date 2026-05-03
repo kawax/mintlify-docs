@@ -1,0 +1,114 @@
+---
+title: "LINE SDK for Laravel"
+description: "LINE公式SDKをLaravel向けに使いやすくしたパッケージ。Webhook・Bot・通知・Socialiteの4機能を提供。"
+sidebarTitle: "概要"
+---
+
+## 概要
+
+[revolution/laravel-line-sdk](https://github.com/invokable/laravel-line-sdk) は、LINE公式SDKをLaravelから使いやすくするパッケージです。
+
+Webhook受信、Bot Facade、Laravel Notifications統合、LINE Login（Socialite）の4機能を提供します。
+
+<Info>
+  このパッケージは PHP 8.3 以上、Laravel 12.0 以上が必要です。
+</Info>
+
+## インストール
+
+```shell
+composer require revolution/laravel-line-sdk
+```
+
+## 設定
+
+### LINE Developers コンソール
+
+[LINE Developers](https://developers.line.biz/) でチャンネルを作成します。
+
+<Info>
+  Messaging API チャンネルは LINE Developers Console から直接作成できなくなりました。先に [LINE Official Account Manager](https://manager.line.biz/) で公式アカウントを作成し、Messaging API の利用を有効化してください。
+</Info>
+
+2つのチャンネルを作成します。
+
+| チャンネル | 取得するもの |
+| --- | --- |
+| **Messaging API** | Channel access token (long-lived)、Channel secret |
+| **LINE Login** | Channel ID、Channel secret |
+
+### .env
+
+```dotenv
+LINE_BOT_CHANNEL_TOKEN=
+LINE_BOT_CHANNEL_SECRET=
+
+LINE_LOGIN_CLIENT_ID=
+LINE_LOGIN_CLIENT_SECRET=
+LINE_LOGIN_REDIRECT=
+```
+
+### 設定ファイルの公開（任意）
+
+```shell
+php artisan vendor:publish --tag=line-config
+```
+
+## クイックスタート
+
+最短でBotを動作させる手順です。
+
+<Steps>
+  <Step title="新しいLaravelプロジェクトを作成する">
+    ```shell
+    laravel new line-bot
+    cd ./line-bot
+    composer require revolution/laravel-line-sdk
+    ```
+  </Step>
+  <Step title=".env を設定する">
+    ```dotenv
+    LINE_BOT_CHANNEL_TOKEN=
+    LINE_BOT_CHANNEL_SECRET=
+    ```
+  </Step>
+  <Step title="デフォルト Listener を公開する">
+    ```shell
+    php artisan vendor:publish --tag=line-listeners
+    ```
+
+    `app/Listeners/Line/` に `MessageListener` が生成されます。
+  </Step>
+  <Step title="Webサーバーにデプロイする">
+    LINEからWebhookを受信するには、公開されたURLが必要です。ローカルサーバーでは受信できません。
+
+    LINE Developers コンソールで Webhook URL を設定します。
+
+    ```
+    https://example.com/line/webhook
+    ```
+  </Step>
+  <Step title="Botを友だち追加してテストする">
+    Messaging API チャンネルの QR コードを使って友だち追加します。メッセージを送ると、`MessageListener` がそのままオウム返しします。
+  </Step>
+</Steps>
+
+## ドキュメント
+
+<Columns cols={2}>
+  <Card title="Webhook / Bot" href="/jp/packages/laravel-line-sdk/bot" icon="webhook">
+    WebhookコントローラーとBot Facadeによるメッセージ送受信。
+  </Card>
+  <Card title="通知チャンネル" href="/jp/packages/laravel-line-sdk/notification" icon="bell">
+    Laravel Notification SystemとのLINE Messaging API統合。
+  </Card>
+  <Card title="Socialite（LINE Login）" href="/jp/packages/laravel-line-sdk/socialite" icon="shield-check">
+    LINE LoginによるOAuth2認証をSocialiteで実装する。
+  </Card>
+</Columns>
+
+## 参考リンク
+
+- GitHub: [invokable/laravel-line-sdk](https://github.com/invokable/laravel-line-sdk)
+- デモ: [invokable/laravel-line-project](https://github.com/invokable/laravel-line-project)
+- DeepWiki: [invokable/laravel-line-sdk](https://deepwiki.com/invokable/laravel-line-sdk)

@@ -1,0 +1,191 @@
+---
+title: "通知チャンネル - LINE SDK for Laravel"
+description: "Laravel Notification SystemとLINE Messaging APIを統合して通知を送信する。"
+sidebarTitle: "通知チャンネル"
+---
+
+## 概要
+
+`LineChannel` を使うと、Laravel Notifications から LINE にメッセージを送信できます。
+
+<Info>
+  LINE Notifyのサービス終了に伴いLINE Notify対応は終了しています。現在はMessaging APIによる通知なので料金プランごとの通数制限があります。[Messaging APIの料金](https://developers.line.biz/ja/docs/messaging-api/pricing/) を参照してください。
+</Info>
+
+## Notification クラス
+
+`via()` で `LineChannel::class` を返し、`toLine()` でメッセージを定義します。
+
+```php
+use Illuminate\Notifications\Notification;
+use Revolution\Line\Notifications\LineChannel;
+use Revolution\Line\Notifications\LineMessage;
+
+class TestNotification extends Notification
+{
+    public function via(object $notifiable): array
+    {
+        return [
+            LineChannel::class,
+        ];
+    }
+
+    public function toLine(object $notifiable): LineMessage
+    {
+        return LineMessage::create(text: 'test');
+    }
+}
+```
+
+## 送信パターン
+
+### On-Demand 通知
+
+ユーザーモデルに紐づけずに通知を送る場合は `Notification::route()` を使います。送信先は `userId` または `groupId` です。
+
+```php
+use Illuminate\Support\Facades\Notification;
+
+Notification::route('line', 'to')
+            ->notify(new TestNotification());
+```
+
+### User モデルからの通知
+
+User ごとに送信先を管理する場合は `routeNotificationForLine()` を定義します。
+
+```php
+use Illuminate\Notifications\Notifiable;
+
+class User extends Model
+{
+    use Notifiable;
+
+    public function routeNotificationForLine($notification): string
+    {
+        return $this->line_id;
+    }
+}
+```
+
+```php
+$user->notify(new TestNotification());
+```
+
+<Info>
+  `userId` や `groupId` は `FollowEvent` や `JoinEvent` などのWebhookイベントから取得できます。
+</Info>
+
+## メッセージタイプ
+
+### テキスト
+
+最大5件まで送信できます。
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->text('text 1')
+                      ->text('text 2');
+}
+```
+
+### 送信者名とアイコンのカスタマイズ
+
+`withSender()` はメッセージ追加メソッドより前に呼ぶ必要があります。
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->withSender(name: 'alt-name', icon: 'https://...png')
+                      ->text('text 1')
+                      ->text('text 2');
+}
+```
+
+`create()` のパラメータで名前とアイコンを指定することもできます。
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create(text: 'test', name: 'alt-name', icon: 'https://...png');
+}
+```
+
+### スタンプ
+
+使用できるスタンプは [Sticker list](https://developers.line.biz/ja/docs/messaging-api/sticker-list/) を参照してください。
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->text('test')
+                      ->sticker(package: 446, sticker: 1988);
+}
+```
+
+### 画像
+
+公開URLを指定します。
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->image(original: 'https://.../test.png', preview: 'https://.../preview.png');
+}
+```
+
+### 動画
+
+公開URLを指定します。
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->video(original: 'https://.../test.mp4', preview: 'https://.../preview.png');
+}
+```
+
+### その他のメッセージタイプ
+
+`message()` を使うと任意のメッセージタイプを追加できます。`setType()` でタイプを指定してください。
+
+```php
+use LINE\Clients\MessagingApi\Model\LocationMessage;
+use LINE\Constants\MessageType;
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    $location = (new LocationMessage())
+        ->setType(MessageType::LOCATION)
+        ->setTitle('title')
+        ->setAddress('address')
+        ->setLatitude(0.0)
+        ->setLongitude(0.0);
+
+    return LineMessage::create()
+                      ->message($location);
+}
+```
+
+<Info>
+  最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-line-sdk) を参照してください。
+</Info>

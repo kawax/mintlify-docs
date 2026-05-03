@@ -1,0 +1,191 @@
+---
+title: "Notifications - LINE SDK for Laravel"
+description: "Send LINE messages through the Laravel Notification System using Messaging API."
+sidebarTitle: "Notifications"
+---
+
+## Overview
+
+Use `LineChannel` to send LINE messages through Laravel Notifications.
+
+<Info>
+  LINE Notify has been discontinued. Notifications now use the Messaging API, which has monthly message limits depending on your pricing plan. See [Messaging API pricing](https://developers.line.biz/en/docs/messaging-api/pricing/) for details.
+</Info>
+
+## Notification class
+
+Return `LineChannel::class` from `via()` and define the message in `toLine()`.
+
+```php
+use Illuminate\Notifications\Notification;
+use Revolution\Line\Notifications\LineChannel;
+use Revolution\Line\Notifications\LineMessage;
+
+class TestNotification extends Notification
+{
+    public function via(object $notifiable): array
+    {
+        return [
+            LineChannel::class,
+        ];
+    }
+
+    public function toLine(object $notifiable): LineMessage
+    {
+        return LineMessage::create(text: 'test');
+    }
+}
+```
+
+## Sending notifications
+
+### On-demand notifications
+
+To send a notification without a user model, use `Notification::route()`. The routing value is a `userId` or `groupId`.
+
+```php
+use Illuminate\Support\Facades\Notification;
+
+Notification::route('line', 'to')
+            ->notify(new TestNotification());
+```
+
+### User model notifications
+
+Define `routeNotificationForLine()` on the User model to route per-user.
+
+```php
+use Illuminate\Notifications\Notifiable;
+
+class User extends Model
+{
+    use Notifiable;
+
+    public function routeNotificationForLine($notification): string
+    {
+        return $this->line_id;
+    }
+}
+```
+
+```php
+$user->notify(new TestNotification());
+```
+
+<Info>
+  A `userId` or `groupId` can be obtained from Webhook events such as `FollowEvent` or `JoinEvent`.
+</Info>
+
+## Message types
+
+### Text
+
+Up to 5 messages can be sent at once.
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->text('text 1')
+                      ->text('text 2');
+}
+```
+
+### Custom sender name and icon
+
+Call `withSender()` before any message-adding method.
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->withSender(name: 'alt-name', icon: 'https://...png')
+                      ->text('text 1')
+                      ->text('text 2');
+}
+```
+
+You can also pass name and icon directly to `create()`:
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create(text: 'test', name: 'alt-name', icon: 'https://...png');
+}
+```
+
+### Sticker
+
+Only stickers listed on the [sticker list](https://developers.line.biz/en/docs/messaging-api/sticker-list/) can be used.
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->text('test')
+                      ->sticker(package: 446, sticker: 1988);
+}
+```
+
+### Image
+
+Specify a public URL.
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->image(original: 'https://.../test.png', preview: 'https://.../preview.png');
+}
+```
+
+### Video
+
+Specify a public URL.
+
+```php
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    return LineMessage::create()
+                      ->video(original: 'https://.../test.mp4', preview: 'https://.../preview.png');
+}
+```
+
+### Other message types
+
+Use `message()` to add any message type. Set the type with `setType()`.
+
+```php
+use LINE\Clients\MessagingApi\Model\LocationMessage;
+use LINE\Constants\MessageType;
+use Revolution\Line\Notifications\LineMessage;
+
+public function toLine(object $notifiable): LineMessage
+{
+    $location = (new LocationMessage())
+        ->setType(MessageType::LOCATION)
+        ->setTitle('title')
+        ->setAddress('address')
+        ->setLatitude(0.0)
+        ->setLongitude(0.0);
+
+    return LineMessage::create()
+                      ->message($location);
+}
+```
+
+<Info>
+  For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-line-sdk).
+</Info>

@@ -1,0 +1,120 @@
+---
+title: "Socialite（LINE Login）- LINE SDK for Laravel"
+description: "LINE LoginによるOAuth2認証をLaravel Socialiteで実装する。"
+sidebarTitle: "Socialite（LINE Login）"
+---
+
+## 概要
+
+このパッケージは `Socialite::extend()` を使った正規の方法でLINE Loginドライバーを提供します。組み込みプロバイダーとまったく同じAPIで使えます。
+
+利用可能なドライバー:
+
+| ドライバー | 説明 |
+| --- | --- |
+| `line-login` | [LINE Login](https://developers.line.biz/ja/docs/line-login/) によるOAuth2認証 |
+
+<Info>
+  Laravel Socialite 自体の使い方については [Socialite ガイド](/jp/socialite) を参照してください。
+</Info>
+
+## 設定
+
+### .env
+
+```dotenv
+LINE_LOGIN_CLIENT_ID=
+LINE_LOGIN_CLIENT_SECRET=
+LINE_LOGIN_REDIRECT=
+```
+
+## 基本的な使い方
+
+<Steps>
+  <Step title="ルートを定義する">
+    `routes/web.php` にリダイレクト用とコールバック用の2つのルートを追加します。
+
+    ```php
+    use App\Http\Controllers\SocialiteController;
+
+    Route::get('login', [SocialiteController::class, 'login']);
+    Route::get('callback', [SocialiteController::class, 'callback']);
+    ```
+  </Step>
+  <Step title="コントローラーを作成する">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use App\Models\User;
+    use Illuminate\Http\Request;
+    use Laravel\Socialite\Facades\Socialite;
+
+    class SocialiteController extends Controller
+    {
+        public function login()
+        {
+            return Socialite::driver('line-login')->redirect();
+        }
+
+        public function callback(Request $request)
+        {
+            if ($request->missing('code')) {
+                // デバッグ用。本番環境ではリダイレクトやエラー処理に変更してください
+                return redirect('/login')->withErrors('認証がキャンセルされました。');
+            }
+
+            /** @var \Laravel\Socialite\Two\User */
+            $user = Socialite::driver('line-login')->user();
+
+            $loginUser = User::updateOrCreate([
+                'line_id' => $user->id,
+            ], [
+                'name'          => $user->nickname,
+                'avatar'        => $user->avatar,
+                'access_token'  => $user->token,
+                'refresh_token' => $user->refreshToken,
+            ]);
+
+            auth()->login($loginUser, true);
+
+            return redirect()->route('home');
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## オプションパラメータ
+
+`with()` で追加パラメータを渡せます。
+
+```php
+public function login()
+{
+    return Socialite::driver('line-login')->with([
+        'prompt'     => 'consent',
+        'bot_prompt' => 'normal',
+    ])->redirect();
+}
+```
+
+## スコープの設定
+
+取得する権限をスコープで指定します。
+
+```php
+public function login()
+{
+    return Socialite::driver('line-login')
+                    ->setScopes(['profile', 'openid'])
+                    ->redirect();
+}
+```
+
+主なスコープの一覧については [LINE Login スコープ](https://developers.line.biz/ja/docs/line-login/integrate-line-login/#scopes) を参照してください。
+
+<Info>
+  最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-line-sdk) を参照してください。
+</Info>
