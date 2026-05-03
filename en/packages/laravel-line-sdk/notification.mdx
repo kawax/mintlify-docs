@@ -1,20 +1,20 @@
 ---
-title: "通知チャンネル - LINE SDK for Laravel"
-description: "Laravel Notification SystemとLINE Messaging APIを統合して通知を送信する。"
-sidebarTitle: "通知チャンネル"
+title: "Notifications - LINE SDK for Laravel"
+description: "Send LINE messages through the Laravel Notification System using Messaging API."
+sidebarTitle: "Notifications"
 ---
 
-## 概要
+## Overview
 
-`LineChannel` を使うと、Laravel Notifications から LINE にメッセージを送信できます。
+Use `LineChannel` to send LINE messages through Laravel Notifications.
 
 <Info>
-  LINE Notifyのサービス終了に伴いLINE Notify対応は終了しています。現在はMessaging APIによる通知なので料金プランごとの通数制限があります。[Messaging APIの料金](https://developers.line.biz/ja/docs/messaging-api/pricing/) を参照してください。
+  LINE Notify has been discontinued. Notifications now use the Messaging API, which has monthly message limits depending on your pricing plan. See [Messaging API pricing](https://developers.line.biz/en/docs/messaging-api/pricing/) for details.
 </Info>
 
-## Notification クラス
+## Notification class
 
-`via()` で `LineChannel::class` を返し、`toLine()` でメッセージを定義します。
+Return `LineChannel::class` from `via()` and define the message in `toLine()`.
 
 ```php
 use Illuminate\Notifications\Notification;
@@ -37,11 +37,11 @@ class TestNotification extends Notification
 }
 ```
 
-## 送信パターン
+## Sending notifications
 
-### On-Demand 通知
+### On-demand notifications
 
-ユーザーモデルに紐づけずに通知を送る場合は `Notification::route()` を使います。送信先は `userId` または `groupId` です。
+To send a notification without a user model, use `Notification::route()`. The routing value is a `userId` or `groupId`.
 
 ```php
 use Illuminate\Support\Facades\Notification;
@@ -50,9 +50,9 @@ Notification::route('line', 'to')
             ->notify(new TestNotification());
 ```
 
-### User モデルからの通知
+### User model notifications
 
-User ごとに送信先を管理する場合は `routeNotificationForLine()` を定義します。
+Define `routeNotificationForLine()` on the User model to route per-user.
 
 ```php
 use Illuminate\Notifications\Notifiable;
@@ -73,14 +73,14 @@ $user->notify(new TestNotification());
 ```
 
 <Info>
-  `userId` や `groupId` は `FollowEvent` や `JoinEvent` などのWebhookイベントから取得できます。
+  A `userId` or `groupId` can be obtained from Webhook events such as `FollowEvent` or `JoinEvent`.
 </Info>
 
-## メッセージタイプ
+## Message types
 
-### テキスト
+### Text
 
-最大5件まで送信できます。
+Up to 5 messages can be sent at once.
 
 ```php
 use Revolution\Line\Notifications\LineMessage;
@@ -93,9 +93,9 @@ public function toLine(object $notifiable): LineMessage
 }
 ```
 
-### 送信者名とアイコンのカスタマイズ
+### Custom sender name and icon
 
-`withSender()` はメッセージ追加メソッドより前に呼ぶ必要があります。
+Call `withSender()` before any message-adding method.
 
 ```php
 use Revolution\Line\Notifications\LineMessage;
@@ -109,7 +109,7 @@ public function toLine(object $notifiable): LineMessage
 }
 ```
 
-`create()` のパラメータで名前とアイコンを指定することもできます。
+You can also pass name and icon directly to `create()`:
 
 ```php
 use Revolution\Line\Notifications\LineMessage;
@@ -120,9 +120,9 @@ public function toLine(object $notifiable): LineMessage
 }
 ```
 
-### スタンプ
+### Sticker
 
-使用できるスタンプは [Sticker list](https://developers.line.biz/en/docs/messaging-api/sticker-list/) を参照してください。
+Only stickers listed on the [sticker list](https://developers.line.biz/en/docs/messaging-api/sticker-list/) can be used.
 
 ```php
 use Revolution\Line\Notifications\LineMessage;
@@ -135,9 +135,9 @@ public function toLine(object $notifiable): LineMessage
 }
 ```
 
-### 画像
+### Image
 
-公開URLを指定します。
+Specify a public URL.
 
 ```php
 use Revolution\Line\Notifications\LineMessage;
@@ -149,9 +149,9 @@ public function toLine(object $notifiable): LineMessage
 }
 ```
 
-### 動画
+### Video
 
-公開URLを指定します。
+Specify a public URL.
 
 ```php
 use Revolution\Line\Notifications\LineMessage;
@@ -163,9 +163,9 @@ public function toLine(object $notifiable): LineMessage
 }
 ```
 
-### その他のメッセージタイプ
+### Other message types
 
-`message()` を使うと任意のメッセージタイプを追加できます。`setType()` でタイプを指定してください。
+Use `message()` to add any message type. Set the type with `setType()`.
 
 ```php
 use LINE\Clients\MessagingApi\Model\LocationMessage;
@@ -187,5 +187,5 @@ public function toLine(object $notifiable): LineMessage
 ```
 
 <Info>
-  最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-line-sdk) を参照してください。
+  For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-line-sdk).
 </Info>

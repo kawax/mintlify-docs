@@ -1,42 +1,42 @@
 ---
 title: "Webhook / Bot - LINE SDK for Laravel"
-description: "WebhookコントローラーとBot FacadeによるLINE Messaging APIのメッセージ送受信。"
+description: "Webhook routing and Bot Facade for LINE Messaging API message handling."
 sidebarTitle: "Webhook / Bot"
 ---
 
 ## Webhook
 
-パッケージはWebhookルーティングとコントローラーを提供しています。
+The package includes Webhook routing and a controller out of the box.
 
 ### Webhook URL
 
-デフォルトのWebhook URLは次のとおりです。
+The default Webhook URL is:
 
 ```
 https://example.com/line/webhook
 ```
 
-`.env` でパスを変更できます。
+You can change the path via `.env`:
 
 ```dotenv
 LINE_BOT_WEBHOOK_PATH=webhook
 ```
 
-### Laravelイベントシステムとの連携
+### Working with the Laravel Event System
 
-Webhookイベントを受信するとLaravelイベントがディスパッチされます。イベントディスカバリーはデフォルトで有効です。
+When a Webhook event is received, a Laravel event is dispatched. Event discovery is enabled by default.
 
 <Info>
-  本番環境では `php artisan event:cache` を実行してください。
+  In production, run `php artisan event:cache`.
 </Info>
 
-### デフォルト Listener の公開
+### Publish the default Listener
 
 ```shell
 php artisan vendor:publish --tag=line-listeners
 ```
 
-`app/Listeners/Line/` に `MessageListener` が生成されます。
+This generates `MessageListener` in `app/Listeners/Line/`.
 
 ```php
 namespace App\Listeners\Line;
@@ -79,7 +79,7 @@ class MessageListener
 
 ## Bot Facade
 
-`Revolution\Line\Facades\Bot` は公式SDK `MessagingApiApi` クラスのすべてのメソッドに委譲します。
+`Revolution\Line\Facades\Bot` delegates to all methods of the official SDK `MessagingApiApi` class.
 
 ```php
 use Revolution\Line\Facades\Bot;
@@ -88,34 +88,34 @@ Bot::replyMessage();
 Bot::pushMessage();
 ```
 
-### reply メソッド
+### reply method
 
-`Bot::reply()` を使うと、リプライトークンを渡してメッセージを返信できます。
+`Bot::reply()` sends a reply using a reply token.
 
 <Info>
-  `Bot::pushMessage()` によるプッシュ配信は料金プランごとに通数制限があります。一方、ユーザーからのメッセージに対するリプライ（`Bot::reply()`）は通数制限がなく無料で利用できます。
+  Push delivery (`Bot::pushMessage()`) is subject to monthly message limits depending on your pricing plan. Replies to user messages (`Bot::reply()`) have no message limit and are free.
 </Info>
 
 ```php
 use Revolution\Line\Facades\Bot;
 
-// テキストを返信する
+// Reply with text
 Bot::reply($token)->text('text');
 
-// 送信者名を変えて複数のテキストを返信する
+// Reply with multiple texts and a custom sender name
 Bot::reply($token)->withSender('alt-name')->text('text1', 'text2');
 
-// スタンプを返信する
+// Reply with a sticker
 Bot::reply($token)->sticker(package: 1, sticker: 1);
 ```
 
-## カスタマイズ
+## Customization
 
-### Bot マクロ
+### Bot macro
 
-`Bot` は `Macroable` を実装しているため、任意のメソッドを追加できます。
+`Bot` is `Macroable`, so you can add any method you need.
 
-`AppServiceProvider@boot` で登録します。
+Register macros in `AppServiceProvider@boot`:
 
 ```php
 use Revolution\Line\Facades\Bot;
@@ -132,9 +132,9 @@ public function boot(): void
 $foo = Bot::foo();
 ```
 
-### MessagingApiApi インスタンスの差し替え
+### Replacing the MessagingApiApi instance
 
-`Bot::bot()` は `MessagingApiApi` インスタンスを返します。`Bot::botUsing()` でインスタンスを差し替えられます。
+`Bot::bot()` returns the `MessagingApiApi` instance. Use `Bot::botUsing()` to swap it out.
 
 ```php
 $bot = new MyBot();
@@ -142,7 +142,7 @@ $bot = new MyBot();
 Bot::botUsing($bot);
 ```
 
-Callableも受け付けます。
+A callable is also accepted:
 
 ```php
 Bot::botUsing(function () {
@@ -150,11 +150,11 @@ Bot::botUsing(function () {
 });
 ```
 
-### WebhookHandler の差し替え
+### Replacing the WebhookHandler
 
-Laravelイベントシステムを使わずに独自のWebhook処理を書きたい場合は、`WebhookHandler` interfaceを実装して差し替えます。
+If you want to handle Webhooks without the Laravel Event System, implement the `WebhookHandler` interface.
 
-`app/Actions/LineWebhook.php` を作成します。
+Create `app/Actions/LineWebhook.php`:
 
 ```php
 <?php
@@ -181,7 +181,7 @@ class LineWebhook implements WebhookHandler
 }
 ```
 
-`AppServiceProvider@register` でシングルトンとして登録します。
+Register it as a singleton in `AppServiceProvider@register`:
 
 ```php
 use App\Actions\LineWebhook;
@@ -193,21 +193,21 @@ public function register(): void
 }
 ```
 
-### デフォルトルートのミドルウェア
+### Default route middleware
 
-デフォルトで `throttle` ミドルウェアが有効です。`.env` で変更できます。
+The `throttle` middleware is enabled by default. Configure it via `.env`:
 
 ```dotenv
-# 無効にする
+# Disable throttle
 LINE_BOT_WEBHOOK_MIDDLEWARE=null
 
-# throttle 設定を変更する
+# Change throttle settings
 LINE_BOT_WEBHOOK_MIDDLEWARE=throttle:120,1
 ```
 
 ### Http::line()
 
-パッケージは `Http` クラスを拡張しているため、`Bot` Facade を使わず直接APIリクエストを送ることもできます。
+The package extends the `Http` class, so you can make LINE API requests directly without using the `Bot` Facade.
 
 ```php
 use Illuminate\Support\Facades\Http;
@@ -218,5 +218,5 @@ $response = Http::line()->post('/v2/bot/channel/webhook/test', [
 ```
 
 <Info>
-  最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-line-sdk) を参照してください。
+  For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-line-sdk).
 </Info>

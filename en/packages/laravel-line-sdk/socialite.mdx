@@ -1,0 +1,119 @@
+---
+title: "Socialite (LINE Login) - LINE SDK for Laravel"
+description: "OAuth2 authentication with LINE Login using Laravel Socialite."
+sidebarTitle: "Socialite (LINE Login)"
+---
+
+## Overview
+
+This package provides a LINE Login driver using the standard `Socialite::extend()` approach. It works with the same API as any built-in Socialite provider.
+
+Available drivers:
+
+| Driver | Description |
+| --- | --- |
+| `line-login` | OAuth2 authentication via [LINE Login](https://developers.line.biz/en/docs/line-login/) |
+
+<Info>
+  For general Socialite usage, see the [Socialite guide](/en/socialite).
+</Info>
+
+## Configuration
+
+### .env
+
+```dotenv
+LINE_LOGIN_CLIENT_ID=
+LINE_LOGIN_CLIENT_SECRET=
+LINE_LOGIN_REDIRECT=
+```
+
+## Basic usage
+
+<Steps>
+  <Step title="Define routes">
+    Add redirect and callback routes to `routes/web.php`.
+
+    ```php
+    use App\Http\Controllers\SocialiteController;
+
+    Route::get('login', [SocialiteController::class, 'login']);
+    Route::get('callback', [SocialiteController::class, 'callback']);
+    ```
+  </Step>
+  <Step title="Create a controller">
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use App\Models\User;
+    use Illuminate\Http\Request;
+    use Laravel\Socialite\Facades\Socialite;
+
+    class SocialiteController extends Controller
+    {
+        public function login()
+        {
+            return Socialite::driver('line-login')->redirect();
+        }
+
+        public function callback(Request $request)
+        {
+            if ($request->missing('code')) {
+                return redirect('/login')->withErrors('Authentication was cancelled.');
+            }
+
+            /** @var \Laravel\Socialite\Two\User */
+            $user = Socialite::driver('line-login')->user();
+
+            $loginUser = User::updateOrCreate([
+                'line_id' => $user->id,
+            ], [
+                'name'          => $user->nickname,
+                'avatar'        => $user->avatar,
+                'access_token'  => $user->token,
+                'refresh_token' => $user->refreshToken,
+            ]);
+
+            auth()->login($loginUser, true);
+
+            return redirect()->route('home');
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Optional parameters
+
+Pass additional parameters with `with()`.
+
+```php
+public function login()
+{
+    return Socialite::driver('line-login')->with([
+        'prompt'     => 'consent',
+        'bot_prompt' => 'normal',
+    ])->redirect();
+}
+```
+
+## Scopes
+
+Specify the permissions you want with scopes.
+
+```php
+public function login()
+{
+    return Socialite::driver('line-login')
+                    ->setScopes(['profile', 'openid'])
+                    ->redirect();
+}
+```
+
+See [LINE Login scopes](https://developers.line.biz/en/docs/line-login/integrate-line-login/#scopes) for the full list.
+
+<Info>
+  For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-line-sdk).
+</Info>

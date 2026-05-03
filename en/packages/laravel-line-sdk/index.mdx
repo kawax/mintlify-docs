@@ -1,0 +1,114 @@
+---
+title: "LINE SDK for Laravel"
+description: "A Laravel package wrapping the official LINE SDK. Provides Webhook, Bot, Notifications, and Socialite (LINE Login) in one package."
+sidebarTitle: "Overview"
+---
+
+## Overview
+
+[revolution/laravel-line-sdk](https://github.com/invokable/laravel-line-sdk) makes the official LINE SDK easy to use in Laravel applications.
+
+It provides four features: Webhook handling, Bot Facade, Laravel Notifications integration, and LINE Login via Socialite.
+
+<Info>
+  This package requires PHP 8.3 or higher and Laravel 12.0 or higher.
+</Info>
+
+## Installation
+
+```shell
+composer require revolution/laravel-line-sdk
+```
+
+## Configuration
+
+### LINE Developers console
+
+Create channels in the [LINE Developers console](https://developers.line.biz/).
+
+<Info>
+  You can no longer create a Messaging API channel directly from the LINE Developers Console. First create a LINE Official Account using the [LINE Official Account Manager](https://manager.line.biz/), then enable Messaging API from the account manager.
+</Info>
+
+Create two channels:
+
+| Channel | What to get |
+| --- | --- |
+| **Messaging API** | Channel access token (long-lived), Channel secret |
+| **LINE Login** | Channel ID, Channel secret |
+
+### .env
+
+```dotenv
+LINE_BOT_CHANNEL_TOKEN=
+LINE_BOT_CHANNEL_SECRET=
+
+LINE_LOGIN_CLIENT_ID=
+LINE_LOGIN_CLIENT_SECRET=
+LINE_LOGIN_REDIRECT=
+```
+
+### Publish config (optional)
+
+```shell
+php artisan vendor:publish --tag=line-config
+```
+
+## Quick start
+
+The fastest path to a working bot.
+
+<Steps>
+  <Step title="Create a new Laravel project">
+    ```shell
+    laravel new line-bot
+    cd ./line-bot
+    composer require revolution/laravel-line-sdk
+    ```
+  </Step>
+  <Step title="Configure .env">
+    ```dotenv
+    LINE_BOT_CHANNEL_TOKEN=
+    LINE_BOT_CHANNEL_SECRET=
+    ```
+  </Step>
+  <Step title="Publish the default Listener">
+    ```shell
+    php artisan vendor:publish --tag=line-listeners
+    ```
+
+    This generates `MessageListener` in `app/Listeners/Line/`.
+  </Step>
+  <Step title="Deploy to a web server">
+    LINE requires a publicly accessible URL to deliver webhooks. Local servers are not supported.
+
+    Set the Webhook URL in the LINE Developers console:
+
+    ```
+    https://example.com/line/webhook
+    ```
+  </Step>
+  <Step title="Add the bot as a friend and test it">
+    Use the QR code from the Messaging API channel to add the bot. Send a message and `MessageListener` will echo it back.
+  </Step>
+</Steps>
+
+## Documentation
+
+<Columns cols={2}>
+  <Card title="Webhook / Bot" href="/en/packages/laravel-line-sdk/bot" icon="webhook">
+    Webhook routing and Bot Facade for sending and receiving messages.
+  </Card>
+  <Card title="Notifications" href="/en/packages/laravel-line-sdk/notification" icon="bell">
+    Send LINE messages through the Laravel Notification System.
+  </Card>
+  <Card title="Socialite (LINE Login)" href="/en/packages/laravel-line-sdk/socialite" icon="shield-check">
+    OAuth2 authentication with LINE Login via Socialite.
+  </Card>
+</Columns>
+
+## Links
+
+- GitHub: [invokable/laravel-line-sdk](https://github.com/invokable/laravel-line-sdk)
+- Demo: [invokable/laravel-line-project](https://github.com/invokable/laravel-line-project)
+- DeepWiki: [invokable/laravel-line-sdk](https://deepwiki.com/invokable/laravel-line-sdk)
