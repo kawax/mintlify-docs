@@ -191,7 +191,7 @@ class LineWebhook implements WebhookHandler
 }
 ```
 
-Register it as a singleton in `AppServiceProvider@register`:
+Register it in `AppServiceProvider@register`:
 
 ```php
 use App\Actions\LineWebhook;
@@ -199,7 +199,7 @@ use Revolution\Line\Contracts\WebhookHandler;
 
 public function register(): void
 {
-    $this->app->singleton(WebhookHandler::class, LineWebhook::class);
+    $this->app->scoped(WebhookHandler::class, LineWebhook::class);
 }
 ```
 
