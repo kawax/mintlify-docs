@@ -61,7 +61,8 @@ LINE_LOGIN_REDIRECT=
         public function callback(Request $request)
         {
             if ($request->missing('code')) {
-                dd($request);
+                // デバッグ用。本番環境ではリダイレクトやエラー処理に変更してください
+                return redirect('/login')->withErrors('認証がキャンセルされました。');
             }
 
             /** @var \Laravel\Socialite\Two\User */
