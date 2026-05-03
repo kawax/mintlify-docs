@@ -1,0 +1,541 @@
+---
+title: "旧構造から新構造への移行ガイド"
+description: "Laravel 10の旧アプリ構造からLaravel 11以降のSlim Application Skeletonへ移行する手順を解説します。"
+sidebarTitle: "移行ガイド"
+---
+
+## はじめに
+
+このガイドでは、Laravel 10 以前の旧アプリケーション構造（`Kernel` クラスや複数のサービスプロバイダーを持つ構造）から、Laravel 11 以降の Slim Application Skeleton へ移行する手順を解説します。
+
+<Warning>
+  **公式ドキュメントはこの移行を推奨していません。**
+
+  - Laravel 10 の旧構造は Laravel 11 以降でも**そのまま動作**します。Laravel 13 を含む現在のバージョンに至るまで、サポート終了の予定はありません。
+  - 移行は**完全に任意**です。強制でも推奨でもありません。
+  - 旧構造と新構造の違いを深く理解していない場合は、移行を避けることを強くお勧めします。フレームワーク内部に精通した開発者向けの作業です。
+  - 移行前に**必ずバックアップを取り**、テストが全て通ることを確認してください。
+</Warning>
+
+## 移行が必要になる場面
+
+以下のような場合に移行を検討することがあります。
+
+- 新規参加メンバーが公式ドキュメントと照合しやすいように、プロジェクトを最新の標準構造に合わせたい
+- Laravel 11 以降で新規作成したパッケージやスターターキットとの整合性を保ちたい
+- 旧構造由来の設定ファイルやクラスを減らし、コードベースをシンプルにしたい
+
+## 前提条件
+
+このガイドでは、以下の状態を前提とします。
+
+- **Laravel バージョンアップが完了している**（`laravel/framework ^11.0` 以降）
+- 既存のテストがすべて通っている
+- Laravel 11 以降のアプリケーション構造（[Laravel 11 以降のアプリケーション構造](/jp/advanced/app-structure)を参照）を理解している
+
+## 移行例
+
+Laravel 10 + Breeze（Blade スタック）で作成したプロジェクトを Breeze のまま維持しつつ、アプリケーション構造だけを新構造へ移行する手順を示します。
+
+<Steps>
+  <Step title="bootstrap/app.php を置き換える">
+    旧 `bootstrap/app.php` は `$app` インスタンスを生成してカーネルを登録する形式でした。これを `Application::configure()` チェーンに置き換えます。
+
+    **旧（Laravel 10）:**
+
+    ```php
+    <?php
+
+    $app = new Illuminate\Foundation\Application(
+        $_ENV['APP_BASE_PATH'] ?? dirname(__DIR__)
+    );
+
+    $app->singleton(
+        Illuminate\Contracts\Http\Kernel::class,
+        App\Http\Kernel::class
+    );
+
+    $app->singleton(
+        Illuminate\Contracts\Console\Kernel::class,
+        App\Console\Kernel::class
+    );
+
+    $app->singleton(
+        Illuminate\Contracts\Debug\ExceptionHandler::class,
+        App\Exceptions\Handler::class
+    );
+
+    return $app;
+    ```
+
+    **新（Laravel 11 以降）:**
+
+    ```php
+    <?php
+
+    use Illuminate\Foundation\Application;
+    use Illuminate\Foundation\Configuration\Exceptions;
+    use Illuminate\Foundation\Configuration\Middleware;
+
+    return Application::configure(basePath: dirname(__DIR__))
+        ->withRouting(
+            web: __DIR__.'/../routes/web.php',
+            commands: __DIR__.'/../routes/console.php',
+            health: '/up',
+        )
+        ->withMiddleware(function (Middleware $middleware) {
+            //
+        })
+        ->withExceptions(function (Exceptions $exceptions) {
+            //
+        })->create();
+    ```
+
+    <Info>
+      `withMiddleware()` と `withExceptions()` のコールバックは、次のステップで削除するカーネルファイルの設定を移植する場所です。まずは空のままにして、後続のステップで追記します。
+    </Info>
+  </Step>
+
+  <Step title="HTTP カーネル（app/Http/Kernel.php）を削除する">
+    `app/Http/Kernel.php` にはグローバルミドルウェア、ミドルウェアグループ、ミドルウェアエイリアスが定義されていました。
+
+    **旧（app/Http/Kernel.php）:**
+
+    ```php
+    <?php
+
+    namespace App\Http;
+
+    use Illuminate\Foundation\Http\Kernel as HttpKernel;
+
+    class Kernel extends HttpKernel
+    {
+        protected $middleware = [
+            \App\Http\Middleware\TrustProxies::class,
+            \Illuminate\Http\Middleware\HandleCors::class,
+            \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
+            \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
+            \App\Http\Middleware\TrimStrings::class,
+            \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
+        ];
+
+        protected $middlewareGroups = [
+            'web' => [
+                \App\Http\Middleware\EncryptCookies::class,
+                \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+                \Illuminate\Session\Middleware\StartSession::class,
+                \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+                \App\Http\Middleware\VerifyCsrfToken::class,
+                \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            ],
+            'api' => [
+                \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+                \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            ],
+        ];
+
+        protected $middlewareAliases = [
+            'auth' => \App\Http\Middleware\Authenticate::class,
+            // ...
+        ];
+    }
+    ```
+
+    Laravel 11 では、上記のミドルウェアはフレームワーク内部にデフォルト値として組み込まれています。カスタマイズが**ない**場合は、`app/Http/Kernel.php` をそのまま削除できます。
+
+    **カスタマイズがある場合**（独自ミドルウェアを追加・除外している場合）は、`bootstrap/app.php` の `withMiddleware()` に移植してから削除してください。
+
+    ```php
+    ->withMiddleware(function (Middleware $middleware) {
+        // グローバルミドルウェアの追加
+        $middleware->append(\App\Http\Middleware\MyCustomMiddleware::class);
+
+        // web グループにミドルウェアを追加
+        $middleware->web(append: [
+            \App\Http\Middleware\HandleInertiaRequests::class,
+        ]);
+
+        // ミドルウェアエイリアスの追加
+        $middleware->alias([
+            'role' => \App\Http\Middleware\CheckRole::class,
+        ]);
+    })
+    ```
+
+    移植が完了したら `app/Http/Kernel.php` を削除します。
+
+    <Info>
+      Laravel 11 では `TrustProxies`、`EncryptCookies`、`VerifyCsrfToken` などのデフォルトミドルウェアクラスも `app/Http/Middleware/` から削除できます。フレームワーク側に内蔵されているため、カスタマイズが不要ならファイル自体が不要になります。
+    </Info>
+  </Step>
+
+  <Step title="コンソールカーネル（app/Console/Kernel.php）を削除する">
+    `app/Console/Kernel.php` はスケジュールの定義とコマンドの自動ロードを担っていました。
+
+    **旧（app/Console/Kernel.php）:**
+
+    ```php
+    <?php
+
+    namespace App\Console;
+
+    use Illuminate\Console\Scheduling\Schedule;
+    use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+
+    class Kernel extends ConsoleKernel
+    {
+        protected function schedule(Schedule $schedule): void
+        {
+            // $schedule->command('inspire')->hourly();
+        }
+
+        protected function commands(): void
+        {
+            $this->load(__DIR__.'/Commands');
+            require base_path('routes/console.php');
+        }
+    }
+    ```
+
+    **コマンドの自動ロード**は Laravel 11 以降では `app/Console/Commands/` ディレクトリが自動的にスキャンされるため、`$this->load()` の記述は不要になりました。
+
+    **スケジュールの定義**は `routes/console.php` または `AppServiceProvider::boot()` に移行します。
+
+    ```php
+    // routes/console.php（Laravel 11 以降）
+    use Illuminate\Support\Facades\Schedule;
+
+    Schedule::command('emails:send')->daily();
+    ```
+
+    移行後に `app/Console/Kernel.php` を削除します。
+
+    <Info>
+      `app/Console/` ディレクトリ内のカスタム Artisan コマンドファイルは削除しないでください。コマンドファイルはそのまま残し、カーネルクラスのファイルだけを削除します。
+    </Info>
+  </Step>
+
+  <Step title="例外ハンドラー（app/Exceptions/Handler.php）を削除する">
+    `app/Exceptions/Handler.php` は例外レポートとレンダリングの設定を担っていました。
+
+    **旧（app/Exceptions/Handler.php）:**
+
+    ```php
+    <?php
+
+    namespace App\Exceptions;
+
+    use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+    use Throwable;
+
+    class Handler extends ExceptionHandler
+    {
+        protected $dontFlash = [
+            'current_password',
+            'password',
+            'password_confirmation',
+        ];
+
+        public function register(): void
+        {
+            $this->reportable(function (Throwable $e) {
+                //
+            });
+        }
+    }
+    ```
+
+    カスタマイズがある場合は `bootstrap/app.php` の `withExceptions()` に移植してから削除します。
+
+    ```php
+    use Throwable;
+    use Illuminate\Http\Request;
+
+    ->withExceptions(function (Exceptions $exceptions) {
+        // 例外レポートのカスタマイズ
+        $exceptions->report(function (Throwable $e) {
+            // ...
+        });
+
+        // 例外レンダリングのカスタマイズ
+        $exceptions->render(function (\App\Exceptions\InvalidOrderException $e, Request $request) {
+            return response()->view('errors.invalid-order', status: 500);
+        });
+    })
+    ```
+
+    `$dontFlash` に独自の項目を追加していた場合は同様に移植できます。
+
+    ```php
+    ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->dontFlash([
+            'my_sensitive_field',
+        ]);
+    })
+    ```
+
+    移植が完了したら `app/Exceptions/Handler.php` を削除します。
+  </Step>
+
+  <Step title="RouteServiceProvider を削除してルート登録を移行する">
+    `app/Providers/RouteServiceProvider.php` はルートファイルのロードとレート制限の設定を行っていました。
+
+    **旧（app/Providers/RouteServiceProvider.php）:**
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use Illuminate\Cache\RateLimiting\Limit;
+    use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\RateLimiter;
+    use Illuminate\Support\Facades\Route;
+
+    class RouteServiceProvider extends ServiceProvider
+    {
+        public const HOME = '/home';
+
+        public function boot(): void
+        {
+            RateLimiter::for('api', function (Request $request) {
+                return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+            });
+
+            $this->routes(function () {
+                Route::middleware('api')
+                    ->prefix('api')
+                    ->group(base_path('routes/api.php'));
+
+                Route::middleware('web')
+                    ->group(base_path('routes/web.php'));
+            });
+        }
+    }
+    ```
+
+    **ルートファイルの登録**を `bootstrap/app.php` の `withRouting()` に移行します。
+
+    ```php
+    ->withRouting(
+        web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',      // API ルートを使う場合
+        commands: __DIR__.'/../routes/console.php',
+        health: '/up',
+    )
+    ```
+
+    **レート制限**は `AppServiceProvider::boot()` に移行します。
+
+    ```php
+    // app/Providers/AppServiceProvider.php
+    use Illuminate\Cache\RateLimiting\Limit;
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\RateLimiter;
+
+    public function boot(): void
+    {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+    }
+    ```
+
+    `HOME` 定数を使っている箇所がある場合は、直接 URL 文字列に置き換えるか、`AppServiceProvider` に定数を移動してください。
+
+    移行後に `app/Providers/RouteServiceProvider.php` を削除します。
+  </Step>
+
+  <Step title="サービスプロバイダーを整理する">
+    Laravel 10 ではデフォルトで 5 つのサービスプロバイダーが用意されていました。これらを `AppServiceProvider.php` 1 つに統合します。
+
+    **削除するプロバイダー（内容を AppServiceProvider に移してから削除）:**
+
+    | ファイル | 移行先 |
+    |---|---|
+    | `app/Providers/AuthServiceProvider.php` | `AppServiceProvider::boot()` の `Gate::policy()` 等 |
+    | `app/Providers/BroadcastServiceProvider.php` | Broadcasting を使う場合は `bootstrap/app.php` の `withBroadcasting()` |
+    | `app/Providers/EventServiceProvider.php` | `AppServiceProvider::boot()` の `Event::listen()` 等 |
+    | `app/Providers/RouteServiceProvider.php` | 前のステップで対応済み |
+
+    **旧（app/Providers/AuthServiceProvider.php）の内容を移行する例:**
+
+    ```php
+    // 旧: app/Providers/AuthServiceProvider.php
+    use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+    class AuthServiceProvider extends ServiceProvider
+    {
+        protected $policies = [
+            Post::class => PostPolicy::class,
+        ];
+
+        public function boot(): void
+        {
+            $this->registerPolicies();
+        }
+    }
+    ```
+
+    ```php
+    // 新: app/Providers/AppServiceProvider.php
+    use Illuminate\Support\Facades\Gate;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            Gate::policy(Post::class, PostPolicy::class);
+        }
+    }
+    ```
+
+    不要になったプロバイダーファイルを削除したら、`config/app.php` の `providers` 配列から参照を削除します。
+
+    ```php
+    // config/app.php の providers 配列
+    'providers' => ServiceProvider::defaultProviders()->merge([
+        App\Providers\AppServiceProvider::class,
+        // 削除したプロバイダーのエントリも削除
+        // App\Providers\AuthServiceProvider::class,  // 削除
+        // App\Providers\EventServiceProvider::class,  // 削除
+        // App\Providers\RouteServiceProvider::class,  // 削除
+    ])->toArray(),
+    ```
+
+    さらに、`bootstrap/providers.php` を作成して新構造に対応します。
+
+    ```php
+    <?php
+
+    // bootstrap/providers.php
+    return [
+        App\Providers\AppServiceProvider::class,
+    ];
+    ```
+
+    <Info>
+      `bootstrap/providers.php` が存在する場合、Laravel はこちらをプロバイダー一覧として優先して読み込みます。`config/app.php` の `providers` 配列は不要になりますが、後方互換のために残しておいても問題ありません。
+    </Info>
+  </Step>
+
+  <Step title="コントローラーベースクラスを更新する">
+    Laravel 10 の `Controller` ベースクラスは `AuthorizesRequests` と `ValidatesRequests` トレイトを使用していました。Laravel 11 の新しいベースクラスはこれらのトレイトを持たないシンプルな抽象クラスです。
+
+    **旧（Laravel 10）:**
+
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+    use Illuminate\Foundation\Validation\ValidatesRequests;
+    use Illuminate\Routing\Controller as BaseController;
+
+    class Controller extends BaseController
+    {
+        use AuthorizesRequests, ValidatesRequests;
+    }
+    ```
+
+    **新（Laravel 11 以降）:**
+
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    abstract class Controller
+    {
+        //
+    }
+    ```
+
+    トレイトが提供していた機能は次のように置き換えます。
+
+    | 旧の方法（トレイト経由） | 新の方法 |
+    |---|---|
+    | `$this->validate($request, $rules)` | `$request->validate($rules)` |
+    | `$this->authorize('update', $post)` | `Gate::authorize('update', $post)` |
+    | `$this->authorizeResource(Post::class)` | コンストラクターで `Gate::authorize()` |
+
+    既存のコントローラーがトレイトのメソッドを使っている場合は、各コントローラーを修正するか、トレイトを `Controller` ベースクラスに残すかを選択できます。一度にすべてを変更しなくても動作はします。
+
+    <Warning>
+      Breeze や Jetstream が生成した認証コントローラーが `$this->validate()` や `$this->authorize()` を呼び出している場合は、ベースクラスを変更する前に必ず動作確認してください。
+    </Warning>
+  </Step>
+
+  <Step title="動作確認">
+    移行が完了したら、以下の順序で動作確認を行います。
+
+    ```shell
+    # 設定キャッシュのクリア
+    php artisan config:clear
+    php artisan route:clear
+    php artisan cache:clear
+
+    # ルートが正しく登録されているか確認
+    php artisan route:list
+
+    # テストを実行
+    php artisan test
+    ```
+
+    問題が発生した場合は、削除したファイルをバックアップから復元し、エラーメッセージを確認してください。
+  </Step>
+</Steps>
+
+## 移行後のファイル構成
+
+移行後のプロジェクトは、以下のような構成になります（旧構造からの変更点を示す）。
+
+```
+app/
+├── Console/
+│   └── Commands/          ← カスタムコマンドはそのまま残す
+│   （Kernel.php は削除）
+├── Exceptions/
+│   （Handler.php は削除）
+├── Http/
+│   ├── Controllers/
+│   │   └── Controller.php ← シンプルな抽象クラスに変更
+│   └── Middleware/        ← カスタムミドルウェアはそのまま残す
+│   （Kernel.php は削除）
+├── Models/
+└── Providers/
+    └── AppServiceProvider.php ← 1 ファイルに統合
+    （AuthServiceProvider.php は削除）
+    （BroadcastServiceProvider.php は削除）
+    （EventServiceProvider.php は削除）
+    （RouteServiceProvider.php は削除）
+bootstrap/
+├── app.php                ← Application::configure() 形式に置き換え
+└── providers.php          ← 新規作成
+routes/
+├── web.php
+├── api.php                ← 必要な場合のみ
+└── console.php            ← スケジュール定義もここに
+```
+
+## まとめ
+
+| 移行内容 | 旧の場所 | 新の場所 |
+|---|---|---|
+| HTTP ミドルウェア | `app/Http/Kernel.php` | `bootstrap/app.php` の `withMiddleware()` |
+| 例外ハンドリング | `app/Exceptions/Handler.php` | `bootstrap/app.php` の `withExceptions()` |
+| スケジュール定義 | `app/Console/Kernel.php` | `routes/console.php` |
+| ルート登録 | `app/Providers/RouteServiceProvider.php` | `bootstrap/app.php` の `withRouting()` |
+| サービスプロバイダー一覧 | `config/app.php` の `providers` 配列 | `bootstrap/providers.php` |
+| ポリシー登録 | `app/Providers/AuthServiceProvider.php` | `AppServiceProvider::boot()` |
+| イベントリスナー | `app/Providers/EventServiceProvider.php` | `AppServiceProvider::boot()` |
+
+## 参考リンク
+
+- [Laravel 11 以降のアプリケーション構造](/jp/advanced/app-structure)
+- [公式アップグレードガイド（11.x）](https://github.com/laravel/docs/blob/11.x/upgrade.md)
+- [laravel/laravel リポジトリ 10.x → 11.x 差分](https://github.com/laravel/laravel/compare/10.x...11.x)
+- [Laravel 10 の Controller.php](https://github.com/laravel/laravel/blob/10.x/app/Http/Controllers/Controller.php)
+- [Laravel 11 の Controller.php](https://github.com/laravel/laravel/blob/11.x/app/Http/Controllers/Controller.php)
