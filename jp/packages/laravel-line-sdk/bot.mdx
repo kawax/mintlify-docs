@@ -11,10 +11,10 @@ sidebarTitle: "Webhook / Bot"
 ```mermaid
 flowchart TD
     A["ユーザーがメッセージを送信"] --> B["LINEがWebhookで送信"]
-    B --> C["`line.webhook` ルートで受信"]
-    C --> D["`ValidateSignature` ミドルウェアで検証"]
-    D --> E["`WebhookController`"]
-    E --> F["`WebhookEventDispatcher` から<br>Laravelイベントをディスパッチ"]
+    B --> C["line.webhook ルートで受信"]
+    C --> D["ValidateSignature ミドルウェアで検証"]
+    D --> E["WebhookController"]
+    E --> F["WebhookEventDispatcher から<br>Laravelイベントをディスパッチ"]
     F --> G["イベントリスナーで返信"]
 ```
 

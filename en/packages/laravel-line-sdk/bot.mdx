@@ -11,10 +11,10 @@ The package includes Webhook routing and a controller out of the box.
 ```mermaid
 flowchart TD
     A["User sends a message"] --> B["LINE sends via Webhook"]
-    B --> C["`line.webhook` route receives the request"]
-    C --> D["`ValidateSignature` middleware validates the signature"]
-    D --> E["`WebhookController`"]
-    E --> F["`WebhookEventDispatcher` dispatches<br>a Laravel event"]
+    B --> C["line.webhook route receives the request"]
+    C --> D["ValidateSignature middleware validates the signature"]
+    D --> E["WebhookController"]
+    E --> F["WebhookEventDispatcher dispatches<br>a Laravel event"]
     F --> G["Event listener replies"]
 ```
 
