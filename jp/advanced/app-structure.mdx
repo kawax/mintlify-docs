@@ -658,7 +658,7 @@ class AppServiceProvider extends ServiceProvider
 ```php
 // bootstrap/app.php
 
-use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Contracts\Http\Kernel;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(...)
