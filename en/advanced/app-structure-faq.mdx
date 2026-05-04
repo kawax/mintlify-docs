@@ -1,0 +1,396 @@
+---
+title: "Laravel 11+ New Application Structure FAQ"
+description: "Common questions and answers when working with the Slim Application Skeleton introduced in Laravel 11. Aimed at developers joining a project mid-way or learning from older books and tutorials."
+sidebarTitle: "New App Structure FAQ"
+---
+
+Laravel 11 introduced the "Slim Application Skeleton," which significantly changed the application structure. This FAQ covers points that can be confusing when you join a project that has already been upgraded, or when you learned Laravel from books and tutorials written for Laravel 10 or earlier. These are questions frequently asked on Laracasts forums and Stack Overflow around the time Laravel 11 was released.
+
+<Info>
+  This FAQ targets **new projects** (Laravel 11 and later). For upgrading an existing project, see the [Migration Guide](/en/advanced/app-structure-migration).
+</Info>
+
+<AccordionGroup>
+
+  <Accordion title="Few config files exist">
+    In the new structure, config files that are rarely changed have been removed from the project. The framework's own `config/` directory is used for those files.
+
+    The project-side `config/` and the framework-side `config/` are merged, with **the project side taking precedence**. You can create a file at any point when customization is needed and it will be picked up.
+
+    ```bash
+    # Inspect a config file inside the framework
+    cat vendor/laravel/framework/config/cors.php
+
+    # Copy it to the project side to customize
+    php artisan config:publish cors
+    ```
+  </Accordion>
+
+  <Accordion title="$this->validate() / $this->authorize() not available in controllers">
+    In the new structure, `App\Http\Controllers\Controller` is an empty class — it does not extend `Illuminate\Routing\Controller` and does not use the `ValidatesRequests` or `AuthorizesRequests` traits.
+
+    | Laravel 10 | Laravel 11 |
+    |---|---|
+    | Extends `Illuminate\Routing\Controller` | Empty class |
+    | Uses `ValidatesRequests` trait | None |
+    | Uses `AuthorizesRequests` trait | None |
+
+    Reference: [Laravel 10 Controller](https://github.com/laravel/laravel/blob/10.x/app/Http/Controllers/Controller.php) vs [Laravel 11 Controller](https://github.com/laravel/laravel/blob/11.x/app/Http/Controllers/Controller.php)
+
+    **Alternative approaches:**
+
+    ```php
+    // Use $request->validate() instead
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+        ]);
+    }
+
+    // Use Gate::authorize() instead
+    use Illuminate\Support\Facades\Gate;
+
+    public function update(Request $request, Post $post)
+    {
+        Gate::authorize('update', $post);
+    }
+    ```
+
+    If you use these frequently, you can restore `App\Http\Controllers\Controller` to the Laravel 10 style:
+
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+    use Illuminate\Foundation\Validation\ValidatesRequests;
+    use Illuminate\Routing\Controller as BaseController;
+
+    abstract class Controller extends BaseController
+    {
+        use AuthorizesRequests, ValidatesRequests;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="app/Http/Middleware and app/Http/Kernel.php missing — middleware configuration">
+    In the new structure, `app/Http/Kernel.php` has been removed. Middleware configuration is now done via `withMiddleware()` in `bootstrap/app.php`.
+
+    ```php
+    // bootstrap/app.php
+    ->withMiddleware(function (Middleware $middleware) {
+        // Settings previously configured in TrustProxies middleware
+        // are now available as methods on the Middleware class
+        $middleware->trustProxies(at: '*');
+
+        // Add a global middleware
+        $middleware->append(\App\Http\Middleware\MyMiddleware::class);
+
+        // Set a route alias
+        $middleware->alias([
+            'my-middleware' => \App\Http\Middleware\MyMiddleware::class,
+        ]);
+
+        // Customize the web / api middleware group
+        $middleware->web(append: [
+            \App\Http\Middleware\HandleInertiaRequests::class,
+        ]);
+    })
+    ```
+
+    Custom middleware files themselves are still created in `app/Http/Middleware/`.
+  </Accordion>
+
+  <Accordion title="$this->middleware() not available in controllers">
+    `$this->middleware()` is a feature of `Illuminate\Routing\Controller`. It is not available in the new structure's empty base controller.
+
+    Instead, implement the `HasMiddleware` interface and define a `middleware()` method:
+
+    ```php
+    use Illuminate\Routing\Controllers\HasMiddleware;
+    use Illuminate\Routing\Controllers\Middleware;
+
+    class UserController extends Controller implements HasMiddleware
+    {
+        public static function middleware(): array
+        {
+            return [
+                'auth',
+                new Middleware('log', only: ['index']),
+                new Middleware('subscribed', except: ['index']),
+            ];
+        }
+    }
+    ```
+
+    In Laravel 13 and later, you can also use the `#[Middleware]` attribute:
+
+    ```php
+    use Illuminate\Routing\Controllers\HasMiddleware;
+    use App\Http\Middleware\EnsureTokenIsValid;
+
+    #[Middleware(EnsureTokenIsValid::class)]
+    class UserController extends Controller
+    {
+        // ...
+    }
+    ```
+
+    Reference: [Controller middleware](https://laravel.com/docs/13.x/controllers#controller-middleware)
+  </Accordion>
+
+  <Accordion title="$this->authorizeResource() not available">
+    `authorizeResource()` depends on the `AuthorizesRequests` trait, which is not included in the new structure's empty base controller.
+
+    **There are several ways to address this.**
+
+    **1. Restore the base controller to the Laravel 10 style (easiest)**
+
+    ```php
+    // app/Http/Controllers/Controller.php
+    use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+    use Illuminate\Routing\Controller as BaseController;
+
+    abstract class Controller extends BaseController
+    {
+        use AuthorizesRequests;
+    }
+    ```
+
+    This makes `$this->authorizeResource()` available again.
+
+    **2. Use the `#[Authorize]` attribute on each method (Laravel 13+)**
+
+    ```php
+    use Illuminate\Routing\Attributes\Controllers\Authorize;
+    use App\Models\Post;
+
+    class PostController extends Controller
+    {
+        #[Authorize('view', 'post')]
+        public function show(Post $post) { /* ... */ }
+
+        #[Authorize('update', 'post')]
+        public function update(Request $request, Post $post) { /* ... */ }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="app/Console/Kernel.php missing — schedule configuration">
+    In the new structure, `app/Console/Kernel.php` has been removed. The location for defining scheduled tasks has changed.
+
+    **Define schedules in `routes/console.php` (recommended):**
+
+    ```php
+    // routes/console.php
+    use Illuminate\Support\Facades\Schedule;
+
+    Schedule::command('emails:send')->daily();
+    Schedule::job(new SendEmails)->everyFiveMinutes();
+    ```
+
+    **Define schedules in `bootstrap/app.php`:**
+
+    ```php
+    ->withSchedule(function (Schedule $schedule) {
+        $schedule->command('emails:send')->daily();
+    })
+    ```
+  </Accordion>
+
+  <Accordion title="How to register events and listeners">
+    In the new structure, `EventServiceProvider` has been removed, and manual event and listener registration is no longer required.
+
+    **Auto-discovery:** Declare the event class as a type hint on the `handle()` method of your listener class, and it will be registered automatically.
+
+    ```php
+    namespace App\Listeners;
+
+    use App\Events\OrderShipped;
+
+    class SendShipmentNotification
+    {
+        // Type-hint the event class in handle() — registration is automatic
+        public function handle(OrderShipped $event): void
+        {
+            // ...
+        }
+    }
+    ```
+
+    If you need to register manually, do it in `AppServiceProvider::boot()`:
+
+    ```php
+    use Illuminate\Support\Facades\Event;
+
+    public function boot(): void
+    {
+        Event::listen(
+            OrderShipped::class,
+            SendShipmentNotification::class,
+        );
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="How to add service providers (no providers key in config/app.php)">
+    In the new structure, the list of service providers moved from `config/app.php` to `bootstrap/providers.php`.
+
+    ```php
+    // bootstrap/providers.php
+    return [
+        App\Providers\AppServiceProvider::class,
+        App\Providers\MyCustomServiceProvider::class, // ← add here
+    ];
+    ```
+
+    Providers created with `artisan make:provider` are automatically added to this file.
+  </Accordion>
+
+  <Accordion title="app/Exceptions/Handler.php missing">
+    In the new structure, `app/Exceptions/Handler.php` has been removed. Exception handling is now configured via `withExceptions()` in `bootstrap/app.php`.
+
+    ```php
+    // bootstrap/app.php
+    ->withExceptions(function (Exceptions $exceptions) {
+        // Do not report a specific exception
+        $exceptions->dontReport(InvalidOrderException::class);
+
+        // Custom rendering
+        $exceptions->render(function (InvalidOrderException $e, Request $request) {
+            return response()->view('errors.invalid-order', status: 500);
+        });
+
+        // Decide when to render JSON responses
+        $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {
+            return $request->is('api/*');
+        });
+    })
+    ```
+  </Accordion>
+
+  <Accordion title="How to customize routing">
+    Route customization is done via `withRouting()` in `bootstrap/app.php`.
+
+    **Adding a route file:**
+
+    ```php
+    ->withRouting(
+        web: __DIR__.'/../routes/web.php',
+        then: function () {
+            Route::middleware('web')
+                ->prefix('admin')
+                ->group(base_path('routes/admin.php'));
+        },
+    )
+    ```
+
+    **Full control (equivalent to Laravel 10's `RouteServiceProvider`):**
+
+    Specifying `using` disables Laravel's default route registration entirely, giving you full control.
+
+    ```php
+    ->withRouting(
+        using: function () {
+            Route::middleware('web')
+                ->group(base_path('routes/web.php'));
+
+            Route::middleware('api')
+                ->prefix('api')
+                ->group(base_path('routes/api.php'));
+        },
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="How to replace a default Laravel ServiceProvider">
+    Add a `providers` key to `config/app.php`. It will be merged with the framework's own `config/app.php` and take effect.
+
+    ```php
+    // config/app.php
+    use Illuminate\Support\ServiceProvider;
+
+    return [
+        // ...
+        'providers' => ServiceProvider::defaultProviders()->replace([
+            Illuminate\Foo\FooServiceProvider::class => Bar\BarServiceProvider::class,
+        ])->toArray(),
+    ];
+    ```
+
+    The `replace()` method lets you swap a default provider with your own implementation.
+  </Accordion>
+
+  <Accordion title="routes/api.php missing">
+    Starting with Laravel 11, API functionality is not included by default — install it separately when you need it.
+
+    ```bash
+    php artisan install:api
+    ```
+
+    This command creates and configures the following:
+
+    - `routes/api.php`
+    - [Laravel Sanctum](https://laravel.com/docs/sanctum) for API authentication
+    - API route registration in `bootstrap/app.php`
+  </Accordion>
+
+  <Accordion title="routes/channels.php missing">
+    Starting with Laravel 11, broadcasting is also not included by default — install it separately when you need it.
+
+    ```bash
+    php artisan install:broadcasting
+    ```
+
+    This command creates and configures the following:
+
+    - `routes/channels.php`
+    - [Laravel Reverb](https://laravel.com/docs/reverb) installation and configuration
+    - Broadcasting configuration file
+  </Accordion>
+
+  <Accordion title="How to determine if a joined project uses old or new structure">
+    Check the contents of `bootstrap/app.php`.
+
+    **Laravel 11+ new structure (or migrated):**
+
+    ```php
+    // bootstrap/app.php
+    return Application::configure(basePath: dirname(__DIR__))
+        ->withRouting(...)
+        ->withMiddleware(...)
+        ->withExceptions(...)
+        ->create();
+    ```
+
+    **Legacy structure upgraded from Laravel 10 or earlier:**
+
+    ```php
+    // bootstrap/app.php
+    $app = new Illuminate\Foundation\Application(
+        $_ENV['APP_BASE_PATH'] ?? dirname(__DIR__)
+    );
+
+    $app->singleton(
+        Illuminate\Contracts\Http\Kernel::class,
+        App\Http\Kernel::class
+    );
+    // ...
+    ```
+
+    If the file starts with `return Application::configure(...`, it uses the new structure. Otherwise, the project was upgraded from the legacy structure. To migrate a legacy project to the new structure, see the [Migration Guide](/en/advanced/app-structure-migration).
+  </Accordion>
+
+</AccordionGroup>
+
+## Related pages
+
+<Card title="Laravel 11+ Application Structure" icon="sitemap" href="/en/advanced/app-structure">
+  A full breakdown of the new application structure and the internals of `ApplicationBuilder`.
+</Card>
+
+<Card title="Migration Guide: Old Structure to Slim Application Skeleton" icon="arrow-right" href="/en/advanced/app-structure-migration">
+  Step-by-step guide to migrating a Laravel 10 application from the legacy structure to the Slim Application Skeleton.
+</Card>

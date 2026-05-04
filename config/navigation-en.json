@@ -218,7 +218,8 @@
           "group": "Application Structure",
           "pages": [
             "en/advanced/app-structure",
-            "en/advanced/app-structure-migration"
+            "en/advanced/app-structure-migration",
+            "en/advanced/app-structure-faq"
           ]
         },
         {
