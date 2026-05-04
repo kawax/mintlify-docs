@@ -1,6 +1,6 @@
 ---
 title: "Laravel Prompts"
-description: "laravel/promptsパッケージを使ってArtisanコマンドに美しい対話型UIを追加する方法を解説します。テキスト入力・選択・検索・プログレスバーなど多彩な関数を紹介します。"
+description: "laravel/promptsパッケージを使ってArtisanコマンドに美しい対話型UIを追加する方法を解説します。テキスト入力・選択・検索・autocomplete・タスクログ・ストリーミング出力など多彩な関数を紹介します。"
 ---
 
 ## はじめに
@@ -272,6 +272,43 @@ use function Laravel\Prompts\pause;
 pause('Press ENTER to continue.');
 ```
 
+### autocomplete — インライン補完
+
+`autocomplete()` はゴーストテキストとして候補を表示するインライン補完関数です。`suggest()` と異なり、ユーザーが入力するたびに一致する候補がゴーストテキストとして表示され、`Tab` キーまたは右矢印キーで補完を確定できます。
+
+```php
+use function Laravel\Prompts\autocomplete;
+
+$name = autocomplete(
+    label: 'What is your name?',
+    options: ['Taylor', 'Dayle', 'Jess', 'Nuno', 'Tim']
+);
+```
+
+プレースホルダー・デフォルト値・ヒントを設定できます。
+
+```php
+$name = autocomplete(
+    label: 'What is your name?',
+    options: ['Taylor', 'Dayle', 'Jess', 'Nuno', 'Tim'],
+    placeholder: 'E.g. Taylor',
+    default: $user?->name,
+    hint: 'Use Tab to accept, up/down to cycle.'
+);
+```
+
+クロージャを渡すと入力内容に応じて動的に候補を生成できます。
+
+```php
+$file = autocomplete(
+    label: 'Which file?',
+    options: fn (string $value) => collect($files)
+        ->filter(fn ($file) => str_starts_with(strtolower($file), strtolower($value)))
+        ->values()
+        ->all(),
+);
+```
+
 ## バリデーション
 
 すべてのプロンプト関数は `validate` 引数でバリデーションを設定できます。
@@ -409,13 +446,128 @@ $progress->finish();
 
 ## タスク
 
-`task()` でラベル付きのタスクを実行し、成功/失敗を視覚的に示せます。
+`task()` はコールバック実行中にスピナーとスクロール可能なライブ出力エリアを表示します。依存関係のインストールやデプロイスクリプトなど長時間実行するプロセスをラップするのに最適で、何が起きているかリアルタイムで確認できます。
 
 ```php
 use function Laravel\Prompts\task;
 
-task('Installing dependencies', fn () => Process::run('composer install')->successful());
+task(
+    label: 'Installing dependencies',
+    callback: function ($logger) {
+        // 長時間実行する処理...
+    }
+);
 ```
+
+コールバックは `Logger` インスタンスを受け取り、ログ行やステータスメッセージをリアルタイムで表示できます。
+
+<Warning>
+  `task()` を使うには `pcntl` PHP拡張が必要です。使用できない環境ではスタティック表示にフォールバックします。
+</Warning>
+
+### ログ行の出力
+
+`line` メソッドでスクロール出力エリアに1行ずつログを書き込みます。
+
+```php
+task(
+    label: 'Installing dependencies',
+    callback: function ($logger) {
+        $logger->line('Resolving packages...');
+        $logger->line('Downloading laravel/framework');
+    }
+);
+```
+
+### ステータスメッセージ
+
+`success`・`warning`・`error` を使うと、スクロールログエリアの上部に固定されたハイライト付きメッセージを表示できます。
+
+```php
+task(
+    label: 'Deploying application',
+    callback: function ($logger) {
+        $logger->line('Pulling latest changes...');
+        $logger->success('Changes pulled!');
+
+        $logger->line('Running migrations...');
+        $logger->warning('No new migrations to run.');
+
+        $logger->line('Clearing cache...');
+        $logger->success('Cache cleared!');
+    }
+);
+```
+
+### ラベルの更新
+
+`label` メソッドで実行中にタスクのラベルを更新できます。`subLabel` メソッドはラベルの下に薄く表示されるサブラベルを設定します。空文字列を渡すとサブラベルを消去できます。`subLabel` 引数で初期サブラベルを指定することもできます。
+
+```php
+task(
+    label: 'Deploying',
+    callback: function ($logger) {
+        $logger->subLabel('Building assets...');
+        // ...
+        $logger->subLabel('Running migrations...');
+        // ...
+        $logger->subLabel('');
+    },
+    subLabel: 'Preparing...'
+);
+```
+
+### テキストのストリーミング
+
+AIが生成するレスポンスのように段階的に出力が生成される処理では、`partial` メソッドでテキストをひとつひとつストリーミングできます。ストリームが完了したら `commitPartial` を呼んで確定します。
+
+```php
+task(
+    label: 'Generating response...',
+    callback: function ($logger) {
+        foreach ($words as $word) {
+            $logger->partial($word . ' ');
+        }
+
+        $logger->commitPartial();
+    }
+);
+```
+
+### 出力上限とサマリーの保持
+
+デフォルトでは最大10行のスクロール出力を表示します。`limit` 引数でカスタマイズできます。タスク完了後もステータスメッセージを画面に残したい場合は `keepSummary: true` を渡します。
+
+```php
+task(
+    label: 'Deploying',
+    callback: function ($logger) {
+        $logger->success('Assets built');
+        $logger->success('Migrations complete');
+    },
+    limit: 20,
+    keepSummary: true,
+);
+```
+
+## ストリーム
+
+`stream()` はテキストを段階的にターミナルに表示します。AIが生成するコンテンツやチャンクで届くデータの表示に最適です。
+
+```php
+use function Laravel\Prompts\stream;
+
+$stream = stream();
+
+foreach ($words as $word) {
+    $stream->append($word . ' ');
+    usleep(25_000); // チャンク間の遅延をシミュレート...
+}
+
+$stream->close();
+```
+
+`append` メソッドはフェードインエフェクトでテキストをストリームに追加します。すべてのコンテンツをストリームし終えたら `close` を呼んで出力を確定しカーソルを復元します。
 
 ## ターミナル操作
 
@@ -427,6 +579,12 @@ use function Laravel\Prompts\title;
 title('My Application');
 ```
 
+空文字列を渡すとデフォルトのタイトルにリセットできます。
+
+```php
+title('');
+```
+
 ### ターミナルのクリア
 
 ```php
@@ -434,6 +592,12 @@ use function Laravel\Prompts\clear;
 
 clear();
 ```
+
+## ターミナルの考慮事項
+
+**ターミナル幅**: ラベル・選択肢・バリデーションメッセージがターミナルの列数を超える場合、自動的に切り詰められます。80列のターミナルを想定する場合、最大74文字を目安にしてください。
+
+**ターミナルの高さ**: `scroll` 引数を受け付けるプロンプトでは、バリデーションメッセージ用のスペースを含めてターミナルの高さに収まるよう自動的に値が調整されます。
 
 ## フォールバック
 
@@ -453,6 +617,41 @@ $name      = text('What is your name?');
 $confirmed = confirm('Do you accept the terms?');
 
 Prompt::assertOutputContains('What is your name?');
+```
+
+LaravelのArtisanテストヘルパーを使うと、情報出力関数に対してもアサーションを記述できます。
+
+```php
+// Pest
+test('report generation', function () {
+    $this->artisan('report:generate')
+        ->expectsPromptsInfo('Welcome to the application!')
+        ->expectsPromptsWarning('This action cannot be undone')
+        ->expectsPromptsError('Something went wrong')
+        ->expectsPromptsAlert('Important notice!')
+        ->expectsPromptsTable(
+            headers: ['Name', 'Email'],
+            rows: [
+                ['Taylor Otwell', 'taylor@example.com'],
+            ]
+        )
+        ->assertExitCode(0);
+});
+```
+
+```php
+// PHPUnit
+public function test_report_generation(): void
+{
+    $this->artisan('report:generate')
+        ->expectsPromptsInfo('Welcome to the application!')
+        ->expectsPromptsWarning('This action cannot be undone')
+        ->expectsPromptsTable(
+            headers: ['Name', 'Email'],
+            rows: [['Taylor Otwell', 'taylor@example.com']]
+        )
+        ->assertExitCode(0);
+}
 ```
 
 ## 関連ページ
