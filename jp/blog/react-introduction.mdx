@@ -191,6 +191,84 @@ resources/js/
 
 ---
 
+## JSX 構文の基礎
+
+React は JSX を使います。JavaScript の中に HTML ライクな構文を書くスタイルで、スターターキットのコードを読むために最低限知っておきたいパターンを紹介します。
+
+#### `{}` — 変数展開
+
+JSX 内では `{}` を使って JavaScript の値や式を埋め込みます。
+
+```tsx
+const name = '世界'
+const count = 3
+
+return (
+    <div>
+        <p>こんにちは、{name}！</p>
+        <p>2倍は {count * 2}</p>
+    </div>
+)
+```
+
+#### 条件分岐 — `&&` と三項演算子
+
+React には `v-if` に相当するディレクティブがありません。シンプルな条件には `&&` 演算子、if/else には三項演算子 `? :` を使います。
+
+```tsx
+{/* 条件が true のときだけ表示 */}
+{isLoggedIn && <p>ようこそ！</p>}
+
+{/* if / else */}
+{isLoggedIn ? <p>ようこそ！</p> : <a href="/login">ログイン</a>}
+
+{/* if / else if / else */}
+{isLoggedIn
+    ? <p>ようこそ！</p>
+    : role === 'admin'
+        ? <p>管理者としてログイン中</p>
+        : <a href="/login">ログイン</a>
+}
+```
+
+#### リスト描画 — `.map()`
+
+リストの描画には `Array.map()` を使います。効率的な差分更新のために `key` prop は必ず指定します。
+
+```tsx
+<ul>
+    {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+    ))}
+</ul>
+```
+
+Vue の `v-for :key` や Svelte の `{#each}` に相当します。
+
+#### `className` — CSS クラス名
+
+JSX は JavaScript にコンパイルされるため、`class` は予約語です。CSS クラスには `className` を使います。
+
+```tsx
+{/* HTML: <div class="container"> */}
+<div className="container">...</div>
+```
+
+#### イベントハンドラー — キャメルケース
+
+JSX のイベント属性はキャメルケースで、関数の参照を渡します。
+
+```tsx
+<button onClick={handleClick}>クリック</button>
+
+{/* フォーム送信のデフォルト動作をキャンセル */}
+<form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
+    ...
+</form>
+```
+
+---
+
 ## ページコンポーネントの基本
 
 Inertia のページコンポーネントは通常の React コンポーネントです。Laravel のコントローラーから渡したデータが props として受け取れます。
@@ -282,6 +360,77 @@ export default function PostsIndex() {
 ```
 
 通常の `<a>` タグと同じように書けますが、裏側で Inertia がページコンポーネントだけを差し替えるため SPA のような操作感になります。
+
+---
+
+## `Form` コンポーネント
+
+`@inertiajs/react` が提供する `<Form>` コンポーネントは、スターターキットの認証画面で使われているフォーム送信の推奨スタイルです。`action` と `method` を props で指定し、children 関数（render prop）で `errors` と `processing` を受け取ります。
+
+### 基本的な使い方
+
+```tsx
+import { Form } from '@inertiajs/react'
+
+export default function PostCreate() {
+    return (
+        <Form action="/posts" method="post" className="flex flex-col gap-4">
+            {({ errors, processing }) => (
+                <>
+                    <div>
+                        <label htmlFor="title">タイトル</label>
+                        <input id="title" name="title" type="text" required />
+                        {errors.title && <p className="error">{errors.title}</p>}
+                    </div>
+
+                    <div>
+                        <label htmlFor="content">本文</label>
+                        <textarea id="content" name="content" />
+                        {errors.content && <p className="error">{errors.content}</p>}
+                    </div>
+
+                    <button type="submit" disabled={processing}>
+                        {processing ? '送信中...' : '投稿する'}
+                    </button>
+                </>
+            )}
+        </Form>
+    )
+}
+```
+
+`<Form>` の children は `({ errors, processing }) => JSX` という関数（render prop パターン）です。`Form` コンポーネントがこれらの値を自動で算出して渡してくれます。フォームフィールドには `onChange` ハンドラではなく HTML ネイティブの `name` 属性を使い、ブラウザの標準フォームデータ収集が機能します。
+
+### スターターキットのパターン
+
+スターターキットは [Wayfinder](/jp/blog/wayfinder-introduction) を使ってルートをオブジェクトとして管理しています。`store.form()` はルートオブジェクトの `action` と `method` を含むオブジェクトを返し、`<Form>` に spread します。
+
+```tsx
+import { Form } from '@inertiajs/react'
+import { store } from '@/routes/login'
+
+export default function Login() {
+    return (
+        <Form
+            {...store.form()}
+            resetOnSuccess={['password']}
+            className="flex flex-col gap-6"
+        >
+            {({ errors, processing }) => (
+                <>
+                    {/* フォームの中身 */}
+                </>
+            )}
+        </Form>
+    )
+}
+```
+
+`resetOnSuccess` に指定したフィールドは、送信成功時に自動でリセットされます。パスワードフィールドなど送信後に空にしたいフィールドに指定します。
+
+<Info>
+  Wayfinder を使わない場合は `action="/login"` のように直接 URL を渡せば同じように動作します。
+</Info>
 
 ---
 
