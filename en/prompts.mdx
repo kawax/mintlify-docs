@@ -1,6 +1,6 @@
 ---
 title: "Laravel Prompts"
-description: "Add beautiful, interactive CLI forms to your Artisan commands using the laravel/prompts package. Covers text input, selection, search, validation, progress bars, and more."
+description: "Add beautiful, interactive CLI forms to your Artisan commands using the laravel/prompts package. Covers text input, selection, search, autocomplete, task logging, streaming output, and more."
 ---
 
 ## Introduction
@@ -257,6 +257,43 @@ use function Laravel\Prompts\pause;
 pause('Press ENTER to continue.');
 ```
 
+### autocomplete — inline completion
+
+`autocomplete()` provides inline ghost-text completion. Matching suggestions appear as users type and can be accepted by pressing `Tab` or the right arrow key. Unlike `suggest()`, the user is encouraged to choose from the provided options.
+
+```php
+use function Laravel\Prompts\autocomplete;
+
+$name = autocomplete(
+    label: 'What is your name?',
+    options: ['Taylor', 'Dayle', 'Jess', 'Nuno', 'Tim']
+);
+```
+
+Add a placeholder, default value, and hint:
+
+```php
+$name = autocomplete(
+    label: 'What is your name?',
+    options: ['Taylor', 'Dayle', 'Jess', 'Nuno', 'Tim'],
+    placeholder: 'E.g. Taylor',
+    default: $user?->name,
+    hint: 'Use Tab to accept, up/down to cycle.'
+);
+```
+
+Pass a closure to generate options dynamically based on what the user has typed:
+
+```php
+$file = autocomplete(
+    label: 'Which file?',
+    options: fn (string $value) => collect($files)
+        ->filter(fn ($file) => str_starts_with(strtolower($file), strtolower($value)))
+        ->values()
+        ->all(),
+);
+```
+
 ## Validation
 
 Every prompt function accepts a `validate` argument for custom validation logic. Return an error message string on failure, or `null` on success.
@@ -385,13 +422,128 @@ $progress->finish();
 
 ## Task
 
-`task()` executes a callback and displays a success or failure indicator next to a label.
+`task()` displays a labeled task with a spinner and a scrolling live output area while a given callback is executing. It is ideal for wrapping long-running processes such as dependency installation or deployment scripts, providing real-time visibility into what is happening.
 
 ```php
 use function Laravel\Prompts\task;
 
-task('Installing dependencies', fn () => Process::run('composer install')->successful());
+task(
+    label: 'Installing dependencies',
+    callback: function ($logger) {
+        // Long-running process...
+    }
+);
 ```
+
+The callback receives a `Logger` instance that you can use to display log lines and status messages in real time.
+
+<Warning>
+  `task()` requires the `pcntl` PHP extension to animate the spinner. Without it, a static version of the task will appear instead.
+</Warning>
+
+### Logging lines
+
+The `line` method writes a single log line to the scrolling output area:
+
+```php
+task(
+    label: 'Installing dependencies',
+    callback: function ($logger) {
+        $logger->line('Resolving packages...');
+        $logger->line('Downloading laravel/framework');
+    }
+);
+```
+
+### Status messages
+
+Use `success`, `warning`, and `error` to display stable highlighted messages above the scrolling log area:
+
+```php
+task(
+    label: 'Deploying application',
+    callback: function ($logger) {
+        $logger->line('Pulling latest changes...');
+        $logger->success('Changes pulled!');
+
+        $logger->line('Running migrations...');
+        $logger->warning('No new migrations to run.');
+
+        $logger->line('Clearing cache...');
+        $logger->success('Cache cleared!');
+    }
+);
+```
+
+### Updating the label
+
+The `label` method updates the task's label while it is running, and `subLabel` displays a dim line beneath it for ephemeral status messages. Pass an empty string to clear the sub-label:
+
+```php
+task(
+    label: 'Deploying',
+    callback: function ($logger) {
+        $logger->subLabel('Building assets...');
+        // ...
+        $logger->subLabel('Running migrations...');
+        // ...
+        $logger->subLabel('');
+    },
+    subLabel: 'Preparing...'
+);
+```
+
+### Streaming text
+
+For processes that produce output incrementally — such as AI-generated responses — the `partial` method streams text word-by-word or chunk-by-chunk. Call `commitPartial` when the stream is complete:
+
+```php
+task(
+    label: 'Generating response...',
+    callback: function ($logger) {
+        foreach ($words as $word) {
+            $logger->partial($word . ' ');
+        }
+
+        $logger->commitPartial();
+    }
+);
+```
+
+### Customizing output limit and keeping the summary
+
+By default the task displays up to 10 lines of scrolling output. Customize this with the `limit` argument. To keep the status messages on screen after the task finishes, pass `keepSummary: true`:
+
+```php
+task(
+    label: 'Deploying',
+    callback: function ($logger) {
+        $logger->success('Assets built');
+        $logger->success('Migrations complete');
+    },
+    limit: 20,
+    keepSummary: true,
+);
+```
+
+## Stream
+
+`stream()` displays text that streams into the terminal incrementally — ideal for AI-generated content or any chunked output.
+
+```php
+use function Laravel\Prompts\stream;
+
+$stream = stream();
+
+foreach ($words as $word) {
+    $stream->append($word . ' ');
+    usleep(25_000); // Simulate delay between chunks...
+}
+
+$stream->close();
+```
+
+The `append` method adds text to the stream with a gradual fade-in effect. Call `close` when all content has been streamed to finalize the output and restore the cursor.
 
 ## Terminal utilities
 
@@ -403,6 +555,12 @@ use function Laravel\Prompts\title;
 title('My Application');
 ```
 
+Pass an empty string to reset the terminal title to its default:
+
+```php
+title('');
+```
+
 ### Clear the terminal
 
 ```php
@@ -410,6 +568,12 @@ use function Laravel\Prompts\clear;
 
 clear();
 ```
+
+## Terminal considerations
+
+**Terminal width**: Labels, options, and validation messages that exceed the terminal column width are automatically truncated. Aim for a maximum of 74 characters to safely support 80-column terminals.
+
+**Terminal height**: For prompts that accept the `scroll` argument, the configured value is automatically reduced to fit the terminal height, including space for a validation message.
 
 ## Unsupported environments and fallbacks
 
@@ -428,6 +592,41 @@ $name      = text('What is your name?');
 $confirmed = confirm('Do you accept the terms?');
 
 Prompt::assertOutputContains('What is your name?');
+```
+
+When using Laravel's Artisan test helpers, you can also assert against informational output functions:
+
+```php
+// Pest
+test('report generation', function () {
+    $this->artisan('report:generate')
+        ->expectsPromptsInfo('Welcome to the application!')
+        ->expectsPromptsWarning('This action cannot be undone')
+        ->expectsPromptsError('Something went wrong')
+        ->expectsPromptsAlert('Important notice!')
+        ->expectsPromptsTable(
+            headers: ['Name', 'Email'],
+            rows: [
+                ['Taylor Otwell', 'taylor@example.com'],
+            ]
+        )
+        ->assertExitCode(0);
+});
+```
+
+```php
+// PHPUnit
+public function test_report_generation(): void
+{
+    $this->artisan('report:generate')
+        ->expectsPromptsInfo('Welcome to the application!')
+        ->expectsPromptsWarning('This action cannot be undone')
+        ->expectsPromptsTable(
+            headers: ['Name', 'Email'],
+            rows: [['Taylor Otwell', 'taylor@example.com']]
+        )
+        ->assertExitCode(0);
+}
 ```
 
 ## Related pages
