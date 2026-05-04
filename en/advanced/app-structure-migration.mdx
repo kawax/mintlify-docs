@@ -1,0 +1,618 @@
+---
+title: "Migration Guide: Old Structure to Slim Application Skeleton"
+description: "Step-by-step guide to migrating a Laravel 10 application from the legacy structure to the Slim Application Skeleton introduced in Laravel 11."
+sidebarTitle: "Migration Guide"
+---
+
+## Introduction
+
+This guide walks you through migrating a Laravel 10 application — with its `Kernel` classes and multiple service providers — to the Slim Application Skeleton introduced in Laravel 11.
+
+<Warning>
+  **The official Laravel documentation does not recommend this migration.**
+
+  - The Laravel 10 application structure works **as-is** in Laravel 11 and later, including Laravel 13. There are no plans to deprecate it.
+  - This migration is **entirely optional** — it is neither required nor officially encouraged.
+  - Unless you have a deep understanding of how the framework internals work, it is strongly recommended that you skip this migration. This is work for developers who are intimately familiar with the framework.
+  - **Always back up your project and ensure all tests pass** before starting.
+</Warning>
+
+## When you might consider migrating
+
+You might consider this migration when:
+
+- You want to align the project with the latest official conventions so new team members can follow the documentation directly.
+- You want consistency with packages and starter kits created with Laravel 11 or later.
+- You want to simplify the codebase by removing legacy configuration files and classes that came from the old structure.
+
+## Prerequisites
+
+This guide assumes the following:
+
+- **You have already upgraded the Laravel framework** to `laravel/framework ^11.0` or later.
+- All existing tests pass.
+- You understand the [Laravel 11+ application structure](/en/advanced/app-structure).
+
+## Migration example
+
+The steps below show how to migrate a project that was originally created with Laravel 10 + Breeze (Blade stack), keeping Breeze in place while updating only the application structure.
+
+<Steps>
+  <Step title="Replace bootstrap/app.php">
+    The old `bootstrap/app.php` created an `$app` instance and registered the kernel classes. Replace it with the `Application::configure()` fluent chain.
+
+    **Before (Laravel 10):**
+
+    ```php
+    <?php
+
+    $app = new Illuminate\Foundation\Application(
+        $_ENV['APP_BASE_PATH'] ?? dirname(__DIR__)
+    );
+
+    $app->singleton(
+        Illuminate\Contracts\Http\Kernel::class,
+        App\Http\Kernel::class
+    );
+
+    $app->singleton(
+        Illuminate\Contracts\Console\Kernel::class,
+        App\Console\Kernel::class
+    );
+
+    $app->singleton(
+        Illuminate\Contracts\Debug\ExceptionHandler::class,
+        App\Exceptions\Handler::class
+    );
+
+    return $app;
+    ```
+
+    **After (Laravel 11+):**
+
+    ```php
+    <?php
+
+    use Illuminate\Foundation\Application;
+    use Illuminate\Foundation\Configuration\Exceptions;
+    use Illuminate\Foundation\Configuration\Middleware;
+
+    return Application::configure(basePath: dirname(__DIR__))
+        ->withRouting(
+            web: __DIR__.'/../routes/web.php',
+            commands: __DIR__.'/../routes/console.php',
+            health: '/up',
+        )
+        ->withMiddleware(function (Middleware $middleware) {
+            //
+        })
+        ->withExceptions(function (Exceptions $exceptions) {
+            //
+        })->create();
+    ```
+
+    <Info>
+      Leave the `withMiddleware()` and `withExceptions()` callbacks empty for now. You will populate them in later steps when you migrate customizations from the kernel files you are about to remove.
+    </Info>
+  </Step>
+
+  <Step title="Remove the HTTP kernel (app/Http/Kernel.php)">
+    `app/Http/Kernel.php` defined global middleware, middleware groups, and middleware aliases.
+
+    **Before (app/Http/Kernel.php):**
+
+    ```php
+    <?php
+
+    namespace App\Http;
+
+    use Illuminate\Foundation\Http\Kernel as HttpKernel;
+
+    class Kernel extends HttpKernel
+    {
+        protected $middleware = [
+            \App\Http\Middleware\TrustProxies::class,
+            \Illuminate\Http\Middleware\HandleCors::class,
+            \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
+            \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
+            \App\Http\Middleware\TrimStrings::class,
+            \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
+        ];
+
+        protected $middlewareGroups = [
+            'web' => [
+                \App\Http\Middleware\EncryptCookies::class,
+                \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+                \Illuminate\Session\Middleware\StartSession::class,
+                \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+                \App\Http\Middleware\VerifyCsrfToken::class,
+                \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            ],
+            'api' => [
+                \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+                \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            ],
+        ];
+
+        protected $middlewareAliases = [
+            'auth' => \App\Http\Middleware\Authenticate::class,
+            // ...
+        ];
+    }
+    ```
+
+    In Laravel 11, all of the middleware listed above are built into the framework as default values. If you have **no customizations**, you can delete `app/Http/Kernel.php` directly.
+
+    If you **do** have customizations (custom middleware added or removed), migrate them to `withMiddleware()` in `bootstrap/app.php` before deleting the file:
+
+    ```php
+    ->withMiddleware(function (Middleware $middleware) {
+        // Append to global middleware
+        $middleware->append(\App\Http\Middleware\MyCustomMiddleware::class);
+
+        // Append to the web group
+        $middleware->web(append: [
+            \App\Http\Middleware\HandleInertiaRequests::class,
+        ]);
+
+        // Register middleware aliases
+        $middleware->alias([
+            'role' => \App\Http\Middleware\CheckRole::class,
+        ]);
+    })
+    ```
+
+    Once you have migrated any customizations, delete `app/Http/Kernel.php`.
+
+    <Info>
+      In Laravel 11, the default middleware classes such as `TrustProxies`, `EncryptCookies`, and `VerifyCsrfToken` are also no longer needed in `app/Http/Middleware/`. If you have not customized them, you can delete those files too — the framework provides the defaults internally.
+    </Info>
+  </Step>
+
+  <Step title="Remove the Console kernel (app/Console/Kernel.php)">
+    `app/Console/Kernel.php` was responsible for defining the schedule and auto-loading commands.
+
+    **Before (app/Console/Kernel.php):**
+
+    ```php
+    <?php
+
+    namespace App\Console;
+
+    use Illuminate\Console\Scheduling\Schedule;
+    use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+
+    class Kernel extends ConsoleKernel
+    {
+        protected function schedule(Schedule $schedule): void
+        {
+            // $schedule->command('inspire')->hourly();
+        }
+
+        protected function commands(): void
+        {
+            $this->load(__DIR__.'/Commands');
+            require base_path('routes/console.php');
+        }
+    }
+    ```
+
+    **Command auto-loading:** Laravel 11+ automatically scans `app/Console/Commands/`, so the `$this->load()` call is no longer needed.
+
+    **Schedule definitions:** Move them to `routes/console.php` or to `withSchedule()` in `bootstrap/app.php`:
+
+    ```php
+    // routes/console.php (Laravel 11+)
+    use Illuminate\Support\Facades\Schedule;
+
+    Schedule::command('emails:send')->daily();
+    ```
+
+    After migrating any schedule definitions, delete `app/Console/Kernel.php`.
+
+    <Info>
+      Do not delete your custom Artisan command files inside `app/Console/Commands/`. Only the `Kernel.php` class file should be removed.
+    </Info>
+  </Step>
+
+  <Step title="Remove the exception handler (app/Exceptions/Handler.php)">
+    `app/Exceptions/Handler.php` configured exception reporting and rendering.
+
+    **Before (app/Exceptions/Handler.php):**
+
+    ```php
+    <?php
+
+    namespace App\Exceptions;
+
+    use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+    use Throwable;
+
+    class Handler extends ExceptionHandler
+    {
+        protected $dontFlash = [
+            'current_password',
+            'password',
+            'password_confirmation',
+        ];
+
+        public function register(): void
+        {
+            $this->reportable(function (Throwable $e) {
+                //
+            });
+        }
+    }
+    ```
+
+    If you have customizations, migrate them to `withExceptions()` in `bootstrap/app.php` before deleting the file:
+
+    ```php
+    use Throwable;
+    use Illuminate\Http\Request;
+
+    ->withExceptions(function (Exceptions $exceptions) {
+        // Custom exception reporting
+        $exceptions->report(function (Throwable $e) {
+            // ...
+        });
+
+        // Custom exception rendering
+        $exceptions->render(function (\App\Exceptions\InvalidOrderException $e, Request $request) {
+            return response()->view('errors.invalid-order', status: 500);
+        });
+    })
+    ```
+
+    If you added extra fields to `$dontFlash`, you can migrate them like this:
+
+    ```php
+    ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->dontFlash([
+            'my_sensitive_field',
+        ]);
+    })
+    ```
+
+    Once you have migrated any customizations, delete `app/Exceptions/Handler.php`.
+  </Step>
+
+  <Step title="Remove RouteServiceProvider and migrate route registration">
+    `app/Providers/RouteServiceProvider.php` loaded route files and configured rate limiting.
+
+    **Before (app/Providers/RouteServiceProvider.php):**
+
+    ```php
+    <?php
+
+    namespace App\Providers;
+
+    use Illuminate\Cache\RateLimiting\Limit;
+    use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\RateLimiter;
+    use Illuminate\Support\Facades\Route;
+
+    class RouteServiceProvider extends ServiceProvider
+    {
+        public const HOME = '/home';
+
+        public function boot(): void
+        {
+            RateLimiter::for('api', function (Request $request) {
+                return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+            });
+
+            $this->routes(function () {
+                Route::middleware('api')
+                    ->prefix('api')
+                    ->group(base_path('routes/api.php'));
+
+                Route::middleware('web')
+                    ->group(base_path('routes/web.php'));
+            });
+        }
+    }
+    ```
+
+    **Route file registration:** Move to `withRouting()` in `bootstrap/app.php`:
+
+    ```php
+    ->withRouting(
+        web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php', // Only if you use API routes
+        commands: __DIR__.'/../routes/console.php',
+        health: '/up',
+    )
+    ```
+
+    **Rate limiting:** Move to `AppServiceProvider::boot()`:
+
+    ```php
+    // app/Providers/AppServiceProvider.php
+    use Illuminate\Cache\RateLimiting\Limit;
+    use Illuminate\Http\Request;
+    use Illuminate\Support\Facades\RateLimiter;
+
+    public function boot(): void
+    {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+    }
+    ```
+
+    If you use the `HOME` constant anywhere in the codebase, replace it with the URL string directly or move the constant to `AppServiceProvider`.
+
+    After migrating, delete `app/Providers/RouteServiceProvider.php`.
+  </Step>
+
+  <Step title="Consolidate service providers">
+    Laravel 10 shipped with five default service providers. Consolidate them into a single `AppServiceProvider.php`.
+
+    **Providers to remove (migrate their contents to `AppServiceProvider` first):**
+
+    | File | Migration target |
+    |---|---|
+    | `app/Providers/AuthServiceProvider.php` | `Gate::policy()` calls in `AppServiceProvider::boot()` |
+    | `app/Providers/BroadcastServiceProvider.php` | `withBroadcasting()` in `bootstrap/app.php` (if using Broadcasting) |
+    | `app/Providers/EventServiceProvider.php` | `Event::listen()` calls in `AppServiceProvider::boot()` |
+    | `app/Providers/RouteServiceProvider.php` | Already handled in the previous step |
+
+    **Example: migrating `AuthServiceProvider`:**
+
+    ```php
+    // Before: app/Providers/AuthServiceProvider.php
+    use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+    class AuthServiceProvider extends ServiceProvider
+    {
+        protected $policies = [
+            Post::class => PostPolicy::class,
+        ];
+
+        public function boot(): void
+        {
+            $this->registerPolicies();
+        }
+    }
+    ```
+
+    ```php
+    // After: app/Providers/AppServiceProvider.php
+    // Note: policies that follow Laravel's standard naming convention are discovered automatically.
+    use Illuminate\Support\Facades\Gate;
+
+    class AppServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            Gate::policy(Post::class, PostPolicy::class);
+        }
+    }
+    ```
+
+    After deleting the individual provider files, remove them from the `providers` array in `config/app.php`:
+
+    ```php
+    // config/app.php — remove the old entries from the providers array
+    'providers' => ServiceProvider::defaultProviders()->merge([
+        App\Providers\AppServiceProvider::class,
+        // App\Providers\AuthServiceProvider::class,   <- remove
+        // App\Providers\EventServiceProvider::class,  <- remove
+        // App\Providers\RouteServiceProvider::class,  <- remove
+    ])->toArray(),
+    ```
+
+    Then create `bootstrap/providers.php` to switch to the new structure:
+
+    ```php
+    <?php
+
+    // bootstrap/providers.php
+    return [
+        App\Providers\AppServiceProvider::class,
+    ];
+    ```
+
+    <Info>
+      When `bootstrap/providers.php` exists, Laravel uses it as the authoritative list of service providers and ignores the `providers` array in `config/app.php`.
+    </Info>
+  </Step>
+
+  <Step title="Update the base Controller class">
+    The Laravel 10 `Controller` base class used the `AuthorizesRequests` and `ValidatesRequests` traits. The new base class is a simple abstract class with no traits.
+
+    **Before (Laravel 10):**
+
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+    use Illuminate\Foundation\Validation\ValidatesRequests;
+    use Illuminate\Routing\Controller as BaseController;
+
+    class Controller extends BaseController
+    {
+        use AuthorizesRequests, ValidatesRequests;
+    }
+    ```
+
+    **After (Laravel 11+):**
+
+    ```php
+    <?php
+
+    namespace App\Http\Controllers;
+
+    abstract class Controller
+    {
+        //
+    }
+    ```
+
+    Replace calls to the trait methods as follows:
+
+    | Old approach (via trait) | New approach |
+    |---|---|
+    | `$this->validate($request, $rules)` | `$request->validate($rules)` |
+    | `$this->authorize('update', $post)` | `Gate::authorize('update', $post)` |
+    | `$this->authorizeResource(Post::class)` | No simple equivalent — keep the Laravel 10 traits in `Controller` if needed |
+
+    If your existing controllers call trait methods, you can either update each controller individually or keep the traits in the base `Controller` class. Both approaches work — you do not need to change everything at once.
+
+    <Warning>
+      If Breeze or Jetstream generated authentication controllers that call `$this->validate()` or `$this->authorize()`, verify they still work correctly before modifying the base class.
+    </Warning>
+  </Step>
+
+  <Step title="Remove unused config files">
+    Config files such as `config/cors.php`, `config/hashing.php`, and `config/view.php` can be deleted if you have not changed them from their defaults — the framework ships with built-in defaults for all of these. Keep any file where you have made actual changes.
+  </Step>
+
+  <Step title="Update public/index.php">
+    Rewrite `public/index.php` to match the new application bootstrap:
+
+    ```php
+    <?php
+
+    use Illuminate\Foundation\Application;
+    use Illuminate\Http\Request;
+
+    define('LARAVEL_START', microtime(true));
+
+    // Determine if the application is in maintenance mode...
+    if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
+        require $maintenance;
+    }
+
+    // Register the Composer autoloader...
+    require __DIR__.'/../vendor/autoload.php';
+
+    // Bootstrap Laravel and handle the request...
+    /** @var Application $app */
+    $app = require_once __DIR__.'/../bootstrap/app.php';
+
+    $app->handleRequest(Request::capture());
+    ```
+  </Step>
+
+  <Step title="Update artisan">
+    Rewrite the `artisan` file as well:
+
+    ```php
+    #!/usr/bin/env php
+    <?php
+
+    use Illuminate\Foundation\Application;
+    use Symfony\Component\Console\Input\ArgvInput;
+
+    define('LARAVEL_START', microtime(true));
+
+    // Register the Composer autoloader...
+    require __DIR__.'/vendor/autoload.php';
+
+    // Bootstrap Laravel and handle the command...
+    /** @var Application $app */
+    $app = require_once __DIR__.'/bootstrap/app.php';
+
+    $status = $app->handleCommand(new ArgvInput);
+
+    exit($status);
+    ```
+  </Step>
+
+  <Step title="Update tests/TestCase.php">
+    The `CreatesApplication` trait is no longer needed. Update `tests/TestCase.php` and delete `tests/CreatesApplication.php`:
+
+    ```php
+    <?php
+
+    namespace Tests;
+
+    use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+
+    abstract class TestCase extends BaseTestCase
+    {
+        //
+    }
+    ```
+  </Step>
+
+  <Step title="Update .env, .env.example, and phpunit.xml">
+    Some environment variables were renamed between Laravel 10 and 11 — for example, `CACHE_DRIVER` became `CACHE_STORE`. Update these files if necessary, but keep in mind that changes here also affect your config files and production environment. There is no need to rush these updates; they can be done incrementally.
+  </Step>
+
+  <Step title="Verify everything works">
+    After completing the migration, run the following checks in order:
+
+    ```shell
+    # Clear all caches
+    php artisan config:clear
+    php artisan route:clear
+    php artisan cache:clear
+
+    # Verify routes are registered correctly
+    php artisan route:list
+
+    # Run your test suite
+    php artisan test
+    ```
+
+    If you encounter any issues, restore the affected files from your backup and check the error messages carefully.
+  </Step>
+</Steps>
+
+## File structure after migration
+
+The following shows what your project should look like after completing the migration (changes from the old structure are noted):
+
+```
+app/
+├── Console/
+│   └── Commands/          ← Keep your custom commands
+│   (Kernel.php removed)
+├── Exceptions/
+│   (Handler.php removed)
+├── Http/
+│   ├── Controllers/
+│   │   └── Controller.php ← Simplified abstract class
+│   └── Middleware/        ← Keep your custom middleware
+│   (Kernel.php removed)
+├── Models/
+└── Providers/
+    └── AppServiceProvider.php ← Consolidated into one file
+    (AuthServiceProvider.php removed)
+    (BroadcastServiceProvider.php removed)
+    (EventServiceProvider.php removed)
+    (RouteServiceProvider.php removed)
+bootstrap/
+├── app.php                ← Replaced with Application::configure() chain
+└── providers.php          ← Newly created
+routes/
+├── web.php
+├── api.php                ← Only if you use API routes
+└── console.php            ← Schedule definitions go here
+```
+
+## Summary
+
+| What changed | Old location | New location |
+|---|---|---|
+| HTTP middleware | `app/Http/Kernel.php` | `withMiddleware()` in `bootstrap/app.php` |
+| Exception handling | `app/Exceptions/Handler.php` | `withExceptions()` in `bootstrap/app.php` |
+| Schedule definitions | `app/Console/Kernel.php` | `routes/console.php` |
+| Route registration | `app/Providers/RouteServiceProvider.php` | `withRouting()` in `bootstrap/app.php` |
+| Service provider list | `providers` array in `config/app.php` | `bootstrap/providers.php` |
+| Policy registration | `app/Providers/AuthServiceProvider.php` | Auto-discovered, or `AppServiceProvider::boot()` |
+| Event listeners | `app/Providers/EventServiceProvider.php` | Auto-discovered, or `AppServiceProvider::boot()` |
+
+## Further reading
+
+- [Application Structure in Laravel 11+](/en/advanced/app-structure)
+- [Official upgrade guide (11.x)](https://github.com/laravel/docs/blob/11.x/upgrade.md)
+- [laravel/laravel diff: 10.x → 11.x](https://github.com/laravel/laravel/compare/10.x...11.x)
+- [Laravel 10 Controller.php](https://github.com/laravel/laravel/blob/10.x/app/Http/Controllers/Controller.php)
+- [Laravel 11 Controller.php](https://github.com/laravel/laravel/blob/11.x/app/Http/Controllers/Controller.php)
