@@ -42,7 +42,44 @@ Copilot::start(function (CopilotSession $session) {
 
 ### Artisan command
 
-As shown above, print directly with `echo` or `$this->output->write()`. This is easy to understand because the display is similar to running Copilot CLI directly.
+As shown above, print directly with `echo` or `$this->output->write()`. This is easy to understand because the display is similar to running Copilot CLI directly. You can also use Laravel Prompts `stream()` to display output with a fade-in effect.
+
+```php
+use function Laravel\Prompts\stream;
+
+Artisan::command('copilot:streaming {--resume=}', function () {
+    $config = new SessionConfig(
+        streaming: true,
+    );
+
+    Copilot::start(function (CopilotSession $session) {
+        info('Starting Copilot with streaming: '.$session->id());
+
+        $stream = stream();
+
+        $session->on(function (SessionEvent $event) use ($stream) {
+            if ($event->isAssistantMessageDelta()) {
+                // Delta chunks arrive in pieces. Use Laravel Prompts stream() for smooth output with a fade-in effect.
+                $stream->append($event->deltaContent());
+            } elseif ($event->isIdle()) {
+                // Close after idle completes. Works correctly for multiple prompts in the same session, so calling `$stream = stream()` again is not needed.
+                $stream->close();
+            }
+        });
+
+        while (true) {
+            $prompt = text(
+                label: 'Enter your prompt',
+                placeholder: 'Ask me anything...',
+                required: true,
+                hint: 'Ctrl+C to exit',
+            );
+
+            $session->sendAndWait($prompt);
+        }
+    }, config: $config, resume: $this->option('resume'));
+})->purpose('Copilot streaming');
+```
 
 ### Deliver as SSE on a web page
 
