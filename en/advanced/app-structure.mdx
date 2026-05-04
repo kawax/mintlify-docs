@@ -604,6 +604,76 @@ return Application::configure(basePath: dirname(__DIR__))
     ->create();
 ```
 
+## Laravel boot process order
+
+When a Laravel application starts, service providers and Application hooks fire in this order:
+
+1. All ServiceProvider `register()` methods run
+2. Application `registered()`
+3. Application `booting()`
+4. All ServiceProvider `boot()` methods run
+5. Application `booted()`
+
+You can verify the order yourself by adding the following code to `AppServiceProvider`:
+
+```php
+class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        info('1. AppServiceProvider register');
+
+        $this->booting(function () {
+            info('4. AppServiceProvider booting');
+        });
+
+        $this->booted(function () {
+            info('5. AppServiceProvider booted');
+        });
+
+        $this->app->registered(function () {
+            info('2. app registered');
+        });
+
+        $this->app->booting(function () {
+            info('3. app booting');
+        });
+
+        $this->app->booted(function () {
+            info('6. AppServiceProvider@register app booted');
+        });
+    }
+
+    public function boot(): void
+    {
+        $this->app->booted(function () {
+            info('7. AppServiceProvider@boot app booted');
+        });
+    }
+}
+```
+
+`ApplicationBuilder`'s `registered()`, `booting()`, and `booted()` methods simply register callbacks on the Application instance. You rarely need them in normal usage, but they enable advanced scenarios — for example, modifying a fully-booted Kernel via `booted()`:
+
+```php
+// bootstrap/app.php
+
+use Illuminate\Contracts\Http\Kernel;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(...)
+    ->withMiddleware(...)
+    ->withExceptions(...)
+    ->booted(function (Application $app) {
+        $kernel = $app->make(Kernel::class);
+
+        //
+
+        $app->instance(Kernel::class, $kernel);
+    })
+    ->create();
+```
+
 ## Next steps
 
 <Card title="Service container" icon="box" href="/en/service-container">
