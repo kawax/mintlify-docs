@@ -604,6 +604,76 @@ return Application::configure(basePath: dirname(__DIR__))
     ->create();
 ```
 
+## Laravelの起動処理の順番
+
+Laravelアプリケーションの起動時、サービスプロバイダーとApplicationのフックは以下の順番で実行されます。
+
+1. すべてのServiceProviderの`register()`実行
+2. Applicationの`registered()`
+3. Applicationの`booting()`
+4. すべてのServiceProviderの`boot()`実行
+5. Applicationの`booted()`
+
+`AppServiceProvider`に次のコードを追加すると実行順を確認できます。
+
+```php
+class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        info('1. AppServiceProvider register');
+
+        $this->booting(function () {
+            info('4. AppServiceProvider booting');
+        });
+
+        $this->booted(function () {
+            info('5. AppServiceProvider booted');
+        });
+
+        $this->app->registered(function () {
+            info('2. app registered');
+        });
+
+        $this->app->booting(function () {
+            info('3. app booting');
+        });
+
+        $this->app->booted(function () {
+            info('6. AppServiceProvider@register app booted');
+        });
+    }
+
+    public function boot(): void
+    {
+        $this->app->booted(function () {
+            info('7. AppServiceProvider@boot app booted');
+        });
+    }
+}
+```
+
+`ApplicationBuilder`の`registered()`、`booting()`、`booted()`はApplicationにコールバックを登録するだけのメソッドです。通常は使う必要がありませんが、起動準備が完了したKernelに対して`booted()`で変更を加えるといった特殊な操作が可能です。
+
+```php
+// bootstrap/app.php
+
+use Illuminate\Contracts\Console\Kernel;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(...)
+    ->withMiddleware(...)
+    ->withExceptions(...)
+    ->booted(function (Application $app) {
+        $kernel = $app->make(Kernel::class);
+
+        //
+
+        $app->instance(Kernel::class, $kernel);
+    })
+    ->create();
+```
+
 ## 次のステップ
 
 <Card title="サービスコンテナ" icon="box" href="/jp/service-container">
