@@ -191,6 +191,84 @@ resources/js/
 
 ---
 
+## JSX Syntax Essentials
+
+React uses JSX — an HTML-like syntax inside JavaScript. These are the patterns you'll encounter most often in the starter kit.
+
+#### `{}` — Interpolation
+
+Use curly braces to embed JavaScript values or expressions in JSX.
+
+```tsx
+const name = 'World'
+const count = 3
+
+return (
+    <div>
+        <p>Hello, {name}!</p>
+        <p>Double is {count * 2}</p>
+    </div>
+)
+```
+
+#### Conditional rendering — `&&` and ternary
+
+React has no dedicated `v-if` directive. Use JavaScript's `&&` operator for simple conditions and the ternary operator `? :` for if/else branches.
+
+```tsx
+// Render only when condition is true
+{isLoggedIn && <p>Welcome back!</p>}
+
+// If / else
+{isLoggedIn ? <p>Welcome back!</p> : <a href="/login">Log in</a>}
+
+// Nested condition (if / else if / else)
+{isLoggedIn
+    ? <p>Welcome back!</p>
+    : role === 'admin'
+        ? <p>Logged in as administrator</p>
+        : <a href="/login">Log in</a>
+}
+```
+
+#### List rendering — `.map()`
+
+Use `Array.map()` to render lists. Always include the `key` prop for efficient DOM diffing.
+
+```tsx
+<ul>
+    {posts.map((post) => (
+        <li key={post.id}>{post.title}</li>
+    ))}
+</ul>
+```
+
+Equivalent to Vue's `v-for :key` or Svelte's `{#each}`.
+
+#### `className` instead of `class`
+
+Because JSX compiles to JavaScript, `class` is a reserved keyword. Use `className` for CSS class names.
+
+```tsx
+// HTML:  <div class="container">
+<div className="container">...</div>
+```
+
+#### Event handlers — camelCase
+
+Event handler attributes in JSX use camelCase and accept a function reference.
+
+```tsx
+<button onClick={handleClick}>Click me</button>
+
+// Prevent default on form submit
+<form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
+    ...
+</form>
+```
+
+---
+
 ## Page Components
 
 Inertia page components are ordinary React components. Data passed from a Laravel controller arrives as props.
@@ -282,6 +360,77 @@ export default function PostsIndex() {
 ```
 
 `<Link>` looks just like a regular `<a>` tag, but Inertia swaps only the page component behind the scenes, giving you instant, SPA-like navigation.
+
+---
+
+## `Form` Component
+
+The `<Form>` component from `@inertiajs/react` is the recommended form-submission style used in the starter kit's authentication pages. You specify `action` and `method` as props and receive `errors` and `processing` via a render-prop children function.
+
+### Basic usage
+
+```tsx
+import { Form } from '@inertiajs/react'
+
+export default function PostCreate() {
+    return (
+        <Form action="/posts" method="post" className="flex flex-col gap-4">
+            {({ errors, processing }) => (
+                <>
+                    <div>
+                        <label htmlFor="title">Title</label>
+                        <input id="title" name="title" type="text" required />
+                        {errors.title && <p className="error">{errors.title}</p>}
+                    </div>
+
+                    <div>
+                        <label htmlFor="content">Content</label>
+                        <textarea id="content" name="content" />
+                        {errors.content && <p className="error">{errors.content}</p>}
+                    </div>
+
+                    <button type="submit" disabled={processing}>
+                        {processing ? 'Submitting...' : 'Create post'}
+                    </button>
+                </>
+            )}
+        </Form>
+    )
+}
+```
+
+The children of `<Form>` is a function `({ errors, processing }) => JSX` — a render prop pattern. The `Form` component computes and injects `errors` and `processing` automatically. Form fields use the native `name` attribute instead of controlled `onChange` handlers, so the browser's standard form data collection handles serialisation.
+
+### Starter kit pattern
+
+The starter kit uses [Wayfinder](/en/blog/wayfinder-introduction) to manage routes as objects. `store.form()` returns an object containing `action` and `method` which is spread onto `<Form>`.
+
+```tsx
+import { Form } from '@inertiajs/react'
+import { store } from '@/routes/login'
+
+export default function Login() {
+    return (
+        <Form
+            {...store.form()}
+            resetOnSuccess={['password']}
+            className="flex flex-col gap-6"
+        >
+            {({ errors, processing }) => (
+                <>
+                    {/* form body */}
+                </>
+            )}
+        </Form>
+    )
+}
+```
+
+`resetOnSuccess` lists fields to clear after a successful submission — useful for password fields that should be emptied after the form is sent.
+
+<Info>
+  Without Wayfinder, passing the URL directly (`action="/login"`) works just the same.
+</Info>
 
 ---
 

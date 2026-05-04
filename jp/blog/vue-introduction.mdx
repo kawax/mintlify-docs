@@ -217,6 +217,99 @@ resources/js/
 
 ---
 
+## Vue テンプレート構文
+
+スターターキットのコードを読み書きするために必要な、基本的なテンプレートディレクティブを紹介します。
+
+#### `{{ }}` — 変数展開
+
+二重中括弧を使って、JavaScript の値や式をテンプレートに埋め込みます。
+
+```vue
+<script setup>
+const name = '世界'
+const count = 3
+</script>
+
+<template>
+    <p>こんにちは、{{ name }}！</p>
+    <p>2倍は {{ count * 2 }}</p>
+</template>
+```
+
+#### `v-if` — 条件分岐
+
+```vue
+<template>
+    <p v-if="isLoggedIn">ようこそ！</p>
+    <p v-else-if="role === 'admin'">管理者としてログイン中</p>
+    <a v-else href="/login">ログイン</a>
+</template>
+```
+
+Svelte の `{#if}` や React の三項演算子に相当します。
+
+#### `v-for` — リスト描画
+
+```vue
+<template>
+    <ul>
+        <li v-for="post in posts" :key="post.id">{{ post.title }}</li>
+    </ul>
+</template>
+```
+
+効率的な差分更新のために `:key` は必ず指定します。React の `Array.map()` に相当します。
+
+#### `v-model` — 双方向バインディング
+
+`v-model` を使うと、フォーム要素の値とリアクティブ変数を双方向に同期できます。
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const title = ref('')
+const agreed = ref(false)
+const role = ref('viewer')
+</script>
+
+<template>
+    <!-- テキスト入力 -->
+    <input v-model="title" type="text" />
+    <p>入力中: {{ title }}</p>
+
+    <!-- チェックボックス -->
+    <input v-model="agreed" type="checkbox" />
+    <p>同意: {{ agreed }}</p>
+
+    <!-- セレクトボックス -->
+    <select v-model="role">
+        <option value="viewer">閲覧者</option>
+        <option value="editor">編集者</option>
+        <option value="admin">管理者</option>
+    </select>
+</template>
+```
+
+#### `:` (v-bind) と `@` (v-on)
+
+- `:attr="value"` — HTML 属性に動的な値をバインド（`v-bind:attr` の省略形）
+- `@event="handler"` — イベントリスナーを登録（`v-on:event` の省略形）
+
+```vue
+<template>
+    <!-- 動的な属性バインディング -->
+    <img :src="imageUrl" :alt="imageAlt" />
+
+    <!-- イベントハンドラー -->
+    <button @click="handleClick">クリック</button>
+    <form @submit.prevent="handleSubmit">...</form>
+</template>
+```
+
+---
+
 ## ページコンポーネントの基本
 
 Inertia のページコンポーネントは通常の Vue コンポーネントです。Laravelのコントローラーから渡したデータが props として受け取れます。
@@ -292,6 +385,70 @@ import { Link } from '@inertiajs/vue3'
 ```
 
 通常の `<a>` タグと同じように書けますが、裏側で Inertia がページコンポーネントだけを差し替えるため SPA のような操作感になります。
+
+---
+
+## `Form` コンポーネント
+
+`@inertiajs/vue3` が提供する `<Form>` コンポーネントは、スターターキットの認証画面で使われているフォーム送信の推奨スタイルです。`action` と `method` を props で指定し、`v-slot` で `errors` と `processing` にアクセスします。
+
+### 基本的な使い方
+
+```vue
+<script setup>
+import { Form } from '@inertiajs/vue3'
+</script>
+
+<template>
+    <Form action="/posts" method="post" class="flex flex-col gap-4" v-slot="{ errors, processing }">
+        <div>
+            <label for="title">タイトル</label>
+            <input id="title" name="title" type="text" required />
+            <p v-if="errors.title" class="error">{{ errors.title }}</p>
+        </div>
+
+        <div>
+            <label for="content">本文</label>
+            <textarea id="content" name="content"></textarea>
+            <p v-if="errors.content" class="error">{{ errors.content }}</p>
+        </div>
+
+        <button type="submit" :disabled="processing">
+            {{ processing ? '送信中...' : '投稿する' }}
+        </button>
+    </Form>
+</template>
+```
+
+`v-slot="{ errors, processing }"` は Vue のスコープ付きスロット構文で、`Form` コンポーネントがこれらの値を自動で算出して渡してくれます。フォームフィールドには `v-model` ではなく HTML ネイティブの `name` 属性を使い、ブラウザの標準フォームデータ収集が機能します。
+
+### スターターキットのパターン
+
+スターターキットは [Wayfinder](/jp/blog/wayfinder-introduction) を使ってルートをオブジェクトとして管理しています。`store.form()` はルートオブジェクトの `action` と `method` を含むオブジェクトを返し、`v-bind` で `<Form>` に spread します。
+
+```vue
+<script setup lang="ts">
+import { Form } from '@inertiajs/vue3'
+import { store } from '@/routes/login'
+</script>
+
+<template>
+    <Form
+        v-bind="store.form()"
+        :reset-on-success="['password']"
+        v-slot="{ errors, processing }"
+        class="flex flex-col gap-6"
+    >
+        <!-- フォームの中身 -->
+    </Form>
+</template>
+```
+
+`reset-on-success` に指定したフィールドは、送信成功時に自動でリセットされます。パスワードフィールドなど送信後に空にしたいフィールドに指定します。
+
+<Info>
+  Wayfinder を使わない場合は `action="/login"` のように直接 URL を渡せば同じように動作します。
+</Info>
 
 ---
 

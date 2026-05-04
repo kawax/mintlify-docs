@@ -215,6 +215,99 @@ resources/js/
 
 ---
 
+## Vue Template Syntax
+
+The essential template directives you need to read and write Vue starter kit code.
+
+#### `{{ }}` — Interpolation
+
+Use double curly braces to embed JavaScript values or expressions in the template.
+
+```vue
+<script setup>
+const name = 'World'
+const count = 3
+</script>
+
+<template>
+    <p>Hello, {{ name }}!</p>
+    <p>Double is {{ count * 2 }}</p>
+</template>
+```
+
+#### `v-if` — Conditional rendering
+
+```vue
+<template>
+    <p v-if="isLoggedIn">Welcome back!</p>
+    <p v-else-if="role === 'admin'">Logged in as administrator</p>
+    <a v-else href="/login">Log in</a>
+</template>
+```
+
+Equivalent to Svelte's `{#if}` or React's ternary expressions.
+
+#### `v-for` — List rendering
+
+```vue
+<template>
+    <ul>
+        <li v-for="post in posts" :key="post.id">{{ post.title }}</li>
+    </ul>
+</template>
+```
+
+Always include `:key` for efficient DOM diffing — equivalent to React's `Array.map()` with a `key` prop.
+
+#### `v-model` — Two-way binding
+
+`v-model` synchronises a form element with a reactive variable in both directions.
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const title = ref('')
+const agreed = ref(false)
+const role = ref('viewer')
+</script>
+
+<template>
+    <!-- Text input -->
+    <input v-model="title" type="text" />
+    <p>Typing: {{ title }}</p>
+
+    <!-- Checkbox -->
+    <input v-model="agreed" type="checkbox" />
+    <p>Agreed: {{ agreed }}</p>
+
+    <!-- Select -->
+    <select v-model="role">
+        <option value="viewer">Viewer</option>
+        <option value="editor">Editor</option>
+        <option value="admin">Admin</option>
+    </select>
+</template>
+```
+
+#### `:` (v-bind) and `@` (v-on)
+
+- `:attr="value"` — binds a dynamic value to an HTML attribute (`v-bind:attr` shorthand)
+- `@event="handler"` — attaches an event listener (`v-on:event` shorthand)
+
+```vue
+<template>
+    <!-- Dynamic attribute binding -->
+    <img :src="imageUrl" :alt="imageAlt" />
+
+    <!-- Event handler -->
+    <button @click="handleClick">Click me</button>
+    <form @submit.prevent="handleSubmit">...</form>
+</template>
+```
+
+---
+
 ## Page Components
 
 Inertia page components are ordinary Vue components. Data passed from a Laravel controller arrives as props.
@@ -290,6 +383,70 @@ import { Link } from '@inertiajs/vue3'
 ```
 
 `<Link>` looks just like a regular `<a>` tag, but Inertia swaps only the page component behind the scenes, giving you instant, SPA-like navigation.
+
+---
+
+## `Form` Component
+
+The `<Form>` component from `@inertiajs/vue3` is the recommended form-submission style used in the starter kit's authentication pages. You specify `action` and `method` as props and access `errors` and `processing` via `v-slot`.
+
+### Basic usage
+
+```vue
+<script setup>
+import { Form } from '@inertiajs/vue3'
+</script>
+
+<template>
+    <Form action="/posts" method="post" class="flex flex-col gap-4" v-slot="{ errors, processing }">
+        <div>
+            <label for="title">Title</label>
+            <input id="title" name="title" type="text" required />
+            <p v-if="errors.title" class="error">{{ errors.title }}</p>
+        </div>
+
+        <div>
+            <label for="content">Content</label>
+            <textarea id="content" name="content"></textarea>
+            <p v-if="errors.content" class="error">{{ errors.content }}</p>
+        </div>
+
+        <button type="submit" :disabled="processing">
+            {{ processing ? 'Submitting...' : 'Create post' }}
+        </button>
+    </Form>
+</template>
+```
+
+`v-slot="{ errors, processing }"` is Vue's scoped slot syntax — the `Form` component computes and injects these values automatically. Form fields use the native `name` attribute instead of `v-model`, so the browser's standard form data collection handles serialisation.
+
+### Starter kit pattern
+
+The starter kit uses [Wayfinder](/en/blog/wayfinder-introduction) to manage routes as objects. `store.form()` returns an object containing `action` and `method` which is spread onto `<Form>` via `v-bind`.
+
+```vue
+<script setup lang="ts">
+import { Form } from '@inertiajs/vue3'
+import { store } from '@/routes/login'
+</script>
+
+<template>
+    <Form
+        v-bind="store.form()"
+        :reset-on-success="['password']"
+        v-slot="{ errors, processing }"
+        class="flex flex-col gap-6"
+    >
+        <!-- form body -->
+    </Form>
+</template>
+```
+
+`reset-on-success` lists fields to clear after a successful submission — useful for password fields that should be emptied after the form is sent.
+
+<Info>
+  Without Wayfinder, passing the URL directly (`action="/login"`) works just the same.
+</Info>
 
 ---
 
