@@ -21,6 +21,7 @@
   - 歴史。Laravel8(2020年)のJetstreamスターターキットと同時に登場。当時はJetstreamをインストールしたら一緒にインストールされる裏方扱いだった。「フロントエンドに依存しない認証バックエンド」なので結局JetstreamやBreezeから現行スターターキットに変わっても使われていてFortifyが一番長生きしている。
   - https://github.com/laravel/react-starter-kit/blob/main/app/Providers/FortifyServiceProvider.php, https://github.com/laravel/react-starter-kit/blob/main/config/fortify.php 現行スターターキットでもFortifyが使われている。実は最初はFortifyを使ってなかったけど二要素認証に対応するためにFortifyを使うようになったので認証機能などもFortifyに置き換わった。
   - blog/passkeys-introduction.mdx で初期調査したパスキーはFortifyの機能として追加。公式ドキュメントはさっき更新されたばかり。スターターキットもパスキーに対応しそうだけどまだなのでドキュメント通りの説明を書いておいて後で更新する。passkeys-introduction.mdx は初期調査なので中身は変更せず「その後パスキーはFortifyの機能として追加されました」とFortifyページへリンク。
+  - 日本語ページはOK。
 - [ ] スターターキットの作り方ページ。「パッケージ開発」グループに追加。
   - 公式ドキュメントでは短い説明しかない。
   - スターターキットを作るならパッケージと同様にLaravelのバージョンアップに追従する作業が必要になる。
@@ -47,7 +48,7 @@
 - [x] Reactの紹介ページ
 - [x] Svelteの紹介ページ
 - [ ] `laravel/ui`からFortifyへの移行ガイド
-  - 古くからのプロジェクト、もしくはよく分からず`laravel/ui`で初めてしまったプロジェクト用。`laravel/ui`はLaravel13でも動くようにメンテナンスは続いているけどいつまでも古いパッケージに依存してるのは不安、かといって新しいスターターキットへのリニューアルも難しい場合はFortifyに移行すると少しだけ現行スターターキットと近くなる。
+  - 古くからのプロジェクト、もしくはよく分からず`laravel/ui`で作り始めてしまったプロジェクト用。`laravel/ui`はLaravel13でも動くようにメンテナンスは続いているけどいつまでも古いパッケージに依存してるのは不安、かといって新しいスターターキットへのリニューアルも難しい場合はFortifyに移行すると少しだけ現行スターターキットと近くなる。
   - bootstrapベースのまま認証バックエンドだけFortifyに変更できる。
   - 現行スターターキットと同様にFortifyServiceProviderで`Fortify::loginView()`などを設定するのがポイント。`Fortify::viewPrefix('auth.');`
   - PC内にLaravel8当時の記事ファイルが残ってるので日本語ページを作成→管理者が修正→英語ページを作成の流れ。
