@@ -16,8 +16,13 @@
 
 - パッケージ開発者向けのページを増やす。管理者は大量のパッケージを作ってきて知見があるのでいくらでもネタはある。パッケージを一度作って終わりではなくLaravel・PHPのバージョンアップに合わせてメンテナンスを年単位で継続できるようになるまでのガイドを提供する。
   - `package-versioning`が作られたけど今後もネタがあれば継続。
-- [x] app-structureの下に旧構造から新構造への移行ガイドを追加
-- [x] Laravel11以降の新構造のFAQページ
+- [ ] スターターキットの作り方ページ。「パッケージ開発」グループに追加。
+  - 公式ドキュメントでは短い説明しかない。
+  - スターターキットを作るならパッケージと同様にLaravelのバージョンアップに追従する作業が必要になる。
+  - テンプレートとなるLaravelプロジェクトを作成。composer.jsonの`name`にユニークな名前を付けて [Packagist](https://packagist.org/) に登録。`laravel new my-app --using=example/starter-kit`コマンドではこの`name`を使う。
+  - composer.jsonの`scripts`はLaravel公式スターターキットを参考に`post-root-package-install`や`post-create-project-cmd`を記述。
+  - `.gitattributes`でスターターキットのリポジトリには含めるけどユーザーが作成したプロジェクトからは除くファイルを指定できる。`LICENSE export-ignore`や`composer.lock export-ignore`など。
+  - 参考リンク。packages/laravel-console-starter
 
 ## blog ページ案
 
