@@ -215,20 +215,6 @@
           ]
         },
         {
-          "group": "Application Structure",
-          "pages": [
-            "en/advanced/app-structure",
-            "en/advanced/app-structure-migration",
-            "en/advanced/app-structure-faq"
-          ]
-        },
-        {
-          "group": "Laravel 13 New Features",
-          "pages": [
-            "en/advanced/php-attributes"
-          ]
-        },
-        {
           "group": "Design Patterns",
           "pages": [
             "en/advanced/pipeline",
@@ -249,6 +235,20 @@
             "en/advanced/package-testing",
             "en/advanced/package-workbench",
             "en/advanced/generator-command"
+          ]
+        },
+        {
+          "group": "Application Structure",
+          "pages": [
+            "en/advanced/app-structure",
+            "en/advanced/app-structure-migration",
+            "en/advanced/app-structure-faq"
+          ]
+        },
+        {
+          "group": "Laravel 13 New Features",
+          "pages": [
+            "en/advanced/php-attributes"
           ]
         },
         {

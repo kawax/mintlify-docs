@@ -253,12 +253,6 @@
           ]
         },
         {
-          "group": "バリデーション拡張",
-          "pages": [
-            "jp/advanced/custom-validation-rules"
-          ]
-        },
-        {
           "group": "アプリケーション構造",
           "pages": [
             "jp/advanced/app-structure",
@@ -278,6 +272,12 @@
             "jp/advanced/eloquent-observers",
             "jp/advanced/eloquent-scopes",
             "jp/advanced/eloquent-casts"
+          ]
+        },
+        {
+          "group": "バリデーション拡張",
+          "pages": [
+            "jp/advanced/custom-validation-rules"
           ]
         },
         {
