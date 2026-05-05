@@ -242,6 +242,17 @@
           ]
         },
         {
+          "group": "パッケージ開発",
+          "pages": [
+            "jp/advanced/package-development",
+            "jp/advanced/interacts-with-data",
+            "jp/advanced/package-versioning",
+            "jp/advanced/package-testing",
+            "jp/advanced/package-workbench",
+            "jp/advanced/generator-command"
+          ]
+        },
+        {
           "group": "バリデーション拡張",
           "pages": [
             "jp/advanced/custom-validation-rules"
@@ -279,17 +290,6 @@
           "group": "セキュリティ",
           "pages": [
             "jp/advanced/rate-limiting"
-          ]
-        },
-        {
-          "group": "パッケージ開発",
-          "pages": [
-            "jp/advanced/package-development",
-            "jp/advanced/interacts-with-data",
-            "jp/advanced/package-versioning",
-            "jp/advanced/package-testing",
-            "jp/advanced/package-workbench",
-            "jp/advanced/generator-command"
           ]
         },
         {

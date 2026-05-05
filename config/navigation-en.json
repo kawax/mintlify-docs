@@ -241,6 +241,17 @@
           ]
         },
         {
+          "group": "Package Development",
+          "pages": [
+            "en/advanced/package-development",
+            "en/advanced/interacts-with-data",
+            "en/advanced/package-versioning",
+            "en/advanced/package-testing",
+            "en/advanced/package-workbench",
+            "en/advanced/generator-command"
+          ]
+        },
+        {
           "group": "Eloquent Deep Dive",
           "pages": [
             "en/advanced/eloquent-observers",
@@ -264,17 +275,6 @@
           "group": "Security",
           "pages": [
             "en/advanced/rate-limiting"
-          ]
-        },
-        {
-          "group": "Package Development",
-          "pages": [
-            "en/advanced/package-development",
-            "en/advanced/interacts-with-data",
-            "en/advanced/package-versioning",
-            "en/advanced/package-testing",
-            "en/advanced/package-workbench",
-            "en/advanced/generator-command"
           ]
         },
         {
