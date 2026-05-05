@@ -270,10 +270,11 @@ Agent から利用します。
 use App\Ai\Tools\GetWeather;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Promptable;
 
 #[MaxSteps(5)]
-class WeatherAgent implements Agent
+class WeatherAgent implements Agent, HasTools
 {
     use Promptable;
 
