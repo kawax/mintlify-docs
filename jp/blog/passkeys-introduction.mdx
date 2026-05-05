@@ -144,10 +144,18 @@ WebAuthn はブラウザ API ですが、各フレームワーク用フックは
 - どちらもタグなしの開発段階ですが、Laravel 公式エコシステムとして今後の標準認証手段になる可能性が高いです。
 - 早期採用する場合は、README のルート・設定・エラーハンドリング・カスタマイズ拡張点を前提に設計すると安全です。
 
+<Info>
+  その後パスキーは **Laravel Fortify の機能として正式に追加されました**。Fortify 経由でパスキーを有効化する場合は、`laravel/passkeys-server` を直接インストールするのではなく `Features::passkeys()` を使います。詳細は [Laravel Fortify とスターターキット](/jp/advanced/fortify) を参照してください。
+</Info>
+
 <Card title="laravel/passkeys-server" icon="github" href="https://github.com/laravel/passkeys-server">
   サーバー側パッケージの最新 README と実装を確認します。
 </Card>
 
 <Card title="@laravel/passkeys" icon="github" href="https://github.com/laravel/passkeys">
   クライアント側パッケージの最新 README と API を確認します。
+</Card>
+
+<Card title="Laravel Fortify とスターターキット" icon="shield-check" href="/jp/advanced/fortify">
+  Fortify 経由でのパスキー有効化手順と、スターターキットとの関係を解説します。
 </Card>

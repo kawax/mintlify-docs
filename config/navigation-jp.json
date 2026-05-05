@@ -71,7 +71,8 @@
         {
           "group": "認証の拡張",
           "pages": [
-            "jp/advanced/custom-auth-guard"
+            "jp/advanced/custom-auth-guard",
+            "jp/advanced/fortify"
           ]
         },
         {
