@@ -1,0 +1,149 @@
+{
+  "tab": "ガイド",
+  "groups": [
+    {
+      "group": "アーキテクチャ",
+      "pages": [
+        "jp/lifecycle",
+        "jp/service-container",
+        "jp/service-providers",
+        "jp/facades",
+        "jp/contracts"
+      ]
+    },
+    {
+      "group": "データベース",
+      "pages": [
+        "jp/query-builder",
+        "jp/pagination"
+      ]
+    },
+    {
+      "group": "Eloquent",
+      "pages": [
+        "jp/eloquent-resources",
+        "jp/eloquent-mutators",
+        "jp/scout",
+        "jp/eloquent-serialization"
+      ]
+    },
+    {
+      "group": "セキュリティ",
+      "pages": [
+        "jp/authorization",
+        "jp/sanctum",
+        "jp/hashing",
+        "jp/encryption",
+        "jp/precognition",
+        "jp/passport"
+      ]
+    },
+    {
+      "group": "イベント",
+      "pages": [
+        "jp/events"
+      ]
+    },
+    {
+      "group": "メールと通知",
+      "pages": [
+        "jp/mail",
+        "jp/notifications"
+      ]
+    },
+    {
+      "group": "非同期処理",
+      "pages": [
+        "jp/queues",
+        "jp/horizon",
+        "jp/concurrency"
+      ]
+    },
+    {
+      "group": "リアルタイム通信",
+      "pages": [
+        "jp/broadcasting",
+        "jp/reverb"
+      ]
+    },
+    {
+      "group": "スケジューリング",
+      "pages": [
+        "jp/scheduling"
+      ]
+    },
+    {
+      "group": "キャッシュと最適化",
+      "pages": [
+        "jp/cache",
+        "jp/redis"
+      ]
+    },
+    {
+      "group": "ヘルパーとコレクション",
+      "pages": [
+        "jp/helpers",
+        "jp/strings",
+        "jp/collections"
+      ]
+    },
+    {
+      "group": "国際化",
+      "pages": [
+        "jp/localization"
+      ]
+    },
+    {
+      "group": "外部通信",
+      "pages": [
+        "jp/http-client"
+      ]
+    },
+    {
+      "group": "ファイルとストレージ",
+      "pages": [
+        "jp/filesystem"
+      ]
+    },
+    {
+      "group": "デバッグと監視",
+      "pages": [
+        "jp/context",
+        "jp/error-handling",
+        "jp/logging",
+        "jp/pulse"
+      ]
+    },
+    {
+      "group": "コンソールとCLI",
+      "pages": [
+        "jp/artisan",
+        "jp/prompts",
+        "jp/processes",
+        "jp/pint",
+        "jp/dusk"
+      ]
+    },
+    {
+      "group": "パフォーマンス",
+      "pages": [
+        "jp/octane"
+      ]
+    },
+    {
+      "group": "フロントエンド",
+      "pages": [
+        "jp/vite",
+        "jp/folio"
+      ]
+    },
+    {
+      "group": "AI開発",
+      "pages": [
+        "jp/boost",
+        "jp/mcp",
+        "jp/ai-sdk"
+      ]
+    }
+  ]
+}

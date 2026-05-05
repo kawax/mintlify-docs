@@ -1,0 +1,69 @@
+{
+  "tab": "チュートリアル",
+  "groups": [
+    {
+      "group": "はじめに",
+      "pages": [
+        "jp/introduction",
+        "jp/true-tutorial",
+        "jp/installation",
+        "jp/directory-structure",
+        "jp/configuration"
+      ]
+    },
+    {
+      "group": "基本",
+      "pages": [
+        "jp/routing",
+        "jp/views",
+        "jp/blade",
+        "jp/urls"
+      ]
+    },
+    {
+      "group": "リクエスト処理",
+      "pages": [
+        "jp/controllers",
+        "jp/middleware",
+        "jp/requests",
+        "jp/validation",
+        "jp/responses",
+        "jp/session"
+      ]
+    },
+    {
+      "group": "データベース",
+      "pages": [
+        "jp/migrations",
+        "jp/seeding",
+        "jp/eloquent",
+        "jp/eloquent-relationships",
+        "jp/eloquent-factories"
+      ]
+    },
+    {
+      "group": "認証",
+      "pages": [
+        "jp/authentication",
+        "jp/starter-kits",
+        "jp/passwords",
+        "jp/socialite"
+      ]
+    },
+    {
+      "group": "テストとデプロイ",
+      "pages": [
+        "jp/testing",
+        "jp/http-tests",
+        "jp/mocking",
+        "jp/deployment"
+      ]
+    },
+    {
+      "group": "AI開発支援",
+      "pages": [
+        "jp/ai"
+      ]
+    }
+  ]
+}

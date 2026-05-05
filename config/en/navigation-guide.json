@@ -1,0 +1,139 @@
+{
+  "tab": "Guide",
+  "groups": [
+    {
+      "group": "Architecture",
+      "pages": [
+        "en/lifecycle",
+        "en/service-container",
+        "en/service-providers",
+        "en/facades",
+        "en/contracts"
+      ]
+    },
+    {
+      "group": "Security",
+      "pages": [
+        "en/authorization",
+        "en/hashing",
+        "en/sanctum",
+        "en/encryption",
+        "en/precognition",
+        "en/passport"
+      ]
+    },
+    {
+      "group": "Mail & Notifications",
+      "pages": [
+        "en/mail",
+        "en/notifications"
+      ]
+    },
+    {
+      "group": "Async Processing",
+      "pages": [
+        "en/queues",
+        "en/horizon",
+        "en/events",
+        "en/concurrency",
+        "en/scheduling"
+      ]
+    },
+    {
+      "group": "Caching",
+      "pages": [
+        "en/cache",
+        "en/redis"
+      ]
+    },
+    {
+      "group": "Database",
+      "pages": [
+        "en/query-builder",
+        "en/pagination",
+        "en/eloquent-resources"
+      ]
+    },
+    {
+      "group": "Eloquent",
+      "pages": [
+        "en/eloquent-mutators",
+        "en/scout",
+        "en/eloquent-serialization"
+      ]
+    },
+    {
+      "group": "HTTP & External",
+      "pages": [
+        "en/http-client"
+      ]
+    },
+    {
+      "group": "Console & CLI",
+      "pages": [
+        "en/artisan",
+        "en/prompts",
+        "en/processes",
+        "en/pint",
+        "en/dusk"
+      ]
+    },
+    {
+      "group": "Frontend",
+      "pages": [
+        "en/vite",
+        "en/folio"
+      ]
+    },
+    {
+      "group": "File Storage",
+      "pages": [
+        "en/filesystem"
+      ]
+    },
+    {
+      "group": "Debug & Monitoring",
+      "pages": [
+        "en/context",
+        "en/error-handling",
+        "en/logging",
+        "en/pulse"
+      ]
+    },
+    {
+      "group": "Helpers & Collections",
+      "pages": [
+        "en/helpers",
+        "en/strings",
+        "en/collections"
+      ]
+    },
+    {
+      "group": "Internationalization",
+      "pages": [
+        "en/localization"
+      ]
+    },
+    {
+      "group": "AI Development",
+      "pages": [
+        "en/boost",
+        "en/mcp",
+        "en/ai-sdk"
+      ]
+    },
+    {
+      "group": "Real-time",
+      "pages": [
+        "en/broadcasting",
+        "en/reverb"
+      ]
+    },
+    {
+      "group": "Performance",
+      "pages": [
+        "en/octane"
+      ]
+    }
+  ]
+}
