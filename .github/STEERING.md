@@ -25,8 +25,8 @@
 - [ ] スターターキットの作り方ページ。「パッケージ開発」グループに追加。
   - 公式ドキュメントでは短い説明しかない。
   - スターターキットを作るならパッケージと同様にLaravelのバージョンアップに追従する作業が必要になる。
-  - テンプレートとなるLaravelプロジェクトを作成。composer.jsonの`name`にユニークな名前を付けて [Packagist](https://packagist.org/) に登録。`laravel new my-app --using=example/starter-kit`コマンドではこの`name`を使う。
-  - composer.jsonの`scripts`はLaravel公式スターターキットを参考に`post-root-package-install`や`post-create-project-cmd`を記述。
+  - 特殊なことはなく、テンプレートとなるLaravelプロジェクトを作成、composer.jsonの`name`にユニークな名前を付けて [Packagist](https://packagist.org/) に登録。`laravel new my-app --using=example/starter-kit`コマンドではこの`name`を使う。
+  - composer.jsonの`scripts`はLaravel公式スターターキットを参考に`post-root-package-install`や`post-create-project-cmd`を記述。データベースを使うならそのまま同じ内容になる。
   - `.gitattributes`でスターターキットのリポジトリには含めるけどユーザーが作成したプロジェクトからは除くファイルを指定できる。`LICENSE export-ignore`や`composer.lock export-ignore`など。
   - 参考リンク。packages/laravel-console-starter
 
