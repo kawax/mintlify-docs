@@ -16,7 +16,7 @@
 
 - パッケージ開発者向けのページを増やす。管理者は大量のパッケージを作ってきて知見があるのでいくらでもネタはある。パッケージを一度作って終わりではなくLaravel・PHPのバージョンアップに合わせてメンテナンスを年単位で継続できるようになるまでのガイドを提供する。
   - `package-versioning`が作られたけど今後もネタがあれば継続。
-- [ ] Fortifyページ https://github.com/laravel/docs/blob/13.x/fortify.md
+- [x] Fortifyページ https://github.com/laravel/docs/blob/13.x/fortify.md
   - Fortifyは単体で使うよりスターターキットの一部なので公式ドキュメントそのままではなくadvanced用のページを作る。スターターキットで使われている機能だけ解説。
   - 歴史。Laravel8(2020年)のJetstreamスターターキットと同時に登場。当時はJetstreamをインストールしたら一緒にインストールされる裏方扱いだった。「フロントエンドに依存しない認証バックエンド」なので結局JetstreamやBreezeから現行スターターキットに変わっても使われていてFortifyが一番長生きしている。
   - https://github.com/laravel/react-starter-kit/blob/main/app/Providers/FortifyServiceProvider.php, https://github.com/laravel/react-starter-kit/blob/main/config/fortify.php 現行スターターキットでもFortifyが使われている。実は最初はFortifyを使ってなかったけど二要素認証に対応するためにFortifyを使うようになったので認証機能などもFortifyに置き換わった。
