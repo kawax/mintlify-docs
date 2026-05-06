@@ -196,6 +196,7 @@
                 "jp/packages/laravel-copilot-sdk/ai-sdk",
                 "jp/packages/laravel-copilot-sdk/bundle-cli",
                 "jp/packages/laravel-copilot-sdk/tcp-mode",
+                "jp/packages/laravel-copilot-sdk/remote-sessions",
                 "jp/packages/laravel-copilot-sdk/session-context",
                 "jp/packages/laravel-copilot-sdk/session-lifecycle-event",
                 "jp/packages/laravel-copilot-sdk/telemetry",
