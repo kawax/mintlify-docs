@@ -71,6 +71,7 @@
         {
           "group": "Authentication Extensions",
           "pages": [
+            "en/advanced/fortify",
             "en/advanced/custom-auth-guard"
           ]
         },
