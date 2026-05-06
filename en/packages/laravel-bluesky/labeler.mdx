@@ -6,7 +6,7 @@ description: "Build and operate a Labeler server with Laravel Bluesky. Covers Ab
 <Warning>
 Labeler is an advanced feature. Because the server must run continuously, it is intended for developers who use Laravel Forge or can configure their own production server. It is not recommended for Laravel beginners. No support is provided.
 
-**Laravel Cloud is not supported.** A Labeler must run as a persistent WebSocket server, which is not possible within Laravel Cloud's constraints.
+**Laravel Cloud is not supported.** A Labeler must run as a persistent WebSocket server and requires custom nginx configuration, but Laravel Cloud does not allow nginx configuration changes, so a Labeler cannot be run there.
 </Warning>
 
 ## What is a Labeler?
