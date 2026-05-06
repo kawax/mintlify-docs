@@ -1,0 +1,106 @@
+---
+title: "Remote Sessions"
+description: "Enable remote sessions in Laravel Copilot SDK to access the same session from the web or mobile via GitHub Mission Control."
+---
+
+## Remote Sessions
+
+Remote sessions let you access the same Copilot session from GitHub web and mobile via Mission Control.
+When enabled, the SDK connects each session to Mission Control and issues a URL that can be shared as a link or QR code.
+
+## Prerequisites
+
+- The user must be authenticated (GitHub token or logged-in user)
+- The session's `workingDirectory` must be a GitHub repository
+
+## Always-on (client-level)
+
+When `remote: true` is set, every session in a GitHub repository automatically gets a remote URL.
+
+Rather than hardcoding this in `config/copilot.php`, a more flexible approach is to enable `remote: true` only when calling `useStdio()` for the specific operation that needs it.
+
+<Info>
+The `remote` option only applies when the SDK spawns the CLI process. It is **stdio mode only** and is ignored when connecting to an external server via `useTcp()`.
+</Info>
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Enums\SessionEventType;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Support\PermissionHandler;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SessionEvent;
+
+$config = new SessionConfig(
+    workingDirectory: '/path/to/github-repo',
+    onPermissionRequest: PermissionHandler::approveAll(),
+);
+
+$stdioConfig = config('copilot');
+$stdioConfig['remote'] = true;
+
+Copilot::useStdio($stdioConfig)->start(function (CopilotSession $session): void {
+    $session->on(SessionEventType::SESSION_INFO, function (SessionEvent $event): void {
+        if ($event->data('infoType') === 'remote') {
+            echo 'Remote URL: '.$event->data('url').PHP_EOL;
+        }
+    });
+}, config: $config);
+```
+
+## On-demand (per-session toggle)
+
+To start sharing mid-session, toggle remote access via RPC.
+This is equivalent to the CLI's `/remote on` and `/remote off` commands.
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+
+Copilot::start(function (CopilotSession $session): void {
+    $result = $session->rpc()->remote()->enable();
+
+    if ($result->url !== null) {
+        echo 'Remote URL: '.$result->url.PHP_EOL;
+    }
+
+    // Stop sharing
+    $session->rpc()->remote()->disable();
+});
+```
+
+## QR code generation
+
+Render the remote URL as a QR code for easy mobile access.
+[BaconQrCode](https://github.com/Bacon/BaconQRCode), which is also used by Laravel Fortify, works well here.
+
+```php
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
+
+$writer = new Writer(
+    new ImageRenderer(
+        new RendererStyle(256),
+        new SvgImageBackEnd(),
+    ),
+);
+
+$svg = $writer->writeString($result->url ?? '');
+```
+
+## Notes
+
+- The `remote` option only applies when the SDK spawns the CLI process. It is ignored when connecting to an external server via `useTcp()`.
+- If the working directory is not a GitHub repository, remote setup is silently skipped in always-on mode. In on-demand mode (`remote()->enable()`), this may return an error.
+- Ensure authentication is configured correctly (`github_token` or `use_logged_in_user`).
+
+## See also
+
+- [RPC](/en/packages/laravel-copilot-sdk/rpc)
+- [TCP mode](/en/packages/laravel-copilot-sdk/tcp-mode)
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

@@ -1,0 +1,106 @@
+---
+title: "Remote Sessions"
+description: "Laravel Copilot SDK でリモートセッションを有効にし、GitHub の Mission Control 経由でウェブやモバイルから同じセッションにアクセスする方法を説明します。"
+---
+
+## Remote Sessions
+
+Remote Sessions を有効にすると、GitHub の Mission Control 経由でウェブやモバイルから同じセッションにアクセスできます。
+有効化すると各セッションが Mission Control に接続され、リンクや QR コードとして共有できる URL が発行されます。
+
+## 前提条件
+
+- ユーザーが認証済みであること（GitHub トークンまたはログイン済みユーザー）
+- `workingDirectory` が GitHub リポジトリであること
+
+## クライアントレベルで有効化（常時 ON）
+
+`remote: true` を有効化すると、GitHub リポジトリ内のすべてのセッションで自動的にリモート URL が発行されます。
+
+`config/copilot.php` に固定で追加するより、必要な処理だけ `useStdio()` で `remote: true` を有効化する使い方が扱いやすいです。
+
+<Info>
+`remote` オプションは SDK が CLI プロセスを起動する場合にのみ有効です。つまり **stdio モード専用**です。`useTcp()` など外部サーバーへ接続する場合は無視されます。
+</Info>
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Enums\SessionEventType;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Support\PermissionHandler;
+use Revolution\Copilot\Types\SessionConfig;
+use Revolution\Copilot\Types\SessionEvent;
+
+$config = new SessionConfig(
+    workingDirectory: '/path/to/github-repo',
+    onPermissionRequest: PermissionHandler::approveAll(),
+);
+
+$stdioConfig = config('copilot');
+$stdioConfig['remote'] = true;
+
+Copilot::useStdio($stdioConfig)->start(function (CopilotSession $session): void {
+    $session->on(SessionEventType::SESSION_INFO, function (SessionEvent $event): void {
+        if ($event->data('infoType') === 'remote') {
+            echo 'Remote URL: '.$event->data('url').PHP_EOL;
+        }
+    });
+}, config: $config);
+```
+
+## セッションごとに有効化（オンデマンド）
+
+途中からリモート共有を開始したい場合は RPC で切り替えます。
+CLI の `/remote on` および `/remote off` コマンドと同等の操作です。
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+
+Copilot::start(function (CopilotSession $session): void {
+    $result = $session->rpc()->remote()->enable();
+
+    if ($result->url !== null) {
+        echo 'Remote URL: '.$result->url.PHP_EOL;
+    }
+
+    // 共有停止
+    $session->rpc()->remote()->disable();
+});
+```
+
+## QR コード生成
+
+取得したリモート URL は QR コードにしてモバイルへ渡せます。
+Laravel Fortify でも使われている [BaconQrCode](https://github.com/Bacon/BaconQRCode) が利用できます。
+
+```php
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
+
+$writer = new Writer(
+    new ImageRenderer(
+        new RendererStyle(256),
+        new SvgImageBackEnd(),
+    ),
+);
+
+$svg = $writer->writeString($result->url ?? '');
+```
+
+## 注意点
+
+- `remote` オプションは SDK が CLI プロセスを起動する場合にのみ有効です。`useTcp()` など外部サーバー接続時は無視されます。
+- `workingDirectory` が GitHub リポジトリでない場合、常時 ON モードではリモート設定がスキップされます。オンデマンド有効化（`remote()->enable()`）ではエラーになる場合があります。
+- 認証情報（`github_token` または `use_logged_in_user`）を適切に設定してください。
+
+## 参考
+
+- [RPC](/jp/packages/laravel-copilot-sdk/rpc)
+- [TCP モード](/jp/packages/laravel-copilot-sdk/tcp-mode)
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>
