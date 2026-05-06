@@ -418,16 +418,19 @@ How you actually label content is entirely up to your application. The sample im
 // Example listener: label a user when they follow you
 
 use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Events\Jetstream\JetstreamCommitMessage;
+use Revolution\Bluesky\Types\RepoRef;
 
-public function handle(object $event): void
+public function handle(JetstreamCommitMessage $event): void
 {
-    $followerDid = $event->did;
+    $message = $event->message;
+    $followerDid = data_get($message, 'did');
 
     Bluesky::login(
         identifier: config('bluesky.labeler.identifier'),
         password: config('bluesky.labeler.password'),
-    )->addLabels(
-        subject: $followerDid,
+    )->createLabels(
+        subject: RepoRef::to($followerDid),
         labels: ['artisan'],
     );
 }
@@ -436,6 +439,6 @@ public function handle(object $event): void
 To handle missed events, the sample also labels followers on a scheduled task as a fallback.
 
 <Info>
-Source: [docs/labeler.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/labeler.md)  
+Source: [docs/labeler.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/labeler.md)
 Sample: [invokable/laralabeler](https://github.com/invokable/laralabeler)
 </Info>

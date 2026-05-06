@@ -419,17 +419,20 @@ php artisan bluesky:labeler:server start --firehose
 // app/Listeners/FollowListener.php のイメージ
 
 use Revolution\Bluesky\Facades\Bluesky;
+use Revolution\Bluesky\Events\Jetstream\JetstreamCommitMessage;
+use Revolution\Bluesky\Types\RepoRef;
 
-public function handle(object $event): void
+public function handle(JetstreamCommitMessage $event): void
 {
-    $followerDid = $event->did;
+    $message = $event->message;
+    $followerDid = data_get($message, 'did');
 
     // Bluesky の Ozone API 経由でラベルを付与
     Bluesky::login(
         identifier: config('bluesky.labeler.identifier'),
         password: config('bluesky.labeler.password'),
-    )->addLabels(
-        subject: $followerDid,
+    )->createLabels(
+        subject: RepoRef::to($followerDid),
         labels: ['artisan'],
     );
 }
@@ -438,6 +441,6 @@ public function handle(object $event): void
 イベント取りこぼしに備えて、タスクスケジュールでもラベル付けを行うことを推奨します。
 
 <Info>
-Source: [docs/labeler.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/labeler.md)  
+Source: [docs/labeler.md](https://github.com/invokable/laravel-bluesky/blob/main/docs/labeler.md)
 Sample: [invokable/laralabeler](https://github.com/invokable/laralabeler)
 </Info>
