@@ -37,7 +37,8 @@
             "jp/advanced/package-versioning",
             "jp/advanced/package-testing",
             "jp/advanced/package-workbench",
-            "jp/advanced/generator-command"
+            "jp/advanced/generator-command",
+            "jp/advanced/starter-kit-creation"
           ]
         },
         {
