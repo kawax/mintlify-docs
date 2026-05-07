@@ -97,11 +97,11 @@ flowchart TD
     E --> F["必要に応じて migrate / npm install を実行"]
 ```
 
-`NewCommand.php` で確認したい箇所:
+[NewCommand.php](https://github.com/laravel/installer/blob/master/src/NewCommand.php) で確認したい箇所:
 
-- [--using オプション定義](https://github.com/laravel/installer/blob/master/src/NewCommand.php#L119-L120)
-- [`create-project` と `post-root-package-install` の実行](https://github.com/laravel/installer/blob/master/src/NewCommand.php#L521-L569)
-- [`getStarterKit()` の実装](https://github.com/laravel/installer/blob/master/src/NewCommand.php#L1237-L1255)
+- [--using オプション定義](https://github.com/laravel/installer/blob/958a4e7c1386199a63d3c5e49a18b2e5c2ad1600/src/NewCommand.php#L119)
+- [`create-project` と `post-root-package-install` の実行](https://github.com/laravel/installer/blob/958a4e7c1386199a63d3c5e49a18b2e5c2ad1600/src/NewCommand.php#L521-L569)
+- [`getStarterKit()` の実装](https://github.com/laravel/installer/blob/958a4e7c1386199a63d3c5e49a18b2e5c2ad1600/src/NewCommand.php#L1237-L1255)
 
 ## フロントエンドフレームワークの選択
 
