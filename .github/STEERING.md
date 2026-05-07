@@ -30,6 +30,7 @@
   - `.gitattributes`でスターターキットのリポジトリには含めるけどユーザーが作成したプロジェクトからは除くファイルを指定できる。`LICENSE export-ignore`や`composer.lock export-ignore`など。
   - `laravel new`実行時のフローを [NewCommand](https://github.com/laravel/installer/blob/master/src/NewCommand.php) を元に説明。
   - 参考リンク。packages/laravel-console-starter
+  - 日本語ページはOK
 
 ## blog ページ案
 
@@ -51,7 +52,15 @@
 - [ ] `laravel/ui`からFortifyへの移行ガイド
   - 古くからのプロジェクト、もしくはよく分からず`laravel/ui`で作り始めてしまったプロジェクト用。`laravel/ui`はLaravel13でも動くようにメンテナンスは続いているけどいつまでも古いパッケージに依存してるのは不安、かといって新しいスターターキットへのリニューアルも難しい場合はFortifyに移行すると少しだけ現行スターターキットと近くなる。
   - bootstrapベースのまま認証バックエンドだけFortifyに変更できる。
-  - 現行スターターキットと同様にFortifyServiceProviderで`Fortify::loginView()`などを設定するのがポイント。`Fortify::viewPrefix('auth.');`
+  - 現行スターターキットと同様にFortifyServiceProviderでViewを設定するのがポイント。
+```php
+        Fortify::viewPrefix('auth.');
+        Fortify::requestPasswordResetLinkView('auth.passwords.email');
+        Fortify::resetPasswordView('auth.passwords.reset');
+        Fortify::confirmPasswordView('auth.passwords.confirm');
+        Fortify::verifyEmailView('auth.verify');
+```
+  - Bladeファイルも少し修正が必要になるかもしれないけど複雑な作業はなく移行できる。
   - PC内にLaravel8当時の記事ファイルが残ってるので日本語ページを作成→管理者が修正→英語ページを作成の流れ。
 
 ## packages ページ案
