@@ -28,6 +28,7 @@
   - 特殊なことはなく、テンプレートとなるLaravelプロジェクトを作成、composer.jsonの`name`にユニークな名前を付けて [Packagist](https://packagist.org/) に登録。`laravel new my-app --using=example/starter-kit`コマンドではこの`name`を使う。
   - composer.jsonの`scripts`はLaravel公式スターターキットを参考に`post-root-package-install`や`post-create-project-cmd`を記述。データベースを使うならそのまま同じ内容になる。
   - `.gitattributes`でスターターキットのリポジトリには含めるけどユーザーが作成したプロジェクトからは除くファイルを指定できる。`LICENSE export-ignore`や`composer.lock export-ignore`など。
+  - `laravel new`実行時のフローを [NewCommand](https://github.com/laravel/installer/blob/master/src/NewCommand.php) を元に説明。
   - 参考リンク。packages/laravel-console-starter
 
 ## blog ページ案
