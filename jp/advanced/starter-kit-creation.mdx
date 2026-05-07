@@ -105,17 +105,17 @@ flowchart TD
 
 ## フロントエンドフレームワークの選択
 
-Laravel 13 の公式スターターキットは複数の選択肢を持ちます。あなたのスターターキットでも、対象を明確に決めて依存を固定してください。
+Laravel 13 の公式スターターキットは React / Vue / Svelte / Livewire を提供していますが、独自スターターキットはこの構成に合わせる必要はありません。目的に合わせて CSS や component library、認証方式を自由に決めて問題ありません。
 
 | 選択肢 | 主な構成 | 向いているケース |
 | --- | --- | --- |
-| React | Inertia 3 + React + Tailwind | ReactでSPAライクに構築したい |
-| Vue | Inertia 3 + Vue + Tailwind | Vue中心のチームで開発したい |
-| Svelte | Inertia 3 + Svelte + Tailwind | Svelteの軽量性を活かしたい |
-| Livewire | Livewire 4 + Blade + Flux UI | PHP中心でインタラクティブUIを作りたい |
+| 公式 React / Vue / Svelte / Livewire | Inertia 3 や Livewire 4 を使う公式構成 | 公式に近い開発体験を提供したい |
+| 独自フロントエンド | 任意のCSSやcomponent library | 既存デザインシステムや別CSS基盤を使いたい |
+| シンプル Blade キット | Blade中心、最小限のフロント依存 | 軽量な構成で素早く導入したい |
+| 独自認証キット | Fortifyに限定しない（例: Socialite中心） | 特定の認証方式に絞りたい |
 
 <Info>
-  どれを選んでも認証のバックエンド方針は共通です。差分は主にフロントエンド構成と初期コンポーネント設計です。
+  コミュニティのスターターキットは、公式とは異なるCSS基盤を採用する例が一般的です。認証もFortify前提にせず、要件に合わせて設計してください。
 </Info>
 
 ## バージョンアップメンテナンス
