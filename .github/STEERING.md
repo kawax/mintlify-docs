@@ -22,7 +22,7 @@
   - https://github.com/laravel/react-starter-kit/blob/main/app/Providers/FortifyServiceProvider.php, https://github.com/laravel/react-starter-kit/blob/main/config/fortify.php 現行スターターキットでもFortifyが使われている。実は最初はFortifyを使ってなかったけど二要素認証に対応するためにFortifyを使うようになったので認証機能などもFortifyに置き換わった。
   - blog/passkeys-introduction.mdx で初期調査したパスキーはFortifyの機能として追加。公式ドキュメントはさっき更新されたばかり。スターターキットもパスキーに対応しそうだけどまだなのでドキュメント通りの説明を書いておいて後で更新する。passkeys-introduction.mdx は初期調査なので中身は変更せず「その後パスキーはFortifyの機能として追加されました」とFortifyページへリンク。
   - 日本語ページはOK。
-- [ ] スターターキットの作り方ページ。「パッケージ開発」グループに追加。
+- [x] スターターキットの作り方ページ。「パッケージ開発」グループに追加。
   - 公式ドキュメントでは短い説明しかない。
   - スターターキットを作るならパッケージと同様にLaravelのバージョンアップに追従する作業が必要になる。
   - 特殊なことはなく、テンプレートとなるLaravelプロジェクトを作成、composer.jsonの`name`にユニークな名前を付けて [Packagist](https://packagist.org/) に登録。`laravel new my-app --using=example/starter-kit`コマンドではこの`name`を使う。
