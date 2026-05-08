@@ -37,7 +37,8 @@
             "en/advanced/package-versioning",
             "en/advanced/package-testing",
             "en/advanced/package-workbench",
-            "en/advanced/generator-command"
+            "en/advanced/generator-command",
+            "en/advanced/starter-kit-creation"
           ]
         },
         {
