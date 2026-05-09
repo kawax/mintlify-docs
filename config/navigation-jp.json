@@ -120,6 +120,12 @@
           ]
         },
         {
+          "group": "認証",
+          "pages": [
+            "jp/blog/ui-to-fortify"
+          ]
+        },
+        {
           "group": "新リポジトリ調査",
           "pages": [
             "jp/blog/maestro-introduction",
