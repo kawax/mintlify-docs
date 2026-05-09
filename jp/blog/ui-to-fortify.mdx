@@ -1,0 +1,113 @@
+---
+title: "laravel/ui から Fortify への移行ガイド"
+description: "laravel/ui の認証スキャフォールドを使う既存プロジェクト向けに、認証バックエンドだけを Fortify へ移行する手順を解説します。"
+---
+
+## なぜ `laravel/ui` から移行するのか
+
+`laravel/ui` は Laravel 13 でも動作します。実際に `laravel/ui` の最新リリースは Laravel 13 compatibility を含んでいます。
+
+ただし、現行の公式スターターキットは Fortify ベースです。`laravel/ui` のまま運用を続けると、公式の現在地と少しずつズレていきます。  
+あなたが既存の Bootstrap + Blade 構成を維持しながら将来の保守性を上げたいなら、認証バックエンドを Fortify に寄せる移行が有効です。
+
+## 移行の全体像
+
+この移行は **認証バックエンドだけ** を置き換えます。UI の大規模リニューアルは不要です。
+
+- Fortify で認証ルート・認証処理を提供する
+- 既存の Bootstrap + Blade テンプレートは活かす
+- 必要な範囲でフォームの `action` や入力名を調整する
+
+<Info>
+  Fortify は headless な認証バックエンドです。Fortify 自体は UI を提供しないので、既存の Blade をそのまま活用できます。
+</Info>
+
+## Fortify のインストール手順
+
+<Steps>
+  <Step title="Fortify パッケージを追加する">
+    ```bash
+    composer require laravel/fortify
+    ```
+  </Step>
+  <Step title="Fortify のリソースを公開する">
+    ```bash
+    php artisan fortify:install
+    ```
+  </Step>
+  <Step title="マイグレーションを実行する">
+    ```bash
+    php artisan migrate
+    ```
+  </Step>
+  <Step title="`laravel/ui` が追加した Auth ルートを削除する">
+    `routes/web.php` の `Auth::routes();` や、`Auth::routes([...])` を削除します。Fortify が `/login`、`/register`、`/forgot-password` などのルートを提供するため、重複を避ける必要があります。
+  </Step>
+</Steps>
+
+## `FortifyServiceProvider` を設定する
+
+`php artisan fortify:install` で公開された `app/Providers/FortifyServiceProvider.php` でビューを紐付けます。  
+既存の `resources/views/auth` をそのまま使う場合は、次の設定が移行のポイントです。
+
+```php
+use Laravel\Fortify\Fortify;
+
+public function boot(): void
+{
+    Fortify::viewPrefix('auth.');
+    Fortify::requestPasswordResetLinkView('auth.passwords.email');
+    Fortify::resetPasswordView('auth.passwords.reset');
+    Fortify::confirmPasswordView('auth.passwords.confirm');
+    Fortify::verifyEmailView('auth.verify');
+}
+```
+
+## Blade テンプレートを最小修正する
+
+移行後は、既存 Blade で次の点を確認してください。
+
+- フォームの `action` が Fortify のエンドポイントに向いているか（例: `/login`, `/register`, `/forgot-password`）
+- `@csrf` がすべての POST フォームに含まれているか
+- 入力名が Fortify の期待値に一致しているか（`email`, `password`, `password_confirmation` など）
+
+```blade
+<form method="POST" action="/login">
+    @csrf
+
+    <input type="email" name="email" required>
+    <input type="password" name="password" required>
+    <button type="submit">Login</button>
+</form>
+```
+
+## 動作確認チェックリスト
+
+移行後は、少なくとも次を確認してください。
+
+<Steps>
+  <Step title="ログイン / ログアウトを確認する">
+    既存ユーザーでログインし、セッションが正しく維持されることを確認します。
+  </Step>
+  <Step title="登録を確認する">
+    新規ユーザー登録が通り、想定した画面へリダイレクトされることを確認します。
+  </Step>
+  <Step title="パスワードリセットを確認する">
+    リセットメール送信、トークン付きリンク、再設定完了まで一連のフローを確認します。
+  </Step>
+</Steps>
+
+## 移行後の利点
+
+この移行を行うと、あなたのアプリは現行スターターキットと同じ Fortify ベースに近づきます。  
+その結果、将来的に 2FA やパスキー（Passkeys）を有効化しやすくなります。
+
+<Card title="Laravel Fortify とスターターキット" icon="shield-check" href="/jp/advanced/fortify">
+  Fortify の内部設計、2FA、Passkeys の有効化まで進めたい場合はこのページを参照してください。
+</Card>
+
+## 参考リンク
+
+- [Laravel Fortify リポジトリ](https://github.com/laravel/fortify)
+- [Laravel 13.x Fortify ドキュメント](https://github.com/laravel/docs/blob/13.x/fortify.md)
+- [React Starter Kit の FortifyServiceProvider](https://github.com/laravel/react-starter-kit/blob/main/app/Providers/FortifyServiceProvider.php)
