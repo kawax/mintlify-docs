@@ -67,18 +67,45 @@ public function boot(): void
 
 移行後は、既存 Blade で次の点を確認してください。
 
-- フォームの `action` が Fortify のエンドポイントに向いているか（例: `/login`, `/register`, `/forgot-password`）
-- `@csrf` がすべての POST フォームに含まれているか
-- 入力名が Fortify の期待値に一致しているか（`email`, `password`, `password_confirmation` など）
+- フォームの `action` が Fortify のエンドポイントに向いているか（例: `/login`, `/register`, `/forgot-password`）。ほとんどは`route('login')`や`route('register')`のルート名での指定なので修正箇所は少ないはずです。`route(verification.resend')`だけはFortifyでは`route('verification.send')`なので修正が必要です。
 
-```blade
-<form method="POST" action="/login">
-    @csrf
+`auth/passwords/reset.balde.php`は2箇所修正が必要です。
+```
+<input type="hidden" name="token" value="{{ $token }}">
+```
+↓
+```
+<input type="hidden" name="token" value="{{ $request->route('token') }}">
+```
 
-    <input type="email" name="email" required>
-    <input type="password" name="password" required>
-    <button type="submit">Login</button>
-</form>
+```
+{{ $email ?? old('email') }}
+```
+↓
+```
+{{ old('email', $request->email) }}
+```
+
+## 不要な機能を無効化
+
+`laravel/ui`になかった機能は使えないので`config/fortify.php`で無効化します。新しくviewファイルを用意すれば有効化できます。
+
+```php
+    'features' => [
+        Features::registration(),
+        Features::resetPasswords(),
+        // Features::emailVerification(),
+        // Features::updateProfileInformation(),
+        // Features::updatePasswords(),
+        // Features::twoFactorAuthentication([
+        //     'confirm' => true,
+        //     'confirmPassword' => true,
+            // 'window' => 0,
+        // ]),
+        // Features::passkeys([
+        //     'confirmPassword' => true,
+        // ]),
+    ],
 ```
 
 ## 動作確認チェックリスト
