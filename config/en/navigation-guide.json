@@ -134,6 +134,12 @@
       "pages": [
         "en/octane"
       ]
+    },
+    {
+      "group": "Package Development",
+      "pages": [
+        "en/advanced/forwards-calls"
+      ]
     }
   ]
 }
