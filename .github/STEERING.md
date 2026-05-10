@@ -62,6 +62,7 @@
 ```
   - Bladeファイルも少し修正が必要になるかもしれないけど複雑な作業はなく移行できる。
   - PC内にLaravel8当時の記事ファイルが残ってるので日本語ページを作成→管理者が修正→英語ページを作成の流れ。
+  - 日本語版はOK
 
 ## packages ページ案
 - [x] Laravel Notification for Discord(Webhook)
