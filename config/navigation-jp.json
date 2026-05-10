@@ -23,6 +23,7 @@
             "jp/advanced/pipeline",
             "jp/advanced/macroable",
             "jp/advanced/conditionable",
+            "jp/advanced/forwards-calls",
             "jp/advanced/tap",
             "jp/advanced/higher-order-messages",
             "jp/advanced/collection-deep-dive",

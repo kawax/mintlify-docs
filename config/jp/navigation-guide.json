@@ -144,12 +144,6 @@
         "jp/mcp",
         "jp/ai-sdk"
       ]
-    },
-    {
-      "group": "パッケージ開発",
-      "pages": [
-        "jp/advanced/forwards-calls"
-      ]
     }
   ]
 }
