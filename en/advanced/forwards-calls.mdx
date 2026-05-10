@@ -1,0 +1,185 @@
+---
+title: "The ForwardsCalls trait"
+description: "Use Illuminate\\Support\\Traits\\ForwardsCalls to build safe proxy/decorator APIs with method forwarding and fluent chains."
+---
+
+## What is the ForwardsCalls trait?
+
+`Illuminate\Support\Traits\ForwardsCalls` standardizes method delegation from one object to another. Laravel uses it in wrapper-style classes across Eloquent, Mail, and Events.
+
+<Info>
+  The implementation is in `src/Illuminate/Support/Traits/ForwardsCalls.php`. When a forwarded method does not exist, it rethrows a normalized `BadMethodCallException` with the caller class name.
+</Info>
+
+```mermaid
+flowchart LR
+  A["Your proxy class"] -->|__call| B["forwardCallTo()"]
+  B --> C["Inner driver / builder"]
+  C --> D["Return value"]
+  D --> A
+```
+
+## Core API
+
+### `forwardCallTo($object, $method, $parameters)`
+
+Forwards a method call directly to another object. You usually call this from `__call()`.
+
+### `forwardDecoratedCallTo($object, $method, $parameters)`
+
+Use this for fluent decorators/builders. If the forwarded method returns the inner object itself, this method returns the outer object (`$this`) instead, so your chain stays on the wrapper.
+
+### Combining with `__call()` and `__callStatic()`
+
+`ForwardsCalls` does not implement magic methods for you. You implement `__call()` (and optionally `__callStatic()`) in your class, then call `forwardCallTo` methods inside them.
+
+## Real Laravel usage
+
+<Steps>
+  <Step title="Facade provides static proxying">
+    `Illuminate\Support\Facades\Facade` forwards in `__callStatic()` directly to the facade root instance. Because Facade is static proxying, it uses direct delegation rather than `ForwardsCalls`.
+  </Step>
+  <Step title="Eloquent Builder uses forwardCallTo">
+    `Illuminate\Database\Eloquent\Builder::__call()` forwards unresolved methods to the inner query builder with `forwardCallTo($this->query, ...)`, then returns `$this` to keep fluent chains.
+  </Step>
+  <Step title="Relation / Mail / Events use forwardDecoratedCallTo">
+    `Illuminate\Database\Eloquent\Relations\Relation`, `Illuminate\Mail\Message`, and `Illuminate\Events\NullDispatcher` use `forwardDecoratedCallTo` to preserve the outer API while delegating work.
+  </Step>
+</Steps>
+
+## Basic proxy implementation (`forwardCallTo`)
+
+```php
+use Illuminate\Support\Traits\ForwardsCalls;
+
+class CourierProxy
+{
+    use ForwardsCalls;
+
+    public function __construct(
+        protected CourierDriver $driver
+    ) {}
+
+    public function __call(string $method, array $parameters): mixed
+    {
+        return $this->forwardCallTo($this->driver, $method, $parameters);
+    }
+}
+```
+
+This pattern exposes the inner driver's public API through your wrapper class.
+
+## Fluent proxy implementation (`forwardDecoratedCallTo`)
+
+```php
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Traits\ForwardsCalls;
+
+class QueryProxy
+{
+    use ForwardsCalls;
+
+    public function __construct(
+        protected Builder $query
+    ) {}
+
+    public function __call(string $method, array $parameters): static
+    {
+        $this->forwardDecoratedCallTo($this->query, $method, $parameters);
+
+        return $this;
+    }
+
+    public function get(): \Illuminate\Support\Collection
+    {
+        return $this->query->get();
+    }
+}
+```
+
+```php
+$users = (new QueryProxy(User::query()))
+    ->where('active', true)
+    ->orderByDesc('created_at')
+    ->limit(10)
+    ->get();
+```
+
+<Tip>
+  Prefer `forwardDecoratedCallTo` over manual `return $this` glue logic. It handles the "inner object returned itself" case consistently.
+</Tip>
+
+## Automatic `BadMethodCallException`
+
+When a method is missing on the forwarded object, `ForwardsCalls` rethrows a `BadMethodCallException` using the wrapper class name.
+
+```php
+try {
+    (new CourierProxy($driver))->missingMethod();
+} catch (\BadMethodCallException $e) {
+    // Example: Call to undefined method App\Services\CourierProxy::missingMethod()
+    report($e);
+}
+```
+
+This keeps error messages aligned with the API your users call.
+
+## Comparing with Macroable
+
+| Topic | `Macroable` | `ForwardsCalls` |
+|---|---|---|
+| Goal | Add new methods to a class | Delegate calls to another object |
+| Main entry points | `macro()`, `mixin()` | `forwardCallTo()`, `forwardDecoratedCallTo()` |
+| Best fit | API extension | Proxy / Decorator / Adapter |
+
+<Warning>
+  If your goal is "add new methods", `ForwardsCalls` is the wrong tool. Calls still fail when the inner object does not implement that method. Use `Macroable` for true API extension.
+</Warning>
+
+## Package development patterns
+
+### 1) Driver-switching manager
+
+```php
+use Illuminate\Support\Traits\ForwardsCalls;
+
+class SmsManager
+{
+    use ForwardsCalls;
+
+    public function __construct(
+        protected SmsDriver $driver
+    ) {}
+
+    public function via(string $name): static
+    {
+        $this->driver = app(SmsDriverFactory::class)->make($name);
+
+        return $this;
+    }
+
+    public function __call(string $method, array $parameters): mixed
+    {
+        return $this->forwardCallTo($this->driver, $method, $parameters);
+    }
+}
+```
+
+### 2) Adapter for multiple backends
+
+Use one stable API while switching among HTTP, queue, or WebSocket backends internally.
+
+### 3) Test spy/stub wrappers
+
+Inject a spy driver and route calls through `forwardCallTo` so you can assert call count and arguments while keeping production-like behavior.
+
+## Related pages
+
+<Columns cols={2}>
+  <Card title="The Macroable trait" icon="puzzle-piece" href="/en/advanced/macroable">
+    Learn the API extension pattern for adding methods to existing classes.
+  </Card>
+  <Card title="The Conditionable trait" icon="git-branch" href="/en/advanced/conditionable">
+    Learn conditional fluent chains with `when()` and `unless()`.
+  </Card>
+</Columns>
