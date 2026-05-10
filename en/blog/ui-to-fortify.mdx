@@ -1,0 +1,141 @@
+---
+title: "Migration guide: laravel/ui to Fortify"
+description: "A step-by-step guide to migrating your authentication backend from laravel/ui to Laravel Fortify, while keeping your existing Bootstrap + Blade templates."
+---
+
+## Why migrate from `laravel/ui`
+
+`laravel/ui` still works with Laravel 13. In fact, the latest release of `laravel/ui` includes Laravel 13 compatibility.
+
+However, current official starter kits are Fortify-based. Continuing to use `laravel/ui` gradually widens the gap with the official direction.
+If you want to keep your existing Bootstrap + Blade setup while improving long-term maintainability, migrating your authentication backend to Fortify is a practical step.
+
+## Migration overview
+
+This migration replaces **only the authentication backend**. You do not need to overhaul your UI.
+
+- Fortify provides authentication routes and logic
+- Your existing Bootstrap + Blade templates remain intact
+- You make minimal adjustments to form `action` attributes and input names
+
+<Info>
+  Fortify is a headless authentication backend. Because Fortify ships no UI of its own, you can continue using your existing Blade views without major changes.
+</Info>
+
+## Install Fortify
+
+<Steps>
+  <Step title="Add the Fortify package">
+    ```bash
+    composer require laravel/fortify
+    ```
+  </Step>
+  <Step title="Publish Fortify resources">
+    ```bash
+    php artisan fortify:install
+    ```
+  </Step>
+  <Step title="Run migrations">
+    ```bash
+    php artisan migrate
+    ```
+  </Step>
+  <Step title="Remove the Auth routes added by laravel/ui">
+    Delete `Auth::routes();` or `Auth::routes([...])` from `routes/web.php`. Fortify registers routes such as `/login`, `/register`, and `/forgot-password`, so you must remove the duplicates.
+  </Step>
+</Steps>
+
+## Configure `FortifyServiceProvider`
+
+Wire up your views in the `app/Providers/FortifyServiceProvider.php` published by `php artisan fortify:install`.
+If you keep your existing views under `resources/views/auth`, the following configuration covers the migration:
+
+```php
+use Laravel\Fortify\Fortify;
+
+public function boot(): void
+{
+    Fortify::viewPrefix('auth.');
+    Fortify::requestPasswordResetLinkView('auth.passwords.email');
+    Fortify::resetPasswordView('auth.passwords.reset');
+    Fortify::confirmPasswordView('auth.passwords.confirm');
+    Fortify::verifyEmailView('auth.verify');
+}
+```
+
+## Make minimal Blade template changes
+
+After the migration, verify the following in your existing Blade views:
+
+- Form `action` attributes point to Fortify endpoints (e.g., `/login`, `/register`, `/forgot-password`). Most views already use named routes such as `route('login')` or `route('register')`, so very few changes are needed. The one exception is `route('verification.resend')`, which Fortify registers as `route('verification.send')` — update that reference.
+
+`auth/passwords/reset.blade.php` requires two changes:
+
+```blade
+<input type="hidden" name="token" value="{{ $token }}">
+```
+↓
+```blade
+<input type="hidden" name="token" value="{{ $request->route('token') }}">
+```
+
+```blade
+{{ $email ?? old('email') }}
+```
+↓
+```blade
+{{ old('email', $request->email) }}
+```
+
+## Disable unused features
+
+Features that did not exist in `laravel/ui` should be disabled in `config/fortify.php`. You can enable them later by providing the corresponding view files.
+
+```php
+'features' => [
+    Features::registration(),
+    Features::resetPasswords(),
+    // Features::emailVerification(),
+    // Features::updateProfileInformation(),
+    // Features::updatePasswords(),
+    // Features::twoFactorAuthentication([
+    //     'confirm' => true,
+    //     'confirmPassword' => true,
+    //     // 'window' => 0,
+    // ]),
+    // Features::passkeys([
+    //     'confirmPassword' => true,
+    // ]),
+],
+```
+
+## Verification checklist
+
+After the migration, verify at least the following:
+
+<Steps>
+  <Step title="Verify login and logout">
+    Log in with an existing user and confirm the session is maintained correctly.
+  </Step>
+  <Step title="Verify registration">
+    Register a new user and confirm the redirect goes to the expected screen.
+  </Step>
+  <Step title="Verify password reset">
+    Walk through the full reset flow: send the reset email, follow the token link, and complete the password change.
+  </Step>
+</Steps>
+
+## Benefits after migration
+
+Once you complete this migration, your application aligns with the same Fortify-based foundation used by current official starter kits.
+As a result, enabling 2FA and Passkeys in the future becomes significantly easier.
+
+<Card title="Laravel Fortify and starter kits" icon="shield-check" href="/en/advanced/fortify">
+  Learn about Fortify's internal design, 2FA, and how to enable Passkeys.
+</Card>
+
+## References
+
+- [Laravel Fortify repository](https://github.com/laravel/fortify)
+- [Laravel 13.x Fortify documentation](https://github.com/laravel/docs/blob/13.x/fortify.md)
+- [FortifyServiceProvider in React Starter Kit](https://github.com/laravel/react-starter-kit/blob/main/app/Providers/FortifyServiceProvider.php)
