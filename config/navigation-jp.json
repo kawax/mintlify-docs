@@ -25,6 +25,7 @@
             "jp/advanced/conditionable",
             "jp/advanced/forwards-calls",
             "jp/advanced/tap",
+            "jp/advanced/lottery",
             "jp/advanced/higher-order-messages",
             "jp/advanced/collection-deep-dive",
             "jp/advanced/manager"
