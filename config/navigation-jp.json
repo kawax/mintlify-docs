@@ -28,7 +28,8 @@
             "jp/advanced/lottery",
             "jp/advanced/higher-order-messages",
             "jp/advanced/collection-deep-dive",
-            "jp/advanced/manager"
+            "jp/advanced/manager",
+            "jp/advanced/php-reflection"
           ]
         },
         {
