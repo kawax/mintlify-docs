@@ -28,7 +28,8 @@
             "en/advanced/lottery",
             "en/advanced/higher-order-messages",
             "en/advanced/manager",
-            "en/advanced/collection-deep-dive"
+            "en/advanced/collection-deep-dive",
+            "en/advanced/php-reflection"
           ]
         },
         {
