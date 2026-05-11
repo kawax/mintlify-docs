@@ -18,9 +18,7 @@
   - `package-versioning`が作られたけど今後もネタがあれば継続。
 - [x] Fortifyページ
 - [x] スターターキットの作り方ページ
-- [ ] Reflectionの解説。デザインパターンに追加。Laravelのコアである [Container](https://github.com/laravel/framework/blob/13.x/src/Illuminate/Container/Container.php) を支える機能であり、フレームワークのいたる所で使われているので理解は大事。
-  - パッケージ開発でもReflectionを使いこなせるとできることが増える。packages/laravel-bluesky で少し使っている。
-  - 何より今ならAttributesを読み取るために必須。advanced/php-attributes
+- [x] Reflectionの解説
 
 ## blog ページ案
 
