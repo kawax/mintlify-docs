@@ -30,6 +30,12 @@
       ]
     },
     {
+      "group": "Payment",
+      "pages": [
+        "en/cashier"
+      ]
+    },
+    {
       "group": "Async Processing",
       "pages": [
         "en/queues",
