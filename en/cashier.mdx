@@ -62,13 +62,8 @@ $stripeCustomer = $user->createAsStripeCustomer();
 Create a subscription with `newSubscription()` and `create()`.
 
 ```php
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-
-Route::post('/user/subscribe', function (Request $request) {
-    $request->user()->newSubscription('default', 'price_monthly')
-        ->create($request->paymentMethodId);
-});
+$user->newSubscription('default', 'price_monthly')
+    ->create($paymentMethodId);
 ```
 
 ### Check status
@@ -131,12 +126,7 @@ composer require dompdf/dompdf
 ```
 
 ```php
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-
-Route::get('/user/invoice/{invoice}', function (Request $request, string $invoiceId) {
-    return $request->user()->downloadInvoice($invoiceId);
-});
+return $user->downloadInvoice($invoiceId);
 ```
 
 ## Webhook setup
