@@ -106,14 +106,10 @@ stateDiagram-v2
 ここでも `$paymentMethodId` には Stripe で作成した Payment Method ID を使います。
 
 ```php
-use Exception;
-
-try {
-    $payment = $user->charge(100, $paymentMethodId);
-} catch (Exception $e) {
-    // Charge failed...
-}
+$payment = $user->charge(100, $paymentMethodId);
 ```
+
+課金に失敗した場合、`charge()` は例外をスローします。
 
 ## 請求書
 

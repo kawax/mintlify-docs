@@ -105,14 +105,10 @@ stateDiagram-v2
 Use `charge()` for one-time billing. Pass the amount in the lowest currency denomination (for example, `100` means `$1.00` in USD). Use a Stripe Payment Method ID as `$paymentMethodId`.
 
 ```php
-use Exception;
-
-try {
-    $payment = $user->charge(100, $paymentMethodId);
-} catch (Exception $e) {
-    // Charge failed...
-}
+$payment = $user->charge(100, $paymentMethodId);
 ```
+
+If the charge fails, `charge()` throws an exception.
 
 ## Invoices
 
