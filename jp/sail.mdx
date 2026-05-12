@@ -5,16 +5,29 @@ description: "Laravel Sail を使って Docker ベースのローカル開発環
 
 ## Sail とは
 
-[Laravel Sail](https://github.com/laravel/sail) は、Laravel のデフォルト Docker 開発環境を操作するための軽量なコマンドラインインターフェースです。
-PHP、MySQL、Redis を使った Laravel アプリケーションを、Docker の事前知識がなくても構築できる優れた出発点を提供します。
+[Laravel Sail](https://github.com/laravel/sail) は、Laravel の Docker 開発環境を操作するための軽量なコマンドラインインターフェースです。
+PHP、MySQL、Redis を使った Laravel アプリケーションを、Docker の事前知識がなくても構築できます。
 
 Sail の中心にあるのは、プロジェクトルートに置かれる `compose.yaml` ファイルと `sail` スクリプトです。
 `sail` スクリプトは `compose.yaml` で定義された Docker コンテナを操作するための便利な CLI メソッドを提供します。
 
 Laravel Sail は macOS、Linux、および Windows（[WSL2](https://docs.microsoft.com/en-us/windows/wsl/about) 経由）で動作します。
 
+<Warning>
+  **Laravel 13 では Sail は標準の開発環境ではなくなりました。**
+  スケルトンの `composer.json` から `laravel/sail` が削除され、代わりに `composer setup` コマンドが用意されています。
+  標準はローカルの PHP + SQLite で動かす構成です。
+
+  ```shell
+  composer setup
+  composer dev
+  ```
+
+  Docker コンテナが必要な場合は、引き続き Sail をインストールして使うことができます。
+</Warning>
+
 <Info>
-  Sail はあくまでローカル開発専用のツールです。本番環境への利用は想定されていません。
+  Sail はローカル開発専用のツールです。本番環境への利用は想定されていません。
   本番環境では適切な Docker / クラウド構成を別途用意してください。
 </Info>
 
