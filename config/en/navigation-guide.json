@@ -134,6 +134,12 @@
       "pages": [
         "en/octane"
       ]
+    },
+    {
+      "group": "Local Development",
+      "pages": [
+        "en/sail"
+      ]
     }
   ]
 }
