@@ -144,6 +144,12 @@
         "jp/mcp",
         "jp/ai-sdk"
       ]
+    },
+    {
+      "group": "開発環境",
+      "pages": [
+        "jp/sail"
+      ]
     }
   ]
 }
