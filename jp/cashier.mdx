@@ -60,6 +60,7 @@ $stripeCustomer = $user->createAsStripeCustomer();
 ### 新規作成
 
 `newSubscription()` と `create()` で Subscription を開始します。
+`$paymentMethodId` には Stripe.js などで取得した Payment Method ID を渡します。
 
 ```php
 $user->newSubscription('default', 'price_monthly')
@@ -102,6 +103,7 @@ stateDiagram-v2
 ## 1回払い (Charge)
 
 `charge()` で 1 回だけ課金できます。金額は通貨の最小単位で渡してください（例: USD なら `100` は `$1.00`）。
+ここでも `$paymentMethodId` には Stripe で作成した Payment Method ID を使います。
 
 ```php
 use Exception;
@@ -121,7 +123,7 @@ try {
 $invoices = $user->invoices();
 ```
 
-PDF ダウンロードには `dompdf/dompdf` をインストールし、`downloadInvoice()` を使います。
+PDF ダウンロードには `dompdf/dompdf` をインストールし、`downloadInvoice()` を使います。`$invoiceId` には `invoices()` で取得した請求書 ID を渡してください。
 
 ```shell
 composer require dompdf/dompdf

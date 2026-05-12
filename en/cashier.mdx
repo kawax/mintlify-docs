@@ -60,6 +60,7 @@ $stripeCustomer = $user->createAsStripeCustomer();
 ### Create a subscription
 
 Create a subscription with `newSubscription()` and `create()`.
+Pass a Payment Method ID (for example, from Stripe.js) as `$paymentMethodId`.
 
 ```php
 $user->newSubscription('default', 'price_monthly')
@@ -101,7 +102,7 @@ stateDiagram-v2
 
 ## One-time charges
 
-Use `charge()` for one-time billing. Pass the amount in the lowest currency denomination (for example, `100` means `$1.00` in USD).
+Use `charge()` for one-time billing. Pass the amount in the lowest currency denomination (for example, `100` means `$1.00` in USD). Use a Stripe Payment Method ID as `$paymentMethodId`.
 
 ```php
 use Exception;
@@ -121,7 +122,7 @@ Retrieve invoices with `invoices()`.
 $invoices = $user->invoices();
 ```
 
-To generate downloadable PDFs, install `dompdf/dompdf` and call `downloadInvoice()`.
+To generate downloadable PDFs, install `dompdf/dompdf` and call `downloadInvoice()`. Pass an invoice ID from the `invoices()` collection as `$invoiceId`.
 
 ```shell
 composer require dompdf/dompdf
