@@ -28,12 +28,6 @@
       ]
     },
     {
-      "group": "認証",
-      "pages": [
-        "jp/blog/ui-to-fortify"
-      ]
-    },
-    {
       "group": "新リポジトリ調査",
       "pages": [
         "jp/blog/maestro-introduction",
@@ -52,6 +46,12 @@
         "jp/blog/upgrade-11-to-12",
         "jp/blog/upgrade-10-to-11",
         "jp/blog/upgrade-9-to-10"
+      ]
+    },
+    {
+      "group": "認証",
+      "pages": [
+        "jp/blog/ui-to-fortify"
       ]
     },
     {
