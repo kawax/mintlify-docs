@@ -56,6 +56,7 @@
     {
       "group": "Database",
       "pages": [
+        "en/database",
         "en/query-builder",
         "en/pagination",
         "en/eloquent-resources"
