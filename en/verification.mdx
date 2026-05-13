@@ -1,0 +1,123 @@
+---
+title: "Email verification"
+description: "Implement Laravel email verification with model setup, the three required routes, route protection, email customization, and verification events."
+---
+
+## Introduction
+
+Email verification confirms that a user actually owns the email address they registered with. Laravel provides built-in services for sending and verifying verification links, so you can implement this flow without rebuilding it from scratch.
+
+<Info>
+  If you use a Laravel starter kit, authentication views and email verification flow are already scaffolded. If you implement authentication manually, define the model, routes, and views described on this page.
+</Info>
+
+## Prepare the model and database
+
+### Implement MustVerifyEmail
+
+Make sure your `App\Models\User` model implements `Illuminate\Contracts\Auth\MustVerifyEmail`.
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+
+class User extends Authenticatable implements MustVerifyEmail
+{
+    use Notifiable;
+}
+```
+
+After adding this interface, newly registered users automatically receive a verification email. If you handle registration manually instead of using a starter kit, dispatch the `Registered` event after registration succeeds.
+
+```php
+use Illuminate\Auth\Events\Registered;
+
+event(new Registered($user));
+```
+
+### Check the email_verified_at column
+
+Your `users` table must include an `email_verified_at` column. Laravel's default `0001_01_01_000000_create_users_table.php` migration already includes it.
+
+## Routing (three required routes)
+
+Email verification requires three routes: `verification.notice`, `verification.verify`, and `verification.send`.
+
+<Steps>
+  <Step title="Define the verification notice route (verification.notice)">
+    Return a page that asks unverified users to click the verification link sent by email.
+
+    ```php
+    Route::get('/email/verify', function () {
+        return view('auth.verify-email');
+    })->middleware('auth')->name('verification.notice');
+    ```
+  </Step>
+  <Step title="Define the verification handler route (verification.verify)">
+    Validate the signed URL and mark the user's email as verified when they click the link.
+
+    ```php
+    use Illuminate\Foundation\Auth\EmailVerificationRequest;
+
+    Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+        $request->fulfill();
+
+        return redirect('/home');
+    })->middleware(['auth', 'signed'])->name('verification.verify');
+    ```
+  </Step>
+  <Step title="Define the resend route (verification.send)">
+    Let users request a new verification email if they lost the first one.
+
+    ```php
+    use Illuminate\Http\Request;
+
+    Route::post('/email/verification-notification', function (Request $request) {
+        $request->user()->sendEmailVerificationNotification();
+
+        return back()->with('message', 'Verification link sent!');
+    })->middleware(['auth', 'throttle:6,1'])->name('verification.send');
+    ```
+  </Step>
+</Steps>
+
+## Protect routes
+
+Use the `verified` middleware to allow only verified users to access specific routes. Pair it with `auth` in most cases.
+
+```php
+Route::get('/profile', function () {
+    // Only verified users may access this route...
+})->middleware(['auth', 'verified']);
+```
+
+When an unverified user hits this route, Laravel automatically redirects them to the `verification.notice` route.
+
+## Customization
+
+Customize verification email content by registering `VerifyEmail::toMailUsing` in the `boot` method of `AppServiceProvider`.
+
+```php
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Notifications\Messages\MailMessage;
+
+public function boot(): void
+{
+    VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
+        return (new MailMessage)
+            ->subject('Verify Email Address')
+            ->line('Click the button below to verify your email address.')
+            ->action('Verify Email Address', $url);
+    });
+}
+```
+
+## Events
+
+Laravel dispatches the `Illuminate\Auth\Events\Verified` event during email verification. With starter kits this happens automatically, and with manual implementations you can listen for or dispatch verification-related events as needed.
+

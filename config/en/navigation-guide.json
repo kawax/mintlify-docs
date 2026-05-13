@@ -15,6 +15,7 @@
       "group": "Security",
       "pages": [
         "en/authorization",
+        "en/verification",
         "en/hashing",
         "en/sanctum",
         "en/encryption",

@@ -31,6 +31,7 @@
       "group": "セキュリティ",
       "pages": [
         "jp/authorization",
+        "jp/verification",
         "jp/sanctum",
         "jp/hashing",
         "jp/encryption",

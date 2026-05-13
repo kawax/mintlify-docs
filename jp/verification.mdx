@@ -1,0 +1,123 @@
+---
+title: "メール認証（Email Verification）"
+description: "Laravelのメール認証機能を実装する手順を解説します。モデル準備、3つのルート定義、verifiedミドルウェア、カスタマイズ、イベントを学べます。"
+---
+
+## はじめに
+
+メール認証（Email Verification）は、ユーザーが登録したメールアドレスを実際に所有しているか確認する仕組みです。Laravelは確認メールの送信と検証処理を標準で提供するため、あなたは最小限の実装で安全な認証フローを構築できます。
+
+<Info>
+  スターターキットを使う場合は、認証画面とメール認証フローがすでに組み込まれています。手動実装する場合は、このページの手順でモデル・ルート・ビューを自分で定義してください。
+</Info>
+
+## モデルとデータベースの準備
+
+### MustVerifyEmail を実装する
+
+`App\Models\User` が `Illuminate\Contracts\Auth\MustVerifyEmail` を実装していることを確認してください。
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+
+class User extends Authenticatable implements MustVerifyEmail
+{
+    use Notifiable;
+}
+```
+
+このインターフェースを追加すると、新規登録ユーザーに確認メールが自動送信されます。スターターキットを使わずに登録処理を実装している場合は、登録成功後に `Registered` イベントを発火してください。
+
+```php
+use Illuminate\Auth\Events\Registered;
+
+event(new Registered($user));
+```
+
+### email_verified_at カラムを確認する
+
+`users` テーブルに `email_verified_at` カラムが必要です。通常はデフォルトの `0001_01_01_000000_create_users_table.php` に含まれています。
+
+## ルーティング（3つのルート）
+
+メール認証では、`verification.notice`、`verification.verify`、`verification.send` の3ルートを定義します。
+
+<Steps>
+  <Step title="認証通知表示ルート（verification.notice）を定義する">
+    未認証ユーザーに「メールを確認してください」と表示する画面を返します。
+
+    ```php
+    Route::get('/email/verify', function () {
+        return view('auth.verify-email');
+    })->middleware('auth')->name('verification.notice');
+    ```
+  </Step>
+  <Step title="認証ハンドラールート（verification.verify）を定義する">
+    メール内リンクを踏んだときに、署名付きURLを検証して認証完了します。
+
+    ```php
+    use Illuminate\Foundation\Auth\EmailVerificationRequest;
+
+    Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+        $request->fulfill();
+
+        return redirect('/home');
+    })->middleware(['auth', 'signed'])->name('verification.verify');
+    ```
+  </Step>
+  <Step title="再送信ルート（verification.send）を定義する">
+    ユーザーが確認メールを紛失したときに再送信します。
+
+    ```php
+    use Illuminate\Http\Request;
+
+    Route::post('/email/verification-notification', function (Request $request) {
+        $request->user()->sendEmailVerificationNotification();
+
+        return back()->with('message', 'Verification link sent!');
+    })->middleware(['auth', 'throttle:6,1'])->name('verification.send');
+    ```
+  </Step>
+</Steps>
+
+## ルートの保護
+
+認証済みユーザーだけにアクセスを許可するには、`verified` ミドルウェアを使います。通常は `auth` と組み合わせます。
+
+```php
+Route::get('/profile', function () {
+    // 認証済みユーザーのみアクセス可能
+})->middleware(['auth', 'verified']);
+```
+
+未認証ユーザーがアクセスすると、Laravelは自動的に `verification.notice` へリダイレクトします。
+
+## カスタマイズ
+
+確認メール本文をカスタマイズするには、`AppServiceProvider` の `boot` メソッドで `VerifyEmail::toMailUsing` を設定します。
+
+```php
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Notifications\Messages\MailMessage;
+
+public function boot(): void
+{
+    VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
+        return (new MailMessage)
+            ->subject('Verify Email Address')
+            ->line('Click the button below to verify your email address.')
+            ->action('Verify Email Address', $url);
+    });
+}
+```
+
+## イベント
+
+メール認証時には `Illuminate\Auth\Events\Verified` イベントが発火されます。スターターキットでは自動的に扱われますが、手動実装では必要に応じてイベント処理を追加してください。
+
