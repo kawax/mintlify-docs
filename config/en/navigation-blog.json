@@ -28,9 +28,15 @@
       ]
     },
     {
-      "group": "Authentication",
+      "group": "New Repository Reports",
       "pages": [
-        "en/blog/ui-to-fortify"
+        "en/blog/maestro-introduction",
+        "en/blog/agent-skills-introduction",
+        "en/blog/laravel-ecosystem-analysis",
+        "en/blog/sentinel-introduction",
+        "en/blog/passkeys-introduction",
+        "en/blog/agent-detector-introduction",
+        "en/blog/pao-introduction"
       ]
     },
     {
@@ -43,15 +49,9 @@
       ]
     },
     {
-      "group": "New Repository Reports",
+      "group": "Authentication",
       "pages": [
-        "en/blog/maestro-introduction",
-        "en/blog/agent-skills-introduction",
-        "en/blog/laravel-ecosystem-analysis",
-        "en/blog/sentinel-introduction",
-        "en/blog/passkeys-introduction",
-        "en/blog/agent-detector-introduction",
-        "en/blog/pao-introduction"
+        "en/blog/ui-to-fortify"
       ]
     },
     {
