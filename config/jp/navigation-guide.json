@@ -14,6 +14,7 @@
     {
       "group": "データベース",
       "pages": [
+        "jp/database",
         "jp/query-builder",
         "jp/pagination"
       ]
