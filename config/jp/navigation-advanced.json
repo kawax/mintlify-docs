@@ -1,0 +1,87 @@
+{
+  "tab": "応用トピック",
+  "groups": [
+    {
+      "group": "AI開発",
+      "pages": [
+        "jp/advanced/mcp-server",
+        "jp/advanced/boost-custom-agent",
+        "jp/advanced/ai-sdk-custom-provider"
+      ]
+    },
+    {
+      "group": "デザインパターン",
+      "pages": [
+        "jp/advanced/pipeline",
+        "jp/advanced/macroable",
+        "jp/advanced/conditionable",
+        "jp/advanced/forwards-calls",
+        "jp/advanced/tap",
+        "jp/advanced/lottery",
+        "jp/advanced/higher-order-messages",
+        "jp/advanced/collection-deep-dive",
+        "jp/advanced/manager",
+        "jp/advanced/php-reflection"
+      ]
+    },
+    {
+      "group": "パッケージ開発",
+      "pages": [
+        "jp/advanced/package-development",
+        "jp/advanced/interacts-with-data",
+        "jp/advanced/package-versioning",
+        "jp/advanced/package-testing",
+        "jp/advanced/package-workbench",
+        "jp/advanced/generator-command",
+        "jp/advanced/starter-kit-creation"
+      ]
+    },
+    {
+      "group": "アプリケーション構造",
+      "pages": [
+        "jp/advanced/app-structure",
+        "jp/advanced/app-structure-migration",
+        "jp/advanced/app-structure-faq"
+      ]
+    },
+    {
+      "group": "Laravel 13 新機能",
+      "pages": [
+        "jp/advanced/php-attributes"
+      ]
+    },
+    {
+      "group": "Eloquent 深掘り",
+      "pages": [
+        "jp/advanced/eloquent-observers",
+        "jp/advanced/eloquent-scopes",
+        "jp/advanced/eloquent-casts"
+      ]
+    },
+    {
+      "group": "バリデーション拡張",
+      "pages": [
+        "jp/advanced/custom-validation-rules"
+      ]
+    },
+    {
+      "group": "認証の拡張",
+      "pages": [
+        "jp/advanced/custom-auth-guard",
+        "jp/advanced/fortify"
+      ]
+    },
+    {
+      "group": "セキュリティ",
+      "pages": [
+        "jp/advanced/rate-limiting"
+      ]
+    },
+    {
+      "group": "テスト",
+      "pages": [
+        "jp/advanced/testing-pest"
+      ]
+    }
+  ]
+}

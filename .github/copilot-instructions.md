@@ -80,15 +80,20 @@ Playwright MCPでスクリーンショットを撮ってプルリクに添付。
 
 ## docs.json
 
-ページが増えてきたので`$ref`を使って`navigation`を分割。言語ごとのページはそれぞれのファイルに記載。もっとページが増えたらここからさらに分割。
-ほぼ追加し終わったtutorialとguideを言語別ディレクトリに移動。他はまだnavigation-jpとnavigation-enに。
+ページが増えてきたので`$ref`を使って`navigation`を分割。言語ごとのページに分けてさらにタブごとに分割。
 
 - config/navigation-jp.json
   - config/jp/navigation-tutorial.json 
   - config/jp/navigation-guide.json 
+  - config/jp/navigation-advanced.json 
+  - config/jp/navigation-blog.json 
+  - config/jp/navigation-packages.json 
 - config/navigation-en.json
   - config/en/navigation-tutorial.json
   - config/en/navigation-guide.json
+  - config/en/navigation-advanced.json
+  - config/en/navigation-blog.json
+  - config/en/navigation-packages.json
 
 新しいページは基本的にはグループの一番下に追加。
 

@@ -1,0 +1,87 @@
+{
+  "tab": "Advanced Topics",
+  "groups": [
+    {
+      "group": "AI Development",
+      "pages": [
+        "en/advanced/mcp-server",
+        "en/advanced/boost-custom-agent",
+        "en/advanced/ai-sdk-custom-provider"
+      ]
+    },
+    {
+      "group": "Design Patterns",
+      "pages": [
+        "en/advanced/pipeline",
+        "en/advanced/macroable",
+        "en/advanced/conditionable",
+        "en/advanced/forwards-calls",
+        "en/advanced/tap",
+        "en/advanced/lottery",
+        "en/advanced/higher-order-messages",
+        "en/advanced/manager",
+        "en/advanced/collection-deep-dive",
+        "en/advanced/php-reflection"
+      ]
+    },
+    {
+      "group": "Package Development",
+      "pages": [
+        "en/advanced/package-development",
+        "en/advanced/interacts-with-data",
+        "en/advanced/package-versioning",
+        "en/advanced/package-testing",
+        "en/advanced/package-workbench",
+        "en/advanced/generator-command",
+        "en/advanced/starter-kit-creation"
+      ]
+    },
+    {
+      "group": "Application Structure",
+      "pages": [
+        "en/advanced/app-structure",
+        "en/advanced/app-structure-migration",
+        "en/advanced/app-structure-faq"
+      ]
+    },
+    {
+      "group": "Laravel 13 New Features",
+      "pages": [
+        "en/advanced/php-attributes"
+      ]
+    },
+    {
+      "group": "Eloquent Deep Dive",
+      "pages": [
+        "en/advanced/eloquent-observers",
+        "en/advanced/eloquent-scopes",
+        "en/advanced/eloquent-casts"
+      ]
+    },
+    {
+      "group": "Validation Extensions",
+      "pages": [
+        "en/advanced/custom-validation-rules"
+      ]
+    },
+    {
+      "group": "Authentication Extensions",
+      "pages": [
+        "en/advanced/fortify",
+        "en/advanced/custom-auth-guard"
+      ]
+    },
+    {
+      "group": "Security",
+      "pages": [
+        "en/advanced/rate-limiting"
+      ]
+    },
+    {
+      "group": "Testing",
+      "pages": [
+        "en/advanced/testing-pest"
+      ]
+    }
+  ]
+}
