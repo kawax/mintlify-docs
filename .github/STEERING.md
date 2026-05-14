@@ -38,7 +38,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - [x] passkeys-introduction
   - [x] agent-detector PAOで使っているからこれも一緒に公式に移行されたのかも。
   - [x] pao-introduction
-  - [ ] Laravel Chisel https://github.com/laravel/chisel
+  - [x] Laravel Chisel https://github.com/laravel/chisel
     - READMEで全部説明している。
     - コミットログから判断すると3ヶ月前から非公開で開発していたけど公開されたのは2026年5月。v0.1のタグが付いたばかり。
     - https://github.com/laravel/moat も公開されているけどGitHub組織向けセキュリティ監査ツールでLaravelでもPHPでもないRust製なのでページは不要だろう。
