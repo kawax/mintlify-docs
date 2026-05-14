@@ -34,6 +34,7 @@
         "jp/authorization",
         "jp/verification",
         "jp/sanctum",
+        "jp/passwords",
         "jp/hashing",
         "jp/encryption",
         "jp/precognition",
@@ -88,23 +89,9 @@
       ]
     },
     {
-      "group": "ヘルパーとコレクション",
-      "pages": [
-        "jp/helpers",
-        "jp/strings",
-        "jp/collections"
-      ]
-    },
-    {
       "group": "国際化",
       "pages": [
         "jp/localization"
-      ]
-    },
-    {
-      "group": "外部通信",
-      "pages": [
-        "jp/http-client"
       ]
     },
     {

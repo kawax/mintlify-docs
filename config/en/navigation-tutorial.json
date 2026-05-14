@@ -41,8 +41,16 @@
       "pages": [
         "en/authentication",
         "en/starter-kits",
-        "en/passwords",
         "en/socialite"
+      ]
+    },
+    {
+      "group": "Helpers & External",
+      "pages": [
+        "en/helpers",
+        "en/strings",
+        "en/collections",
+        "en/http-client"
       ]
     },
     {
