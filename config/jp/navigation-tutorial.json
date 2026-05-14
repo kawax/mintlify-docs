@@ -46,8 +46,16 @@
       "pages": [
         "jp/authentication",
         "jp/starter-kits",
-        "jp/passwords",
         "jp/socialite"
+      ]
+    },
+    {
+      "group": "ヘルパーと外部通信",
+      "pages": [
+        "jp/helpers",
+        "jp/strings",
+        "jp/collections",
+        "jp/http-client"
       ]
     },
     {
