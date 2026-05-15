@@ -1,11 +1,11 @@
 ---
 title: "VOICEVOX Core for PHP"
-description: "PHP FFI を使って VOICEVOX CORE の C ダイナミックライブラリをラップした Pure PHP パッケージ。テキスト読み上げ（TTS）を PHP から直接利用できます。"
+description: "PHP FFI を使って VOICEVOX CORE の C 動的ライブラリをラップした Pure PHP パッケージ。テキスト読み上げ（TTS）を PHP から直接利用できます。"
 ---
 
 ## 概要
 
-[revolution/voicevox-core](https://github.com/invokable/voicevox-core-php) は、[VOICEVOX CORE](https://github.com/VOICEVOX/voicevox_core) の C ダイナミックライブラリを PHP FFI でラップした Pure PHP パッケージです。
+[revolution/voicevox-core](https://github.com/invokable/voicevox-core-php) は、[VOICEVOX CORE](https://github.com/VOICEVOX/voicevox_core) の C 動的ライブラリを PHP FFI でラップした Pure PHP パッケージです。
 
 VOICEVOX は高品質な日本語テキスト読み上げ（TTS）エンジンで、このパッケージを使うことで PHP から直接音声合成を行えます。
 
@@ -27,7 +27,7 @@ composer require revolution/voicevox-core
 
 ## ライブラリのセットアップ
 
-このパッケージを使用するには、VOICEVOX CORE のダイナミックライブラリ（`.so` / `.dylib`）、ONNX Runtime ライブラリ、OpenJTalk 辞書が必要です。
+このパッケージを使用するには、VOICEVOX CORE の動的ライブラリ（`.so` / `.dylib`）、ONNX Runtime ライブラリ、OpenJTalk 辞書が必要です。
 
 <Steps>
   <Step title="voicevox_core をダウンロードする">
@@ -38,7 +38,7 @@ composer require revolution/voicevox-core
     ```
     voicevox_core/
     ├── dict/open_jtalk_dic_*/     # OpenJTalk 辞書
-    ├── c_api/lib/                 # ダイナミックライブラリ (.so, .dylib)
+    ├── c_api/lib/                 # 動的ライブラリ (.so, .dylib)
     ├── models/vvms/               # 音声モデルファイル (.vvm)
     └── onnxruntime/               # ONNX Runtime ライブラリ
     ```
@@ -80,6 +80,10 @@ composer require revolution/voicevox-core
 ```bash
 export VOICEVOX_CORE_LIB_PATH=/path/to/libvoicevox_core.dylib
 ```
+
+<Info>
+    macOSで `DYLD_FALLBACK_LIBRARY_PATH` を使ってもロードできない場合は `VOICEVOX_CORE_LIB_PATH` で設定してください。
+</Info>
 
 ## ドキュメント
 
