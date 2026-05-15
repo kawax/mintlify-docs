@@ -81,6 +81,10 @@ composer require revolution/voicevox-core
 export VOICEVOX_CORE_LIB_PATH=/path/to/libvoicevox_core.dylib
 ```
 
+```bash
+export VOICEVOX_CORE_LIB_PATH="$HOME/.local/voicevox_core/c_api/lib/libvoicevox_core.dylib"
+```
+
 <Info>
     macOSで `DYLD_FALLBACK_LIBRARY_PATH` を使ってもロードできない場合は `VOICEVOX_CORE_LIB_PATH` で設定してください。
 </Info>
