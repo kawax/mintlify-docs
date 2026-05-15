@@ -1,0 +1,162 @@
+---
+title: "使い方 - VOICEVOX Core for PHP"
+description: "VOICEVOX Core for PHP の基本的な使い方。テキスト読み上げ（TTS）と音声合成のコードサンプルを紹介します。"
+sidebarTitle: "使い方"
+---
+
+## 基本的な音声合成
+
+以下の `talk.php` は、テキストから音声を合成して WAV ファイルに書き出すサンプルです。
+
+<Warning>
+  PHP FFI は Web サーバー環境（FPM など）では通常無効です。このスクリプトは `php talk.php` のように **CLI から実行**してください。
+</Warning>
+
+```php
+<?php
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Revolution\Voicevox\Core\Enums\AccelerationMode;
+use Revolution\Voicevox\Core\Onnxruntime;
+use Revolution\Voicevox\Core\OpenJtalk;
+use Revolution\Voicevox\Core\Synthesizer;
+use Revolution\Voicevox\Core\VoiceModelFile;
+
+// voicevox_core のインストール先に合わせてパスを変更してください
+$voicevoxCoreDir = getenv('HOME') . '/.local/voicevox_core';
+$onnxruntimeFilename = $voicevoxCoreDir . '/onnxruntime/lib/' . Onnxruntime::libVersionedFilename();
+$dictDir = $voicevoxCoreDir . '/dict/open_jtalk_dic_utf_8-1.11';
+$vvmPath  = $voicevoxCoreDir . '/models/vvms/0.vvm';
+
+// 合成するテキストとスタイル ID
+$text    = 'この音声は、ボイスボックスを使用して、出力されています。';
+$styleId = 0;
+$outPath = './output.wav';
+
+// 初期化
+$onnxruntime = Onnxruntime::loadOnce($onnxruntimeFilename);
+$openJtalk   = new OpenJtalk($dictDir);
+$synthesizer = new Synthesizer($onnxruntime, $openJtalk, AccelerationMode::Auto);
+
+// 音声モデルを読み込む
+$model = VoiceModelFile::open($vvmPath);
+$synthesizer->loadVoiceModel($model);
+
+// 音声合成
+$audioQuery = $synthesizer->createAudioQuery($text, $styleId);
+$wav        = $synthesizer->synthesis($audioQuery, $styleId);
+
+file_put_contents($outPath, $wav);
+echo 'Wrote ' . $outPath . PHP_EOL;
+```
+
+実行：
+
+```bash
+php talk.php
+```
+
+## 1 ステップで音声合成（`tts` メソッド）
+
+`createAudioQuery` + `synthesis` の 2 ステップを省略したい場合は `tts()` メソッドが使えます：
+
+```php
+$wav = $synthesizer->tts($text, $styleId);
+file_put_contents('./output.wav', $wav);
+```
+
+## かな記法で音声合成
+
+AquesTalk スタイルのかな記法からも合成できます：
+
+```php
+// ttsFromKana を使う場合
+$wav = $synthesizer->ttsFromKana("コノオンセイワ'、ボイスボックスオ'/シヨーシテ'、シュツリョクサレテイマ'ス。", $styleId);
+file_put_contents('./output.wav', $wav);
+```
+
+## ユーザー辞書を使う
+
+カスタム単語の読みを登録するには `UserDict` を使います：
+
+```php
+use Revolution\Voicevox\Core\UserDict;
+use Revolution\Voicevox\Core\Enums\UserDictWordType;
+
+$userDict = new UserDict();
+$uuid = $userDict->addWord(
+    surface: 'ボイボ',
+    pronunciation: 'ボイボ',
+    accentType: 0,
+    wordType: UserDictWordType::ProperNoun,
+    priority: 10,
+);
+
+// 辞書を保存
+$userDict->save('./mydict.json');
+
+// OpenJTalk に辞書を適用
+$openJtalk->useUserDict($userDict);
+```
+
+## AudioQuery の調整
+
+`createAudioQuery` で取得した JSON を調整してから合成することで、抑揚やテンポなどを細かく制御できます：
+
+```php
+$audioQueryJson = $synthesizer->createAudioQuery($text, $styleId);
+
+// JSON をデコードして調整
+$audioQuery = json_decode($audioQueryJson, true);
+$audioQuery['speedScale'] = 1.2;   // 速度を 1.2 倍に
+$audioQuery['pitchScale'] = 0.05;  // ピッチを少し上げる
+
+$wav = $synthesizer->synthesis(json_encode($audioQuery), $styleId);
+file_put_contents('./output.wav', $wav);
+```
+
+## アクセント句の取得
+
+テキストのアクセント句情報を取得して確認・編集できます：
+
+```php
+$accentPhrasesJson = $synthesizer->createAccentPhrases($text, $styleId);
+$accentPhrases = json_decode($accentPhrasesJson, true);
+
+// モーラのピッチと音素長を別のスタイルで上書き
+$updatedJson = $synthesizer->replaceMoraData($accentPhrasesJson, $styleId);
+```
+
+## GPU モードの使用
+
+GPU が利用可能な環境では `AccelerationMode::Gpu` を指定すると高速化できます：
+
+```php
+use Revolution\Voicevox\Core\Enums\AccelerationMode;
+
+$synthesizer = new Synthesizer($onnxruntime, $openJtalk, AccelerationMode::Gpu);
+
+// GPU モードかどうかを確認
+if ($synthesizer->isGpuMode()) {
+    echo 'GPU モードで動作中' . PHP_EOL;
+}
+```
+
+## 複数の音声モデルを使う
+
+複数の `.vvm` ファイルを読み込んで、スタイル ID を切り替えることで複数のキャラクターボイスを使い分けられます：
+
+```php
+$model0 = VoiceModelFile::open($voicevoxCoreDir . '/models/vvms/0.vvm');
+$model1 = VoiceModelFile::open($voicevoxCoreDir . '/models/vvms/1.vvm');
+
+$synthesizer->loadVoiceModel($model0);
+$synthesizer->loadVoiceModel($model1);
+
+// モデルに含まれるスピーカーの情報を確認
+$metas = json_decode($synthesizer->metas(), true);
+
+// モデルをアンロード（不要になった場合）
+$synthesizer->unloadVoiceModel($model0->id());
+```

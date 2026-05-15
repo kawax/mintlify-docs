@@ -94,7 +94,16 @@
     {
       "group": "AI SDK",
       "pages": [
-        "jp/packages/laravel-amazon-bedrock"
+        "jp/packages/laravel-amazon-bedrock",
+        {
+          "group": "VOICEVOX",
+          "expanded": false,
+          "pages": [
+            "jp/packages/laravel-voicevox/index",
+            "jp/packages/laravel-voicevox/usage",
+            "jp/packages/laravel-voicevox/api"
+          ]
+        }
       ]
     },
     {

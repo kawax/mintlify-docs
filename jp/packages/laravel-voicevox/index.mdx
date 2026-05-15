@@ -1,0 +1,98 @@
+---
+title: "VOICEVOX Core for PHP"
+description: "PHP FFI を使って VOICEVOX CORE の C ダイナミックライブラリをラップした Pure PHP パッケージ。テキスト読み上げ（TTS）を PHP から直接利用できます。"
+---
+
+## 概要
+
+[revolution/voicevox-core](https://github.com/invokable/voicevox-core-php) は、[VOICEVOX CORE](https://github.com/VOICEVOX/voicevox_core) の C ダイナミックライブラリを PHP FFI でラップした Pure PHP パッケージです。
+
+VOICEVOX は高品質な日本語テキスト読み上げ（TTS）エンジンで、このパッケージを使うことで PHP から直接音声合成を行えます。
+
+<Warning>
+  PHP FFI は Web サーバー環境（FPM など）では `ffi.enable=false` がデフォルトのため通常無効です。このパッケージは **ローカル CLI での使用を前提**としています。
+</Warning>
+
+## 要件
+
+- PHP 8.3+
+- `ext-ffi` 拡張が有効になっていること
+- VOICEVOX CORE 0.16+
+
+## インストール
+
+```bash
+composer require revolution/voicevox-core
+```
+
+## ライブラリのセットアップ
+
+このパッケージを使用するには、VOICEVOX CORE のダイナミックライブラリ（`.so` / `.dylib`）、ONNX Runtime ライブラリ、OpenJTalk 辞書が必要です。
+
+<Steps>
+  <Step title="voicevox_core をダウンロードする">
+    [voicevox_core releases](https://github.com/VOICEVOX/voicevox_core/releases) から OS・アーキテクチャに合ったダウンローダーをダウンロードして実行します。実行すると、カレントディレクトリに `voicevox_core` ディレクトリが作成されます。
+
+    作成されるディレクトリ構造：
+
+    ```
+    voicevox_core/
+    ├── dict/open_jtalk_dic_*/     # OpenJTalk 辞書
+    ├── c_api/lib/                 # ダイナミックライブラリ (.so, .dylib)
+    ├── models/vvms/               # 音声モデルファイル (.vvm)
+    └── onnxruntime/               # ONNX Runtime ライブラリ
+    ```
+  </Step>
+  <Step title="恒久的な場所に移動する">
+    ```bash
+    mv voicevox_core ~/.local/voicevox_core
+    ```
+  </Step>
+  <Step title="シンボリックリンクを作成する（推奨）">
+    ライブラリが自動的に見つかるようにシンボリックリンクを作成します。
+
+    <Warning>
+      `ln -s` には必ず**絶対パス**を使用してください。
+    </Warning>
+
+    **macOS:**
+    ```bash
+    # [VOICEVOX_CORE_DIR] を voicevox_core の絶対パスに置き換えてください
+    ln -s [VOICEVOX_CORE_DIR]/libvoicevox_core.dylib /usr/local/lib/libvoicevox_core.dylib
+    ```
+
+    `/usr/local/lib/` からロードできない場合は `.zshrc` などで `DYLD_FALLBACK_LIBRARY_PATH` を設定します：
+    ```bash
+    export DYLD_FALLBACK_LIBRARY_PATH="$HOME/lib:/usr/local/lib:/usr/lib"
+    ```
+
+    **Linux:**
+    ```bash
+    ln -s [VOICEVOX_CORE_DIR]/libvoicevox_core.so /usr/local/lib/libvoicevox_core.so
+    ```
+  </Step>
+</Steps>
+
+### 代替手段: 環境変数で指定する
+
+シンボリックリンクが作成できない場合は、`VOICEVOX_CORE_LIB_PATH` 環境変数にライブラリファイルのフルパスを設定します：
+
+```bash
+export VOICEVOX_CORE_LIB_PATH=/path/to/libvoicevox_core.dylib
+```
+
+## ドキュメント
+
+<Columns cols={2}>
+  <Card title="使い方" href="/jp/packages/laravel-voicevox/usage" icon="play">
+    テキスト読み上げ・音声合成の基本的な使い方とコードサンプル。
+  </Card>
+  <Card title="API リファレンス" href="/jp/packages/laravel-voicevox/api" icon="code">
+    全クラス・メソッド・enum の詳細リファレンス。
+  </Card>
+</Columns>
+
+## 参考リンク
+
+- GitHub: [invokable/voicevox-core-php](https://github.com/invokable/voicevox-core-php)
+- VOICEVOX CORE: [VOICEVOX/voicevox_core](https://github.com/VOICEVOX/voicevox_core)
