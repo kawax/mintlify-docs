@@ -27,6 +27,9 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
 - [x] Fortifyページ
 - [x] スターターキットの作り方ページ
 - [x] Reflectionの解説
+- [ ] Laravel Chiselページで少し出てきたのでPHP AST（抽象構文木）の解説。
+  - Chiselでも`nikic/php-parser`パッケージが使われている。 https://github.com/nikic/PHP-Parser
+  - 一般的に使われる機能ではないのでどのくらい深掘りするか判断しにくい。
 
 ## blog ページ案
 
@@ -38,10 +41,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - [x] passkeys-introduction
   - [x] agent-detector PAOで使っているからこれも一緒に公式に移行されたのかも。
   - [x] pao-introduction
-  - [x] Laravel Chisel https://github.com/laravel/chisel
-    - READMEで全部説明している。
-    - コミットログから判断すると3ヶ月前から非公開で開発していたけど公開されたのは2026年5月。v0.1のタグが付いたばかり。
-    - https://github.com/laravel/moat も公開されているけどGitHub組織向けセキュリティ監査ツールでLaravelでもPHPでもないRust製なのでページは不要だろう。
+  - [x] chisel-introduction。moatはLaravelとは直接関係ないのでページは不要。
 
 ## packages ページ案
 - [x] Laravel Notification for Discord(Webhook)
