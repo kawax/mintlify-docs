@@ -82,7 +82,7 @@ For Laravel 13 support, classification depends on your actual compatibility poli
 | Drop Laravel 11/12 support and require only `^13.0` | MAJOR |
 | Fix a Laravel-13-specific bug | PATCH |
 
-Always check the official [Laravel 13 upgrade guide](https://laravel.com/docs/13.x/upgrade). If your package depends on APIs with breaking changes, you need to redesign compatibility policy before release.
+Always check the official [Laravel 13 upgrade guide](https://laravel.com/docs/13.x/upgrade). You can confirm current release status on [laravel/framework releases](https://github.com/laravel/framework/releases). If your package depends on APIs with breaking changes, you need to redesign compatibility policy before release.
 
 <Warning>
   Raising the minimum PHP version or removing public APIs is a breaking change from the user's point of view. Treat it as a MAJOR release even when it happens during Laravel major support work.
