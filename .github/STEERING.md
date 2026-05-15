@@ -30,6 +30,12 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
 - [ ] Laravel Chiselページで少し出てきたのでPHP AST（抽象構文木）の解説。
   - Chiselでも`nikic/php-parser`パッケージが使われている。 https://github.com/nikic/PHP-Parser
   - 一般的に使われる機能ではないのでどのくらい深掘りするか判断しにくい。
+- [ ] FFIの解説。
+  - ASTと同様にそんなに使われる機能ではないけどVOICEVOX Core for PHPという実際の使用例ができたのでページを作成。
+  - Laravel Cloudを含めWebサーバーでは無効にされてることが多い。
+  - FFIの基本的な説明。
+  - 具体的なVOICEVOX Core for PHPでの使用パターンの解説。何らかのC APIの動的ライブラリがあればPHP FFIから使える可能性がある。
+  - VOICEVOX Core for PHPの実装前の調査資料が英語と日本語であるのでこれも参考にする。 [voicevox-core-php-ffi-en.md](https://github.com/invokable/voicevox-core-php/blob/main/docs/voicevox-core-php-ffi-en.md)、[voicevox-core-php-ffi-ja.md](https://github.com/invokable/voicevox-core-php/blob/main/docs/voicevox-core-php-ffi-ja.md)
 
 ## blog ページ案
 
@@ -47,3 +53,9 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
 - [x] Laravel Notification for Discord(Webhook)
 - [x] Socialite for Discord
 - [x] LINE SDK for Laravel
+- [ ] VOICEVOX Core for PHP https://github.com/invokable/voicevox-core-php
+  - 日本語のテキスト音声合成、歌声合成ソフトウェア、VOICEVOXのCOREをFFIでラップしたPure PHP用パッケージ。
+  - README.mdが英語、README_jp.mdが日本語。VOICEVOX COREの動的ライブラリのダウンロードからAPIリファレンスまで一通り説明しているのでこれでページを作れる。
+  - Laravel版を先に別パッケージで作ってたけど技術的に実現不可能な箇所が多いのでまだ開発中。PHP版コアは完成しているので先にページを作成。
+  - 「AI SDK」グループの下にVOICEVOXグループを追加。
+  - FFIの解説は別ページ。
