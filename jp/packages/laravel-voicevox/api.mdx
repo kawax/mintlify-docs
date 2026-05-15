@@ -1,0 +1,134 @@
+---
+title: "API リファレンス - VOICEVOX Core for PHP"
+description: "VOICEVOX Core for PHP の全クラス・メソッド・enum のリファレンス。"
+sidebarTitle: "API リファレンス"
+---
+
+## `Onnxruntime`
+
+ONNX Runtime ローダー。プロセスレベルのシングルトンで、1 プロセスにつき 1 インスタンスのみ存在します。
+
+### メソッド
+
+| メソッド | 説明 |
+|--------|------|
+| `static loadOnce(string $filename = ''): self` | ONNX Runtime を読み込んで初期化します。2 回目以降の呼び出しでは引数を無視して既存のインスタンスを返します。 |
+| `static get(): ?self` | 既存のインスタンスを返します。まだ初期化されていない場合は `null` を返します。 |
+| `supportedDevices(): string` | 利用可能なデバイス情報を JSON 文字列で返します。 |
+| `static libVersionedFilename(): string` | ONNX Runtime ライブラリのバージョン付きファイル名を返します（例: `libvoicevox_onnxruntime.1.17.3.dylib`）。 |
+| `static libUnversionedFilename(): string` | ONNX Runtime ライブラリのバージョンなしファイル名を返します。 |
+
+### 定数
+
+| 定数 | 説明 |
+|-----|------|
+| `LIB_NAME` | ライブラリベース名（`voicevox_onnxruntime`） |
+| `LIB_VERSION` | 推奨 ONNX Runtime バージョン |
+
+---
+
+## `OpenJtalk`
+
+OpenJTalk を使ったテキスト解析器。
+
+### メソッド
+
+| メソッド | 説明 |
+|--------|------|
+| `__construct(string $openJtalkDictDir)` | OpenJTalk 辞書ディレクトリのパスで初期化します。 |
+| `useUserDict(UserDict $userDict): void` | ユーザー辞書を適用します。辞書が変更された場合は再度呼び出す必要があります。 |
+
+---
+
+## `VoiceModelFile`
+
+音声モデルファイル（`.vvm` ファイル）。
+
+### メソッド
+
+| メソッド | 説明 |
+|--------|------|
+| `static open(string $path): self` | `.vvm` ファイルを開きます。 |
+| `id(): string` | 音声モデル ID を hex 文字列（16 バイト）で返します。 |
+| `createMetasJson(): string` | スピーカーメタデータを JSON 文字列で返します。 |
+| `close(): void` | ファイルを閉じてリソースを解放します。 |
+
+---
+
+## `Synthesizer`
+
+テキスト読み上げのメインクラス。
+
+### メソッド
+
+| メソッド | 説明 |
+|--------|------|
+| `__construct(Onnxruntime $onnxruntime, OpenJtalk $openJtalk, AccelerationMode $accelerationMode = Auto, int $cpuNumThreads = 0)` | シンセサイザーを初期化します。 |
+| `isGpuMode(): bool` | GPU モードが有効かどうかを返します。 |
+| `metas(): string` | 読み込まれているスピーカーのメタデータを JSON 文字列で返します。 |
+| `loadVoiceModel(VoiceModelFile $model): void` | 音声モデルを読み込みます。 |
+| `unloadVoiceModel(string $voiceModelId): void` | hex ID で指定した音声モデルをアンロードします。 |
+| `isLoadedVoiceModel(string $voiceModelId): bool` | 音声モデルが読み込まれているかどうかを確認します。 |
+| `createAudioQuery(string $text, int $styleId): string` | 日本語テキストから AudioQuery JSON を生成します。 |
+| `createAudioQueryFromKana(string $kana, int $styleId): string` | AquesTalk スタイルのかな記法から AudioQuery JSON を生成します。 |
+| `createAccentPhrases(string $text, int $styleId): string` | 日本語テキストからアクセント句配列 JSON を生成します。 |
+| `createAccentPhrasesFromKana(string $kana, int $styleId): string` | かな記法からアクセント句配列 JSON を生成します。 |
+| `replaceMoraData(string $accentPhrasesJson, int $styleId): string` | モーラのピッチと音素長を更新した新しいアクセント句を返します。 |
+| `replacePhonemeLength(string $accentPhrasesJson, int $styleId): string` | 音素長を更新した新しいアクセント句を返します。 |
+| `replaceMoraPitch(string $accentPhrasesJson, int $styleId): string` | モーラのピッチを更新した新しいアクセント句を返します。 |
+| `synthesis(string $audioQueryJson, int $styleId, bool $enableInterrogativeUpspeak = true): string` | AudioQuery JSON から音声を合成します。WAV バイナリを返します。 |
+| `tts(string $text, int $styleId, bool $enableInterrogativeUpspeak = true): string` | 日本語テキストから 1 ステップで音声を合成します。WAV バイナリを返します。 |
+| `ttsFromKana(string $kana, int $styleId, bool $enableInterrogativeUpspeak = true): string` | かな記法から音声を合成します。WAV バイナリを返します。 |
+| `createSingFrameAudioQuery(string $scoreJson, int $styleId): string` | 楽譜 JSON から歌唱合成クエリ JSON を生成します。 |
+| `frameSynthesis(string $frameAudioQueryJson, int $styleId): string` | フレームオーディオクエリから歌唱音声を合成します。WAV バイナリを返します。 |
+
+---
+
+## `UserDict`
+
+カスタム単語の発音を登録するユーザー辞書。
+
+### メソッド
+
+| メソッド | 説明 |
+|--------|------|
+| `__construct()` | 空のユーザー辞書を作成します。 |
+| `load(string $path): void` | ファイルからユーザー辞書を読み込みます。 |
+| `save(string $path): void` | ユーザー辞書をファイルに保存します。 |
+| `addWord(string $surface, string $pronunciation, int $accentType, UserDictWordType $wordType = CommonNoun, int $priority = 5): string` | 単語を追加します。単語 UUID を hex 文字列で返します。 |
+| `updateWord(string $wordUuid, string $surface, string $pronunciation, int $accentType, UserDictWordType $wordType = CommonNoun, int $priority = 5): void` | UUID で指定した既存の単語を更新します。 |
+| `removeWord(string $wordUuid): void` | UUID で指定した単語を削除します。 |
+| `importDict(UserDict $other): void` | 別の `UserDict` から単語をインポートします。 |
+| `toJson(): string` | すべての単語を JSON 文字列で返します。 |
+
+---
+
+## Enum: `AccelerationMode`
+
+シンセサイザーのハードウェアアクセラレーションモード。
+
+| Case | 値 | 説明 |
+|------|---|------|
+| `Auto` | `0` | 利用可能な最適モードを自動選択します。 |
+| `Cpu` | `1` | CPU モードを強制します。 |
+| `Gpu` | `2` | GPU モードを強制します。 |
+
+---
+
+## Enum: `UserDictWordType`
+
+ユーザー辞書エントリの品詞。
+
+| Case | 値 | 説明 |
+|------|---|------|
+| `ProperNoun` | `0` | 固有名詞 |
+| `CommonNoun` | `1` | 普通名詞 |
+| `Verb` | `2` | 動詞 |
+| `Adjective` | `3` | 形容詞 |
+| `Suffix` | `4` | 接尾辞 |
+
+---
+
+## `VoicevoxException`
+
+VOICEVOX Core の C API 呼び出しがエラーコードを返した場合にスローされます。例外メッセージにはライブラリからのエラー説明が含まれます。
