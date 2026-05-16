@@ -31,7 +31,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - Chiselでも`nikic/php-parser`パッケージが使われている。 https://github.com/nikic/PHP-Parser
   - 一般的に使われる機能ではないのでASTを初めて知った人向けの説明で十分だろう。
   - blog/chisel-introduction.mdx のPHP ASTセクションからリンク。
-- [ ] FFIの解説。
+- [x] FFIの解説。
   - ASTと同様にそんなに使われる機能ではないけどVOICEVOX Core for PHPという実際の使用例ができたのでページを作成。
   - Laravel Cloudを含めWebサーバーでは無効にされてることが多い。
   - FFIの基本的な説明。
