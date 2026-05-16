@@ -29,12 +29,14 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
 - [x] Reflectionの解説
 - [ ] Laravel Chiselページで少し出てきたのでPHP AST（抽象構文木）の解説。
   - Chiselでも`nikic/php-parser`パッケージが使われている。 https://github.com/nikic/PHP-Parser
-  - 一般的に使われる機能ではないのでどのくらい深掘りするか判断しにくい。
+  - 一般的に使われる機能ではないのでASTを初めて知った人向けの説明で十分だろう。
+  - blog/chisel-introduction.mdx のPHP ASTセクションからリンク。
 - [ ] FFIの解説。
   - ASTと同様にそんなに使われる機能ではないけどVOICEVOX Core for PHPという実際の使用例ができたのでページを作成。
   - Laravel Cloudを含めWebサーバーでは無効にされてることが多い。
   - FFIの基本的な説明。
-  - 具体的なVOICEVOX Core for PHPでの使用パターンの解説。何らかのC APIの動的ライブラリがあればPHP FFIから使える可能性がある。
+  - 何らかのC APIの動的ライブラリがあればPHP FFIから使える可能性がある。
+  - 具体的なVOICEVOX Core for PHPでの使用パターンの解説。[VoicevoxFFI.php](https://github.com/invokable/voicevox-core-php/blob/main/src/VoicevoxFFI.php)、[voicevox_core_ffi.h](https://github.com/invokable/voicevox-core-php/blob/main/headers/voicevox_core_ffi.h)、[Synthesizer.php](https://github.com/invokable/voicevox-core-php/blob/main/src/Synthesizer.php) 辺りが主要なコード。
   - VOICEVOX Core for PHPの実装前の調査資料が英語と日本語であるのでこれも参考にする。 [voicevox-core-php-ffi-en.md](https://github.com/invokable/voicevox-core-php/blob/main/docs/voicevox-core-php-ffi-en.md)、[voicevox-core-php-ffi-ja.md](https://github.com/invokable/voicevox-core-php/blob/main/docs/voicevox-core-php-ffi-ja.md)
 
 ## blog ページ案
