@@ -1,0 +1,297 @@
+---
+title: "PHP FFI"
+description: "PHP FFI の基本、利用できる環境、そして VOICEVOX Core for PHP を題材にした実践的なラップパターンを解説します。"
+---
+
+## はじめに
+
+PHP FFI（Foreign Function Interface）は、共有ライブラリを読み込み、C 関数を呼び出し、C のデータ構造へアクセスするための PHP 拡張です。PHP 拡張を自作しなくても、既存の C API を PHP から直接使えます。
+
+PHP 公式ドキュメントは、FFI を低レベルで危険な機能として説明しています。C と対象ライブラリの API を理解した開発者だけが使うべき機能です。
+
+<Warning>
+  FFI は安全に抽象化された通常の PHP API ではありません。ポインタ、所有権、解放関数を誤るとクラッシュやメモリ破壊につながります。
+</Warning>
+
+FFI は「速くするための機能」でもありません。PHP 公式ドキュメントでも、FFI のデータ構造アクセスはネイティブな PHP 配列やオブジェクトより遅いと説明されています。FFI を選ぶ理由は速度ではなく、既存の C ライブラリを PHP から使いたいことです。
+
+## FFI が使える環境と制限
+
+PHP 公式ドキュメントでは、FFI 拡張を有効にする方法を次のように説明しています。
+
+- PHP を `--with-ffi` 付きでビルドする
+- Windows では `php.ini` で `php_ffi.dll` を有効にする
+- `php.ini` の `ffi.enable` で使用可否を制御する
+
+`ffi.enable` は次の 3 つの値を取ります。
+
+| 設定値 | 意味 |
+| --- | --- |
+| `true` | FFI API を有効にする |
+| `false` | FFI API を無効にする |
+| `preload` | CLI SAPI と preload 済みファイルだけで FFI API を許可する |
+
+<Info>
+  Web サーバー環境では `ffi.enable=false` や `ffi.enable=preload` が使われることが多いです。Laravel Cloud を含むホスティング環境でも、通常の Web アプリとして FFI を使えるとは限りません。
+</Info>
+
+そのため、Laravel アプリで FFI を使う場合でも、まずは CLI ツールやバッチ処理で成立するかを考えてください。FPM や Apache mod_php で常時有効にする前提は避けたほうが安全です。
+
+## 基本的な使い方
+
+PHP FFI の基本は `FFI::cdef()`、`FFI::new()`、`FFI::addr()`、`FFI::string()` の 4 つです。
+
+```php
+<?php
+
+$ffi = FFI::cdef(<<<'CDEF'
+typedef unsigned int time_t;
+typedef unsigned int suseconds_t;
+
+struct timeval {
+    time_t tv_sec;
+    suseconds_t tv_usec;
+};
+
+struct timezone {
+    int tz_minuteswest;
+    int tz_dsttime;
+};
+
+int gettimeofday(struct timeval *tv, struct timezone *tz);
+CDEF, 'libc.so.6');
+
+$tv = $ffi->new('struct timeval');
+$tz = $ffi->new('struct timezone');
+
+$ffi->gettimeofday(FFI::addr($tv), FFI::addr($tz));
+
+echo $tv->tv_sec.PHP_EOL;
+```
+
+この例で押さえる点は次のとおりです。
+
+- `FFI::cdef()` は C の宣言文字列と共有ライブラリ名から FFI オブジェクトを作る
+- `$ffi->new('struct timeval')` は C のデータ構造を確保する
+- `FFI::addr($tv)` は `struct timeval *` のようなポインタ引数を作る
+- `$tv->tv_sec` のように構造体フィールドへアクセスできる
+
+文字列やバイナリを受け取る API では `FFI::string()` を使います。
+
+```php
+<?php
+
+$jsonPtr = $ffi->new('char*');
+
+// C 側が $jsonPtr に結果ポインタを書き込む想定
+$result = $ffi->some_function(FFI::addr($jsonPtr));
+
+if ($result !== 0) {
+    throw new RuntimeException('C API call failed.');
+}
+
+$json = FFI::string($jsonPtr);
+```
+
+<Tip>
+  `FFI::new()` で確保したメモリは、通常は PHP の参照カウントで解放されます。一方で、C ライブラリが返したポインタはライブラリ専用の `free` 関数で解放する場合があります。どちらの所有権なのかを API ごとに確認してください。
+</Tip>
+
+## ヘッダーファイルの読み込み
+
+`FFI::load()` を使うと、C ヘッダーファイルから宣言を読み込めます。ヘッダーファイルには `FFI_SCOPE` と `FFI_LIB` を書けます。
+
+```c
+#define FFI_SCOPE "mylib"
+#define FFI_LIB "/absolute/path/to/libmylib.so"
+
+typedef struct MyContext MyContext;
+
+MyContext *mylib_new(void);
+void mylib_delete(MyContext *context);
+```
+
+```php
+<?php
+
+FFI::load(__DIR__.'/mylib.h');
+
+$ffi = FFI::scope('mylib');
+$context = $ffi->mylib_new();
+```
+
+ただし、PHP 公式ドキュメントは `FFI::cdef()` と `FFI::load()` のどちらでも通常の C プリプロセッサ命令は使えないと説明しています。`#include`、`#define`、条件付きコンパイルをそのまま渡すことはできません。
+
+そのため、実運用では次のどちらかを選ぶことが多いです。
+
+<Steps>
+  <Step title="単純な API なら `FFI::cdef()` に直接書く">
+    依存する型や関数が少ないなら、必要な宣言だけを PHP 側へ埋め込みます。
+  </Step>
+  <Step title="複雑な API なら前処理済みヘッダーを用意する">
+    元のヘッダーからマクロや条件付きコンパイルを取り除いた、FFI 用のヘッダーを別ファイルで管理します。
+  </Step>
+</Steps>
+
+## 実際のユースケース: VOICEVOX Core for PHP
+
+[VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) は、VOICEVOX CORE の C 動的ライブラリを Pure PHP から使う実例です。FFI の実用パターンがまとまっているので、抽象的な説明より理解しやすい題材です。
+
+### 1. FFI 用に整形したヘッダーを持つ
+
+VOICEVOX Core の元ヘッダーはそのままでは使わず、`headers/voicevox_core_ffi.h` に FFI 向けの宣言を切り出しています。ここでは不透明ポインタ、構造体、free 関数を明示しています。
+
+```c
+typedef struct VoicevoxSynthesizer VoicevoxSynthesizer;
+
+typedef struct VoicevoxInitializeOptions {
+    int32_t  acceleration_mode;
+    uint16_t cpu_num_threads;
+} VoicevoxInitializeOptions;
+
+int32_t voicevox_synthesizer_new(
+    const struct VoicevoxOnnxruntime *onnxruntime,
+    const struct OpenJtalkRc *open_jtalk,
+    struct VoicevoxInitializeOptions options,
+    struct VoicevoxSynthesizer **out_synthesizer
+);
+
+void voicevox_synthesizer_delete(struct VoicevoxSynthesizer *synthesizer);
+void voicevox_json_free(char *json);
+void voicevox_wav_free(uint8_t *wav);
+```
+
+この設計で重要なのは、C の詳細な内部構造を PHP 側へ見せずに、不透明ハンドルと関数呼び出しに閉じ込めていることです。PHP から扱う面積が小さくなり、ラッパークラスも整理しやすくなります。
+
+### 2. `FFI::cdef()` を 1 箇所へ集約する
+
+`src/VoicevoxFFI.php` は、ヘッダー読み込みとライブラリパス解決を 1 箇所へ集約しています。
+
+```php
+<?php
+
+class VoicevoxFFI
+{
+    private static ?FFI $ffi = null;
+
+    public static function getInstance(): FFI
+    {
+        return self::$ffi ??= FFI::cdef(
+            file_get_contents(__DIR__.'/../headers/voicevox_core_ffi.h'),
+            self::getLibraryPath(),
+        );
+    }
+
+    public static function getLibraryPath(): string
+    {
+        if ($path = getenv('VOICEVOX_CORE_LIB_PATH')) {
+            return $path;
+        }
+
+        return match (PHP_OS_FAMILY) {
+            'Darwin' => 'libvoicevox_core.dylib',
+            'Windows' => 'voicevox_core.dll',
+            default => 'libvoicevox_core.so',
+        };
+    }
+}
+```
+
+この形にすると、あなたのアプリ側は `FFI::cdef()` を直接呼ばずに済みます。ライブラリパスの差分も、環境変数と OS 判定で吸収できます。
+
+### 3. out parameter をラップしてオブジェクト化する
+
+`src/Synthesizer.php` のコンストラクタは、`struct VoicevoxSynthesizer*` を確保し、`voicevox_synthesizer_new()` にそのアドレスを渡しています。
+
+```php
+<?php
+
+$options = $this->ffi->voicevox_make_default_initialize_options();
+$options->acceleration_mode = $accelerationMode->value;
+$options->cpu_num_threads = $cpuNumThreads;
+
+$ptr = $this->ffi->new('struct VoicevoxSynthesizer*');
+
+$result = $this->ffi->voicevox_synthesizer_new(
+    $onnxruntime->handle(),
+    $openJtalk->handle(),
+    $options,
+    FFI::addr($ptr),
+);
+
+$this->handle = $ptr;
+```
+
+このパターンは、C API の `Type **out_value` を PHP で受ける基本形です。
+
+- `new('struct VoicevoxSynthesizer*')` でポインタ変数を作る
+- `FFI::addr($ptr)` で `Type **` を渡す
+- 取得したハンドルを PHP オブジェクトのプロパティに保持する
+
+### 4. C が返したメモリは PHP 文字列へコピーしてすぐ解放する
+
+VOICEVOX Core for PHP は、JSON 文字列や WAV バイナリを受け取ったら、まず `FFI::string()` で PHP 文字列へコピーし、その後で C 側の free 関数を呼んでいます。
+
+```php
+<?php
+
+$jsonPtr = $this->ffi->voicevox_synthesizer_create_metas_json($this->handle);
+
+$json = FFI::string($jsonPtr);
+$this->ffi->voicevox_json_free($jsonPtr);
+
+return $json;
+```
+
+```php
+<?php
+
+$wavSize = $this->ffi->new('uint64_t');
+$wavPtr = $this->ffi->new('uint8_t*');
+
+$result = $this->ffi->voicevox_synthesizer_tts(
+    $this->handle,
+    $text,
+    $styleId,
+    $options,
+    FFI::addr($wavSize),
+    FFI::addr($wavPtr),
+);
+
+$wav = FFI::string($wavPtr, (int) $wavSize->cdata);
+$this->ffi->voicevox_wav_free($wavPtr);
+
+return $wav;
+```
+
+この「コピーして即解放」の流れは、FFI で最も重要な実装パターンの 1 つです。C 側のバッファを PHP のライフサイクルへ混ぜないことで、所有権を単純化できます。
+
+## 注意点とベストプラクティス
+
+| 観点 | 実践ポイント |
+| --- | --- |
+| 実行環境 | まず CLI 前提で設計する |
+| ヘッダー管理 | 元ヘッダーをそのまま渡さず、FFI 用に整形した宣言を別管理する |
+| ライブラリパス | 絶対パスや環境変数で切り替えられるようにする |
+| メモリ管理 | `FFI::string()` で PHP にコピーし、ライブラリ専用の解放関数を必ず呼ぶ |
+| ラッパー設計 | 生の `CData` をアプリ全体へ広げず、専用クラスへ閉じ込める |
+| 互換性 | PHP バージョンと対象ライブラリの ABI 変更を一緒に確認する |
+
+<Warning>
+  Laravel アプリの request/response サイクルに FFI を直接混ぜると、環境差分と障害切り分けが急に難しくなります。まずは CLI コマンドやキュー以外の単発プロセスで成立させてください。
+</Warning>
+
+FFI が向いているのは、すでに安定した C API があり、PHP 拡張を自作するほどではないケースです。逆に、通常の Web ホスティングで動かしたい機能や、PHP だけで完結できる処理には向いていません。
+
+## まとめ
+
+PHP FFI を使うと、あなたは既存の C ライブラリを Pure PHP から呼び出せます。ただし、FFI は低レベルで危険な仕組みです。Web サーバーで常に使えるとも限りません。
+
+VOICEVOX Core for PHP の実装を見ると、実践では次の 4 点が重要だと分かります。
+
+1. FFI 用のヘッダーを別に用意する
+2. `FFI::cdef()` とライブラリパス解決を 1 箇所へ集約する
+3. 不透明ポインタを専用クラスでラップする
+4. C が返したメモリは PHP にコピーしてから専用関数で解放する
+
+VOICEVOX Core for PHP のページも合わせて読むと、FFI の概念と実際のパッケージ設計を往復しながら理解できます。
