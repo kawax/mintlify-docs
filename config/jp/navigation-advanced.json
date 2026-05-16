@@ -22,7 +22,8 @@
         "jp/advanced/collection-deep-dive",
         "jp/advanced/manager",
         "jp/advanced/php-reflection",
-        "jp/advanced/ffi"
+        "jp/advanced/ffi",
+        "jp/advanced/php-ast"
       ]
     },
     {
