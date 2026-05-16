@@ -1,6 +1,9 @@
 {
   "tabs": [
     {
+      "$ref": "en/navigation-packages.json"
+    },
+    {
       "$ref": "en/navigation-tutorial.json"
     },
     {
@@ -11,9 +14,6 @@
     },
     {
       "$ref": "en/navigation-blog.json"
-    },
-    {
-      "$ref": "en/navigation-packages.json"
     }
   ]
 }

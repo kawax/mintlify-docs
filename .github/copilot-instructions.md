@@ -77,7 +77,8 @@ Mintlifyの対応言語：https://www.mintlify.com/docs/organize/navigation#lang
 
 ## docs.json
 
-ページが増えてきたので`$ref`を使って`navigation`を分割。言語ごとのページに分けてさらにタブごとに分割。タブの並び順は変えるかもしれない。独自コンテンツを先に表示したくなったら変える。
+ページが増えてきたので`$ref`を使って`navigation`を分割。言語ごとのページに分けてさらにタブごとに分割。  
+タブの並び順は変えるかもしれない。独自コンテンツを先に表示したくなったら変える。→パッケージを最初に移動。
 
 - config/navigation-jp.json
   - config/jp/navigation-tutorial.json 
