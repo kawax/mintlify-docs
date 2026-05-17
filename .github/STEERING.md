@@ -27,12 +27,12 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
 - [x] Fortifyページ
 - [x] スターターキットの作り方ページ
 - [x] Reflectionの解説
-- [ ] Laravel Chiselページで少し出てきたのでPHP AST（抽象構文木）の解説。
+- [x] Laravel Chiselページで少し出てきたのでPHP AST（抽象構文木）の解説。
   - Chiselでも`nikic/php-parser`パッケージが使われている。 https://github.com/nikic/PHP-Parser
   - 一般的に使われる機能ではないのでASTを初めて知った人向けの説明で十分だろう。
   - blog/chisel-introduction.mdx のPHP ASTセクションからリンク。
   - 日本語ページはOK
-- [ ] FFIの解説。
+- [x] FFIの解説。
   - ASTと同様にそんなに使われる機能ではないけどVOICEVOX Core for PHPという実際の使用例ができたのでページを作成。
   - Laravel Cloudを含めWebサーバーでは無効にされてることが多い。
   - FFIの基本的な説明。
