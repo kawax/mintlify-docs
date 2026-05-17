@@ -1,0 +1,110 @@
+---
+title: "VOICEVOX Core for PHP"
+description: "A pure PHP package that wraps the VOICEVOX CORE C dynamic library via PHP FFI, enabling text-to-speech (TTS) synthesis directly from PHP."
+---
+
+## Overview
+
+[invokable/voicevox-core-php](https://github.com/invokable/voicevox-core-php) is a pure PHP package that wraps the [VOICEVOX CORE](https://github.com/VOICEVOX/voicevox_core) C dynamic library via PHP FFI.
+
+VOICEVOX is a high-quality Japanese text-to-speech (TTS) engine. With this package, you can perform speech synthesis directly from PHP.
+
+<Info>
+  If you want to understand how PHP FFI works and its constraints first, see [PHP FFI](/en/advanced/ffi).
+</Info>
+
+<Warning>
+  PHP FFI is often disabled in web server environments such as FPM (`ffi.enable=false`). This package is intended for **local CLI use**.
+</Warning>
+
+## Requirements
+
+- PHP 8.3+
+- `ext-ffi` extension enabled
+- VOICEVOX CORE 0.16+
+
+## Installation
+
+```bash
+composer require revolution/voicevox-core
+```
+
+## Library Setup
+
+To use this package, you need the VOICEVOX CORE dynamic library (`.so` / `.dylib`), the ONNX Runtime library, and the OpenJTalk dictionary.
+
+<Steps>
+  <Step title="Download voicevox_core">
+    Download the downloader for your OS and architecture from [voicevox_core releases](https://github.com/VOICEVOX/voicevox_core/releases) and run it. It creates a `voicevox_core` directory in your current directory.
+
+    The created directory structure:
+
+    ```
+    voicevox_core/
+    ├── dict/open_jtalk_dic_*/     # OpenJTalk dictionary
+    ├── c_api/lib/                 # Dynamic libraries (.so, .dylib)
+    ├── models/vvms/               # Voice model files (.vvm)
+    └── onnxruntime/               # ONNX Runtime library
+    ```
+  </Step>
+  <Step title="Move to a permanent location">
+    ```bash
+    mv voicevox_core ~/.local/voicevox_core
+    ```
+  </Step>
+  <Step title="Create a symbolic link (recommended)">
+    Create a symbolic link so the library is found automatically.
+
+    <Warning>
+      Always use **absolute paths** with `ln -s`.
+    </Warning>
+
+    **macOS:**
+    ```bash
+    # Replace [VOICEVOX_CORE_DIR] with the absolute path to voicevox_core
+    ln -s [VOICEVOX_CORE_DIR]/libvoicevox_core.dylib /usr/local/lib/libvoicevox_core.dylib
+    ```
+
+    If the library cannot be loaded from `/usr/local/lib/`, set `DYLD_FALLBACK_LIBRARY_PATH` in your `.zshrc` or similar:
+    ```bash
+    export DYLD_FALLBACK_LIBRARY_PATH="$HOME/lib:/usr/local/lib:/usr/lib"
+    ```
+
+    **Linux:**
+    ```bash
+    ln -s [VOICEVOX_CORE_DIR]/libvoicevox_core.so /usr/local/lib/libvoicevox_core.so
+    ```
+  </Step>
+</Steps>
+
+### Alternative: Use an environment variable
+
+If you cannot create a symbolic link, set the full path to the library file in the `VOICEVOX_CORE_LIB_PATH` environment variable:
+
+```bash
+export VOICEVOX_CORE_LIB_PATH=/path/to/libvoicevox_core.dylib
+```
+
+```bash
+export VOICEVOX_CORE_LIB_PATH="$HOME/.local/voicevox_core/c_api/lib/libvoicevox_core.dylib"
+```
+
+<Info>
+  On macOS, if `DYLD_FALLBACK_LIBRARY_PATH` does not work, use `VOICEVOX_CORE_LIB_PATH` instead.
+</Info>
+
+## Documentation
+
+<Columns cols={2}>
+  <Card title="Usage" href="/en/packages/voicevox-core-php/usage" icon="play">
+    Basic usage and code samples for TTS and speech synthesis.
+  </Card>
+  <Card title="API Reference" href="/en/packages/voicevox-core-php/api" icon="code">
+    Detailed reference for all classes, methods, and enums.
+  </Card>
+</Columns>
+
+## Links
+
+- GitHub: [invokable/voicevox-core-php](https://github.com/invokable/voicevox-core-php)
+- VOICEVOX CORE: [VOICEVOX/voicevox_core](https://github.com/VOICEVOX/voicevox_core)

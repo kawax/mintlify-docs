@@ -1,0 +1,162 @@
+---
+title: "Usage - VOICEVOX Core for PHP"
+description: "Basic usage of VOICEVOX Core for PHP. Code samples for text-to-speech (TTS) and speech synthesis."
+sidebarTitle: "Usage"
+---
+
+## Basic speech synthesis
+
+The following `talk.php` demonstrates how to synthesize speech from text and write it to a WAV file.
+
+<Warning>
+  PHP FFI is usually disabled in web server environments such as FPM. Run this script **from the CLI** with `php talk.php`.
+</Warning>
+
+```php
+<?php
+
+require __DIR__ . '/vendor/autoload.php';
+
+use Revolution\Voicevox\Core\Enums\AccelerationMode;
+use Revolution\Voicevox\Core\Onnxruntime;
+use Revolution\Voicevox\Core\OpenJtalk;
+use Revolution\Voicevox\Core\Synthesizer;
+use Revolution\Voicevox\Core\VoiceModelFile;
+
+// Adjust the path to match your voicevox_core installation
+$voicevoxCoreDir = getenv('HOME') . '/.local/voicevox_core';
+$onnxruntimeFilename = $voicevoxCoreDir . '/onnxruntime/lib/' . Onnxruntime::libVersionedFilename();
+$dictDir = $voicevoxCoreDir . '/dict/open_jtalk_dic_utf_8-1.11';
+$vvmPath  = $voicevoxCoreDir . '/models/vvms/0.vvm';
+
+// Text and style ID to synthesize
+$text    = 'この音声は、ボイスボックスを使用して、出力されています。';
+$styleId = 0;
+$outPath = './output.wav';
+
+// Initialize
+$onnxruntime = Onnxruntime::loadOnce($onnxruntimeFilename);
+$openJtalk   = new OpenJtalk($dictDir);
+$synthesizer = new Synthesizer($onnxruntime, $openJtalk, AccelerationMode::Auto);
+
+// Load the voice model
+$model = VoiceModelFile::open($vvmPath);
+$synthesizer->loadVoiceModel($model);
+
+// Synthesize speech
+$audioQuery = $synthesizer->createAudioQuery($text, $styleId);
+$wav        = $synthesizer->synthesis($audioQuery, $styleId);
+
+file_put_contents($outPath, $wav);
+echo 'Wrote ' . $outPath . PHP_EOL;
+```
+
+Run it:
+
+```bash
+php talk.php
+```
+
+## One-step synthesis with `tts`
+
+If you want to skip the two-step `createAudioQuery` + `synthesis` flow, use the `tts()` method:
+
+```php
+$wav = $synthesizer->tts($text, $styleId);
+file_put_contents('./output.wav', $wav);
+```
+
+## Synthesis from kana notation
+
+You can also synthesize from AquesTalk-style kana notation:
+
+```php
+// Using ttsFromKana
+$wav = $synthesizer->ttsFromKana("コノオンセイワ'、ボイスボックスオ'/シヨーシテ'、シュツリョクサレテイマ'ス。", $styleId);
+file_put_contents('./output.wav', $wav);
+```
+
+## Using a user dictionary
+
+Use `UserDict` to register custom word pronunciations:
+
+```php
+use Revolution\Voicevox\Core\UserDict;
+use Revolution\Voicevox\Core\Enums\UserDictWordType;
+
+$userDict = new UserDict();
+$uuid = $userDict->addWord(
+    surface: 'ボイボ',
+    pronunciation: 'ボイボ',
+    accentType: 0,
+    wordType: UserDictWordType::ProperNoun,
+    priority: 10,
+);
+
+// Save the dictionary
+$userDict->save('./mydict.json');
+
+// Apply the dictionary to OpenJTalk
+$openJtalk->useUserDict($userDict);
+```
+
+## Adjusting AudioQuery
+
+You can fine-tune the intonation and tempo by modifying the JSON returned by `createAudioQuery` before synthesis:
+
+```php
+$audioQueryJson = $synthesizer->createAudioQuery($text, $styleId);
+
+// Decode and adjust the JSON
+$audioQuery = json_decode($audioQueryJson, true);
+$audioQuery['speedScale'] = 1.2;   // Speed up by 1.2x
+$audioQuery['pitchScale'] = 0.05;  // Raise pitch slightly
+
+$wav = $synthesizer->synthesis(json_encode($audioQuery), $styleId);
+file_put_contents('./output.wav', $wav);
+```
+
+## Retrieving accent phrases
+
+You can retrieve and inspect accent phrase information for a text:
+
+```php
+$accentPhrasesJson = $synthesizer->createAccentPhrases($text, $styleId);
+$accentPhrases = json_decode($accentPhrasesJson, true);
+
+// Overwrite mora pitch and phoneme length with another style
+$updatedJson = $synthesizer->replaceMoraData($accentPhrasesJson, $styleId);
+```
+
+## GPU mode
+
+In environments where a GPU is available, specify `AccelerationMode::Gpu` for faster synthesis:
+
+```php
+use Revolution\Voicevox\Core\Enums\AccelerationMode;
+
+$synthesizer = new Synthesizer($onnxruntime, $openJtalk, AccelerationMode::Gpu);
+
+// Check whether GPU mode is active
+if ($synthesizer->isGpuMode()) {
+    echo 'Running in GPU mode' . PHP_EOL;
+}
+```
+
+## Using multiple voice models
+
+Load multiple `.vvm` files and switch between style IDs to use different character voices:
+
+```php
+$model0 = VoiceModelFile::open($voicevoxCoreDir . '/models/vvms/0.vvm');
+$model1 = VoiceModelFile::open($voicevoxCoreDir . '/models/vvms/1.vvm');
+
+$synthesizer->loadVoiceModel($model0);
+$synthesizer->loadVoiceModel($model1);
+
+// Inspect speaker metadata included in the models
+$metas = json_decode($synthesizer->metas(), true);
+
+// Unload a model when it is no longer needed
+$synthesizer->unloadVoiceModel($model0->id());
+```
