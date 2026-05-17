@@ -98,6 +98,21 @@
       ]
     },
     {
+      "group": "VOICEVOX",
+      "expanded": false,
+      "pages": [
+        {
+          "group": "VOICEVOX Core for PHP",
+          "expanded": false,
+          "pages": [
+            "en/packages/voicevox-core-php/index",
+            "en/packages/voicevox-core-php/usage",
+            "en/packages/voicevox-core-php/api"
+          ]
+        }
+      ]
+    },
+    {
       "group": "Starter Kits",
       "pages": [
         {

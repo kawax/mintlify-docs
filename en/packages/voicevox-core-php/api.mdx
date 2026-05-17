@@ -1,0 +1,134 @@
+---
+title: "API Reference - VOICEVOX Core for PHP"
+description: "Complete reference for all classes, methods, and enums in VOICEVOX Core for PHP."
+sidebarTitle: "API Reference"
+---
+
+## `Onnxruntime`
+
+ONNX Runtime loader. This is a process-level singleton — only one instance exists per process.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `static loadOnce(string $filename = ''): self` | Loads and initializes the ONNX Runtime. On subsequent calls the argument is ignored and the existing instance is returned. |
+| `static get(): ?self` | Returns the existing instance, or `null` if not yet initialized. |
+| `supportedDevices(): string` | Returns available device information as a JSON string. |
+| `static libVersionedFilename(): string` | Returns the versioned filename of the ONNX Runtime library (e.g., `libvoicevox_onnxruntime.1.17.3.dylib`). |
+| `static libUnversionedFilename(): string` | Returns the unversioned filename of the ONNX Runtime library. |
+
+### Constants
+
+| Constant | Description |
+|----------|-------------|
+| `LIB_NAME` | Library base name (`voicevox_onnxruntime`) |
+| `LIB_VERSION` | Recommended ONNX Runtime version |
+
+---
+
+## `OpenJtalk`
+
+Text analyzer using OpenJTalk.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `__construct(string $openJtalkDictDir)` | Initializes with the path to the OpenJTalk dictionary directory. |
+| `useUserDict(UserDict $userDict): void` | Applies a user dictionary. Call again if the dictionary is updated. |
+
+---
+
+## `VoiceModelFile`
+
+Voice model file (`.vvm` file).
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `static open(string $path): self` | Opens a `.vvm` file. |
+| `id(): string` | Returns the voice model ID as a hex string (16 bytes). |
+| `createMetasJson(): string` | Returns speaker metadata as a JSON string. |
+| `close(): void` | Closes the file and releases resources. |
+
+---
+
+## `Synthesizer`
+
+Main class for text-to-speech synthesis.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `__construct(Onnxruntime $onnxruntime, OpenJtalk $openJtalk, AccelerationMode $accelerationMode = Auto, int $cpuNumThreads = 0)` | Initializes the synthesizer. |
+| `isGpuMode(): bool` | Returns whether GPU mode is enabled. |
+| `metas(): string` | Returns metadata for all loaded speakers as a JSON string. |
+| `loadVoiceModel(VoiceModelFile $model): void` | Loads a voice model. |
+| `unloadVoiceModel(string $voiceModelId): void` | Unloads a voice model by its hex ID. |
+| `isLoadedVoiceModel(string $voiceModelId): bool` | Returns whether a voice model is loaded. |
+| `createAudioQuery(string $text, int $styleId): string` | Generates an AudioQuery JSON from Japanese text. |
+| `createAudioQueryFromKana(string $kana, int $styleId): string` | Generates an AudioQuery JSON from AquesTalk-style kana notation. |
+| `createAccentPhrases(string $text, int $styleId): string` | Generates an accent phrase array JSON from Japanese text. |
+| `createAccentPhrasesFromKana(string $kana, int $styleId): string` | Generates an accent phrase array JSON from kana notation. |
+| `replaceMoraData(string $accentPhrasesJson, int $styleId): string` | Returns updated accent phrases with mora pitch and phoneme length from another style. |
+| `replacePhonemeLength(string $accentPhrasesJson, int $styleId): string` | Returns updated accent phrases with phoneme lengths from another style. |
+| `replaceMoraPitch(string $accentPhrasesJson, int $styleId): string` | Returns updated accent phrases with mora pitch from another style. |
+| `synthesis(string $audioQueryJson, int $styleId, bool $enableInterrogativeUpspeak = true): string` | Synthesizes speech from an AudioQuery JSON. Returns WAV binary. |
+| `tts(string $text, int $styleId, bool $enableInterrogativeUpspeak = true): string` | Synthesizes speech from Japanese text in one step. Returns WAV binary. |
+| `ttsFromKana(string $kana, int $styleId, bool $enableInterrogativeUpspeak = true): string` | Synthesizes speech from kana notation. Returns WAV binary. |
+| `createSingFrameAudioQuery(string $scoreJson, int $styleId): string` | Generates a singing synthesis query JSON from a score JSON. |
+| `frameSynthesis(string $frameAudioQueryJson, int $styleId): string` | Synthesizes singing audio from a frame audio query. Returns WAV binary. |
+
+---
+
+## `UserDict`
+
+User dictionary for registering custom word pronunciations.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `__construct()` | Creates an empty user dictionary. |
+| `load(string $path): void` | Loads a user dictionary from a file. |
+| `save(string $path): void` | Saves the user dictionary to a file. |
+| `addWord(string $surface, string $pronunciation, int $accentType, UserDictWordType $wordType = CommonNoun, int $priority = 5): string` | Adds a word and returns its UUID as a hex string. |
+| `updateWord(string $wordUuid, string $surface, string $pronunciation, int $accentType, UserDictWordType $wordType = CommonNoun, int $priority = 5): void` | Updates an existing word identified by UUID. |
+| `removeWord(string $wordUuid): void` | Removes the word identified by UUID. |
+| `importDict(UserDict $other): void` | Imports words from another `UserDict`. |
+| `toJson(): string` | Returns all words as a JSON string. |
+
+---
+
+## Enum: `AccelerationMode`
+
+Hardware acceleration mode for the synthesizer.
+
+| Case | Value | Description |
+|------|-------|-------------|
+| `Auto` | `0` | Automatically selects the best available mode. |
+| `Cpu` | `1` | Forces CPU mode. |
+| `Gpu` | `2` | Forces GPU mode. |
+
+---
+
+## Enum: `UserDictWordType`
+
+Part-of-speech for user dictionary entries.
+
+| Case | Value | Description |
+|------|-------|-------------|
+| `ProperNoun` | `0` | Proper noun |
+| `CommonNoun` | `1` | Common noun |
+| `Verb` | `2` | Verb |
+| `Adjective` | `3` | Adjective |
+| `Suffix` | `4` | Suffix |
+
+---
+
+## `VoicevoxException`
+
+Thrown when the VOICEVOX Core C API call returns an error code. The exception message contains the error description from the library.
