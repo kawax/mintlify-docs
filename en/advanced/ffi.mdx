@@ -1,0 +1,297 @@
+---
+title: "PHP FFI"
+description: "An overview of PHP FFI (Foreign Function Interface), supported environments, and practical wrapping patterns using VOICEVOX Core for PHP."
+---
+
+## Introduction
+
+PHP FFI (Foreign Function Interface) is a PHP extension for loading shared libraries, calling C functions, and accessing C data structures. You can use existing C APIs directly from PHP without building your own PHP extension.
+
+The official PHP documentation describes FFI as a low-level and potentially dangerous feature. Only developers who understand C and the target library API should use it.
+
+<Warning>
+  FFI is not a regular PHP API with safe abstractions. Mistakes with pointers, ownership, or deallocation functions can cause crashes or memory corruption.
+</Warning>
+
+FFI is also not a feature for speed. The official PHP documentation explains that FFI data structure access is slower than native PHP arrays or objects. You choose FFI for interoperability with existing C libraries, not performance.
+
+## Supported Environments and Restrictions
+
+The official PHP documentation explains FFI enablement as follows.
+
+- Build PHP with `--with-ffi`
+- Enable `php_ffi.dll` in `php.ini` on Windows
+- Control availability with `ffi.enable` in `php.ini`
+
+`ffi.enable` accepts these three values.
+
+| Value | Meaning |
+| --- | --- |
+| `true` | Enable the FFI API |
+| `false` | Disable the FFI API |
+| `preload` | Allow the FFI API only in CLI SAPI and preloaded files |
+
+<Info>
+  In web server environments, `ffi.enable=false` or `ffi.enable=preload` is common. In hosting environments, including Laravel Cloud, FFI may not be available for regular web applications.
+</Info>
+
+Because of this, even when you use FFI in a Laravel app, first verify whether your use case works as a CLI tool or batch process. It is safer to avoid assumptions that FFI is always enabled under FPM or Apache `mod_php`.
+
+## Basic Usage
+
+The core PHP FFI methods are `FFI::cdef()`, `FFI::new()`, `FFI::addr()`, and `FFI::string()`.
+
+```php
+<?php
+
+$ffi = FFI::cdef(<<<'CDEF'
+typedef unsigned int time_t;
+typedef unsigned int suseconds_t;
+
+struct timeval {
+    time_t tv_sec;
+    suseconds_t tv_usec;
+};
+
+struct timezone {
+    int tz_minuteswest;
+    int tz_dsttime;
+};
+
+int gettimeofday(struct timeval *tv, struct timezone *tz);
+CDEF, 'libc.so.6');
+
+$tv = $ffi->new('struct timeval');
+$tz = $ffi->new('struct timezone');
+
+$ffi->gettimeofday(FFI::addr($tv), FFI::addr($tz));
+
+echo $tv->tv_sec.PHP_EOL;
+```
+
+Key points in this example are:
+
+- `FFI::cdef()` creates an FFI object from a C declaration string and a shared library name
+- `$ffi->new('struct timeval')` allocates a C data structure
+- `FFI::addr($tv)` creates a pointer argument like `struct timeval *`
+- You can access struct fields like `$tv->tv_sec`
+
+For APIs that return strings or binary data, use `FFI::string()`.
+
+```php
+<?php
+
+$jsonPtr = $ffi->new('char*');
+
+// Assume the C side writes a result pointer into $jsonPtr
+$result = $ffi->some_function(FFI::addr($jsonPtr));
+
+if ($result !== 0) {
+    throw new RuntimeException('C API call failed.');
+}
+
+$json = FFI::string($jsonPtr);
+```
+
+<Tip>
+  Memory allocated by `FFI::new()` is usually released through PHP reference counting. In contrast, pointers returned by C libraries may need a library-specific `free` function. Check ownership per API.
+</Tip>
+
+## Loading Header Files
+
+With `FFI::load()`, you can load declarations from a C header file. Header files can include `FFI_SCOPE` and `FFI_LIB`.
+
+```c
+#define FFI_SCOPE "mylib"
+#define FFI_LIB "/absolute/path/to/libmylib.so"
+
+typedef struct MyContext MyContext;
+
+MyContext *mylib_new(void);
+void mylib_delete(MyContext *context);
+```
+
+```php
+<?php
+
+FFI::load(__DIR__.'/mylib.h');
+
+$ffi = FFI::scope('mylib');
+$context = $ffi->mylib_new();
+```
+
+However, the official PHP documentation explains that normal C preprocessor directives are not supported with either `FFI::cdef()` or `FFI::load()`. You cannot pass `#include`, `#define`, or conditional compilation directives as-is.
+
+Because of this, production code usually chooses one of these approaches.
+
+<Steps>
+  <Step title="Use `FFI::cdef()` directly for simple APIs">
+    If dependencies are small, embed only the declarations you need on the PHP side.
+  </Step>
+  <Step title="Prepare a preprocessed header for complex APIs">
+    Maintain a separate FFI header that removes macros and conditional compilation from the original header.
+  </Step>
+</Steps>
+
+## Real-world Use Case: VOICEVOX Core for PHP
+
+[VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) is a practical example of using the VOICEVOX CORE C dynamic library from pure PHP. It is a concrete reference for practical FFI patterns.
+
+### 1. Maintain an FFI-oriented header
+
+Instead of using the original VOICEVOX Core header directly, declarations for FFI are extracted into `headers/voicevox_core_ffi.h`. This defines opaque pointers, structs, and free functions explicitly.
+
+```c
+typedef struct VoicevoxSynthesizer VoicevoxSynthesizer;
+
+typedef struct VoicevoxInitializeOptions {
+    int32_t  acceleration_mode;
+    uint16_t cpu_num_threads;
+} VoicevoxInitializeOptions;
+
+int32_t voicevox_synthesizer_new(
+    const struct VoicevoxOnnxruntime *onnxruntime,
+    const struct OpenJtalkRc *open_jtalk,
+    struct VoicevoxInitializeOptions options,
+    struct VoicevoxSynthesizer **out_synthesizer
+);
+
+void voicevox_synthesizer_delete(struct VoicevoxSynthesizer *synthesizer);
+void voicevox_json_free(char *json);
+void voicevox_wav_free(uint8_t *wav);
+```
+
+The important point in this design is that detailed internal C structures are hidden from PHP. Opaque handles and function calls keep the PHP-side surface area small and wrapper classes easier to maintain.
+
+### 2. Centralize `FFI::cdef()` in one place
+
+`src/VoicevoxFFI.php` centralizes header loading and library path resolution.
+
+```php
+<?php
+
+class VoicevoxFFI
+{
+    private static ?FFI $ffi = null;
+
+    public static function getInstance(): FFI
+    {
+        return self::$ffi ??= FFI::cdef(
+            file_get_contents(__DIR__.'/../headers/voicevox_core_ffi.h'),
+            self::getLibraryPath(),
+        );
+    }
+
+    public static function getLibraryPath(): string
+    {
+        if ($path = getenv('VOICEVOX_CORE_LIB_PATH')) {
+            return $path;
+        }
+
+        return match (PHP_OS_FAMILY) {
+            'Darwin' => 'libvoicevox_core.dylib',
+            'Windows' => 'voicevox_core.dll',
+            default => 'libvoicevox_core.so',
+        };
+    }
+}
+```
+
+With this shape, your application code does not call `FFI::cdef()` directly. Library path differences are also absorbed through environment variables and OS detection.
+
+### 3. Wrap out parameters into objects
+
+The constructor in `src/Synthesizer.php` allocates `struct VoicevoxSynthesizer*` and passes its address into `voicevox_synthesizer_new()`.
+
+```php
+<?php
+
+$options = $this->ffi->voicevox_make_default_initialize_options();
+$options->acceleration_mode = $accelerationMode->value;
+$options->cpu_num_threads = $cpuNumThreads;
+
+$ptr = $this->ffi->new('struct VoicevoxSynthesizer*');
+
+$result = $this->ffi->voicevox_synthesizer_new(
+    $onnxruntime->handle(),
+    $openJtalk->handle(),
+    $options,
+    FFI::addr($ptr),
+);
+
+$this->handle = $ptr;
+```
+
+This pattern is the baseline way to receive `Type **out_value` in PHP with a C API.
+
+- Create a pointer variable with `new('struct VoicevoxSynthesizer*')`
+- Pass `Type **` via `FFI::addr($ptr)`
+- Store the acquired handle in a PHP object property
+
+### 4. Copy C-returned memory into PHP strings and free immediately
+
+VOICEVOX Core for PHP receives JSON strings and WAV binary data, copies them into PHP strings with `FFI::string()`, and then calls the C-side free functions.
+
+```php
+<?php
+
+$jsonPtr = $this->ffi->voicevox_synthesizer_create_metas_json($this->handle);
+
+$json = FFI::string($jsonPtr);
+$this->ffi->voicevox_json_free($jsonPtr);
+
+return $json;
+```
+
+```php
+<?php
+
+$wavSize = $this->ffi->new('uint64_t');
+$wavPtr = $this->ffi->new('uint8_t*');
+
+$result = $this->ffi->voicevox_synthesizer_tts(
+    $this->handle,
+    $text,
+    $styleId,
+    $options,
+    FFI::addr($wavSize),
+    FFI::addr($wavPtr),
+);
+
+$wav = FFI::string($wavPtr, (int) $wavSize->cdata);
+$this->ffi->voicevox_wav_free($wavPtr);
+
+return $wav;
+```
+
+This copy-and-free flow is one of the most important implementation patterns in FFI. It simplifies ownership by keeping C buffers out of the PHP lifecycle.
+
+## Cautions and Best Practices
+
+| Perspective | Practical Point |
+| --- | --- |
+| Runtime environment | Design for CLI-first usage |
+| Header management | Do not pass original headers directly; maintain FFI-shaped declarations separately |
+| Library path | Make switching possible with absolute paths or environment variables |
+| Memory management | Copy to PHP with `FFI::string()` and always call the library-specific free function |
+| Wrapper design | Do not spread raw `CData` across the app; isolate it in dedicated classes |
+| Compatibility | Check both PHP version changes and target library ABI changes |
+
+<Warning>
+  If you mix FFI directly into the Laravel request/response cycle, environment differences and failure isolation become much harder. Start with CLI commands or other short-lived processes.
+</Warning>
+
+FFI is a good fit when you already have a stable C API and do not need to build a custom PHP extension. It is not a good fit for features that must run in standard web hosting or for logic that can be completed purely in PHP.
+
+## Summary
+
+With PHP FFI, you can call existing C libraries from pure PHP. However, FFI is a low-level and dangerous mechanism, and it may not always be available in web server environments.
+
+The VOICEVOX Core for PHP implementation highlights four practical priorities.
+
+1. Prepare a dedicated header for FFI
+2. Centralize `FFI::cdef()` and library path resolution
+3. Wrap opaque pointers with dedicated classes
+4. Copy C-returned memory into PHP and free it with dedicated functions
+
+If you read the VOICEVOX Core for PHP page together with this guide, you can understand both the FFI concepts and practical package design patterns.
