@@ -1,0 +1,227 @@
+---
+title: "Eloquentコレクション"
+description: "Illuminate\\Database\\Eloquent\\Collection の専用メソッドとカスタムコレクションの作り方を解説します。"
+---
+
+## はじめに
+
+Eloquentで複数件のモデルを取得すると、結果は `Illuminate\Database\Eloquent\Collection` として返ります。  
+これは `Illuminate\Support\Collection` を継承しているため、ベースコレクションのメソッドをそのまま使えます。
+
+```mermaid
+classDiagram
+    class "Illuminate\\Support\\Collection" as SupportCollection
+    class "Illuminate\\Database\\Eloquent\\Collection" as EloquentCollection
+    SupportCollection <|-- EloquentCollection
+```
+
+```php
+use App\Models\User;
+
+$users = User::where('active', true)->get();
+
+foreach ($users as $user) {
+    echo $user->name;
+}
+```
+
+まずはベースとなる [コレクション](/jp/collections) と [Eloquent入門](/jp/eloquent) を押さえておくと、Eloquentコレクションの拡張点を理解しやすくなります。
+
+## 利用可能なメソッド
+
+`Eloquent\Collection` はベースコレクションのすべてのメソッドを継承し、さらにモデル向けメソッドを追加します。
+
+### `append` / `withoutAppends` / `setAppends`
+
+シリアライズ時の追加属性（appends）をコレクション全体に対して操作できます。
+
+```php
+$users->append('team');
+$users->append(['team', 'is_admin']);
+
+$users = $users->withoutAppends();
+$users = $users->setAppends(['is_admin']);
+```
+
+### `contains` / `diff` / `except` / `intersect` / `only`
+
+モデルインスタンスや主キーを基準に、包含判定・差集合・積集合・除外・抽出を行います。
+
+```php
+use App\Models\User;
+
+$users->contains(1);
+$users->contains(User::find(1));
+
+$subset = User::whereIn('id', [1, 2, 3])->get();
+
+$users->diff($subset);
+$users->intersect($subset);
+
+$users->except([1, 2, 3]);
+$users->only([1, 2, 3]);
+```
+
+### `find` / `findOrFail`
+
+取得済みコレクションから主キーでモデルを検索します。
+
+```php
+$users = User::all();
+
+$user = $users->find(1);
+$user = $users->findOrFail(1);
+```
+
+### `fresh`
+
+コレクション内の各モデルを、データベースの最新状態で再取得します。
+
+```php
+$users = $users->fresh();
+$users = $users->fresh('comments');
+```
+
+### `load` / `loadMissing`
+
+取得済みコレクションに対して、後からリレーションをEager Loadingできます。
+
+```php
+$users->load(['comments', 'posts']);
+$users->load('comments.author');
+$users->load(['comments', 'posts' => fn ($query) => $query->where('active', 1)]);
+
+$users->loadMissing(['comments', 'posts']);
+$users->loadMissing('comments.author');
+$users->loadMissing(['comments', 'posts' => fn ($query) => $query->where('active', 1)]);
+```
+
+### `modelKeys`
+
+コレクション内モデルの主キー一覧を取得します。
+
+```php
+$users->modelKeys();
+// [1, 2, 3, ...]
+```
+
+### `makeVisible` / `makeHidden` / `mergeVisible` / `mergeHidden` / `setVisible` / `setHidden`
+
+シリアライズ時の可視属性・非可視属性を、コレクション単位で調整できます。
+
+```php
+$users = $users->makeVisible(['address', 'phone_number']);
+$users = $users->makeHidden(['address', 'phone_number']);
+
+$users = $users->mergeVisible(['middle_name']);
+$users = $users->mergeHidden(['last_login_at']);
+
+$users = $users->setVisible(['id', 'name']);
+$users = $users->setHidden(['email', 'password', 'remember_token']);
+```
+
+### `partition`
+
+条件で2つの `Eloquent\Collection` に分割し、外側は `Illuminate\Support\Collection` として返します。
+
+```php
+$partition = $users->partition(fn ($user) => $user->age > 18);
+
+dump($partition::class);    // Illuminate\Support\Collection
+dump($partition[0]::class); // Illuminate\Database\Eloquent\Collection
+dump($partition[1]::class); // Illuminate\Database\Eloquent\Collection
+```
+
+### `toQuery`
+
+取得済みモデル群の主キーに対する `whereIn` クエリを作り、まとめて更新や削除に使えます。
+
+```php
+use App\Models\User;
+
+// まず条件に一致するユーザーを取得
+$vipUsers = User::where('status', 'VIP')->get();
+
+// コレクション対象だけを一括更新
+$vipUsers->toQuery()->update([
+    'status' => 'Administrator',
+]);
+```
+
+<Tip>
+  個別 `save()` のループより、`toQuery()` で一括クエリに変換すると、実運用での性能と可読性を両立しやすくなります。
+</Tip>
+
+### `unique`
+
+同じ主キーを持つ重複モデルを取り除きます。
+
+```php
+$users = $users->unique();
+```
+
+## Eloquentコレクションからベースコレクションへの変換
+
+`collapse`、`flatten`、`flip`、`keys`、`pluck`、`zip` は `Illuminate\Support\Collection` を返します。  
+また、`map` の結果にEloquentモデルが含まれない場合もベースコレクションへ変換されます。
+
+## カスタムコレクション
+
+モデル専用のコレクションクラスを使いたい場合は、まず `#[CollectedBy]` 属性を使う方法を選ぶと明快です。
+
+### `#[CollectedBy]` 属性（推奨）
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Support\UserCollection;
+use Illuminate\Database\Eloquent\Attributes\CollectedBy;
+use Illuminate\Database\Eloquent\Model;
+
+#[CollectedBy(UserCollection::class)]
+class User extends Model
+{
+    // ...
+}
+```
+
+### `newCollection()` メソッド（代替）
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Support\UserCollection;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    public function newCollection(array $models = []): Collection
+    {
+        $collection = new UserCollection($models);
+
+        if (Model::isAutomaticallyEagerLoadingRelationships()) {
+            $collection->withRelationshipAutoloading();
+        }
+
+        return $collection;
+    }
+}
+```
+
+`newCollection()` または `#[CollectedBy]` を定義すると、通常 `Eloquent\Collection` が返る場面でカスタムコレクションが返るようになります。  
+全モデルに適用したい場合は、共通のベースモデルで `newCollection()` を定義します。
+
+## 関連ページ
+
+<Card title="コレクション" icon="list" href="/jp/collections">
+  `Illuminate\\Support\\Collection` の基本操作を先に確認します。
+</Card>
+
+<Card title="Eloquent入門" icon="database" href="/jp/eloquent">
+  モデルとクエリの基礎を整理してからEloquentコレクションを使いましょう。
+</Card>
