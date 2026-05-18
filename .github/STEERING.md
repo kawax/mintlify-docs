@@ -57,7 +57,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
 - [x] Laravel Notification for Discord(Webhook)
 - [x] Socialite for Discord
 - [x] LINE SDK for Laravel
-- [ ] VOICEVOX Core for PHP https://github.com/invokable/voicevox-core-php
+- [x] VOICEVOX Core for PHP https://github.com/invokable/voicevox-core-php
   - 日本語のテキスト音声合成、歌声合成ソフトウェア、VOICEVOXのCOREをFFIでラップしたPure PHP用パッケージ。
   - README.mdが英語、README_jp.mdが日本語。VOICEVOX COREの動的ライブラリのダウンロードからAPIリファレンスまで一通り説明しているのでこれでページを作れる。
   - Laravel版を先に別パッケージで作ってたけど技術的に実現不可能な箇所が多いのでまだ開発中。PHP版コアは完成しているので先にページを作成。
