@@ -1,0 +1,138 @@
+---
+title: "Laravel Cloud CLI — ターミナルからLaravel Cloudを操作する"
+description: "laravel/cloud-cliを使ってターミナルからLaravel Cloudのアプリ・環境・データベース・ドメインなどを管理する方法。"
+---
+
+## Laravel Cloud CLIとは
+
+`laravel/cloud-cli` は、[Laravel Cloud](https://cloud.laravel.com) をターミナルから操作するためのCLIです。  
+このツールは Laravel Zero 製で、ダッシュボードで行う操作を `cloud` コマンドで実行できます。
+
+あなたはこのCLIで、アプリケーション、環境、データベース、キャッシュ、バケット、ドメイン、WebSocketなどを一元管理できます。
+
+## 要件
+
+導入前に次の要件を満たしてください。
+
+- `PHP 8.2+`
+- `Composer`
+- `GitHub CLI (gh)`（インストール済み、認証済み）
+- `Git`
+
+## インストール
+
+まず、CLIをローカルにセットアップしてください。
+
+<Steps>
+  <Step title="リポジトリを取得して依存関係をインストールする">
+    ```bash
+    gh repo clone laravel/cloud-cli
+    cd cloud-cli
+    composer install
+    ```
+  </Step>
+  <Step title="`cloud` エイリアスを設定する">
+    zsh:
+
+    ```bash
+    echo 'alias cloud="php '$(pwd)'/cloud"' >> ~/.zshrc
+    source ~/.zshrc
+    ```
+
+    bash:
+
+    ```bash
+    echo 'alias cloud="php '$(pwd)'/cloud"' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+  </Step>
+  <Step title="任意のパスで手動設定する">
+    ```bash
+    alias cloud="php /path/to/cloud-cli/cloud"
+    ```
+  </Step>
+</Steps>
+
+## 認証
+
+多くのコマンドを使う前に認証してください。
+
+```bash
+cloud auth
+```
+
+`cloud auth` はブラウザを開き、OAuthで認証します。  
+CI用途などでトークンを管理したい場合は `cloud auth:token` を使います。
+
+```bash
+cloud auth:token
+```
+
+## リポジトリ設定
+
+あなたのプロジェクトで毎回 `application` や `environment` を選びたくない場合は、`cloud repo:config` を実行してください。
+
+```bash
+cloud repo:config
+```
+
+この設定でGitリポジトリにデフォルト値が保存され、`cloud deploy` などを短いコマンドで実行できます。
+
+## デプロイ
+
+初回デプロイと継続デプロイを分けて使うと効率的です。
+
+```bash
+# 初回: ガイド付きでアプリ作成とデプロイ
+cloud ship
+
+# 2回目以降: 既存アプリにデプロイ
+cloud deploy
+
+# ダッシュボードを開く
+cloud dashboard
+```
+
+## 主なコマンドカテゴリ
+
+READMEのコマンドリファレンスから、日常的に使うカテゴリをまとめます。
+
+| カテゴリ | 主なコマンド例 | 用途 |
+|---|---|---|
+| Auth / Config | `cloud auth`, `cloud auth:token`, `cloud repo:config` | 認証とデフォルト設定 |
+| Application | `cloud application:list`, `cloud application:create` | アプリ管理 |
+| Environment | `cloud environment:list`, `cloud environment:get`, `cloud environment:logs` | 環境情報・ログ確認 |
+| Deploy | `cloud ship`, `cloud deploy`, `cloud deploy:monitor` | デプロイ管理 |
+| Database | `cloud database-cluster:*`, `cloud database:*`, `cloud database-snapshot:*` | DBクラスタ・DB・スナップショット管理 |
+| Cache | `cloud cache:list`, `cloud cache:create`, `cloud cache:types` | キャッシュ管理 |
+| Bucket | `cloud bucket:*`, `cloud bucket-key:*` | オブジェクトストレージ管理 |
+| Domain | `cloud domain:list`, `cloud domain:create`, `cloud domain:verify` | ドメイン設定・検証 |
+| WebSocket | `cloud websocket-cluster:*`, `cloud websocket-application:*` | Reverb関連リソース管理 |
+
+## 環境変数管理
+
+環境変数は `cloud environment:variables` で管理します。  
+このコマンドは append / set / replace などの操作をまとめて扱えます。
+
+```bash
+cloud environment:variables
+```
+
+CIやチーム運用では、このコマンドを使って設定変更の手順を統一してください。
+
+## 使用量確認
+
+課金やリソース利用状況は `cloud usage` で確認できます。
+
+```bash
+# 当月の使用量
+cloud usage
+
+# 詳細表示
+cloud usage --detailed
+
+# 前期間の使用量
+cloud usage --period=previous
+```
+
+環境単位で絞り込む場合は `cloud usage --environment=<id>` を使ってください。

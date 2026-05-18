@@ -1,0 +1,138 @@
+---
+title: "Laravel Cloud CLI — Manage Laravel Cloud from your terminal"
+description: "Use laravel/cloud-cli to manage Laravel Cloud applications, environments, databases, domains, and more from the command line."
+---
+
+## What is Laravel Cloud CLI
+
+`laravel/cloud-cli` is the official CLI for working with [Laravel Cloud](https://cloud.laravel.com) from your terminal.  
+It is built with Laravel Zero and exposes dashboard workflows through the `cloud` command.
+
+You can manage applications, environments, databases, caches, buckets, domains, and WebSocket resources without leaving the terminal.
+
+## Requirements
+
+Make sure your environment includes:
+
+- `PHP 8.2+`
+- `Composer`
+- `GitHub CLI (gh)` (installed and authenticated)
+- `Git`
+
+## Installation
+
+Set up the CLI locally first.
+
+<Steps>
+  <Step title="Clone the repository and install dependencies">
+    ```bash
+    gh repo clone laravel/cloud-cli
+    cd cloud-cli
+    composer install
+    ```
+  </Step>
+  <Step title="Set up a `cloud` alias">
+    zsh:
+
+    ```bash
+    echo 'alias cloud="php '$(pwd)'/cloud"' >> ~/.zshrc
+    source ~/.zshrc
+    ```
+
+    bash:
+
+    ```bash
+    echo 'alias cloud="php '$(pwd)'/cloud"' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+  </Step>
+  <Step title="Optionally configure a manual path alias">
+    ```bash
+    alias cloud="php /path/to/cloud-cli/cloud"
+    ```
+  </Step>
+</Steps>
+
+## Authentication
+
+Authenticate before running most commands:
+
+```bash
+cloud auth
+```
+
+`cloud auth` opens your browser for OAuth login.  
+For token management in CI or automation, use `cloud auth:token`.
+
+```bash
+cloud auth:token
+```
+
+## Repository defaults
+
+If you want to avoid selecting `application` and `environment` every time, run `cloud repo:config` in your project root.
+
+```bash
+cloud repo:config
+```
+
+This stores repository defaults and makes commands like `cloud deploy` faster to run.
+
+## Deploy workflow
+
+Use guided shipping once, then switch to regular deploys.
+
+```bash
+# First deployment with guided flow
+cloud ship
+
+# Ongoing deployments to an existing app
+cloud deploy
+
+# Open the Cloud dashboard
+cloud dashboard
+```
+
+## Main command categories
+
+The README command reference is broad. This table highlights the most common categories.
+
+| Category | Example commands | Purpose |
+|---|---|---|
+| Auth / config | `cloud auth`, `cloud auth:token`, `cloud repo:config` | Authentication and defaults |
+| Application | `cloud application:list`, `cloud application:create` | Application lifecycle |
+| Environment | `cloud environment:list`, `cloud environment:get`, `cloud environment:logs` | Environment info and logs |
+| Deploy | `cloud ship`, `cloud deploy`, `cloud deploy:monitor` | Deploy and monitor |
+| Database | `cloud database-cluster:*`, `cloud database:*`, `cloud database-snapshot:*` | Database and snapshot operations |
+| Cache | `cloud cache:list`, `cloud cache:create`, `cloud cache:types` | Cache management |
+| Bucket | `cloud bucket:*`, `cloud bucket-key:*` | Object storage and keys |
+| Domain | `cloud domain:list`, `cloud domain:create`, `cloud domain:verify` | Domain setup and verification |
+| WebSocket | `cloud websocket-cluster:*`, `cloud websocket-application:*` | WebSocket resources |
+
+## Environment variable management
+
+Use `cloud environment:variables` to manage environment variables.  
+This command supports append, set, and replace workflows.
+
+```bash
+cloud environment:variables
+```
+
+In team and CI workflows, keep your variable updates consistent through this command.
+
+## Usage and billing checks
+
+Use `cloud usage` to review resource usage and billing summaries.
+
+```bash
+# Current billing period
+cloud usage
+
+# Detailed usage tables
+cloud usage --detailed
+
+# Previous billing period
+cloud usage --period=previous
+```
+
+To scope usage to one environment, run `cloud usage --environment=<id>`.

@@ -12,7 +12,8 @@
       "pages": [
         "jp/blog/laravel-cloud",
         "jp/blog/laravel-cloud-hibernation",
-        "jp/blog/nightwatch-introduction"
+        "jp/blog/nightwatch-introduction",
+        "jp/blog/laravel-cloud-cli"
       ]
     },
     {
