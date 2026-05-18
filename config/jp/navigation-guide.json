@@ -25,7 +25,8 @@
         "jp/eloquent-resources",
         "jp/eloquent-mutators",
         "jp/scout",
-        "jp/eloquent-serialization"
+        "jp/eloquent-serialization",
+        "jp/eloquent-collections"
       ]
     },
     {

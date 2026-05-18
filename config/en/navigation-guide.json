@@ -68,7 +68,8 @@
       "pages": [
         "en/eloquent-mutators",
         "en/scout",
-        "en/eloquent-serialization"
+        "en/eloquent-serialization",
+        "en/eloquent-collections"
       ]
     },
     {

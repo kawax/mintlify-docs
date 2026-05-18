@@ -1,0 +1,226 @@
+---
+title: "Eloquent collections"
+description: "Use Illuminate\\Database\\Eloquent\\Collection methods, including toQuery and custom collections, when working with sets of Eloquent models."
+---
+
+## Introduction
+
+When Eloquent returns more than one model, you receive an `Illuminate\Database\Eloquent\Collection`.  
+It extends `Illuminate\Support\Collection`, so you inherit the full base collection API plus model-specific helpers.
+
+```mermaid
+classDiagram
+    class "Illuminate\\Support\\Collection" as SupportCollection
+    class "Illuminate\\Database\\Eloquent\\Collection" as EloquentCollection
+    SupportCollection <|-- EloquentCollection
+```
+
+```php
+use App\Models\User;
+
+$users = User::where('active', 1)->get();
+
+foreach ($users as $user) {
+    echo $user->name;
+}
+```
+
+Review [Collections](/en/collections) and [Eloquent ORM](/en/eloquent) first if you want a quick refresher on the base behavior.
+
+## Available methods
+
+`Eloquent\Collection` inherits all base collection methods and adds model-focused methods.
+
+### `append` / `withoutAppends` / `setAppends`
+
+Control appended attributes for every model in the collection.
+
+```php
+$users->append('team');
+$users->append(['team', 'is_admin']);
+
+$users = $users->withoutAppends();
+$users = $users->setAppends(['is_admin']);
+```
+
+### `contains` / `diff` / `except` / `intersect` / `only`
+
+Check membership and perform set operations using model instances or primary keys.
+
+```php
+use App\Models\User;
+
+$users->contains(1);
+$users->contains(User::find(1));
+
+$subset = User::whereIn('id', [1, 2, 3])->get();
+
+$users->diff($subset);
+$users->intersect($subset);
+
+$users->except([1, 2, 3]);
+$users->only([1, 2, 3]);
+```
+
+### `find` / `findOrFail`
+
+Find already-loaded models by primary key.
+
+```php
+$users = User::all();
+
+$user = $users->find(1);
+$user = $users->findOrFail(1);
+```
+
+### `fresh`
+
+Re-fetch each model in the collection from the database, optionally eager loading relations.
+
+```php
+$users = $users->fresh();
+$users = $users->fresh('comments');
+```
+
+### `load` / `loadMissing`
+
+Eager load relationships on a collection after retrieval.
+
+```php
+$users->load(['comments', 'posts']);
+$users->load('comments.author');
+$users->load(['comments', 'posts' => fn ($query) => $query->where('active', 1)]);
+
+$users->loadMissing(['comments', 'posts']);
+$users->loadMissing('comments.author');
+$users->loadMissing(['comments', 'posts' => fn ($query) => $query->where('active', 1)]);
+```
+
+### `modelKeys`
+
+Get the primary keys for all models in the collection.
+
+```php
+$users->modelKeys();
+// [1, 2, 3, ...]
+```
+
+### `makeVisible` / `makeHidden` / `mergeVisible` / `mergeHidden` / `setVisible` / `setHidden`
+
+Adjust attribute visibility for serialization across the entire model collection.
+
+```php
+$users = $users->makeVisible(['address', 'phone_number']);
+$users = $users->makeHidden(['address', 'phone_number']);
+
+$users = $users->mergeVisible(['middle_name']);
+$users = $users->mergeHidden(['last_login_at']);
+
+$users = $users->setVisible(['id', 'name']);
+$users = $users->setHidden(['email', 'password', 'remember_token']);
+```
+
+### `partition`
+
+Split models into two `Eloquent\Collection` instances; the outer container is an `Illuminate\Support\Collection`.
+
+```php
+$partition = $users->partition(fn ($user) => $user->age > 18);
+
+dump($partition::class);    // Illuminate\Support\Collection
+dump($partition[0]::class); // Illuminate\Database\Eloquent\Collection
+dump($partition[1]::class); // Illuminate\Database\Eloquent\Collection
+```
+
+### `toQuery`
+
+Build a `whereIn` query from already-loaded model keys and perform one bulk operation.
+
+```php
+use App\Models\User;
+
+// Retrieve target users first
+$vipUsers = User::where('status', 'VIP')->get();
+
+// Run one bulk update for only those model keys
+$vipUsers->toQuery()->update([
+    'status' => 'Administrator',
+]);
+```
+
+<Tip>
+  `toQuery()` is a practical bridge between in-memory selection and efficient bulk SQL updates.
+</Tip>
+
+### `unique`
+
+Remove duplicated models that share the same primary key.
+
+```php
+$users = $users->unique();
+```
+
+## Eloquent-to-base collection conversion
+
+`collapse`, `flatten`, `flip`, `keys`, `pluck`, and `zip` return an `Illuminate\Support\Collection`.  
+Likewise, `map` returns a base collection when the mapped result no longer contains Eloquent models.
+
+## Custom collections
+
+If you want model-specific collection behavior, prefer the `#[CollectedBy]` attribute first.
+
+### `#[CollectedBy]` attribute (preferred)
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Support\UserCollection;
+use Illuminate\Database\Eloquent\Attributes\CollectedBy;
+use Illuminate\Database\Eloquent\Model;
+
+#[CollectedBy(UserCollection::class)]
+class User extends Model
+{
+    // ...
+}
+```
+
+### `newCollection()` method (alternative)
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Support\UserCollection;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    public function newCollection(array $models = []): Collection
+    {
+        $collection = new UserCollection($models);
+
+        if (Model::isAutomaticallyEagerLoadingRelationships()) {
+            $collection->withRelationshipAutoloading();
+        }
+
+        return $collection;
+    }
+}
+```
+
+Once you add `newCollection()` or `#[CollectedBy]`, Eloquent returns your custom collection wherever it would normally return `Illuminate\Database\Eloquent\Collection`.
+
+## Related pages
+
+<Card title="Collections" icon="list" href="/en/collections">
+  Review `Illuminate\\Support\\Collection` fundamentals.
+</Card>
+
+<Card title="Eloquent ORM" icon="database" href="/en/eloquent">
+  Revisit Eloquent model and query basics.
+</Card>
