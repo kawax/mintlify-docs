@@ -107,7 +107,8 @@
         "jp/context",
         "jp/error-handling",
         "jp/logging",
-        "jp/pulse"
+        "jp/pulse",
+        "jp/pennant"
       ]
     },
     {
