@@ -1,0 +1,110 @@
+---
+title: "ネイティブ Talk - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel のネイティブモードで、VOICEVOX CORE を PHP FFI から直接呼び出してテキスト音声合成する方法を説明します。"
+sidebarTitle: "Native Talk"
+---
+
+## ネイティブモードとは
+
+ネイティブモードは、[VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) を通して VOICEVOX CORE を PHP FFI から直接呼び出します。
+
+公式エンジンを起動しなくても合成できますが、FFI とローカルライブラリのセットアップが必要です。
+
+<Warning>
+  ネイティブモードは Web サーバー向けではありません。ローカル CLI で利用してください。FFI の制約は [PHP FFI](/jp/advanced/ffi) でも説明しています。
+</Warning>
+
+## 事前準備
+
+1. [インストールと設定](/jp/packages/laravel-voicevox/installation) を完了していること
+2. [VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) のセットアップを完了していること
+3. `.env` に `VOICEVOX_CORE_PATH` を設定していること
+
+```dotenv
+VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+```
+
+## 基本的な使い方
+
+ネイティブモードでは `talk()` ヘルパーを使います。
+
+```php
+use function Revolution\Voicevox\talk;
+
+$response = talk('ネイティブ版なのだ', id: 1)
+    ->generate(id: 1);
+
+$response->storeAs('native', 'talk.wav');
+```
+
+## スタイル ID の指定
+
+`id` には読み込み済みの `.vvm` に含まれるスタイル ID を指定します。
+
+```php
+use function Revolution\Voicevox\talk;
+
+$response = talk('ずんだもんなのだ', id: 1)
+    ->generate(id: 1);
+```
+
+`config/voicevox.php` の `core.vvms` に含まれるモデルだけが使えます。
+
+## `tap()` で Audio Query を調整する
+
+ネイティブモードでも `tap()` の使い方は同じです。ただし `TalkAudioQuery` はクライアントモードとは別クラスです。
+
+```php
+use Revolution\Voicevox\Talk\TalkAudioQuery;
+use function Revolution\Voicevox\talk;
+
+$response = talk('速めに話すのだ', id: 1)
+    ->tap(function (TalkAudioQuery $talk) {
+        $talk->audioQuery['speedScale'] = 1.2;
+        $talk->audioQuery['pitchScale'] = 0.05;
+        $talk->audioQuery['intonationScale'] = 1.5;
+        $talk->audioQuery['volumeScale'] = 1.0;
+    })
+    ->generate(id: 1);
+```
+
+<Info>
+  `tap()` のパターン自体は [tap() ヘルパーと Tappable トレイト](/jp/advanced/tap) に整理しています。VOICEVOX for Laravel はその実践例です。
+</Info>
+
+## AquesTalk 風記法のカナを使う
+
+ネイティブモードには `enable_katakana_english` がないため、英語混じりの入力をそのまま読む用途には向きません。
+
+代わりに AquesTalk 風記法のカナを直接渡す `kana()` を使えます。
+
+```php
+use function Revolution\Voicevox\kana;
+
+$response = kana("ネイティブ'バンナ/ノダ'", id: 1)
+    ->generate(id: 1);
+
+$response->storeAs('native', 'kana.wav');
+```
+
+AquesTalk 風記法の詳細は [VOICEVOX 公式ドキュメント](https://github.com/VOICEVOX/voicevox_engine/blob/master/docs/kana_parser.md) を参照してください。
+
+## クライアントモードとの違い
+
+| 項目 | クライアント Talk | ネイティブ Talk |
+| --- | --- | --- |
+| エンジン起動 | 必要 | 不要 |
+| FFI | 不要 | 必要 |
+| 英語の自動カタカナ変換 | あり | なし |
+| API 入口 | `Voicevox::talk()` | `talk()` |
+
+## 次に読むページ
+
+<Columns cols={2}>
+  <Card title="ネイティブ Song" href="/jp/packages/laravel-voicevox/native-song" icon="music">
+    歌声モデルを FFI 経由で扱います。
+  </Card>
+  <Card title="VOICEVOX Core for PHP" href="/jp/packages/voicevox-core-php" icon="library">
+    純粋な PHP ラッパー側のセットアップと制約を確認します。
+  </Card>
+</Columns>

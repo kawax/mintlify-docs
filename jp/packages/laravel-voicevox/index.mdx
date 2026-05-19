@@ -1,0 +1,105 @@
+---
+title: "VOICEVOX for Laravel"
+description: "Laravel から VOICEVOX のクライアント・ネイティブ・エンジン API を扱うパッケージの概要と各モードの入口をまとめます。"
+sidebarTitle: "概要"
+---
+
+## 概要
+
+[revolution/laravel-voicevox](https://github.com/invokable/laravel-voicevox) は、Laravel から VOICEVOX を扱うためのパッケージです。
+
+HTTP 経由で公式エンジンに接続するクライアントモードと、[VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) を組み合わせて PHP FFI から直接合成するネイティブモードを同じ Laravel スタイルで扱えます。
+
+<Info>
+  FFI の前提知識を先に整理したいなら [PHP FFI](/jp/advanced/ffi) を、コアライブラリ自体のセットアップは [VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) と [使い方](/jp/packages/voicevox-core-php/usage) を参照してください。
+</Info>
+
+## Overview
+
+| Feature | Supported | Description |
+| --- | --- | --- |
+| VOICEVOX Client | ✅ | 公式 VOICEVOX エンジン API に HTTP でアクセスします。FFI は不要です。 |
+| VOICEVOX Core | ✅ | [VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) を通して VOICEVOX CORE の動的ライブラリを利用します。 |
+| Laravel style | ✅ | Facade、ヘルパー、`config/voicevox.php`、`.env` で Laravel らしく扱えます。 |
+| Laravel AI SDK 統合 | ✅ | Laravel AI SDK の Audio ワークフローからも利用できます。 |
+| VOICEVOX Engine | ⚠️ | Laravel アプリ内に VOICEVOX 互換 API を内蔵します。未対応部分は公式エンジンへフォールバックします。 |
+| VOICEVOX Editor | ❌ | Editor 自体はこのパッケージの対象ではありません。 |
+
+## 要件
+
+- PHP 8.3+
+- Laravel 13 アプリケーション
+- `ext-zip`
+- ネイティブモード / エンジン API を使う場合は `ext-ffi`
+- ローカル CLI 環境
+
+<Warning>
+  Laravel Cloud を含む一般的な Web サーバー環境では FFI が無効なことが多いため、ネイティブモードとエンジン API は **ローカル CLI 前提** で考えてください。
+</Warning>
+
+## モード一覧
+
+| モード | 実行方法 | FFI | 主な用途 | ガイド |
+| --- | --- | --- | --- | --- |
+| クライアント Talk | 公式エンジンへ HTTP リクエスト | 不要 | テキスト音声合成 | [client-talk](/jp/packages/laravel-voicevox/client-talk) |
+| クライアント Song | 公式エンジンへ HTTP リクエスト | 不要 | 歌声合成 | [client-song](/jp/packages/laravel-voicevox/client-song) |
+| ネイティブ Talk | VOICEVOX CORE を FFI で直接呼び出し | 必要 | ローカルでのテキスト音声合成 | [native-talk](/jp/packages/laravel-voicevox/native-talk) |
+| ネイティブ Song | VOICEVOX CORE を FFI で直接呼び出し | 必要 | ローカルでの歌声合成 | [native-song](/jp/packages/laravel-voicevox/native-song) |
+| エンジン API | Laravel アプリ内で互換 API を提供 | 必要 | VOICEVOX 互換 API の内蔵 | [installation](/jp/packages/laravel-voicevox/installation) |
+
+## `tap()` が合う理由
+
+このパッケージは `talk()` / `song()` の直後に Audio Query オブジェクトを返し、`generate()` の前に調整フェーズを差し込めます。
+
+そのため `tap()` を使うと、**戻り値を変えずにクエリーだけを調整する** 書き方が自然です。
+
+```php
+use Revolution\Voicevox\Client\TalkAudioQuery;
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('Laravelが好きなのだ', id: 1)
+    ->tap(function (TalkAudioQuery $talk) {
+        $talk->audioQuery['speedScale'] = 1.2;
+    })
+    ->generate(id: 1);
+```
+
+- Talk では `speedScale` や `pitchScale` などを調整できます。
+- Song では `sync()` で F0 とボリュームを再計算できます。
+- `generate()` が返す `VoicevoxResponse` へきれいにチェーンできます。
+
+<Info>
+  `tap()` 自体の考え方は [tap() ヘルパーと Tappable トレイト](/jp/advanced/tap) で整理しています。このパッケージは実用例として特に分かりやすいケースです。
+</Info>
+
+## ドキュメント
+
+<Columns cols={2}>
+  <Card title="インストール" href="/jp/packages/laravel-voicevox/installation" icon="download">
+    クライアントのみの導入、FFI を使う導入、設定ファイル公開、エンジンリソースの準備を確認します。
+  </Card>
+  <Card title="クライアント Talk" href="/jp/packages/laravel-voicevox/client-talk" icon="message-circle">
+    公式 VOICEVOX エンジンを使ったテキスト音声合成を始めます。
+  </Card>
+  <Card title="クライアント Song" href="/jp/packages/laravel-voicevox/client-song" icon="music">
+    `Score` と `Note` を組み立てて歌声合成を行います。
+  </Card>
+  <Card title="ネイティブ Talk" href="/jp/packages/laravel-voicevox/native-talk" icon="cpu">
+    PHP FFI と VOICEVOX CORE でローカル合成します。
+  </Card>
+  <Card title="ネイティブ Song" href="/jp/packages/laravel-voicevox/native-song" icon="music">
+    FFI 経由で歌声モデルを直接使います。
+  </Card>
+  <Card title="VOICEVOX Core for PHP" href="/jp/packages/voicevox-core-php" icon="library">
+    コアライブラリのセットアップと Pure PHP 側の使い方を確認します。
+  </Card>
+</Columns>
+
+## 参考リンク
+
+- GitHub: [invokable/laravel-voicevox](https://github.com/invokable/laravel-voicevox)
+- VOICEVOX Core for PHP: [/jp/packages/voicevox-core-php](/jp/packages/voicevox-core-php)
+- VOICEVOX Core for PHP 使い方: [/jp/packages/voicevox-core-php/usage](/jp/packages/voicevox-core-php/usage)
+- PHP FFI: [/jp/advanced/ffi](/jp/advanced/ffi)
+- `tap()` ヘルパー: [/jp/advanced/tap](/jp/advanced/tap)
+- 公式 VOICEVOX エンジン: [VOICEVOX/voicevox_engine](https://github.com/VOICEVOX/voicevox_engine)

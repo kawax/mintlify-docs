@@ -1,0 +1,109 @@
+---
+title: "ネイティブ Song - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel のネイティブモードで、VOICEVOX CORE を PHP FFI から直接呼び出して歌声音声合成する方法を説明します。"
+sidebarTitle: "Native Song"
+---
+
+## ネイティブモードで歌わせる
+
+ネイティブモードの歌声合成では、PHP FFI で VOICEVOX CORE を直接呼び出します。
+
+`Score` と `Note` の組み立て方はクライアントモードと共通です。
+
+## 事前準備
+
+1. [インストールと設定](/jp/packages/laravel-voicevox/installation) を完了していること
+2. [VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) をセットアップ済みであること
+3. `.env` に `VOICEVOX_CORE_PATH` を設定していること
+
+```dotenv
+VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+```
+
+歌声モデルを使うには `config/voicevox.php` の `core.vvms` に `s0.vvm` が含まれていることを確認してください。
+
+## `Score` と `Note` を作る
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(ticks: 480, bpm: 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+```
+
+## 基本的な使い方
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use function Revolution\Voicevox\song;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+
+$response = song($score, teacher: 6000)
+    ->generate(id: 3001);
+
+$response->storeAs('native', 'song.wav');
+```
+
+同じ `Score` を使えば、クライアントモードとネイティブモードで共通の譜面を流用できます。
+
+## `tap()` で F0 とボリュームを再同期する
+
+ネイティブ Song でも `tap()` が役立ちます。`SongAudioQuery` を調整したあと、そのまま `generate()` に流せます。
+
+```php
+use Revolution\Voicevox\Song\SongAudioQuery;
+use function Revolution\Voicevox\song;
+
+$response = song($score, teacher: 6000)
+    ->tap(function (SongAudioQuery $song) {
+        $song->sync();
+    })
+    ->generate(id: 3001);
+```
+
+F0 とボリュームを個別に更新する場合は、必ず次の順に実行します。
+
+```php
+->tap(function (SongAudioQuery $song) {
+    $song->updateF0();
+    $song->updateVolume();
+})
+```
+
+## クライアントモードとの違い
+
+| 項目 | クライアント Song | ネイティブ Song |
+| --- | --- | --- |
+| エンジン起動 | 必要 | 不要 |
+| FFI | 不要 | 必要 |
+| API 入口 | `Voicevox::song()` | `song()` |
+| `Score` / `Note` | 共通 | 共通 |
+
+<Info>
+  FFI の仕組みは [PHP FFI](/jp/advanced/ffi)、コアライブラリ単体の流れは [VOICEVOX Core for PHP 使い方](/jp/packages/voicevox-core-php/usage) を参照してください。
+</Info>
+
+## 次に読むページ
+
+<Columns cols={2}>
+  <Card title="クライアント Song" href="/jp/packages/laravel-voicevox/client-song" icon="music">
+    HTTP クライアント版との違いを比較します。
+  </Card>
+  <Card title="VOICEVOX for Laravel 概要" href="/jp/packages/laravel-voicevox" icon="book-open">
+    各モードと関連ページをまとめて確認します。
+  </Card>
+</Columns>

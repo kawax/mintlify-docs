@@ -1,0 +1,152 @@
+---
+title: "インストールと設定 - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel の導入方法、FFI の有無に応じたインストール、設定ファイル、.env、エンジンリソースの準備を説明します。"
+sidebarTitle: "インストール"
+---
+
+## 何をインストールするか
+
+VOICEVOX for Laravel は、使いたいモードによって追加パッケージとローカルセットアップが変わります。
+
+<Tabs>
+  <Tab title="クライアントのみ">
+    公式 VOICEVOX エンジンに HTTP で接続するだけなら `revolution/laravel-voicevox` のみで始められます。
+
+    ```shell
+    composer require revolution/laravel-voicevox
+    ```
+  </Tab>
+  <Tab title="ネイティブ / エンジン API も使う">
+    FFI を使うモードでは `revolution/voicevox-core` も一緒にインストールします。
+
+    ```shell
+    composer require revolution/laravel-voicevox revolution/voicevox-core
+    ```
+  </Tab>
+</Tabs>
+
+## 要件
+
+| 項目 | 内容 |
+| --- | --- |
+| PHP | 8.3+ |
+| Laravel | このサイトでは Laravel 13 を前提に説明 |
+| Composer 依存 | upstream では `illuminate/support:^12.0 || ^13.0` |
+| 必須拡張 | `ext-zip` |
+| FFI | ネイティブモード / エンジン API で必要 |
+
+<Warning>
+  Laravel Cloud を含む一般的な Web サーバーでは FFI が無効です。ネイティブモードとエンジン API は **ローカル CLI** で試してください。
+</Warning>
+
+## セットアップ手順
+
+<Steps>
+  <Step title="パッケージをインストールする">
+    使いたいモードに応じて Composer で導入します。ネイティブモードとエンジン API では [VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) も必要です。
+  </Step>
+  <Step title="設定ファイルを公開する">
+    ```shell
+    php artisan vendor:publish --tag="voicevox-config"
+    ```
+  </Step>
+  <Step title=".env を設定する">
+    クライアントモードだけなら `VOICEVOX_URL`、FFI を使うなら `VOICEVOX_CORE_PATH` を設定します。
+  </Step>
+  <Step title="必要ならエンジンリソースをインストールする">
+    `/speaker_info` や `/singer_info` を使う場合は追加リソースが必要です。
+  </Step>
+</Steps>
+
+## `config/voicevox.php`
+
+```php
+return [
+    'client' => [
+        'url' => env('VOICEVOX_URL', 'http://127.0.0.1:50021'),
+        'core_version' => env('VOICEVOX_CLIENT_CORE_VERSION'),
+    ],
+
+    'core' => [
+        'path' => env('VOICEVOX_CORE_PATH'),
+        'dict' => env('VOICEVOX_CORE_DICT_PATH', 'dict/open_jtalk_dic_utf_8-1.11'),
+        'models' => env('VOICEVOX_CORE_MODELS_PATH', 'models/vvms'),
+        'vvms' => ['0.vvm', '9.vvm', 's0.vvm'],
+    ],
+
+    'engine' => [
+        'disabled' => env('VOICEVOX_ENGINE_DISABLED', false),
+        'fallback_url' => env('VOICEVOX_ENGINE_FALLBACK_URL', 'http://127.0.0.1:50021'),
+    ],
+];
+```
+
+## 最低限必要な `.env`
+
+### クライアントモードのみ
+
+デフォルトの `http://127.0.0.1:50021` で公式エンジンを起動するなら追加設定は不要です。
+
+```dotenv
+VOICEVOX_URL=http://127.0.0.1:50021
+```
+
+### ネイティブモード / エンジン API
+
+```dotenv
+VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+```
+
+<Info>
+  `VOICEVOX_CORE_PATH` の中身は [VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) の手順で準備します。ライブラリ本体、OpenJTalk 辞書、モデルファイルの配置もそちらで確認してください。
+</Info>
+
+## FFI の有効化
+
+CLI では通常そのまま使えます。
+
+ローカルで Laravel 版エンジン API を Web 経由で試す場合は `php.ini` で FFI を有効にします。
+
+```ini
+ffi.enable=true
+```
+
+FFI の仕組みと制約は [PHP FFI](/jp/advanced/ffi) にまとめています。
+
+## エンジンリソースのインストール
+
+`/speaker_info` や `/singer_info` などのリソース系エンドポイントを使う場合は、別途リソースファイルを導入します。
+
+```shell
+php artisan voicevox:install
+```
+
+Orchestra Testbench 環境では次のコマンドです。
+
+```shell
+vendor/bin/testbench voicevox:install
+```
+
+## モードごとの入口
+
+<Columns cols={2}>
+  <Card title="クライアント Talk" href="/jp/packages/laravel-voicevox/client-talk" icon="message-circle">
+    公式 VOICEVOX エンジンを Docker で起動してテキスト音声合成します。
+  </Card>
+  <Card title="クライアント Song" href="/jp/packages/laravel-voicevox/client-song" icon="music">
+    `Score` と `Note` を使って歌声合成します。
+  </Card>
+  <Card title="ネイティブ Talk" href="/jp/packages/laravel-voicevox/native-talk" icon="cpu">
+    FFI で VOICEVOX CORE を直接呼び出します。
+  </Card>
+  <Card title="ネイティブ Song" href="/jp/packages/laravel-voicevox/native-song" icon="music">
+    歌声モデルと `sync()` の使い所を確認します。
+  </Card>
+</Columns>
+
+## 参考リンク
+
+- [VOICEVOX for Laravel 概要](/jp/packages/laravel-voicevox)
+- [VOICEVOX Core for PHP](/jp/packages/voicevox-core-php)
+- [VOICEVOX Core for PHP 使い方](/jp/packages/voicevox-core-php/usage)
+- [PHP FFI](/jp/advanced/ffi)

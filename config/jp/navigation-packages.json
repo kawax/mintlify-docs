@@ -108,6 +108,18 @@
             "jp/packages/voicevox-core-php/usage",
             "jp/packages/voicevox-core-php/api"
           ]
+        },
+        {
+          "group": "VOICEVOX for Laravel",
+          "expanded": false,
+          "pages": [
+            "jp/packages/laravel-voicevox/index",
+            "jp/packages/laravel-voicevox/installation",
+            "jp/packages/laravel-voicevox/client-talk",
+            "jp/packages/laravel-voicevox/client-song",
+            "jp/packages/laravel-voicevox/native-talk",
+            "jp/packages/laravel-voicevox/native-song"
+          ]
         }
       ]
     },
