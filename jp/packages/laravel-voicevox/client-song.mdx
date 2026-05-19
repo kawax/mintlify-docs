@@ -65,7 +65,7 @@ $response->storeAs('client', 'song.wav');
 
 ### `teacher` と `id`
 
-- `teacher`: `sing_frame_audio_query` に渡すスタイル ID
+- `teacher`: `sing_frame_audio_query` に渡すスタイル ID。現状は6000ひとつしか存在しないのでデフォルトで6000。
 - `generate(id:)`: `frame_synthesis` に渡すスタイル ID
 
 利用可能な歌声スピーカー一覧は `singers()` で取得できます。
