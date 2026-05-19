@@ -57,7 +57,7 @@ HTTP 経由で公式エンジンに接続するクライアントモードと、
 use Revolution\Voicevox\Client\TalkAudioQuery;
 use Revolution\Voicevox\Voicevox;
 
-$response = Voicevox::talk('Laravelが好きなのだ', id: 1)
+$response = Voicevox::talk('タップで調整できるのだ', id: 1)
     ->tap(function (TalkAudioQuery $talk) {
         $talk->audioQuery['speedScale'] = 1.2;
     })
