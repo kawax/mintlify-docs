@@ -36,6 +36,7 @@ OpenJTalk を使ったテキスト解析器。
 | メソッド | 説明 |
 |--------|------|
 | `__construct(string $openJtalkDictDir)` | OpenJTalk 辞書ディレクトリのパスで初期化します。 |
+| `analyze(string $text): string` | 日本語テキストを解析し、アクセント句配列の JSON を返します。 |
 | `useUserDict(UserDict $userDict): void` | ユーザー辞書を適用します。辞書が変更された場合は再度呼び出す必要があります。 |
 
 ---
@@ -64,6 +65,7 @@ OpenJTalk を使ったテキスト解析器。
 | メソッド | 説明 |
 |--------|------|
 | `__construct(Onnxruntime $onnxruntime, OpenJtalk $openJtalk, AccelerationMode $accelerationMode = Auto, int $cpuNumThreads = 0)` | シンセサイザーを初期化します。 |
+| `onnxruntime(): Onnxruntime` | このシンセサイザーが保持する `Onnxruntime` インスタンスを返します。 |
 | `isGpuMode(): bool` | GPU モードが有効かどうかを返します。 |
 | `metas(): string` | 読み込まれているスピーカーのメタデータを JSON 文字列で返します。 |
 | `loadVoiceModel(VoiceModelFile $model): void` | 音声モデルを読み込みます。 |
@@ -81,6 +83,29 @@ OpenJTalk を使ったテキスト解析器。
 | `ttsFromKana(string $kana, int $styleId, bool $enableInterrogativeUpspeak = true): string` | かな記法から音声を合成します。WAV バイナリを返します。 |
 | `createSingFrameAudioQuery(string $scoreJson, int $styleId): string` | 楽譜 JSON から歌唱合成クエリ JSON を生成します。 |
 | `frameSynthesis(string $frameAudioQueryJson, int $styleId): string` | フレームオーディオクエリから歌唱音声を合成します。WAV バイナリを返します。 |
+| `createSingFrameF0(string $scoreJson, string $frameAudioQueryJson, int $styleId): string` | 楽譜と歌唱クエリからフレームごとの F0（基本周波数）を JSON の float 配列で返します。 |
+| `createSingFrameVolume(string $scoreJson, string $frameAudioQueryJson, int $styleId): string` | 楽譜と歌唱クエリからフレームごとの音量を JSON の float 配列で返します。 |
+
+---
+
+## `VoicevoxCore`
+
+VOICEVOX Core のグローバルユーティリティ関数。
+
+### メソッド
+
+| メソッド | 説明 |
+|--------|------|
+| `static getVersion(): string` | VOICEVOX Core のバージョンを SemVer 文字列で返します。 |
+| `static audioQueryCreateFromAccentPhrases(string $accentPhrasesJson): string` | アクセント句配列 JSON から AudioQuery JSON を生成します。 |
+| `static audioQueryValidate(string $audioQueryJson): void` | `AudioQuery` JSON を検証します。不正な場合は `VoicevoxException` をスローします。 |
+| `static accentPhraseValidate(string $accentPhraseJson): void` | `AccentPhrase` JSON を検証します。不正な場合は `VoicevoxException` をスローします。 |
+| `static moraValidate(string $moraJson): void` | `Mora` JSON を検証します。不正な場合は `VoicevoxException` をスローします。 |
+| `static scoreValidate(string $scoreJson): void` | `Score` JSON を検証します。不正な場合は `VoicevoxException` をスローします。 |
+| `static noteValidate(string $noteJson): void` | `Note` JSON を検証します。不正な場合は `VoicevoxException` をスローします。 |
+| `static frameAudioQueryValidate(string $frameAudioQueryJson): void` | `FrameAudioQuery` JSON を検証します。不正な場合は `VoicevoxException` をスローします。 |
+| `static framePhonemeValidate(string $framePhonemeJson): void` | `FramePhoneme` JSON を検証します。不正な場合は `VoicevoxException` をスローします。 |
+| `static ensureCompatible(string $scoreJson, string $frameAudioQueryJson): void` | 楽譜と歌唱音声合成クエリの組み合わせが有効かを確認します。不正な場合は `VoicevoxException` をスローします。 |
 
 ---
 
@@ -122,7 +147,7 @@ OpenJTalk を使ったテキスト解析器。
 | Case | 値 | 説明 |
 |------|---|------|
 | `ProperNoun` | `0` | 固有名詞 |
-| `CommonNoun` | `1` | 普通名詞 |
+| `CommonNoun` | `1` | 一般名詞 |
 | `Verb` | `2` | 動詞 |
 | `Adjective` | `3` | 形容詞 |
 | `Suffix` | `4` | 接尾辞 |
