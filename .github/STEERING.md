@@ -64,7 +64,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - 「AI SDK」グループと「スターターキット」の間にVOICEVOXグループを追加。
   - FFIの解説は別ページ。
   - 日本語ページはOK
-- [ ] VOICEVOX for Laravel https://github.com/invokable/laravel-voicevox
+- [x] VOICEVOX for Laravel https://github.com/invokable/laravel-voicevox
   - Laravel版も主要な機能はほぼ完成してきたのでページを作成していく。先に日本語ページから、というかそもそも日本語のTTSなので。
   - README_jp.mdとdocs/jp内が日本語のドキュメント。
   - まずはインストールと設定からモードごとのトークとソングの生成までを説明。

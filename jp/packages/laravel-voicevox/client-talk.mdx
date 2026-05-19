@@ -1,0 +1,127 @@
+---
+title: "クライアント Talk - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel のクライアントモードで、公式 VOICEVOX エンジンに接続してテキスト音声合成する手順を説明します。"
+sidebarTitle: "Client Talk"
+---
+
+## クライアントモードとは
+
+クライアントモードは、公式 VOICEVOX エンジンに HTTP リクエストを送って音声を生成します。
+
+FFI は不要なので、まず試す入口として使いやすいモードです。
+
+<Info>
+  導入がまだなら [インストールと設定](/jp/packages/laravel-voicevox/installation) を先に確認してください。
+</Info>
+
+## 事前準備
+
+<Steps>
+  <Step title="公式エンジンを起動する">
+    ```shell
+    docker pull voicevox/voicevox_engine:cpu-latest
+    docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+    ```
+  </Step>
+  <Step title="必要なら接続先 URL を設定する">
+    ```dotenv
+    VOICEVOX_URL=http://127.0.0.1:50021
+    ```
+  </Step>
+</Steps>
+
+GPU が使える環境なら GPU イメージも利用できます。
+
+## 基本的な使い方
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('Laravelが好きなのだ', id: 1)
+    ->generate(id: 1);
+
+$response->storeAs('client', 'talk.wav');
+```
+
+## スタイル ID の指定
+
+`talk()` と `generate()` の両方にスタイル ID を渡せます。
+
+- `talk(id:)`: `audio_query` を作るときのスタイル
+- `generate(id:)`: 音声合成するときのスタイル
+
+通常は同じ値を指定します。
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('ずんだもんなのだ', id: 1)
+    ->generate(id: 1);
+```
+
+利用可能なスピーカー一覧は `speakers()` で取得できます。
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$speakers = Voicevox::speakers();
+```
+
+## `tap()` で Audio Query を調整する
+
+このパッケージでは `generate()` の前に `TalkAudioQuery` を受け取れるので、`tap()` で副作用だけ差し込む形がきれいにハマります。
+
+```php
+use Revolution\Voicevox\Client\TalkAudioQuery;
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('速めに話すのだ', id: 1)
+    ->tap(function (TalkAudioQuery $talk) {
+        $talk->audioQuery['speedScale'] = 1.2;
+        $talk->audioQuery['pitchScale'] = 0.05;
+        $talk->audioQuery['intonationScale'] = 1.5;
+        $talk->audioQuery['volumeScale'] = 1.0;
+    })
+    ->generate(id: 1);
+```
+
+<Tip>
+  `tap()` はクエリーの微調整だけを行い、戻り値はそのまま次の `generate()` に渡せます。考え方は [tap() ヘルパーと Tappable トレイト](/jp/advanced/tap) で詳しく整理しています。
+</Tip>
+
+## 英語の自動カタカナ変換
+
+クライアントモードでは `enable_katakana_english` が有効なので、英語を含むテキストを自動でカタカナ寄りに補正できます。
+
+```php
+$response = Voicevox::talk('I love Laravel', id: 1)
+    ->generate(id: 1);
+```
+
+無効にしたい場合は第3引数に `false` を渡します。
+
+```php
+$response = Voicevox::talk('I love Laravel', id: 1, enableKatakanaEnglish: false)
+    ->generate(id: 1);
+```
+
+## レスポンスを保存する
+
+```php
+$response = Voicevox::talk('テスト', id: 1)->generate(id: 1);
+
+$wav = $response->content();
+$path = $response->storeAs('client', 'talk.wav');
+$path = $response->storeAs('client', 'talk.wav', disk: 's3');
+```
+
+## 次に読むページ
+
+<Columns cols={2}>
+  <Card title="クライアント Song" href="/jp/packages/laravel-voicevox/client-song" icon="music">
+    歌声合成で `Score` と `Note` を組み立てます。
+  </Card>
+  <Card title="VOICEVOX Core for PHP" href="/jp/packages/voicevox-core-php/usage" icon="library">
+    FFI を使う前提になったらコアライブラリ側の使い方も確認します。
+  </Card>
+</Columns>

@@ -1,0 +1,125 @@
+---
+title: "クライアント Song - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel のクライアントモードで、Score と Note から歌声音声合成する方法を説明します。"
+sidebarTitle: "Client Song"
+---
+
+## クライアントモードで歌わせる
+
+クライアントモードの歌声合成では、公式 VOICEVOX エンジンの `sing_frame_audio_query` と `frame_synthesis` API を使います。
+
+Talk と違って、先に `Score` と `Note` を組み立てる必要があります。
+
+## 事前準備
+
+```shell
+docker pull voicevox/voicevox_engine:cpu-latest
+docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+```
+
+## `Score` と `Note` を作る
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(ticks: 480, bpm: 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+```
+
+| パラメーター | 型 | 説明 |
+| --- | --- | --- |
+| `length` | `int` | フレーム長 |
+| `lyric` | `string` | 歌詞。空文字または省略で休符 |
+| `key` | `int\|null` | MIDI ノート番号 |
+
+<Tip>
+  `Note::len($ticks, $bpm)` を使うと、MIDI の ticks と BPM からフレーム長を計算できます。四分音符を 480 ticks として扱うと分かりやすいです。
+</Tip>
+
+## 基本的な使い方
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use Revolution\Voicevox\Voicevox;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+
+$response = Voicevox::song($score, teacher: 6000)
+    ->generate(id: 3001);
+
+$response->storeAs('client', 'song.wav');
+```
+
+### `teacher` と `id`
+
+- `teacher`: `sing_frame_audio_query` に渡すスタイル ID
+- `generate(id:)`: `frame_synthesis` に渡すスタイル ID
+
+利用可能な歌声スピーカー一覧は `singers()` で取得できます。
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$singers = Voicevox::singers();
+```
+
+## `tap()` で F0 とボリュームを調整する
+
+Song では `tap()` の使いどころが特に分かりやすく、`SongAudioQuery` を調整してから `generate()` へ流せます。
+
+```php
+use Revolution\Voicevox\Client\SongAudioQuery;
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::song($score, teacher: 6000)
+    ->tap(function (SongAudioQuery $song) {
+        $song->sync();
+    })
+    ->generate(id: 3001);
+```
+
+F0 とボリュームを個別に更新する場合は **F0 → ボリューム** の順で実行します。
+
+```php
+->tap(function (SongAudioQuery $song) {
+    $song->updateF0();
+    $song->updateVolume();
+})
+```
+
+Score を変更してから再同期したいときも `tap()` が便利です。
+
+```php
+->tap(function (SongAudioQuery $song) {
+    $song->score->notes[2] = Note::make(length: Note::len(480, 120), lyric: 'ファ', key: 65);
+    $song->sync();
+})
+```
+
+<Info>
+  `tap()` の発想は [tap() ヘルパーと Tappable トレイト](/jp/advanced/tap) にまとめています。VOICEVOX for Laravel は「戻り値を変えずに中間オブジェクトだけ調整したい」典型例です。
+</Info>
+
+## 次に読むページ
+
+<Columns cols={2}>
+  <Card title="ネイティブ Song" href="/jp/packages/laravel-voicevox/native-song" icon="music">
+    同じ `Score` を FFI 経由のネイティブモードで使います。
+  </Card>
+  <Card title="VOICEVOX Core for PHP 使い方" href="/jp/packages/voicevox-core-php/usage" icon="library">
+    コアライブラリ単体での音声合成フローを確認します。
+  </Card>
+</Columns>
