@@ -101,7 +101,8 @@
         "en/context",
         "en/error-handling",
         "en/logging",
-        "en/pulse"
+        "en/pulse",
+        "en/pennant"
       ]
     },
     {
