@@ -71,6 +71,29 @@ Composerでドライバをインストールします。
 composer require predis/predis
 ```
 
+### SQS Overflow Storage
+
+Amazon SQS はメッセージペイロードの最大サイズに制限があります。
+ペイロードが大きくなるジョブを扱う場合は、超過分をキャッシュストアに保存し、SQSにはポインターのみを送る設定を追加します。
+
+```php
+'sqs' => [
+    // ...
+    'overflow' => [
+        'enabled' => env('SQS_OVERFLOW_ENABLED', false),
+        'store' => env('SQS_OVERFLOW_STORE'),
+        'always' => false,
+        'delete_after_processing' => true,
+        'flush_on_clear' => env('SQS_OVERFLOW_FLUSH_ON_CLEAR', false),
+    ],
+],
+```
+
+- `enabled` を有効にすると、**1MB以上**のペイロードを指定したキャッシュストアへ保存します。
+- `always` を `true` にすると、サイズに関係なくすべてのSQSペイロードをキャッシュストアに保存します。
+- `delete_after_processing` はジョブ成功後に保存済みペイロードを削除します（デフォルト `true`）。
+- `flush_on_clear` を `true` にすると `queue:clear` 実行時にoverflow用ストアを `flush` します。通常のキャッシュを消さないため、専用ストアと組み合わせて使ってください。
+
 ## ジョブクラスの作成
 
 ### make:job コマンド

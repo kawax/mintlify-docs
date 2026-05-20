@@ -40,6 +40,7 @@ flowchart LR
         G["database (default)"]
         H["file"]
         I["DynamoDB (AWS)"]
+        J["storage<br>S3 or filesystem disk"]
     end
 
     B --> C
@@ -48,6 +49,7 @@ flowchart LR
     B --> G
     B --> H
     B --> I
+    B --> J
 ```
 
 ### Database driver
@@ -71,6 +73,18 @@ composer require predis/predis
 CACHE_STORE=redis
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
+```
+
+### Storage driver
+
+The `storage` driver lets you store cached values on any configured filesystem disk. Use it when you want to reuse an existing disk, such as S3, as a key/value cache store:
+
+```php
+'storage' => [
+    'driver' => 'storage',
+    'disk' => env('CACHE_STORAGE_DISK'),
+    'path' => env('CACHE_STORAGE_PATH', 'framework/cache/data'),
+],
 ```
 
 ## Retrieving items
@@ -200,7 +214,7 @@ Cache::decrement('api_calls', 2);
 
 ## Cache tags
 
-Tags let you group related cache items and flush them together. Tags require a driver that supports them (Redis or Memcached):
+Tags let you group related cache items and flush them together. Tags are only available with Redis or Memcached drivers and are not supported by the `file`, `dynamodb`, `database`, or `storage` drivers:
 
 ```php
 // Store with tags
@@ -317,6 +331,7 @@ Cache::restoreLock('processing', $token)->release();
 | `redis` | Production | Fast, supports tags and atomic locks |
 | `memcached` | Production | Fast; no persistence |
 | `file` | Development | Stores data in files; no memory pressure |
+| `storage` | Cloud storage-backed cache | Uses filesystem disks such as S3; no cache tags |
 | `array` | Testing | In-memory, never persists between requests |
 
 <Tip>
