@@ -214,7 +214,7 @@ Cache::decrement('api_calls', 2);
 
 ## Cache tags
 
-Tags let you group related cache items and flush them together. Tags require a driver that supports them (Redis or Memcached). Tags are not available with the `file`, `dynamodb`, `database`, or `storage` drivers:
+Tags let you group related cache items and flush them together. Tags are only available with Redis or Memcached drivers and are not supported by the `file`, `dynamodb`, `database`, or `storage` drivers:
 
 ```php
 // Store with tags
