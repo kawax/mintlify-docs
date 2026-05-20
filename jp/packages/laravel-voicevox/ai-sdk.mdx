@@ -1,0 +1,131 @@
+---
+title: "Laravel AI SDK連携 - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel を Laravel AI SDK の Audio ファサードから使うための設定と使い方を説明します。"
+sidebarTitle: "AI SDK連携"
+---
+
+## Laravel AI SDK 連携
+
+VOICEVOX for Laravel は [Laravel AI SDK](https://github.com/laravel/ai) と統合されており、`Audio` ファサードから音声生成できます。
+
+利用できるドライバーは次の2つです。
+
+- `voicevox-client`（クライアントモード）
+- `voicevox`（ネイティブモード）
+
+## クライアントドライバー（`voicevox-client`）
+
+公式 VOICEVOX エンジンに HTTP リクエストを送るモードです。FFI は不要です。
+
+### 事前準備
+
+```shell
+docker pull voicevox/voicevox_engine:cpu-latest
+docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+```
+
+### 設定
+
+`config/ai.php` に `voicevox-client` プロバイダーを追加します。
+
+```php
+'providers' => [
+    'voicevox-client' => [
+        'driver' => 'voicevox-client',
+        'key' => env('VOICEVOX_URL', 'http://127.0.0.1:50021'),
+    ],
+],
+```
+
+### 使い方
+
+```php
+use Laravel\Ai\Audio;
+
+$response = Audio::of('Laravelが好きなのだ')
+    ->voice('ずんだもん')
+    ->generate('voicevox-client');
+
+Storage::put('talk.wav', $response->content());
+```
+
+## ネイティブドライバー（`voicevox`）
+
+VOICEVOX CORE を直接呼び出すモードです。FFI が必要です。
+
+`config/voicevox.php` の `core.vvms` で読み込んだモデルのみ利用できます。
+
+### 設定
+
+```php
+'providers' => [
+    'voicevox' => [
+        'driver' => 'voicevox',
+    ],
+],
+```
+
+### 使い方
+
+```php
+use Laravel\Ai\Audio;
+
+$response = Audio::of('ネイティブで話すのだ')
+    ->voice('ずんだもん')
+    ->generate('voicevox');
+
+Storage::put('talk.wav', $response->content());
+```
+
+## `voice()` に指定できる値
+
+`voice()` には次を指定できます。
+
+- VOICEVOX のスタイル ID（数値文字列）
+- キャラクター名エイリアス（例: `ずんだもん`、`四国めたん/ノーマル`）
+
+`voice()` を省略した場合は `default-female`（ID: 10）が使われます。
+
+```php
+use Laravel\Ai\Audio;
+
+Audio::of('テスト')->voice('3')->generate('voicevox-client');
+```
+
+利用可能なスピーカー一覧は `Voicevox::speakers()` でも確認できます。
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$speakers = Voicevox::speakers();
+```
+
+## エージェント（KanalizerAgent）
+
+ネイティブモードでは `enable_katakana_english` がないため、英語を事前にカタカナ化する `KanalizerAgent` を使えます。
+
+```php
+use Revolution\Voicevox\Ai\Agents\KanalizerAgent;
+use function Revolution\Voicevox\talk;
+
+$kana = KanalizerAgent::make()->prompt('KanalizerAgentで英語をカタカナに変換するのだ');
+
+$response = talk($kana['kana'] ?? $kana->text, id: 1)->generate(id: 1);
+
+$response->storeAs('native', 'kanalizer.wav');
+```
+
+<Tip>
+  AI によるカタカナ変換は常に正確とは限りません。実運用では生成テキストを人間が確認してから合成してください。
+</Tip>
+
+## 次に読むページ
+
+<Columns cols={2}>
+  <Card title="クライアント: トーク" href="/jp/packages/laravel-voicevox/client-talk" icon="message-circle">
+    クライアントモードの通常 API の流れを確認します。
+  </Card>
+  <Card title="ネイティブ: トーク" href="/jp/packages/laravel-voicevox/native-talk" icon="cpu">
+    FFI で直接合成するモードの使い方を確認します。
+  </Card>
+</Columns>

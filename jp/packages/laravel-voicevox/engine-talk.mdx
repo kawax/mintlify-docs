@@ -1,0 +1,121 @@
+---
+title: "エンジン API モード：トーク（テキスト音声合成） - VOICEVOX for Laravel"
+description: "Laravel アプリに VOICEVOX エンジン互換 HTTP API を組み込み、公式エンジンと同じトークエンドポイントを使う方法を説明します。"
+sidebarTitle: "エンジン API: トーク"
+---
+
+## エンジン API モードとは
+
+エンジン API モードは、公式 VOICEVOX エンジン互換の HTTP API を Laravel アプリ内で提供します。
+
+`php artisan serve` でアプリを起動するだけで、`/audio_query` や `/synthesis` をそのまま利用できます。
+
+## 事前準備
+
+<Steps>
+  <Step title="VOICEVOX Core for PHP をセットアップする">
+    [インストールと設定](/jp/packages/laravel-voicevox/installation) の手順で `voicevox-core-php` とコアライブラリを用意します。
+  </Step>
+  <Step title="環境変数と FFI を有効化する">
+    ```dotenv
+    VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+    ```
+
+    ```ini
+    ffi.enable=true
+    ```
+  </Step>
+  <Step title="キャラクター情報リソースをインストールする">
+    ```shell
+    php artisan voicevox:install
+    ```
+  </Step>
+</Steps>
+
+## Laravel 版エンジンを起動する
+
+```shell
+php artisan serve
+```
+
+デフォルトでは `http://127.0.0.1:8000` で起動します。
+
+## トーク音声を生成する
+
+### 1. `audio_query` を作成する
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/audio_query?speaker=1&text=ララベルが好きなのだ" \
+  -H "Content-Type: application/json" \
+  > audio_query.json
+```
+
+### 2. `synthesis` で音声合成する
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/synthesis?speaker=1" \
+  -H "Content-Type: application/json" \
+  -d @audio_query.json \
+  > talk.wav
+```
+
+## Laravel クライアントから使う
+
+Laravel 版エンジンをクライアントモードの接続先として使えます。
+
+```php
+// config/voicevox.php
+'client' => [
+    'url' => env('VOICEVOX_URL', 'http://127.0.0.1:8000'),
+],
+```
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('ララベルが好きなのだ', id: 1)
+    ->generate(id: 1);
+
+$response->storeAs('engine', 'talk.wav');
+```
+
+## エンジン API の有効・無効とフォールバック
+
+```php
+'engine' => [
+    'disabled' => env('VOICEVOX_ENGINE_DISABLED', false),
+    'fallback_url' => env('VOICEVOX_ENGINE_FALLBACK_URL', 'http://127.0.0.1:50021'),
+],
+```
+
+`cancellable_synthesis` や `multi_synthesis` のような未実装エンドポイントは、公式エンジンへフォールバックできます。
+
+<Info>
+  フォールバックを使う場合は、`VOICEVOX_ENGINE_FALLBACK_URL` 側で公式エンジンを起動してください。
+</Info>
+
+## トーク関連の対応状況
+
+| エンドポイント | Laravel 版 | フォールバック | 備考 |
+|---|---|---|---|
+| `POST /audio_query` | ✅ | ✅ | `enable_katakana_english` 非対応 |
+| `POST /accent_phrases` | ✅ | ✅ | `enable_katakana_english` 非対応 |
+| `POST /synthesis` | ✅ | ✅ | |
+| `POST /mora_data` | ✅ | ✅ | |
+| `POST /mora_length` | ✅ | ✅ | |
+| `POST /mora_pitch` | ✅ | ✅ | |
+| `GET /speakers` | ✅ | ✅ | |
+| `GET /speaker_info` | ✅ | ✅ | リソースインストールが必要 |
+| `POST /cancellable_synthesis` | ❌ | ✅ | フォールバックのみ |
+| `POST /multi_synthesis` | ❌ | ✅ | フォールバックのみ |
+
+## 次に読むページ
+
+<Columns cols={2}>
+  <Card title="エンジン API: ソング" href="/jp/packages/laravel-voicevox/engine-song" icon="music">
+    `sing_frame_audio_query` と `frame_synthesis` の使い方を確認します。
+  </Card>
+  <Card title="Laravel AI SDK連携" href="/jp/packages/laravel-voicevox/ai-sdk" icon="sparkles">
+    `Audio` ファサードから VOICEVOX を使う設定を確認します。
+  </Card>
+</Columns>

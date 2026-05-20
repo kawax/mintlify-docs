@@ -1,0 +1,128 @@
+---
+title: "エンジン API モード：ソング（歌声音声合成） - VOICEVOX for Laravel"
+description: "Laravel アプリ内の VOICEVOX エンジン互換 API で、歌声合成エンドポイントを使う手順を説明します。"
+sidebarTitle: "エンジン API: ソング"
+---
+
+## エンジン API で歌わせる
+
+エンジン API モードは、公式 VOICEVOX エンジン互換のソングエンドポイントも提供します。
+
+<Info>
+  エンジン API の基本セットアップは [エンジン API: トーク](/jp/packages/laravel-voicevox/engine-talk) を先に確認してください。
+</Info>
+
+## 事前準備
+
+歌声モデルを使うため、`config/voicevox.php` の `core.vvms` に `s0.vvm` が含まれていることを確認します（デフォルトで含まれます）。
+
+```dotenv
+VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+```
+
+## Laravel 版エンジンを起動する
+
+```shell
+php artisan serve
+```
+
+## 歌声音声を生成する
+
+### 1. `sing_frame_audio_query` を作成する
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/sing_frame_audio_query?speaker=6000" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notes": [
+      {"id": "a", "key": null, "frame_length": 15, "lyric": ""},
+      {"id": "b", "key": 60, "frame_length": 94, "lyric": "ド"},
+      {"id": "c", "key": 62, "frame_length": 94, "lyric": "レ"},
+      {"id": "d", "key": 64, "frame_length": 187, "lyric": "ミ"},
+      {"id": "e", "key": null, "frame_length": 2, "lyric": ""}
+    ]
+  }' \
+  > frame_audio_query.json
+```
+
+`speaker` には `sing` または `singing_teacher` 種別のスタイル ID（例: 6000）を指定します。
+
+### 2. `frame_synthesis` で音声合成する
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/frame_synthesis?speaker=3001" \
+  -H "Content-Type: application/json" \
+  -d @frame_audio_query.json \
+  > song.wav
+```
+
+`speaker` には `sing` または `frame_decode` 種別のスタイル ID（例: 3001）を指定します。
+
+## Laravel クライアントから使う
+
+Laravel 版エンジンに向けて `Voicevox::song()` を利用できます。
+
+```php
+// config/voicevox.php
+'client' => [
+    'url' => env('VOICEVOX_URL', 'http://127.0.0.1:8000'),
+],
+```
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use Revolution\Voicevox\Voicevox;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+
+$response = Voicevox::song($score, teacher: 6000)->generate(id: 3001);
+
+$response->storeAs('engine', 'song.wav');
+```
+
+## F0・ボリューム調整エンドポイント
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/sing_frame_f0?speaker=6000" \
+  -H "Content-Type: application/json" \
+  -d '{"score": {...}, "frame_audio_query": {...}}' \
+  > f0.json
+
+curl -s -X POST "http://127.0.0.1:8000/sing_frame_volume?speaker=6000" \
+  -H "Content-Type: application/json" \
+  -d '{"score": {...}, "frame_audio_query": {...}}' \
+  > volume.json
+```
+
+<Warning>
+  F0 とボリュームを個別に更新する場合は、必ず **F0 → ボリューム** の順で実行してください。
+</Warning>
+
+## ソング関連の対応状況
+
+| エンドポイント | Laravel 版 | フォールバック | 備考 |
+|---|---|---|---|
+| `POST /sing_frame_audio_query` | ✅ | ✅ | |
+| `POST /frame_synthesis` | ✅ | ✅ | |
+| `POST /sing_frame_f0` | ✅ | ✅ | |
+| `POST /sing_frame_volume` | ✅ | ✅ | f0 → volume の順で更新 |
+| `GET /singers` | ✅ | ✅ | |
+| `GET /singer_info` | ✅ | ✅ | リソースインストールが必要 |
+
+## 次に読むページ
+
+<Columns cols={2}>
+  <Card title="エンジン API: トーク" href="/jp/packages/laravel-voicevox/engine-talk" icon="message-circle">
+    テキスト音声合成エンドポイントの使い方を確認します。
+  </Card>
+  <Card title="クライアント: ソング" href="/jp/packages/laravel-voicevox/client-song" icon="music">
+    同じ譜面を公式エンジンへ直接送るモードを確認します。
+  </Card>
+</Columns>
