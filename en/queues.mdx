@@ -66,6 +66,28 @@ composer require predis/predis
 
 Then set `QUEUE_CONNECTION=redis` in `.env`.
 
+### SQS overflow storage
+
+Amazon SQS limits the maximum queued message payload size. If your jobs may exceed that limit, you can store oversized payloads in a cache store and send only a pointer through SQS:
+
+```php
+'sqs' => [
+    // ...
+    'overflow' => [
+        'enabled' => env('SQS_OVERFLOW_ENABLED', false),
+        'store' => env('SQS_OVERFLOW_STORE'),
+        'always' => false,
+        'delete_after_processing' => true,
+        'flush_on_clear' => env('SQS_OVERFLOW_FLUSH_ON_CLEAR', false),
+    ],
+],
+```
+
+- When `enabled` is true, payloads that are **at least 1 MB** are stored in the configured cache store.
+- When `always` is `true`, every SQS payload is stored in the cache store regardless of size.
+- `delete_after_processing` removes stored payloads after successful processing (default: `true`).
+- If `flush_on_clear` is `true`, `queue:clear` flushes the overflow store. Use a dedicated cache store so normal cache data is not removed.
+
 ## Creating and dispatching jobs
 
 ### Generating a job class
