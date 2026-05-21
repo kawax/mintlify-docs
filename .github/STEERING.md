@@ -27,19 +27,8 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
 - [x] Fortifyページ
 - [x] スターターキットの作り方ページ
 - [x] Reflectionの解説
-- [x] Laravel Chiselページで少し出てきたのでPHP AST（抽象構文木）の解説。
-  - Chiselでも`nikic/php-parser`パッケージが使われている。 https://github.com/nikic/PHP-Parser
-  - 一般的に使われる機能ではないのでASTを初めて知った人向けの説明で十分だろう。
-  - blog/chisel-introduction.mdx のPHP ASTセクションからリンク。
-  - 日本語ページはOK
-- [x] FFIの解説。
-  - ASTと同様にそんなに使われる機能ではないけどVOICEVOX Core for PHPという実際の使用例ができたのでページを作成。
-  - Laravel Cloudを含めWebサーバーでは無効にされてることが多い。
-  - FFIの基本的な説明。
-  - 何らかのC APIの動的ライブラリがあればPHP FFIから使える可能性がある。
-  - 具体的なVOICEVOX Core for PHPでの使用パターンの解説。[VoicevoxFFI.php](https://github.com/invokable/voicevox-core-php/blob/main/src/VoicevoxFFI.php)、[voicevox_core_ffi.h](https://github.com/invokable/voicevox-core-php/blob/main/headers/voicevox_core_ffi.h)、[Synthesizer.php](https://github.com/invokable/voicevox-core-php/blob/main/src/Synthesizer.php) 辺りが主要なコード。
-  - VOICEVOX Core for PHPの実装前の調査資料が英語と日本語であるのでこれも参考にする。 [voicevox-core-php-ffi-en.md](https://github.com/invokable/voicevox-core-php/blob/main/docs/voicevox-core-php-ffi-en.md)、[voicevox-core-php-ffi-ja.md](https://github.com/invokable/voicevox-core-php/blob/main/docs/voicevox-core-php-ffi-ja.md)
-  - 日本語ページはOK
+- [x] Laravel Chiselページで少し出てきたのでPHP AST（抽象構文木）の解説
+- [x] FFIの解説
 
 ## blog ページ案
 
@@ -70,3 +59,5 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - まずはインストールと設定からモードごとのトークとソングの生成までを説明。
   - tap()を上手く使えている。使いどころが難しいtapだけどこういう場面ではバッチリ決まる。advanced/tapページからも活用例としてリンク。
   - docs/jp内は更新中なのでしばらくは新しいファイルが増えていたらこちらにも追加の対応。
+  - 英語のREADME.mdを更新したのでこちらにも英語ページを作成。英語版なのでVOICEVOXが日本語のテキスト音声合成なことや日本で一番有名なずんだもんボイスはVOICEVOXで多く作られていることを追加している。
+  - 英語ページはこちらで作るので不要だったのに`docs/en/`に1ファイルだけ作られている。ai-sdk.mdのエイリアス一覧はこちらにも追加。日英両方。
