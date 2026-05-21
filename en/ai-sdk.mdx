@@ -13,12 +13,12 @@ description: "A unified, expressive API for interacting with AI providers — bu
 
 | Capability | Supported providers |
 | --- | --- |
-| Text | OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama |
-| Images | OpenAI, Gemini, xAI |
-| TTS | OpenAI, ElevenLabs |
-| STT | OpenAI, ElevenLabs, Mistral |
-| Embeddings | OpenAI, Gemini, Azure, Cohere, Mistral, Jina, VoyageAI |
-| Reranking | Cohere, Jina |
+| Text | OpenAI, Anthropic, Gemini, Azure, Bedrock, Groq, xAI, DeepSeek, Mistral, Ollama, OpenRouter |
+| Images | OpenAI, Gemini, xAI, Azure, Bedrock, OpenRouter |
+| TTS | OpenAI, ElevenLabs, Gemini |
+| STT | OpenAI, ElevenLabs, Mistral, Gemini |
+| Embeddings | OpenAI, Gemini, Azure, Bedrock, Cohere, Mistral, Jina, VoyageAI, Ollama, OpenRouter |
+| Reranking | Cohere, Jina, VoyageAI |
 | Files | OpenAI, Anthropic, Gemini |
 
 ## Installation
@@ -754,7 +754,7 @@ class SalesCoach implements Agent, HasProviderOptions
 
 ## Image generation
 
-Generate images with the `Image` class. Supported providers: OpenAI, Gemini, xAI.
+Generate images with the `Image` class. Supported providers: OpenAI, Gemini, xAI, Azure, Bedrock, OpenRouter.
 
 ```php
 use Laravel\Ai\Image;
@@ -809,7 +809,7 @@ Image::of('A donut sitting on the kitchen counter')
 
 ## Audio (TTS)
 
-Generate speech from text with the `Audio` class. Supported providers: OpenAI, ElevenLabs.
+Generate speech from text with the `Audio` class. Supported providers: OpenAI, ElevenLabs, Gemini.
 
 ```php
 use Laravel\Ai\Audio;
@@ -850,7 +850,7 @@ Audio::of('I love coding with Laravel.')
 
 ## Transcription (STT)
 
-Transcribe audio files with the `Transcription` class. Supported providers: OpenAI, ElevenLabs, Mistral.
+Transcribe audio files with the `Transcription` class. Supported providers: OpenAI, ElevenLabs, Mistral, Gemini.
 
 ```php
 use Laravel\Ai\Transcription;
@@ -991,7 +991,7 @@ $embeddings = Str::of('Napa Valley has great wine.')->toEmbeddings(cache: 3600);
 
 ## Reranking
 
-Rerank a list of documents by relevance to a query. Supported providers: Cohere, Jina.
+Rerank a list of documents by relevance to a query. Supported providers: Cohere, Jina, VoyageAI.
 
 ```php
 use Laravel\Ai\Reranking;
