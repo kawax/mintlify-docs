@@ -1,0 +1,125 @@
+---
+title: "Client Mode: Song (Singing Synthesis) - VOICEVOX for Laravel"
+description: "Generate singing audio in VOICEVOX for Laravel client mode using Score and Note."
+sidebarTitle: "Client: Song"
+---
+
+## Singing in client mode
+
+Client-mode singing synthesis uses official VOICEVOX engine endpoints: `sing_frame_audio_query` and `frame_synthesis`.
+
+Unlike talk mode, you build a `Score` and `Note` set first.
+
+## Prerequisites
+
+```shell
+docker pull voicevox/voicevox_engine:cpu-latest
+docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+```
+
+## Create `Score` and `Note`
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(ticks: 480, bpm: 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `length` | `int` | Frame length |
+| `lyric` | `string` | Lyrics text. Empty string or omitted value means rest |
+| `key` | `int\|null` | MIDI note number |
+
+<Tip>
+  Use `Note::len($ticks, $bpm)` to calculate frame lengths from MIDI ticks and BPM. A quarter note at 480 ticks is a practical default.
+</Tip>
+
+## Basic usage
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use Revolution\Voicevox\Voicevox;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+
+$response = Voicevox::song($score, teacher: 6000)
+    ->generate(id: 3001);
+
+$response->storeAs('client', 'song.wav');
+```
+
+### `teacher` and `id`
+
+- `teacher`: style ID for `sing_frame_audio_query` (currently `6000` only, so default is 6000)
+- `generate(id:)`: style ID for `frame_synthesis`
+
+Get available singing speakers with `singers()`.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$singers = Voicevox::singers();
+```
+
+## Tune F0 and volume with `tap()`
+
+In song mode, `tap()` is especially useful: adjust `SongAudioQuery`, then keep chaining to `generate()`.
+
+```php
+use Revolution\Voicevox\Client\SongAudioQuery;
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::song($score, teacher: 6000)
+    ->tap(function (SongAudioQuery $song) {
+        $song->sync();
+    })
+    ->generate(id: 3001);
+```
+
+If you update values individually, use this order: **F0 first, volume second**.
+
+```php
+->tap(function (SongAudioQuery $song) {
+    $song->updateF0();
+    $song->updateVolume();
+})
+```
+
+`tap()` is also useful when you edit notes and re-sync.
+
+```php
+->tap(function (SongAudioQuery $song) {
+    $song->score->notes[2] = Note::make(length: Note::len(480, 120), lyric: 'ファ', key: 65);
+    $song->sync();
+})
+```
+
+<Info>
+  See [tap() helper and Tappable trait](/en/advanced/tap) for the core pattern. VOICEVOX for Laravel is a clear real-world use case.
+</Info>
+
+## Next pages
+
+<Columns cols={2}>
+  <Card title="Native Song" href="/en/packages/laravel-voicevox/native-song" icon="music">
+    Use the same `Score` in native FFI mode.
+  </Card>
+  <Card title="VOICEVOX Core for PHP Usage" href="/en/packages/voicevox-core-php/usage" icon="library">
+    Review standalone core synthesis flow.
+  </Card>
+</Columns>

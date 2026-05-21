@@ -1,0 +1,110 @@
+---
+title: "Native Mode: Talk (Text-to-Speech) - VOICEVOX for Laravel"
+description: "Use VOICEVOX for Laravel native mode to call VOICEVOX CORE directly via PHP FFI for text-to-speech synthesis."
+sidebarTitle: "Native: Talk"
+---
+
+## What is native mode
+
+Native mode calls VOICEVOX CORE directly through PHP FFI via [VOICEVOX Core for PHP](/en/packages/voicevox-core-php).
+
+You can synthesize without running the official engine, but FFI and local core library setup are required.
+
+<Warning>
+  Native mode is not meant for typical web-server deployment. Use local CLI. For FFI constraints, see [PHP FFI](/en/advanced/ffi).
+</Warning>
+
+## Prerequisites
+
+1. Complete [Installation and Configuration](/en/packages/laravel-voicevox/installation)
+2. Complete [VOICEVOX Core for PHP](/en/packages/voicevox-core-php) setup
+3. Set `VOICEVOX_CORE_PATH` in `.env`
+
+```dotenv
+VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+```
+
+## Basic usage
+
+Use the `talk()` helper in native mode.
+
+```php
+use function Revolution\Voicevox\talk;
+
+$response = talk('Native mode sample', id: 1)
+    ->generate(id: 1);
+
+$response->storeAs('native', 'talk.wav');
+```
+
+## Style IDs
+
+Use an `id` included in loaded `.vvm` models.
+
+```php
+use function Revolution\Voicevox\talk;
+
+$response = talk('I am Zundamon', id: 1)
+    ->generate(id: 1);
+```
+
+Only models listed in `core.vvms` in `config/voicevox.php` are available.
+
+## Tune Audio Query with `tap()`
+
+`tap()` works the same in native mode, but `TalkAudioQuery` is a different class than client mode.
+
+```php
+use Revolution\Voicevox\Talk\TalkAudioQuery;
+use function Revolution\Voicevox\talk;
+
+$response = talk('Speak faster', id: 1)
+    ->tap(function (TalkAudioQuery $talk) {
+        $talk->audioQuery['speedScale'] = 1.2;
+        $talk->audioQuery['pitchScale'] = 0.05;
+        $talk->audioQuery['intonationScale'] = 1.5;
+        $talk->audioQuery['volumeScale'] = 1.0;
+    })
+    ->generate(id: 1);
+```
+
+<Info>
+  For the general `tap()` pattern, see [tap() helper and Tappable trait](/en/advanced/tap). VOICEVOX for Laravel is a practical implementation example.
+</Info>
+
+## Use kana in AquesTalk-like notation
+
+Native mode has no `enable_katakana_english`, so it is not ideal for reading raw English text directly.
+
+Instead, you can pass AquesTalk-like kana with `kana()`.
+
+```php
+use function Revolution\Voicevox\kana;
+
+$response = kana("ネイティブ'バンナ/ノダ'", id: 1)
+    ->generate(id: 1);
+
+$response->storeAs('native', 'kana.wav');
+```
+
+For notation details, see [official VOICEVOX documentation](https://github.com/VOICEVOX/voicevox_engine/blob/master/docs/kana_parser.md).
+
+## Difference from client mode
+
+| Item | Client Talk | Native Talk |
+| --- | --- | --- |
+| Engine process | Required | Not required |
+| FFI | Not required | Required |
+| Automatic English-to-katakana | Available | Not available |
+| Entry API | `Voicevox::talk()` | `talk()` |
+
+## Next pages
+
+<Columns cols={2}>
+  <Card title="Native Song" href="/en/packages/laravel-voicevox/native-song" icon="music">
+    Use singing models through FFI.
+  </Card>
+  <Card title="VOICEVOX Core for PHP" href="/en/packages/voicevox-core-php" icon="library">
+    Review setup and constraints on the pure PHP wrapper side.
+  </Card>
+</Columns>

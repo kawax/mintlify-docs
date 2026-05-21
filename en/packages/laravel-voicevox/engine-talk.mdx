@@ -1,0 +1,121 @@
+---
+title: "Engine API Mode: Talk (Text-to-Speech) - VOICEVOX for Laravel"
+description: "Embed a VOICEVOX-engine-compatible HTTP API in your Laravel app and use standard talk endpoints."
+sidebarTitle: "Engine API: Talk"
+---
+
+## What is engine API mode
+
+Engine API mode provides a VOICEVOX Engine-compatible HTTP API inside your Laravel app.
+
+Start your app with `php artisan serve`, then use endpoints like `/audio_query` and `/synthesis` directly.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Set up VOICEVOX Core for PHP">
+    Follow [Installation and Configuration](/en/packages/laravel-voicevox/installation) to prepare `voicevox-core-php` and core libraries.
+  </Step>
+  <Step title="Configure environment and enable FFI">
+    ```dotenv
+    VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+    ```
+
+    ```ini
+    ffi.enable=true
+    ```
+  </Step>
+  <Step title="Install character resources">
+    ```shell
+    php artisan voicevox:install
+    ```
+  </Step>
+</Steps>
+
+## Start Laravel engine
+
+```shell
+php artisan serve
+```
+
+Default URL is `http://127.0.0.1:8000`.
+
+## Generate talk audio
+
+### 1. Create `audio_query`
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/audio_query?speaker=1&text=I%20love%20Laravel" \
+  -H "Content-Type: application/json" \
+  > audio_query.json
+```
+
+### 2. Synthesize with `synthesis`
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/synthesis?speaker=1" \
+  -H "Content-Type: application/json" \
+  -d @audio_query.json \
+  > talk.wav
+```
+
+## Use from Laravel client mode
+
+Point client-mode URL to the Laravel engine API.
+
+```php
+// config/voicevox.php
+'client' => [
+    'url' => env('VOICEVOX_URL', 'http://127.0.0.1:8000'),
+],
+```
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('I love Laravel', id: 1)
+    ->generate(id: 1);
+
+$response->storeAs('engine', 'talk.wav');
+```
+
+## Enable/disable and fallback
+
+```php
+'engine' => [
+    'disabled' => env('VOICEVOX_ENGINE_DISABLED', false),
+    'fallback_url' => env('VOICEVOX_ENGINE_FALLBACK_URL', 'http://127.0.0.1:50021'),
+],
+```
+
+Unsupported endpoints like `cancellable_synthesis` and `multi_synthesis` can fall back to official engine.
+
+<Info>
+  If you rely on fallback, run official VOICEVOX engine at `VOICEVOX_ENGINE_FALLBACK_URL`.
+</Info>
+
+## Talk endpoint support
+
+| Endpoint | Laravel engine | Fallback | Notes |
+|---|---|---|---|
+| `POST /audio_query` | ✅ | ✅ | `enable_katakana_english` unsupported |
+| `POST /accent_phrases` | ✅ | ✅ | `enable_katakana_english` unsupported |
+| `POST /synthesis` | ✅ | ✅ | |
+| `POST /mora_data` | ✅ | ✅ | |
+| `POST /mora_length` | ✅ | ✅ | |
+| `POST /mora_pitch` | ✅ | ✅ | |
+| `GET /speakers` | ✅ | ✅ | |
+| `GET /speaker_info` | ✅ | ✅ | Requires resource install |
+| `POST /cancellable_synthesis` | ❌ | ✅ | Fallback only |
+| `POST /multi_synthesis` | ❌ | ✅ | Fallback only |
+
+## Next pages
+
+<Columns cols={2}>
+  <Card title="Engine API: Song" href="/en/packages/laravel-voicevox/engine-song" icon="music">
+    Use `sing_frame_audio_query` and `frame_synthesis` endpoints.
+  </Card>
+  <Card title="Laravel AI SDK Integration" href="/en/packages/laravel-voicevox/ai-sdk" icon="sparkles">
+    Configure VOICEVOX with `Audio` facade workflows.
+  </Card>
+</Columns>

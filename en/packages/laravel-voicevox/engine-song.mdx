@@ -1,0 +1,128 @@
+---
+title: "Engine API Mode: Song (Singing Synthesis) - VOICEVOX for Laravel"
+description: "Use VOICEVOX-engine-compatible singing endpoints from the Laravel embedded engine API mode."
+sidebarTitle: "Engine API: Song"
+---
+
+## Singing with engine API
+
+Engine API mode also provides VOICEVOX-compatible singing endpoints.
+
+<Info>
+  Complete basic setup first in [Engine API: Talk](/en/packages/laravel-voicevox/engine-talk).
+</Info>
+
+## Prerequisites
+
+To use singing models, confirm `s0.vvm` is included in `core.vvms` in `config/voicevox.php` (included by default).
+
+```dotenv
+VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+```
+
+## Start Laravel engine
+
+```shell
+php artisan serve
+```
+
+## Generate singing audio
+
+### 1. Create `sing_frame_audio_query`
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/sing_frame_audio_query?speaker=6000" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notes": [
+      {"id": "a", "key": null, "frame_length": 15, "lyric": ""},
+      {"id": "b", "key": 60, "frame_length": 94, "lyric": "ド"},
+      {"id": "c", "key": 62, "frame_length": 94, "lyric": "レ"},
+      {"id": "d", "key": 64, "frame_length": 187, "lyric": "ミ"},
+      {"id": "e", "key": null, "frame_length": 2, "lyric": ""}
+    ]
+  }' \
+  > frame_audio_query.json
+```
+
+For `speaker`, use a style ID of type `sing` or `singing_teacher` (for example, `6000`).
+
+### 2. Synthesize with `frame_synthesis`
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/frame_synthesis?speaker=3001" \
+  -H "Content-Type: application/json" \
+  -d @frame_audio_query.json \
+  > song.wav
+```
+
+For `speaker`, use a style ID of type `sing` or `frame_decode` (for example, `3001`).
+
+## Use from Laravel client mode
+
+You can point `Voicevox::song()` to Laravel engine API URL.
+
+```php
+// config/voicevox.php
+'client' => [
+    'url' => env('VOICEVOX_URL', 'http://127.0.0.1:8000'),
+],
+```
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use Revolution\Voicevox\Voicevox;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+
+$response = Voicevox::song($score, teacher: 6000)->generate(id: 3001);
+
+$response->storeAs('engine', 'song.wav');
+```
+
+## F0 / volume endpoints
+
+```shell
+curl -s -X POST "http://127.0.0.1:8000/sing_frame_f0?speaker=6000" \
+  -H "Content-Type: application/json" \
+  -d '{"score": {...}, "frame_audio_query": {...}}' \
+  > f0.json
+
+curl -s -X POST "http://127.0.0.1:8000/sing_frame_volume?speaker=6000" \
+  -H "Content-Type: application/json" \
+  -d '{"score": {...}, "frame_audio_query": {...}}' \
+  > volume.json
+```
+
+<Warning>
+  When updating separately, always run in this order: **F0 first, volume second**.
+</Warning>
+
+## Song endpoint support
+
+| Endpoint | Laravel engine | Fallback | Notes |
+|---|---|---|---|
+| `POST /sing_frame_audio_query` | ✅ | ✅ | |
+| `POST /frame_synthesis` | ✅ | ✅ | |
+| `POST /sing_frame_f0` | ✅ | ✅ | |
+| `POST /sing_frame_volume` | ✅ | ✅ | Update in f0 → volume order |
+| `GET /singers` | ✅ | ✅ | |
+| `GET /singer_info` | ✅ | ✅ | Requires resource install |
+
+## Next pages
+
+<Columns cols={2}>
+  <Card title="Engine API: Talk" href="/en/packages/laravel-voicevox/engine-talk" icon="message-circle">
+    Review text-to-speech endpoint usage.
+  </Card>
+  <Card title="Client: Song" href="/en/packages/laravel-voicevox/client-song" icon="music">
+    Compare with direct official engine mode.
+  </Card>
+</Columns>

@@ -1,0 +1,152 @@
+---
+title: "Installation and Configuration - VOICEVOX for Laravel"
+description: "Install and configure VOICEVOX for Laravel with or without FFI, including config, .env, and engine resource setup."
+sidebarTitle: "Installation"
+---
+
+## What to install
+
+The package setup changes depending on which mode you want to run.
+
+<Tabs>
+  <Tab title="Client only">
+    If you only connect to the official VOICEVOX engine over HTTP, you can start with `revolution/laravel-voicevox` alone.
+
+    ```shell
+    composer require revolution/laravel-voicevox
+    ```
+  </Tab>
+  <Tab title="Native / Engine API too">
+    For FFI-based modes, install `revolution/voicevox-core` together with Laravel package.
+
+    ```shell
+    composer require revolution/laravel-voicevox revolution/voicevox-core
+    ```
+  </Tab>
+</Tabs>
+
+## Requirements
+
+| Item | Value |
+| --- | --- |
+| PHP | 8.3+ |
+| Laravel | This site uses Laravel 13 |
+| Composer constraint (upstream) | `illuminate/support:^12.0 || ^13.0` |
+| Required extension | `ext-zip` |
+| FFI | Required for native mode and engine API mode |
+
+<Warning>
+  FFI is disabled on many web servers including Laravel Cloud. Test native mode and engine API mode on **local CLI** first.
+</Warning>
+
+## Setup steps
+
+<Steps>
+  <Step title="Install package(s)">
+    Use Composer based on your target mode. Native mode and engine API mode also require [VOICEVOX Core for PHP](/en/packages/voicevox-core-php).
+  </Step>
+  <Step title="Publish config file">
+    ```shell
+    php artisan vendor:publish --tag="voicevox-config"
+    ```
+  </Step>
+  <Step title="Set .env values">
+    Use `VOICEVOX_URL` for client mode. Add `VOICEVOX_CORE_PATH` when using FFI.
+  </Step>
+  <Step title="Install engine resources when needed">
+    Use this for endpoints such as `/speaker_info` and `/singer_info`.
+  </Step>
+</Steps>
+
+## `config/voicevox.php`
+
+```php
+return [
+    'client' => [
+        'url' => env('VOICEVOX_URL', 'http://127.0.0.1:50021'),
+        'core_version' => env('VOICEVOX_CLIENT_CORE_VERSION'),
+    ],
+
+    'core' => [
+        'path' => env('VOICEVOX_CORE_PATH'),
+        'dict' => env('VOICEVOX_CORE_DICT_PATH', 'dict/open_jtalk_dic_utf_8-1.11'),
+        'models' => env('VOICEVOX_CORE_MODELS_PATH', 'models/vvms'),
+        'vvms' => ['0.vvm', '9.vvm', 's0.vvm'],
+    ],
+
+    'engine' => [
+        'disabled' => env('VOICEVOX_ENGINE_DISABLED', false),
+        'fallback_url' => env('VOICEVOX_ENGINE_FALLBACK_URL', 'http://127.0.0.1:50021'),
+    ],
+];
+```
+
+## Minimum `.env` values
+
+### Client mode only
+
+If you run the official engine at `http://127.0.0.1:50021`, no extra values are required.
+
+```dotenv
+VOICEVOX_URL=http://127.0.0.1:50021
+```
+
+### Native mode / Engine API
+
+```dotenv
+VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+```
+
+<Info>
+  Prepare the `VOICEVOX_CORE_PATH` directory by following [VOICEVOX Core for PHP](/en/packages/voicevox-core-php). That includes binary library files, OpenJTalk dictionary, and model files.
+</Info>
+
+## Enable FFI
+
+For CLI usage, FFI is typically available as-is.
+
+If you test Laravel engine API through a local web process, enable FFI in `php.ini`.
+
+```ini
+ffi.enable=true
+```
+
+For FFI details and constraints, see [PHP FFI](/en/advanced/ffi).
+
+## Install engine resources
+
+If you use resource endpoints such as `/speaker_info` and `/singer_info`, install additional resource files.
+
+```shell
+php artisan voicevox:install
+```
+
+In Orchestra Testbench:
+
+```shell
+vendor/bin/testbench voicevox:install
+```
+
+## Mode entry points
+
+<Columns cols={2}>
+  <Card title="Client Talk" href="/en/packages/laravel-voicevox/client-talk" icon="message-circle">
+    Start text-to-speech with official VOICEVOX engine in Docker.
+  </Card>
+  <Card title="Client Song" href="/en/packages/laravel-voicevox/client-song" icon="music">
+    Build singing synthesis with `Score` and `Note`.
+  </Card>
+  <Card title="Native Talk" href="/en/packages/laravel-voicevox/native-talk" icon="cpu">
+    Call VOICEVOX CORE directly through FFI.
+  </Card>
+  <Card title="Native Song" href="/en/packages/laravel-voicevox/native-song" icon="music">
+    Use singing models and `sync()` in native mode.
+  </Card>
+</Columns>
+
+## Links
+
+- [VOICEVOX for Laravel Overview](/en/packages/laravel-voicevox)
+- [VOICEVOX Core for PHP](/en/packages/voicevox-core-php)
+- [VOICEVOX Core for PHP Usage](/en/packages/voicevox-core-php/usage)
+- [PHP FFI](/en/advanced/ffi)
