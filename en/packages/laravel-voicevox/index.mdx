@@ -6,9 +6,13 @@ sidebarTitle: "Overview"
 
 ## Overview
 
-[revolution/laravel-voicevox](https://github.com/invokable/laravel-voicevox) is a package that brings VOICEVOX to Laravel.
+[revolution/laravel-voicevox](https://github.com/invokable/laravel-voicevox) is a package that brings VOICEVOX, a Japanese TTS / singing synthesis ecosystem, to Laravel.
 
 You can use client mode (HTTP requests to the official engine) and native mode (direct synthesis via PHP FFI with [VOICEVOX Core for PHP](/en/packages/voicevox-core-php)) through a consistent Laravel-style API.
+
+Since VOICEVOX only supports Japanese, you must first translate the text from English to Japanese using an AI/LLM or similar tool before using this package for speech synthesis.
+
+VOICEVOX is widely used in Japan, and many well-known "Zundamon" voice clips are created with it.
 
 <Info>
   If you want FFI fundamentals first, see [PHP FFI](/en/advanced/ffi). For core library setup, see [VOICEVOX Core for PHP](/en/packages/voicevox-core-php) and [Usage](/en/packages/voicevox-core-php/usage).
