@@ -109,6 +109,28 @@
             "en/packages/voicevox-core-php/usage",
             "en/packages/voicevox-core-php/api"
           ]
+        },
+        {
+          "group": "VOICEVOX for Laravel",
+          "expanded": false,
+          "pages": [
+            "en/packages/laravel-voicevox/index",
+            "en/packages/laravel-voicevox/installation",
+            "en/packages/laravel-voicevox/client-talk",
+            "en/packages/laravel-voicevox/client-song",
+            "en/packages/laravel-voicevox/native-talk",
+            "en/packages/laravel-voicevox/native-song",
+            "en/packages/laravel-voicevox/engine-talk",
+            "en/packages/laravel-voicevox/engine-song",
+            "en/packages/laravel-voicevox/ai-sdk"
+          ]
+        },
+        {
+          "group": "VOICEVOX Engine API Reference",
+          "openapi": {
+            "source": "https://raw.githubusercontent.com/invokable/laravel-voicevox/refs/heads/main/docs/en/laravel-openapi.json",
+            "directory": "en/packages/laravel-voicevox/engine-api"
+          }
         }
       ]
     },

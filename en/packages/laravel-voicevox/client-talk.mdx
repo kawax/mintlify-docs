@@ -1,0 +1,127 @@
+---
+title: "Client Mode: Talk (Text-to-Speech) - VOICEVOX for Laravel"
+description: "Use VOICEVOX for Laravel client mode to connect to the official VOICEVOX engine for text-to-speech generation."
+sidebarTitle: "Client: Talk"
+---
+
+## What is client mode
+
+Client mode generates audio by sending HTTP requests to the official VOICEVOX engine.
+
+No FFI is required, so this is the easiest mode to start with.
+
+<Info>
+  If you have not set up the package yet, start with [Installation and Configuration](/en/packages/laravel-voicevox/installation).
+</Info>
+
+## Prerequisites
+
+<Steps>
+  <Step title="Start official engine">
+    ```shell
+    docker pull voicevox/voicevox_engine:cpu-latest
+    docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+    ```
+  </Step>
+  <Step title="Set URL only if needed">
+    ```dotenv
+    VOICEVOX_URL=http://127.0.0.1:50021
+    ```
+  </Step>
+</Steps>
+
+If your environment supports GPU, you can use the GPU image as well.
+
+## Basic usage
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('I love Laravel', id: 1)
+    ->generate(id: 1);
+
+$response->storeAs('client', 'talk.wav');
+```
+
+## Style ID usage
+
+You can pass style IDs to both `talk()` and `generate()`.
+
+- `talk(id:)`: style used for `audio_query`
+- `generate(id:)`: style used for synthesis
+
+Use the same value in most cases.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('I am Zundamon', id: 1)
+    ->generate(id: 1);
+```
+
+Get available speakers with `speakers()`.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$speakers = Voicevox::speakers();
+```
+
+## Tune Audio Query with `tap()`
+
+This package exposes `TalkAudioQuery` before `generate()`, so `tap()` cleanly injects side effects only.
+
+```php
+use Revolution\Voicevox\Client\TalkAudioQuery;
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('Speak faster', id: 1)
+    ->tap(function (TalkAudioQuery $talk) {
+        $talk->audioQuery['speedScale'] = 1.2;
+        $talk->audioQuery['pitchScale'] = 0.05;
+        $talk->audioQuery['intonationScale'] = 1.5;
+        $talk->audioQuery['volumeScale'] = 1.0;
+    })
+    ->generate(id: 1);
+```
+
+<Tip>
+  `tap()` keeps the original object chain intact and passes it to `generate()`. See [tap() helper and Tappable trait](/en/advanced/tap) for the broader pattern.
+</Tip>
+
+## Automatic katakana conversion for English
+
+In client mode, `enable_katakana_english` is enabled, so text with English words can be auto-converted toward katakana.
+
+```php
+$response = Voicevox::talk('I love Laravel', id: 1)
+    ->generate(id: 1);
+```
+
+Disable it by passing `false` as the third argument.
+
+```php
+$response = Voicevox::talk('I love Laravel', id: 1, enableKatakanaEnglish: false)
+    ->generate(id: 1);
+```
+
+## Save response
+
+```php
+$response = Voicevox::talk('Test', id: 1)->generate(id: 1);
+
+$wav = $response->content();
+$path = $response->storeAs('client', 'talk.wav');
+$path = $response->storeAs('client', 'talk.wav', disk: 's3');
+```
+
+## Next pages
+
+<Columns cols={2}>
+  <Card title="Client Song" href="/en/packages/laravel-voicevox/client-song" icon="music">
+    Build singing synthesis with `Score` and `Note`.
+  </Card>
+  <Card title="VOICEVOX Core for PHP" href="/en/packages/voicevox-core-php/usage" icon="library">
+    Check pure PHP core usage before moving deeper into FFI flows.
+  </Card>
+</Columns>

@@ -1,0 +1,109 @@
+---
+title: "Native Mode: Song (Singing Synthesis) - VOICEVOX for Laravel"
+description: "Use VOICEVOX for Laravel native mode to call VOICEVOX CORE via PHP FFI for singing synthesis."
+sidebarTitle: "Native: Song"
+---
+
+## Singing in native mode
+
+Native-mode singing synthesis calls VOICEVOX CORE directly through PHP FFI.
+
+`Score` and `Note` structures are shared with client mode.
+
+## Prerequisites
+
+1. Complete [Installation and Configuration](/en/packages/laravel-voicevox/installation)
+2. Set up [VOICEVOX Core for PHP](/en/packages/voicevox-core-php)
+3. Set `VOICEVOX_CORE_PATH` in `.env`
+
+```dotenv
+VOICEVOX_CORE_PATH=/path/to/voicevox_core/
+```
+
+For singing models, confirm `s0.vvm` is included in `core.vvms` in `config/voicevox.php`.
+
+## Create `Score` and `Note`
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(ticks: 480, bpm: 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+```
+
+## Basic usage
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use function Revolution\Voicevox\song;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+
+$response = song($score, teacher: 6000)
+    ->generate(id: 3001);
+
+$response->storeAs('native', 'song.wav');
+```
+
+The same `Score` can be reused in both client and native modes.
+
+## Re-sync F0 and volume with `tap()`
+
+`tap()` is useful in native song mode as well. Tune `SongAudioQuery`, then continue to `generate()`.
+
+```php
+use Revolution\Voicevox\Song\SongAudioQuery;
+use function Revolution\Voicevox\song;
+
+$response = song($score, teacher: 6000)
+    ->tap(function (SongAudioQuery $song) {
+        $song->sync();
+    })
+    ->generate(id: 3001);
+```
+
+If updating separately, always run in this order:
+
+```php
+->tap(function (SongAudioQuery $song) {
+    $song->updateF0();
+    $song->updateVolume();
+})
+```
+
+## Difference from client mode
+
+| Item | Client Song | Native Song |
+| --- | --- | --- |
+| Engine process | Required | Not required |
+| FFI | Not required | Required |
+| Entry API | `Voicevox::song()` | `song()` |
+| `Score` / `Note` | Shared | Shared |
+
+<Info>
+  For FFI fundamentals, see [PHP FFI](/en/advanced/ffi). For standalone core flow, see [VOICEVOX Core for PHP Usage](/en/packages/voicevox-core-php/usage).
+</Info>
+
+## Next pages
+
+<Columns cols={2}>
+  <Card title="Client Song" href="/en/packages/laravel-voicevox/client-song" icon="music">
+    Compare with HTTP client mode using the same score.
+  </Card>
+  <Card title="VOICEVOX for Laravel Overview" href="/en/packages/laravel-voicevox" icon="book-open">
+    Review all modes and related pages in one place.
+  </Card>
+</Columns>

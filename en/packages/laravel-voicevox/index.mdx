@@ -1,0 +1,105 @@
+---
+title: "VOICEVOX for Laravel"
+description: "Overview of the Laravel package for VOICEVOX client, native, and engine API modes, including where to start for each mode."
+sidebarTitle: "Overview"
+---
+
+## Overview
+
+[revolution/laravel-voicevox](https://github.com/invokable/laravel-voicevox) is a package that brings VOICEVOX to Laravel.
+
+You can use client mode (HTTP requests to the official engine) and native mode (direct synthesis via PHP FFI with [VOICEVOX Core for PHP](/en/packages/voicevox-core-php)) through a consistent Laravel-style API.
+
+<Info>
+  If you want FFI fundamentals first, see [PHP FFI](/en/advanced/ffi). For core library setup, see [VOICEVOX Core for PHP](/en/packages/voicevox-core-php) and [Usage](/en/packages/voicevox-core-php/usage).
+</Info>
+
+## Feature matrix
+
+| Feature | Supported | Description |
+|---|---|---|
+| VOICEVOX Client | ✅ | Accesses the official VOICEVOX Engine API over HTTP. No FFI required. |
+| VOICEVOX Core | ✅ | Uses VOICEVOX CORE dynamic libraries through [VOICEVOX Core for PHP](/en/packages/voicevox-core-php). |
+| Laravel style | ✅ | Uses Facades, helpers, `config/voicevox.php`, and `.env` in a Laravel-friendly way. |
+| Laravel AI SDK Integration | ✅ | Works with Laravel AI SDK Audio workflows. |
+| VOICEVOX Engine | ⚠️ | Provides a VOICEVOX-compatible API inside Laravel, with fallback to the official engine for unsupported parts. |
+| VOICEVOX Editor | ❌ | The Editor itself is out of scope for this package. |
+
+## Requirements
+
+- PHP 8.3+
+- Laravel 13 application
+- `ext-zip`
+- `ext-ffi` for native mode and engine API mode
+- Local CLI environment
+
+<Warning>
+  FFI is often disabled on standard web server environments (including Laravel Cloud). Treat native mode and engine API mode as **local CLI-first** features.
+</Warning>
+
+## Mode matrix
+
+| Mode | Runtime | FFI | Main use case | Guide |
+| --- | --- | --- | --- | --- |
+| Client Talk | HTTP requests to official engine | Not required | Text-to-speech | [client-talk](/en/packages/laravel-voicevox/client-talk) |
+| Client Song | HTTP requests to official engine | Not required | Singing synthesis | [client-song](/en/packages/laravel-voicevox/client-song) |
+| Native Talk | Direct VOICEVOX CORE calls through FFI | Required | Local text-to-speech | [native-talk](/en/packages/laravel-voicevox/native-talk) |
+| Native Song | Direct VOICEVOX CORE calls through FFI | Required | Local singing synthesis | [native-song](/en/packages/laravel-voicevox/native-song) |
+| Engine API | VOICEVOX-compatible API inside Laravel | Required | Embedded VOICEVOX-compatible API | [installation](/en/packages/laravel-voicevox/installation) |
+
+## Why `tap()` works well here
+
+This package returns an Audio Query object right after `talk()` / `song()`, so you can insert a tuning step before `generate()`.
+
+That makes `tap()` a natural fit when you want to mutate query values **without changing the return value**.
+
+```php
+use Revolution\Voicevox\Client\TalkAudioQuery;
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('You can tune with tap()', id: 1)
+    ->tap(function (TalkAudioQuery $talk) {
+        $talk->audioQuery['speedScale'] = 1.2;
+    })
+    ->generate(id: 1);
+```
+
+- In Talk mode, adjust values like `speedScale` and `pitchScale`.
+- In Song mode, run `sync()` to recalculate F0 and volume.
+- Keep clean chaining to `VoicevoxResponse` from `generate()`.
+
+<Info>
+  For the core concept, see [tap() helper and Tappable trait](/en/advanced/tap). This package is one of the most practical examples.
+</Info>
+
+## Documentation
+
+<Columns cols={2}>
+  <Card title="Installation" href="/en/packages/laravel-voicevox/installation" icon="download">
+    Review client-only setup, FFI-enabled setup, config publishing, and engine resource preparation.
+  </Card>
+  <Card title="Client Talk" href="/en/packages/laravel-voicevox/client-talk" icon="message-circle">
+    Start text-to-speech with the official VOICEVOX engine.
+  </Card>
+  <Card title="Client Song" href="/en/packages/laravel-voicevox/client-song" icon="music">
+    Build singing synthesis with `Score` and `Note`.
+  </Card>
+  <Card title="Native Talk" href="/en/packages/laravel-voicevox/native-talk" icon="cpu">
+    Synthesize locally with PHP FFI and VOICEVOX CORE.
+  </Card>
+  <Card title="Native Song" href="/en/packages/laravel-voicevox/native-song" icon="music">
+    Use singing models directly through FFI.
+  </Card>
+  <Card title="VOICEVOX Core for PHP" href="/en/packages/voicevox-core-php" icon="library">
+    Check core library setup and pure PHP usage.
+  </Card>
+</Columns>
+
+## Links
+
+- GitHub: [invokable/laravel-voicevox](https://github.com/invokable/laravel-voicevox)
+- VOICEVOX Core for PHP: [/en/packages/voicevox-core-php](/en/packages/voicevox-core-php)
+- VOICEVOX Core for PHP Usage: [/en/packages/voicevox-core-php/usage](/en/packages/voicevox-core-php/usage)
+- PHP FFI: [/en/advanced/ffi](/en/advanced/ffi)
+- `tap()` helper: [/en/advanced/tap](/en/advanced/tap)
+- Official VOICEVOX Engine: [VOICEVOX/voicevox_engine](https://github.com/VOICEVOX/voicevox_engine)
