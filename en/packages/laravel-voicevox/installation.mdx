@@ -27,13 +27,12 @@ The package setup changes depending on which mode you want to run.
 
 ## Requirements
 
-| Item | Value |
-| --- | --- |
-| PHP | 8.3+ |
-| Laravel | This site uses Laravel 13 |
-| Composer constraint (upstream) | `illuminate/support:^12.0 || ^13.0` |
-| Required extension | `ext-zip` |
-| FFI | Required for native mode and engine API mode |
+| Item               | Value                                        |
+|--------------------|----------------------------------------------|
+| PHP                | 8.3+                                         |
+| Laravel            | 12+                                          |
+| Required extension | `ext-zip`                                    |
+| FFI `ext-ffi`      | Required for native mode and engine API mode |
 
 <Warning>
   FFI is disabled on many web servers including Laravel Cloud. Test native mode and engine API mode on **local CLI** first.
