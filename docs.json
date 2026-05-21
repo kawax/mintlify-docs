@@ -53,6 +53,11 @@
   "metadata": {
     "timestamp": true
   },
+  "api": {
+    "playground": {
+      "display": "simple"
+    }
+  },
   "seo": {
     "metatags": {
       "canonical": "https://kawax.biz"
