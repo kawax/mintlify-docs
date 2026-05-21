@@ -111,7 +111,10 @@
         },
         {
           "group": "VOICEVOX for Laravel",
-          "openapi": "https://raw.githubusercontent.com/invokable/laravel-voicevox/refs/heads/main/docs/laravel-openapi.json",
+          "openapi": {
+            "source": "https://raw.githubusercontent.com/invokable/laravel-voicevox/refs/heads/main/docs/laravel-openapi.json",
+            "directory": "jp/packages/laravel-voicevox/engine-api"
+          },
           "expanded": false,
           "pages": [
             "jp/packages/laravel-voicevox/index",
