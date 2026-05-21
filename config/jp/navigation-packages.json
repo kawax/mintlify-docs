@@ -125,7 +125,7 @@
           ]
         },
         {
-          "group": "Laravel版VOICEVOXエンジンAPIリファレンス",
+          "group": "VOICEVOXエンジンAPIリファレンス",
           "openapi": {
             "source": "https://raw.githubusercontent.com/invokable/laravel-voicevox/refs/heads/main/docs/jp/laravel-openapi.json",
             "directory": "jp/packages/laravel-voicevox/engine-api"
