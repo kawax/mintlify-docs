@@ -1,0 +1,201 @@
+---
+title: "設定リファレンス - VOICEVOX for Laravel"
+description: "config/voicevox.php の全設定項目と環境変数、デフォルト値、設定例を説明します。"
+sidebarTitle: "設定"
+---
+
+このページでは `config/voicevox.php` の全設定項目をまとめます。
+
+## 設定ファイルを公開する
+
+```shell
+php artisan vendor:publish --tag="voicevox-config"
+```
+
+## `client` 設定
+
+### `client.url`
+
+- Type: `string`
+- Default: `'http://127.0.0.1:50021'`
+- Env: `VOICEVOX_URL`
+
+```php
+'client' => [
+    'url' => env('VOICEVOX_URL', 'http://127.0.0.1:50021'),
+],
+```
+
+```dotenv
+VOICEVOX_URL=http://127.0.0.1:50021
+```
+
+### `client.core_version`
+
+- Type: `string|null`
+- Default: `null`
+- Env: `VOICEVOX_CLIENT_CORE_VERSION`
+
+```php
+'client' => [
+    'core_version' => env('VOICEVOX_CLIENT_CORE_VERSION'),
+],
+```
+
+```dotenv
+VOICEVOX_CLIENT_CORE_VERSION=0.15.0
+```
+
+## `core` 設定
+
+### `core.path`
+
+- Type: `string|null`
+- Default: `null`
+- Env: `VOICEVOX_CORE_PATH`
+- Required: ネイティブモード / エンジン API モード
+
+```php
+'core' => [
+    'path' => env('VOICEVOX_CORE_PATH'),
+],
+```
+
+```dotenv
+# macOS
+VOICEVOX_CORE_PATH=/Users/username/.local/voicevox_core/
+
+# Linux
+VOICEVOX_CORE_PATH=/home/username/.local/voicevox_core/
+
+# Windows
+VOICEVOX_CORE_PATH=C:\Users\username\.local\voicevox_core\
+```
+
+### `core.dict`
+
+- Type: `string`
+- Default: `'dict/open_jtalk_dic_utf_8-1.11'`
+- Env: `VOICEVOX_CORE_DICT_PATH`
+
+```php
+'core' => [
+    'dict' => env('VOICEVOX_CORE_DICT_PATH', 'dict/open_jtalk_dic_utf_8-1.11'),
+],
+```
+
+### `core.models`
+
+- Type: `string`
+- Default: `'models/vvms'`
+- Env: `VOICEVOX_CORE_MODELS_PATH`
+
+```php
+'core' => [
+    'models' => env('VOICEVOX_CORE_MODELS_PATH', 'models/vvms'),
+],
+```
+
+### `core.user_dict`
+
+- Type: `string`
+- Default: `storage_path('voicevox/user_dict.json')`
+- Env: `VOICEVOX_CORE_USER_DICT_PATH`
+
+```php
+'core' => [
+    'user_dict' => env('VOICEVOX_CORE_USER_DICT_PATH', storage_path('voicevox/user_dict.json')),
+],
+```
+
+```dotenv
+VOICEVOX_CORE_USER_DICT_PATH=/path/to/custom/user_dict.json
+```
+
+関連ページ: [ユーザー辞書](/jp/packages/laravel-voicevox/user-dict)
+
+### `core.presets`
+
+- Type: `string`
+- Default: `storage_path('voicevox/presets.json')`
+- Env: `VOICEVOX_CORE_PRESETS_PATH`
+
+```php
+'core' => [
+    'presets' => env('VOICEVOX_CORE_PRESETS_PATH', storage_path('voicevox/presets.json')),
+],
+```
+
+```dotenv
+VOICEVOX_CORE_PRESETS_PATH=/path/to/custom/presets.json
+```
+
+関連ページ: [プリセット](/jp/packages/laravel-voicevox/presets)
+
+### `core.vvms`
+
+- Type: `array`
+- Default: `['0.vvm', '9.vvm', 's0.vvm']`
+- Env: なし
+
+```php
+# デフォルト（高速起動）
+'core' => [
+    'vvms' => ['0.vvm', '9.vvm', 's0.vvm'],
+],
+
+# 全モデルを読み込む（起動は遅くなる）
+'core' => [
+    'vvms' => [],
+],
+```
+
+## `engine` 設定
+
+### `engine.disabled`
+
+- Type: `bool`
+- Default: `false`
+- Env: `VOICEVOX_ENGINE_DISABLED`
+
+```php
+'engine' => [
+    'disabled' => env('VOICEVOX_ENGINE_DISABLED', false),
+],
+```
+
+```dotenv
+VOICEVOX_ENGINE_DISABLED=true
+```
+
+### `engine.fallback_url`
+
+- Type: `string`
+- Default: `'http://127.0.0.1:50021'`
+- Env: `VOICEVOX_ENGINE_FALLBACK_URL`
+
+```php
+'engine' => [
+    'fallback_url' => env('VOICEVOX_ENGINE_FALLBACK_URL', 'http://127.0.0.1:50021'),
+],
+```
+
+```dotenv
+VOICEVOX_ENGINE_FALLBACK_URL=http://127.0.0.1:50021
+```
+
+### `engine.fallback_error`
+
+- Type: `string`
+- Default: `'The Laravel version of the engine does not support this endpoint. Please use the official engine instead.'`
+- Env: なし
+
+```php
+'engine' => [
+    'fallback_error' => 'The Laravel version of the engine does not support this endpoint. Please use the official engine instead.',
+],
+```
+
+<Tip>
+  まずは `client.url` と `core.path` だけを設定し、必要になったら `core.user_dict` や `core.presets` を調整する構成が運用しやすいです。
+</Tip>

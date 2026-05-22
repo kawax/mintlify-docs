@@ -1,0 +1,132 @@
+---
+title: "はじめに - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel の基本概念、3つのモード比較、クイックスタート、主要機能をまとめます。"
+sidebarTitle: "はじめに"
+---
+
+VOICEVOX for Laravel は、Laravel で VOICEVOX の音声合成機能を使うためのパッケージです。テキストから日本語音声を生成できます。
+
+<Tip>
+  まずはクライアントモードから始めるとセットアップが最短です。FFI が使える環境なら後からネイティブモードやエンジン API モードへ段階的に移行できます。
+</Tip>
+
+## 3つの利用モード
+
+| モード | 実行方式 | FFI | 向いている用途 | ガイド |
+| --- | --- | --- | --- | --- |
+| クライアントモード | 公式 VOICEVOX エンジンへ HTTP 接続 | 不要 | まず試す、Docker 環境、FFI が使えない環境 | [Client Talk](/jp/packages/laravel-voicevox/client-talk) / [Client Song](/jp/packages/laravel-voicevox/client-song) |
+| ネイティブモード | VOICEVOX CORE を PHP FFI で直接呼び出し | 必要 | 高速化、オフライン実行、CLI ツール統合 | [Native Talk](/jp/packages/laravel-voicevox/native-talk) / [Native Song](/jp/packages/laravel-voicevox/native-song) |
+| エンジン API モード | Laravel が VOICEVOX 互換 API を提供 | 必要 | API サーバー公開、複数クライアント連携 | [Engine Talk](/jp/packages/laravel-voicevox/engine-talk) / [Engine Song](/jp/packages/laravel-voicevox/engine-song) |
+
+## クイックスタート
+
+<Steps>
+  <Step title="パッケージをインストールする">
+    ```shell
+    # クライアントモードのみ（FFI 不要）
+    composer require revolution/laravel-voicevox
+
+    # クライアント + ネイティブ / エンジン API（FFI 必要）
+    composer require revolution/laravel-voicevox revolution/voicevox-core
+    ```
+
+    詳細は [インストールと設定](/jp/packages/laravel-voicevox/installation) を確認してください。
+  </Step>
+  <Step title="公式エンジンを起動する（クライアントモード）">
+    ```shell
+    docker pull voicevox/voicevox_engine:cpu-latest
+    docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+    ```
+  </Step>
+  <Step title="音声合成を試す">
+    ```php
+    use Revolution\Voicevox\Voicevox;
+
+    $response = Voicevox::talk('こんにちは、Laravel です。', id: 1)->generate(id: 1);
+    $response->storeAs('output.wav');
+    ```
+  </Step>
+</Steps>
+
+## 主要な機能
+
+### 音声合成（Talk）
+
+```php
+use Revolution\Voicevox\Client\TalkAudioQuery;
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('こんにちは', id: 1)
+    ->tap(function (TalkAudioQuery $talk) {
+        $talk->audioQuery['speedScale'] = 1.2;
+        $talk->audioQuery['pitchScale'] = 0.05;
+        $talk->audioQuery['intonationScale'] = 1.5;
+        $talk->audioQuery['volumeScale'] = 1.0;
+    })
+    ->generate(id: 1);
+```
+
+### 歌声合成（Song）
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use Revolution\Voicevox\Voicevox;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(ticks: 480, bpm: 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+
+$response = Voicevox::song($score)->generate(id: 3001);
+```
+
+### ユーザー辞書とプリセット
+
+```php
+use function Revolution\Voicevox\dict;
+use function Revolution\Voicevox\preset;
+
+$uuid = dict()->add(
+    surface: 'Laravel',
+    pronunciation: 'ララベル',
+    accent_type: 3,
+);
+
+$presetId = preset()->add([
+    'id' => 0,
+    'name' => 'ゆっくり丁寧',
+    'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
+    'style_id' => 1,
+    'speedScale' => 0.8,
+    'pitchScale' => 0.0,
+    'intonationScale' => 1.2,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.1,
+    'postPhonemeLength' => 0.1,
+]);
+```
+
+### Laravel AI SDK 連携
+
+```php
+use Laravel\Ai\Audio;
+
+$audio = Audio::of('こんにちは、Laravel です。')
+    ->voice('ずんだもん')
+    ->generate();
+
+$audio->storeAs('output.wav');
+```
+
+## 次のステップ
+
+- [インストールと設定](/jp/packages/laravel-voicevox/installation)
+- [設定リファレンス](/jp/packages/laravel-voicevox/configuration)
+- [Client Talk](/jp/packages/laravel-voicevox/client-talk)
+- [Native Talk](/jp/packages/laravel-voicevox/native-talk)
+- [Engine Talk](/jp/packages/laravel-voicevox/engine-talk)
+- [AI SDK 連携](/jp/packages/laravel-voicevox/ai-sdk)

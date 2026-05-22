@@ -1,0 +1,132 @@
+---
+title: "Getting started - VOICEVOX for Laravel"
+description: "Learn the package basics, compare the three modes, and run a quick start for VOICEVOX for Laravel."
+sidebarTitle: "Getting started"
+---
+
+VOICEVOX for Laravel brings VOICEVOX speech synthesis features into Laravel. You can generate natural Japanese voice output from text.
+
+<Tip>
+  Start with client mode for the fastest setup. If your environment supports FFI, you can move to native mode or engine API mode later.
+</Tip>
+
+## Three usage modes
+
+| Mode | Runtime | FFI | Best for | Guide |
+| --- | --- | --- | --- | --- |
+| Client mode | HTTP connection to official VOICEVOX engine | Not required | First trial, Docker environments, environments without FFI | [Client Talk](/en/packages/laravel-voicevox/client-talk) / [Client Song](/en/packages/laravel-voicevox/client-song) |
+| Native mode | Direct VOICEVOX CORE calls through PHP FFI | Required | Better performance, offline use, CLI integration | [Native Talk](/en/packages/laravel-voicevox/native-talk) / [Native Song](/en/packages/laravel-voicevox/native-song) |
+| Engine API mode | Laravel serves VOICEVOX-compatible API endpoints | Required | Publishing as an API server, multi-client integration | [Engine Talk](/en/packages/laravel-voicevox/engine-talk) / [Engine Song](/en/packages/laravel-voicevox/engine-song) |
+
+## Quick start
+
+<Steps>
+  <Step title="Install package(s)">
+    ```shell
+    # Client mode only (no FFI)
+    composer require revolution/laravel-voicevox
+
+    # Client + native / engine API (FFI required)
+    composer require revolution/laravel-voicevox revolution/voicevox-core
+    ```
+
+    See [Installation and Configuration](/en/packages/laravel-voicevox/installation) for full setup.
+  </Step>
+  <Step title="Start the official engine (client mode)">
+    ```shell
+    docker pull voicevox/voicevox_engine:cpu-latest
+    docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+    ```
+  </Step>
+  <Step title="Try speech synthesis">
+    ```php
+    use Revolution\Voicevox\Voicevox;
+
+    $response = Voicevox::talk('こんにちは、Laravel です。', id: 1)->generate(id: 1);
+    $response->storeAs('output.wav');
+    ```
+  </Step>
+</Steps>
+
+## Core features
+
+### Speech synthesis (Talk)
+
+```php
+use Revolution\Voicevox\Client\TalkAudioQuery;
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk('こんにちは', id: 1)
+    ->tap(function (TalkAudioQuery $talk) {
+        $talk->audioQuery['speedScale'] = 1.2;
+        $talk->audioQuery['pitchScale'] = 0.05;
+        $talk->audioQuery['intonationScale'] = 1.5;
+        $talk->audioQuery['volumeScale'] = 1.0;
+    })
+    ->generate(id: 1);
+```
+
+### Singing synthesis (Song)
+
+```php
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use Revolution\Voicevox\Voicevox;
+
+$score = Score::make([
+    Note::make(length: 15),
+    Note::make(length: Note::len(ticks: 480, bpm: 120), lyric: 'ド', key: 60),
+    Note::make(length: Note::len(480, 120), lyric: 'レ', key: 62),
+    Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64),
+    Note::make(length: 2),
+]);
+
+$response = Voicevox::song($score)->generate(id: 3001);
+```
+
+### User dictionary and presets
+
+```php
+use function Revolution\Voicevox\dict;
+use function Revolution\Voicevox\preset;
+
+$uuid = dict()->add(
+    surface: 'Laravel',
+    pronunciation: 'ララベル',
+    accent_type: 3,
+);
+
+$presetId = preset()->add([
+    'id' => 0,
+    'name' => 'Slow and clear',
+    'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
+    'style_id' => 1,
+    'speedScale' => 0.8,
+    'pitchScale' => 0.0,
+    'intonationScale' => 1.2,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.1,
+    'postPhonemeLength' => 0.1,
+]);
+```
+
+### Laravel AI SDK integration
+
+```php
+use Laravel\Ai\Audio;
+
+$audio = Audio::of('こんにちは、Laravel です。')
+    ->voice('ずんだもん')
+    ->generate();
+
+$audio->storeAs('output.wav');
+```
+
+## Next steps
+
+- [Installation and Configuration](/en/packages/laravel-voicevox/installation)
+- [Configuration reference](/en/packages/laravel-voicevox/configuration)
+- [Client Talk](/en/packages/laravel-voicevox/client-talk)
+- [Native Talk](/en/packages/laravel-voicevox/native-talk)
+- [Engine Talk](/en/packages/laravel-voicevox/engine-talk)
+- [AI SDK integration](/en/packages/laravel-voicevox/ai-sdk)
