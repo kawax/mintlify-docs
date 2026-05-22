@@ -61,4 +61,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - docs/jp内は更新中なのでしばらくは新しいファイルが増えていたらこちらにも追加の対応。
   - 英語のREADME.mdを更新したのでこちらにも英語ページを作成。英語版なのでVOICEVOXが日本語のテキスト音声合成なことや日本で一番有名なずんだもんボイスはVOICEVOXで多く作られていることを追加している。
   - 英語ページはこちらで作るので不要だったのに`docs/en/`に1ファイルだけ作られている。ai-sdk.mdのエイリアス一覧はこちらにも追加。日英両方。
+  - laravel-voicevoxのAgentic Workflowsは幻覚の多いドキュメントを作ってしまうのでデイリー実行は停止。以降はこちらメインでドキュメントを作成する。DeepWikiの分析や、コードを直接調査して必要なドキュメントを作る。 https://deepwiki.com/invokable/laravel-voicevox
+  - ソング：ScoreとNoteの詳細解説。フレーム長は全く分からないのでMIDIに慣れた人は`Note::len()`ヘルパーを使うのが推奨。現実的なユースケースではPHPでコードを書いて組み立てるより別途jsonファイルに保存するだろう。jsonファイルは独自フォーマットでいいのでjsonを読み込む→ScoreとNoteで組み立てる→音声化。
+  - VoicevoxResponseのページ
   - Mintlifyは`openapi.json`から自動でページが作られるのでこれは対応不要。
