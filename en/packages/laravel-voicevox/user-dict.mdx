@@ -1,0 +1,202 @@
+---
+title: "User Dictionary - VOICEVOX for Laravel"
+description: "Register, update, and import custom readings with the VOICEVOX for Laravel user dictionary."
+sidebarTitle: "User Dictionary"
+---
+
+## What the user dictionary is
+
+The user dictionary lets you teach VOICEVOX how to read proper nouns and technical terms. Registered words are applied automatically during synthesis.
+
+## Overview
+
+The Laravel VOICEVOX user dictionary feature is a native implementation based on VOICEVOX Core UserDict. Dictionary data is persisted as JSON at `storage/voicevox/user_dict.json`.
+
+<Info>
+  Storage is independent from the official VOICEVOX engine. Words registered from Laravel are not synced to the official engine (and vice versa).
+</Info>
+
+## Configuration
+
+By default, entries are saved to `storage/voicevox/user_dict.json`. To use another path, update `config/voicevox.php`.
+
+```php
+// config/voicevox.php
+
+return [
+    'core' => [
+        'user_dict' => storage_path('voicevox/user_dict.json'),
+    ],
+];
+```
+
+## Basic usage
+
+### Add a word
+
+```php
+use function Revolution\Voicevox\dict;
+
+$uuid = dict()->add(
+    surface: 'Laravel',
+    pronunciation: 'ララベル',
+    accentType: 0,
+);
+
+// Returns UUID without hyphens
+// e.g. "550e8400e29b41d4a716446655440000"
+```
+
+### Parameters
+
+- `surface` (required): written form
+- `pronunciation` (required): reading in Katakana only
+- `accentType` (required): accent type (`0` = flat, `1+` = accent position)
+- `wordType` (optional): part of speech (`COMMON_NOUN`, `PROPER_NOUN`, `VERB`, `ADJECTIVE`, `SUFFIX`)
+- `priority` (optional): priority (default `5`)
+
+### Update a word
+
+```php
+use function Revolution\Voicevox\dict;
+
+dict()->update(
+    wordUuid: '550e8400-e29b-41d4-a716-446655440000',
+    surface: 'Laravel',
+    pronunciation: 'ラレベル',
+    accentType: 1,
+);
+```
+
+### Delete a word
+
+```php
+use function Revolution\Voicevox\dict;
+
+dict()->delete('550e8400-e29b-41d4-a716-446655440000');
+```
+
+### Get all words
+
+```php
+use function Revolution\Voicevox\dict;
+
+$words = dict()->all();
+// or
+$words = dict()->toArray();
+```
+
+### Import dictionary data
+
+```php
+use function Revolution\Voicevox\dict;
+
+$json = file_get_contents('other_user_dict.json');
+dict()->import($json, override: false);
+
+dict()->import($json, override: true);
+```
+
+### Export dictionary data
+
+```php
+use function Revolution\Voicevox\dict;
+
+$json = dict()->toJson();
+file_put_contents('exported_dict.json', $json);
+```
+
+## Access via Engine API
+
+If Laravel VOICEVOX Engine API is running, you can operate the user dictionary over HTTP. It still uses the native dictionary (no fallback to official engine dictionary).
+
+### Get all words
+
+```bash
+curl http://localhost:8000/user_dict
+```
+
+### Add a word
+
+```bash
+curl -X POST "http://localhost:8000/user_dict_word?surface=Laravel&pronunciation=ララベル&accent_type=0"
+```
+
+### Update a word
+
+```bash
+curl -X PUT "http://localhost:8000/user_dict_word/{uuid}?surface=Laravel&pronunciation=ラレベル&accent_type=1"
+```
+
+### Delete a word
+
+```bash
+curl -X DELETE "http://localhost:8000/user_dict_word/{uuid}"
+```
+
+### Import dictionary data
+
+```bash
+curl -X POST "http://localhost:8000/import_user_dict?override=false" \
+  -H "Content-Type: application/json" \
+  -d @other_dict.json
+```
+
+<Tip>
+  Set `override=true` to remove all existing entries before importing.
+</Tip>
+
+## Synthesize after dictionary registration
+
+Words in the user dictionary are referenced automatically during synthesis.
+
+```php
+use function Revolution\Voicevox\{dict, talk};
+
+dict()->add(
+    surface: 'Laravel',
+    pronunciation: 'ララベル',
+    accentType: 0,
+);
+
+$response = talk('Laravelで開発するのは楽しいです', id: 1)->generate(id: 1);
+$response->storeAs('native', 'laravel.wav');
+```
+
+## Notes
+
+<Warning>
+  Set `pronunciation` in Katakana only. Hiragana and Kanji are not supported.
+</Warning>
+
+- Laravel and official VOICEVOX engine dictionaries are managed separately.
+- Add, update, and delete operations are saved to JSON immediately.
+- If you are unsure about accent, try `0` (flat) first.
+
+## Troubleshooting
+
+### Word updates are not reflected
+
+1. Check write permissions for the storage directory.
+2. Confirm `storage/voicevox/user_dict.json` exists and is valid.
+3. Verify Katakana spelling.
+
+### Check dictionary file path
+
+```php
+$path = config('voicevox.core.user_dict');
+echo $path;
+```
+
+### Reset the dictionary
+
+```bash
+rm storage/voicevox/user_dict.json
+```
+
+```php
+$path = config('voicevox.core.user_dict');
+if (file_exists($path)) {
+    unlink($path);
+}
+```

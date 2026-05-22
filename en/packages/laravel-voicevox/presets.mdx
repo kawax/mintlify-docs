@@ -1,0 +1,243 @@
+---
+title: "Presets - VOICEVOX for Laravel"
+description: "Store and reuse VOICEVOX synthesis parameter sets in VOICEVOX for Laravel presets."
+sidebarTitle: "Presets"
+---
+
+## What presets are
+
+Presets let you save and reuse common synthesis parameter combinations.
+
+<Info>
+  Group speed, pitch, and intonation into reusable sets to keep output quality consistent across multiple clips.
+</Info>
+
+## Overview
+
+The Laravel VOICEVOX preset feature is a native implementation backed by VOICEVOX Core. Preset data is persisted as JSON at `storage/voicevox/presets.json`.
+
+It uses storage independent from the official VOICEVOX engine, so presets created on the Laravel side are not reflected in the official engine (and vice versa).
+
+## Configuration
+
+By default, presets are saved to `storage/voicevox/presets.json`. To use another path, update `config/voicevox.php`.
+
+```php
+// config/voicevox.php
+
+return [
+    'core' => [
+        'presets' => storage_path('voicevox/presets.json'),
+    ],
+];
+```
+
+## Preset structure
+
+```php
+[
+    'id' => 1,
+    'name' => 'Slow and clear',
+    'speaker_uuid' => 'uuid',
+    'style_id' => 1,
+    'speedScale' => 0.8,
+    'pitchScale' => 0.0,
+    'intonationScale' => 1.0,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.1,
+    'postPhonemeLength' => 0.1,
+]
+```
+
+## Basic usage
+
+### Create a preset
+
+```php
+use function Revolution\Voicevox\preset;
+
+$id = preset()->add([
+    'id' => 0,
+    'name' => 'ゆっくり丁寧',
+    'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
+    'style_id' => 1,
+    'speedScale' => 0.8,
+    'pitchScale' => 0.0,
+    'intonationScale' => 1.2,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.1,
+    'postPhonemeLength' => 0.1,
+]);
+
+echo $id;
+```
+
+### Get all presets
+
+```php
+use function Revolution\Voicevox\preset;
+
+$presets = preset()->all();
+```
+
+### Find a preset by ID
+
+```php
+use function Revolution\Voicevox\preset;
+
+$preset = preset()->find(1);
+
+if ($preset !== null) {
+    echo $preset['name'];
+}
+```
+
+### Update a preset
+
+```php
+use function Revolution\Voicevox\preset;
+
+preset()->update([
+    'id' => 1,
+    'name' => 'ゆっくりはっきり',
+    'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
+    'style_id' => 1,
+    'speedScale' => 0.7,
+    'pitchScale' => 0.0,
+    'intonationScale' => 1.5,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.1,
+    'postPhonemeLength' => 0.1,
+]);
+```
+
+### Delete a preset
+
+```php
+use function Revolution\Voicevox\preset;
+
+preset()->delete(1);
+```
+
+## Synthesize with a preset
+
+Use the `talk()` helper or the Engine API `/audio_query_from_preset` endpoint.
+
+### `talk()` helper
+
+Pass a preset ID to `talk(preset:)`. The normal style ID is ignored in this mode.
+
+```php
+use function Revolution\Voicevox\talk;
+
+$response = talk('プリセットを使うのだ', preset: 1)->generate(id: 1);
+```
+
+<Tip>
+  Presets only replace default `AudioQuery` values. The rest of the synthesis flow is the same.
+</Tip>
+
+### Access via Engine API
+
+#### Get all presets
+
+```bash
+curl http://localhost:8000/presets
+```
+
+#### Add a preset
+
+```bash
+curl -X POST http://localhost:8000/add_preset \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 0,
+    "name": "ゆっくり丁寧",
+    "speaker_uuid": "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff",
+    "style_id": 1,
+    "speedScale": 0.8,
+    "pitchScale": 0.0,
+    "intonationScale": 1.2,
+    "volumeScale": 1.0,
+    "prePhonemeLength": 0.1,
+    "postPhonemeLength": 0.1
+  }'
+```
+
+#### Update a preset
+
+```bash
+curl -X POST http://localhost:8000/update_preset \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 1,
+    "name": "ゆっくりはっきり",
+    "speaker_uuid": "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff",
+    "style_id": 1,
+    "speedScale": 0.7,
+    "pitchScale": 0.0,
+    "intonationScale": 1.5,
+    "volumeScale": 1.0,
+    "prePhonemeLength": 0.1,
+    "postPhonemeLength": 0.1
+  }'
+```
+
+#### Delete a preset
+
+```bash
+curl -X POST http://localhost:8000/delete_preset \
+  -H "Content-Type: application/json" \
+  -d '{"id": 1}'
+```
+
+#### Generate audio query from a preset
+
+```bash
+curl -X POST "http://localhost:8000/audio_query_from_preset?text=こんにちは&preset_id=1"
+```
+
+## Parameter reference
+
+- `speedScale`: 0.5 to 2.0
+- `pitchScale`: -0.15 to 0.15
+- `intonationScale`: 0.0 to 2.0
+- `volumeScale`: 0.0 to 2.0
+- `prePhonemeLength`: 0.0 to 1.5 seconds
+- `postPhonemeLength`: 0.0 to 1.5 seconds
+
+## Notes
+
+<Warning>
+  Laravel presets and official VOICEVOX engine presets are separate. Add, update, and delete operations are saved to JSON immediately.
+</Warning>
+
+- Set preset `id` to `0` to auto-assign an unused ID.
+- Include both `speaker_uuid` and `style_id` in each preset.
+
+## Troubleshooting
+
+### Presets are not saved
+
+1. Check write permissions for the storage directory.
+2. Confirm `storage/voicevox/presets.json` is created correctly.
+
+### Check preset file path
+
+```php
+$path = config('voicevox.core.presets');
+echo $path;
+```
+
+### Reset presets
+
+```bash
+rm storage/voicevox/presets.json
+```
+
+```php
+$path = config('voicevox.core.presets');
+if (file_exists($path)) {
+    unlink($path);
+}
+```

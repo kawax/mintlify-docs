@@ -122,6 +122,8 @@
             "en/packages/laravel-voicevox/native-song",
             "en/packages/laravel-voicevox/engine-talk",
             "en/packages/laravel-voicevox/engine-song",
+            "en/packages/laravel-voicevox/presets",
+            "en/packages/laravel-voicevox/user-dict",
             "en/packages/laravel-voicevox/ai-sdk"
           ]
         },

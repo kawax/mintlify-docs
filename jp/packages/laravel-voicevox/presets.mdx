@@ -1,0 +1,250 @@
+---
+title: "プリセット - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel のプリセット機能で、音声合成パラメータを保存・再利用する方法を説明します。"
+sidebarTitle: "プリセット"
+---
+
+## プリセットとは
+
+プリセット機能を使うと、よく使う音声合成パラメータの組み合わせを保存して再利用できます。
+
+<Info>
+  話速・音高・抑揚などをまとめて管理すると、複数の音声を生成するときも一貫した品質を維持しやすくなります。
+</Info>
+
+## 概要
+
+Laravel VOICEVOX のプリセット機能は、VOICEVOX Core を利用したネイティブ実装です。プリセットデータは JSON 形式で `storage/voicevox/presets.json` に永続化されます。
+
+公式 VOICEVOX エンジンとは独立したストレージを使用するため、Laravel 側で作成したプリセットは公式エンジン側には反映されません（その逆も同様です）。
+
+## 設定
+
+デフォルトでは `storage/voicevox/presets.json` に保存されます。別のパスを使いたい場合は `config/voicevox.php` で変更できます。
+
+```php
+// config/voicevox.php
+
+return [
+    'core' => [
+        'presets' => storage_path('voicevox/presets.json'),
+    ],
+];
+```
+
+## プリセットの構造
+
+プリセットは次のような構造です。
+
+```php
+[
+    'id' => 1,                 // プリセット ID（整数、自動採番）
+    'name' => 'ゆっくり',       // プリセット名
+    'speaker_uuid' => 'uuid',  // スピーカー UUID（文字列）
+    'style_id' => 1,           // スタイル ID（整数）
+    'speedScale' => 0.8,       // 話速（0.5 〜 2.0）
+    'pitchScale' => 0.0,       // 音高（-0.15 〜 0.15）
+    'intonationScale' => 1.0,  // 抑揚（0.0 〜 2.0）
+    'volumeScale' => 1.0,      // 音量（0.0 〜 2.0）
+    'prePhonemeLength' => 0.1, // 開始無音（0.0 〜 1.5）
+    'postPhonemeLength' => 0.1,// 終了無音（0.0 〜 1.5）
+]
+```
+
+## 基本的な使い方
+
+### プリセットの作成
+
+`preset()` ヘルパーの `add()` でプリセットを作成できます。
+
+```php
+use function Revolution\Voicevox\preset;
+
+$id = preset()->add([
+    'id' => 0, // 0 を指定すると自動採番される
+    'name' => 'ゆっくり丁寧',
+    'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
+    'style_id' => 1,
+    'speedScale' => 0.8,
+    'pitchScale' => 0.0,
+    'intonationScale' => 1.2,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.1,
+    'postPhonemeLength' => 0.1,
+]);
+
+// 自動採番された ID が返される
+echo $id; // 例: 1
+```
+
+### 全プリセットの取得
+
+```php
+use function Revolution\Voicevox\preset;
+
+$presets = preset()->all();
+```
+
+### プリセットの検索
+
+```php
+use function Revolution\Voicevox\preset;
+
+$preset = preset()->find(1);
+
+if ($preset !== null) {
+    echo $preset['name']; // "ゆっくり丁寧"
+}
+```
+
+### プリセットの更新
+
+```php
+use function Revolution\Voicevox\preset;
+
+preset()->update([
+    'id' => 1,
+    'name' => 'ゆっくりはっきり',
+    'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
+    'style_id' => 1,
+    'speedScale' => 0.7,
+    'pitchScale' => 0.0,
+    'intonationScale' => 1.5,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.1,
+    'postPhonemeLength' => 0.1,
+]);
+```
+
+### プリセットの削除
+
+```php
+use function Revolution\Voicevox\preset;
+
+preset()->delete(1);
+```
+
+## プリセットを使った音声合成
+
+`talk()` ヘルパーまたは Engine API の `/audio_query_from_preset` エンドポイントを利用します。
+
+### `talk()` ヘルパー
+
+`talk(preset:)` にプリセット ID を指定します。このとき通常のスタイル ID は無視されます。
+
+```php
+use function Revolution\Voicevox\talk;
+
+$response = talk('プリセットを使うのだ', preset: 1)->generate(id: 1);
+```
+
+<Tip>
+  プリセット適用時も通常の音声合成フローは同じです。デフォルト `AudioQuery` の値だけがプリセットで置き換わります。
+</Tip>
+
+### Engine API 経由でのアクセス
+
+Laravel VOICEVOX のエンジン API を起動している場合、HTTP 経由でプリセットを操作できます。
+
+#### 全プリセットの取得
+
+```bash
+curl http://localhost:8000/presets
+```
+
+#### プリセットの追加
+
+```bash
+curl -X POST http://localhost:8000/add_preset \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 0,
+    "name": "ゆっくり丁寧",
+    "speaker_uuid": "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff",
+    "style_id": 1,
+    "speedScale": 0.8,
+    "pitchScale": 0.0,
+    "intonationScale": 1.2,
+    "volumeScale": 1.0,
+    "prePhonemeLength": 0.1,
+    "postPhonemeLength": 0.1
+  }'
+```
+
+#### プリセットの更新
+
+```bash
+curl -X POST http://localhost:8000/update_preset \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 1,
+    "name": "ゆっくりはっきり",
+    "speaker_uuid": "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff",
+    "style_id": 1,
+    "speedScale": 0.7,
+    "pitchScale": 0.0,
+    "intonationScale": 1.5,
+    "volumeScale": 1.0,
+    "prePhonemeLength": 0.1,
+    "postPhonemeLength": 0.1
+  }'
+```
+
+#### プリセットの削除
+
+```bash
+curl -X POST http://localhost:8000/delete_preset \
+  -H "Content-Type: application/json" \
+  -d '{"id": 1}'
+```
+
+#### プリセットを使った音声クエリの生成
+
+```bash
+curl -X POST "http://localhost:8000/audio_query_from_preset?text=こんにちは&preset_id=1"
+```
+
+## パラメータ詳細
+
+- `speedScale`: 0.5 〜 2.0（話速）
+- `pitchScale`: -0.15 〜 0.15（音高）
+- `intonationScale`: 0.0 〜 2.0（抑揚）
+- `volumeScale`: 0.0 〜 2.0（音量）
+- `prePhonemeLength`: 0.0 〜 1.5（開始無音・秒）
+- `postPhonemeLength`: 0.0 〜 1.5（終了無音・秒）
+
+## 注意事項
+
+<Warning>
+  Laravel 版のプリセットと公式 VOICEVOX エンジンのプリセットは別管理です。追加・更新・削除は即座に JSON ファイルへ保存されます。
+</Warning>
+
+- プリセット ID に `0` を指定すると未使用 ID が自動採番されます。
+- プリセットには `speaker_uuid`（UUID 文字列）と `style_id`（整数）の両方を含めてください。
+
+## トラブルシューティング
+
+### プリセットが保存されない
+
+1. ストレージディレクトリの書き込み権限を確認してください
+2. `storage/voicevox/presets.json` が正しく作成されているか確認してください
+
+### プリセットファイルの場所がわからない
+
+```php
+$path = config('voicevox.core.presets');
+echo $path;
+```
+
+### プリセットをリセットしたい
+
+```bash
+rm storage/voicevox/presets.json
+```
+
+```php
+$path = config('voicevox.core.presets');
+if (file_exists($path)) {
+    unlink($path);
+}
+```
