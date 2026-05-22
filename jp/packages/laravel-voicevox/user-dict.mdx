@@ -1,0 +1,212 @@
+---
+title: "ユーザー辞書 - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel のユーザー辞書機能で、読み方の登録・更新・インポートを行う方法を説明します。"
+sidebarTitle: "ユーザー辞書"
+---
+
+## ユーザー辞書とは
+
+ユーザー辞書を使うと、固有名詞や専門用語の読み方を VOICEVOX に覚えさせられます。登録した単語は音声合成時に適切な発音で読み上げられます。
+
+## 概要
+
+Laravel VOICEVOX のユーザー辞書機能は、VOICEVOX Core の UserDict を利用したネイティブ実装です。辞書データは JSON 形式で `storage/voicevox/user_dict.json` に永続化されます。
+
+<Info>
+  公式 VOICEVOX エンジンとは独立したストレージを使うため、Laravel 側で登録した単語は公式エンジン側には反映されません（逆方向も同様です）。
+</Info>
+
+## 設定
+
+デフォルトでは `storage/voicevox/user_dict.json` に保存されます。別のパスを使いたい場合は `config/voicevox.php` で変更できます。
+
+```php
+// config/voicevox.php
+
+return [
+    'core' => [
+        'user_dict' => storage_path('voicevox/user_dict.json'),
+    ],
+];
+```
+
+## 基本的な使い方
+
+### 単語の追加
+
+`dict()` ヘルパーの `add()` で単語を登録します。
+
+```php
+use function Revolution\Voicevox\dict;
+
+$uuid = dict()->add(
+    surface: 'Laravel',
+    pronunciation: 'ララベル',
+    accentType: 0,
+);
+
+// "-" なしの UUID が返る
+// 例: "550e8400e29b41d4a716446655440000"
+```
+
+#### パラメータ
+
+- `surface`（必須）: 表記
+- `pronunciation`（必須）: 読み方（カタカナのみ）
+- `accentType` （必須）: アクセント型（`0` = 平板、`1` 以上 = アクセント位置）
+- `wordType` （任意）: 品詞（`COMMON_NOUN`、`PROPER_NOUN`、`VERB`、`ADJECTIVE`、`SUFFIX`）
+- `priority` （任意）: 優先度（デフォルト `5`）
+
+#### アクセント型
+
+- `0`: 平板アクセント
+- `1`: 一拍目
+- `2`: 二拍目
+- `3`: 三拍目
+
+### 単語の更新
+
+```php
+use function Revolution\Voicevox\dict;
+
+dict()->update(
+    wordUuid: '550e8400-e29b-41d4-a716-446655440000',
+    surface: 'Laravel',
+    pronunciation: 'ラレベル',
+    accentType: 1,
+);
+```
+
+### 単語の削除
+
+```php
+use function Revolution\Voicevox\dict;
+
+dict()->delete('550e8400-e29b-41d4-a716-446655440000');
+```
+
+### 全単語の取得
+
+```php
+use function Revolution\Voicevox\dict;
+
+$words = dict()->all();
+// または
+$words = dict()->toArray();
+```
+
+### 辞書のインポート
+
+```php
+use function Revolution\Voicevox\dict;
+
+$json = file_get_contents('other_user_dict.json');
+dict()->import($json, override: false);
+
+// override: true なら上書き
+dict()->import($json, override: true);
+```
+
+### 辞書のエクスポート
+
+```php
+use function Revolution\Voicevox\dict;
+
+$json = dict()->toJson();
+file_put_contents('exported_dict.json', $json);
+```
+
+## Engine API 経由でのアクセス
+
+Laravel VOICEVOX のエンジン API を起動している場合、HTTP 経由でもユーザー辞書を操作できます。公式エンジンへフォールバックせず、ネイティブ辞書を利用します。
+
+### 全単語の取得
+
+```bash
+curl http://localhost:8000/user_dict
+```
+
+### 単語の追加
+
+```bash
+curl -X POST "http://localhost:8000/user_dict_word?surface=Laravel&pronunciation=ララベル&accent_type=0"
+```
+
+### 単語の更新
+
+```bash
+curl -X PUT "http://localhost:8000/user_dict_word/{uuid}?surface=Laravel&pronunciation=ラレベル&accent_type=1"
+```
+
+### 単語の削除
+
+```bash
+curl -X DELETE "http://localhost:8000/user_dict_word/{uuid}"
+```
+
+### 辞書のインポート
+
+```bash
+curl -X POST "http://localhost:8000/import_user_dict?override=false" \
+  -H "Content-Type: application/json" \
+  -d @other_dict.json
+```
+
+<Tip>
+  `override=true` を指定すると、既存の辞書をすべて削除してからインポートします。
+</Tip>
+
+## 辞書登録後の音声合成
+
+ユーザー辞書に登録した単語は、音声合成時に自動参照されます。
+
+```php
+use function Revolution\Voicevox\{dict, talk};
+
+dict()->add(
+    surface: 'Laravel',
+    pronunciation: 'ララベル',
+    accentType: 0,
+);
+
+$response = talk('Laravelで開発するのは楽しいです', id: 1)->generate(id: 1);
+$response->storeAs('native', 'laravel.wav');
+```
+
+## 注意事項
+
+<Warning>
+  `pronunciation` にはカタカナのみを指定してください。ひらがなや漢字は使用できません。
+</Warning>
+
+- Laravel 版のユーザー辞書と公式 VOICEVOX エンジンのユーザー辞書は別管理です。
+- 単語の追加・更新・削除は即座に JSON ファイルへ保存されます。
+- アクセント型が不明な場合はまず `0`（平板）を試してください。
+
+## トラブルシューティング
+
+### 単語が反映されない
+
+1. ストレージディレクトリの書き込み権限を確認してください
+2. `storage/voicevox/user_dict.json` が正しく作成されているか確認してください
+3. カタカナ表記が正しいか確認してください
+
+### 辞書ファイルの場所がわからない
+
+```php
+$path = config('voicevox.core.user_dict');
+echo $path;
+```
+
+### 辞書をリセットしたい
+
+```bash
+rm storage/voicevox/user_dict.json
+```
+
+```php
+$path = config('voicevox.core.user_dict');
+if (file_exists($path)) {
+    unlink($path);
+}
+```
