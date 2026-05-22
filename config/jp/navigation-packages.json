@@ -115,6 +115,8 @@
           "pages": [
             "jp/packages/laravel-voicevox/index",
             "jp/packages/laravel-voicevox/installation",
+            "jp/packages/laravel-voicevox/getting-started",
+            "jp/packages/laravel-voicevox/configuration",
             "jp/packages/laravel-voicevox/client-talk",
             "jp/packages/laravel-voicevox/client-song",
             "jp/packages/laravel-voicevox/native-talk",
