@@ -17,7 +17,7 @@ sidebarTitle: "VoicevoxResponse"
 ```php
 use Revolution\Voicevox\Voicevox;
 
-$response = Voicevox::talk(3, 'ずんだもんなのだ')->generate();
+$response = Voicevox::talk('ずんだもんなのだ')->generate();
 $wav = $response->content(); // WAVバイナリ
 
 return response($wav)->header('Content-Type', 'audio/wav');
@@ -30,7 +30,7 @@ return response($wav)->header('Content-Type', 'audio/wav');
 ```php
 use Revolution\Voicevox\Voicevox;
 
-$response = Voicevox::talk(3, 'ずんだもんなのだ')->generate();
+$response = Voicevox::talk('ずんだもんなのだ')->generate();
 
 // ファイル名のみ指定
 $path = $response->storeAs('output.wav');
