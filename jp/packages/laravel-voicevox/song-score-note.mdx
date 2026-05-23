@@ -1,0 +1,182 @@
+---
+title: "Score と Note 詳細解説 - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel の Song 合成で使う Score と Note の設計、フレーム長計算、JSON 管理パターンを解説します。"
+sidebarTitle: "Score と Note"
+---
+
+## 目的
+
+Song 合成で迷いやすい `Score` と `Note` の仕様を整理します。
+
+実装の根拠は `Revolution\Voicevox\Song\Note` / `Score` / `SongAudioQuery` のソースです。
+
+## `Note` クラス
+
+`Note` は 1 音符（または休符）を表します。
+
+```php
+use Revolution\Voicevox\Song\Note;
+
+$note = Note::make(
+    length: 94,
+    lyric: 'ド',
+    key: 60,
+    id: 'intro-1',
+);
+```
+
+### コンストラクタ引数
+
+| 引数 | 型 | 説明 |
+| --- | --- | --- |
+| `length` | `int` | フレーム長。`秒数 × 93.75` を整数化した値 |
+| `lyric` | `string` | 歌詞。休符は空文字 `''` |
+| `key` | `int\|null` | MIDI ノート番号。休符は `null` |
+| `id` | `string\|null` | `FrameAudioQuery` 生成時に `note_id` へコピーされる補助 ID |
+
+### フレーム長の計算
+
+`length` はフレーム単位です。秒数からは次で求めます。
+
+```text
+length = 秒数 × 93.75
+```
+
+この値は直感的ではないため、MIDI に慣れている場合は `Note::len()` を使うのが実用的です。
+
+```php
+Note::len(int $ticks, int $bpm = 125): int
+```
+
+- 4 分音符を `480 ticks` として扱う前提
+- `125 BPM` がデフォルト
+- 内部で `round()` して整数化するため、長い曲では丸め誤差が徐々に蓄積します
+
+```php
+Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60);  // 4分音符
+Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64);  // 2分音符
+```
+
+<Warning>
+  `Note::len()` は便利ですが、長尺の楽曲では累積誤差に注意してください。必要ならセクション単位で長さを再調整します。
+</Warning>
+
+### 休符の表現
+
+休符は次の組み合わせです。
+
+```php
+Note::make(length: 15, lyric: '', key: null);
+```
+
+### MIDI ノート番号の目安
+
+| Note | MIDI |
+| --- | --- |
+| C4 | 60 |
+| D4 | 62 |
+| E4 | 64 |
+| F4 | 65 |
+| G4 | 67 |
+| A4 | 69 |
+| B4 | 71 |
+| C5 | 72 |
+
+## `Score` クラス
+
+`Score` は `Note` の配列を持つ楽譜オブジェクトです。
+
+```php
+use Revolution\Voicevox\Song\Score;
+
+$score = Score::make([
+    Note::make(length: 15, lyric: '', key: null),
+    Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60),
+]);
+```
+
+### 重要ルール
+
+最初のノートは必ず休符にしてください。
+
+### 主な API
+
+- `Score::make(array $notes)` で生成
+- `add(Note $note)` で追記
+- `toJson()` で JSON 文字列化
+
+```php
+$score = Score::make([
+    Note::make(length: 15, lyric: '', key: null),
+]);
+
+$score->add(Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60));
+
+$json = $score->toJson(JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+```
+
+<Info>
+  `Score` コンストラクタは配列入力時に `lyric` の空文字/`null` を吸収する実装があり、`ConvertEmptyStringsToNull` ミドルウェア経由のフォーム入力でも扱いやすくなっています。
+</Info>
+
+## 実用パターン: JSON ファイル管理（推奨）
+
+実際のプロダクトでは、PHP に楽譜を直書きせず JSON で管理するほうが運用しやすいです。
+
+1. 独自フォーマット JSON を保存
+2. 読み込んで `Note` / `Score` に変換
+3. `Voicevox::song()` へ渡して生成
+
+### JSON 例
+
+```json
+{
+  "teacher": 6000,
+  "speaker": 3001,
+  "bpm": 120,
+  "notes": [
+    { "ticks": 120, "lyric": "", "key": null, "id": "r0" },
+    { "ticks": 480, "lyric": "ド", "key": 60, "id": "n1" },
+    { "ticks": 480, "lyric": "レ", "key": 62, "id": "n2" },
+    { "ticks": 960, "lyric": "ミ", "key": 64, "id": "n3" },
+    { "ticks": 120, "lyric": "", "key": null, "id": "r1" }
+  ]
+}
+```
+
+### 読み込みと合成
+
+```php
+use Illuminate\Support\Facades\Storage;
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use Revolution\Voicevox\Voicevox;
+
+$chart = json_decode(
+    Storage::disk('local')->get('songs/sample.json'),
+    true,
+    flags: JSON_THROW_ON_ERROR,
+);
+
+$score = Score::make(
+    collect($chart['notes'])
+        ->map(fn (array $note) => Note::make(
+            length: Note::len(ticks: $note['ticks'], bpm: $chart['bpm']),
+            lyric: $note['lyric'] ?? '',
+            key: $note['key'],
+            id: $note['id'] ?? null,
+        ))
+        ->all(),
+);
+
+$response = Voicevox::song($score, teacher: $chart['teacher'])
+    ->generate(id: $chart['speaker']);
+
+$response->storeAs('songs', 'sample.wav');
+```
+
+## 関連ページ
+
+- [クライアント: ソング](/jp/packages/laravel-voicevox/client-song)
+- [ネイティブ: ソング](/jp/packages/laravel-voicevox/native-song)
+- [エンジン API: ソング](/jp/packages/laravel-voicevox/engine-song)
