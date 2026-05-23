@@ -124,6 +124,7 @@
             "jp/packages/laravel-voicevox/engine-talk",
             "jp/packages/laravel-voicevox/engine-song",
             "jp/packages/laravel-voicevox/song-score-note",
+            "jp/packages/laravel-voicevox/response",
             "jp/packages/laravel-voicevox/presets",
             "jp/packages/laravel-voicevox/user-dict",
             "jp/packages/laravel-voicevox/ai-sdk"
