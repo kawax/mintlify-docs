@@ -8,7 +8,7 @@ sidebarTitle: "Engine API: Talk"
 
 Engine API mode provides a VOICEVOX Engine-compatible HTTP API inside your Laravel app.
 
-Start your app with `php artisan serve`, then use endpoints like `/audio_query` and `/synthesis` directly.
+Start your app with `php artisan serve --port=50513`, then use endpoints like `/audio_query` and `/synthesis` directly.
 
 ## Prerequisites
 
@@ -35,17 +35,17 @@ Start your app with `php artisan serve`, then use endpoints like `/audio_query` 
 ## Start Laravel engine
 
 ```shell
-php artisan serve
+php artisan serve --port=50513
 ```
 
-Default URL is `http://127.0.0.1:8000`.
+Default URL is `http://127.0.0.1:50513`.
 
 ## Generate talk audio
 
 ### 1. Create `audio_query`
 
 ```shell
-curl -s -X POST "http://127.0.0.1:8000/audio_query?speaker=1&text=I%20love%20Laravel" \
+curl -s -X POST "http://127.0.0.1:50513/audio_query?speaker=1&text=I%20love%20Laravel" \
   -H "Content-Type: application/json" \
   > audio_query.json
 ```
@@ -53,7 +53,7 @@ curl -s -X POST "http://127.0.0.1:8000/audio_query?speaker=1&text=I%20love%20Lar
 ### 2. Synthesize with `synthesis`
 
 ```shell
-curl -s -X POST "http://127.0.0.1:8000/synthesis?speaker=1" \
+curl -s -X POST "http://127.0.0.1:50513/synthesis?speaker=1" \
   -H "Content-Type: application/json" \
   -d @audio_query.json \
   > talk.wav
@@ -66,7 +66,7 @@ Point client-mode URL to the Laravel engine API.
 ```php
 // config/voicevox.php
 'client' => [
-    'url' => env('VOICEVOX_URL', 'http://127.0.0.1:8000'),
+    'url' => env('VOICEVOX_URL', 'http://127.0.0.1:50513'),
 ],
 ```
 
