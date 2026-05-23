@@ -6,7 +6,7 @@ sidebarTitle: "VoicevoxResponse"
 
 ## 概要
 
-`VoicevoxResponse` は、`talk()` や `song()` などすべての合成メソッドが返すレスポンスオブジェクトです。
+`VoicevoxResponse` は、`talk()->generate()` や `song()->generate()` など、合成実行メソッドが返すレスポンスオブジェクトです。
 
 内部では WAV 形式のバイナリデータを保持し、保存・変換・文字列化のユーティリティを提供します。
 
@@ -17,7 +17,7 @@ sidebarTitle: "VoicevoxResponse"
 ```php
 use Revolution\Voicevox\Voicevox;
 
-$response = Voicevox::talk(3, 'ずんだもんなのだ');
+$response = Voicevox::talk(3, 'ずんだもんなのだ')->generate();
 $wav = $response->content(); // WAVバイナリ
 
 return response($wav)->header('Content-Type', 'audio/wav');
@@ -30,7 +30,7 @@ return response($wav)->header('Content-Type', 'audio/wav');
 ```php
 use Revolution\Voicevox\Voicevox;
 
-$response = Voicevox::talk(3, 'ずんだもんなのだ');
+$response = Voicevox::talk(3, 'ずんだもんなのだ')->generate();
 
 // ファイル名のみ指定
 $path = $response->storeAs('output.wav');
@@ -67,17 +67,3 @@ return response()->json([
 ```php
 $wav = (string) $response;
 ```
-
-## `tap()` と組み合わせる
-
-`tap()` を使うと、レスポンスを返しつつ副作用として保存を挟めます。
-
-```php
-use Revolution\Voicevox\Voicevox;
-
-$wav = tap(Voicevox::talk(3, 'ずんだもんなのだ'), function ($response) {
-    $response->storeAs('audio', 'output.wav');
-})->content();
-```
-
-`tap()` の詳細は [tap() ヘルパーと Tappable トレイト](/jp/advanced/tap) を参照してください。
