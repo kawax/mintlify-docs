@@ -1,0 +1,83 @@
+---
+title: "VoicevoxResponse - VOICEVOX for Laravel"
+description: "Method guide for the VoicevoxResponse class that represents synthesized audio output in VOICEVOX for Laravel."
+sidebarTitle: "VoicevoxResponse"
+---
+
+## Overview
+
+`VoicevoxResponse` is the response object returned by all synthesis methods such as `talk()` and `song()`.
+
+It wraps WAV binary data and provides helper methods for saving, converting, and casting.
+
+## `content()`
+
+`content()` returns the raw WAV binary. Use it when you want to return audio directly in an HTTP response.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk(3, 'ずんだもんなのだ');
+$wav = $response->content(); // WAV binary
+
+return response($wav)->header('Content-Type', 'audio/wav');
+```
+
+## `storeAs()`
+
+`storeAs()` saves the WAV data through Laravel `Storage`. Its arguments follow the same idea as `Storage::put()`.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk(3, 'ずんだもんなのだ');
+
+// File name only
+$path = $response->storeAs('output.wav');
+
+// Path and file name separately
+$path = $response->storeAs('audio', 'output.wav');
+
+// Specify a disk
+$path = $response->storeAs('audio', 'output.wav', 's3');
+```
+
+The return value is the stored path (`string`), or `false` if saving fails.
+
+## `toBase64()`
+
+`toBase64()` returns the WAV data as a Base64 string. This is useful for JSON responses and inline HTML audio playback.
+
+```php
+$base64 = $response->toBase64();
+
+return response()->json([
+    'audio' => $base64,
+]);
+```
+
+```blade
+<audio controls src="data:audio/wav;base64,{{ $base64 }}"></audio>
+```
+
+## `__toString()`
+
+When you cast `VoicevoxResponse` to a string, it returns the same WAV binary as `content()`.
+
+```php
+$wav = (string) $response;
+```
+
+## Combine it with `tap()`
+
+Use `tap()` when you want to save the file as a side effect and still continue with the same response object.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$wav = tap(Voicevox::talk(3, 'ずんだもんなのだ'), function ($response) {
+    $response->storeAs('audio', 'output.wav');
+})->content();
+```
+
+For a deeper explanation of `tap()`, see [tap() helper and the Tappable trait](/en/advanced/tap).

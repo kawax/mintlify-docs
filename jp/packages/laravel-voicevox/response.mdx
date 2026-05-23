@@ -1,0 +1,83 @@
+---
+title: "VoicevoxResponse - VOICEVOX for Laravel"
+description: "VOICEVOX for Laravel の音声合成結果を表す VoicevoxResponse クラスのメソッド解説。"
+sidebarTitle: "VoicevoxResponse"
+---
+
+## 概要
+
+`VoicevoxResponse` は、`talk()` や `song()` などすべての合成メソッドが返すレスポンスオブジェクトです。
+
+内部では WAV 形式のバイナリデータを保持し、保存・変換・文字列化のユーティリティを提供します。
+
+## `content()`
+
+`content()` は生の WAV バイナリを返します。HTTP レスポンスとしてそのまま返したいときに使います。
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk(3, 'ずんだもんなのだ');
+$wav = $response->content(); // WAVバイナリ
+
+return response($wav)->header('Content-Type', 'audio/wav');
+```
+
+## `storeAs()`
+
+`storeAs()` は Laravel の `Storage` に WAV を保存します。引数は `Storage::put()` と同じ考え方で扱えます。
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talk(3, 'ずんだもんなのだ');
+
+// ファイル名のみ指定
+$path = $response->storeAs('output.wav');
+
+// パスとファイル名を分けて指定
+$path = $response->storeAs('audio', 'output.wav');
+
+// ディスクを指定
+$path = $response->storeAs('audio', 'output.wav', 's3');
+```
+
+戻り値は保存したパス（`string`）です。保存に失敗すると `false` を返します。
+
+## `toBase64()`
+
+`toBase64()` は WAV バイナリを Base64 文字列へ変換します。JSON レスポンスや HTML 埋め込みに使えます。
+
+```php
+$base64 = $response->toBase64();
+
+return response()->json([
+    'audio' => $base64,
+]);
+```
+
+```blade
+<audio controls src="data:audio/wav;base64,{{ $base64 }}"></audio>
+```
+
+## `__toString()`
+
+`VoicevoxResponse` を文字列としてキャストすると `content()` と同じ WAV バイナリが返ります。
+
+```php
+$wav = (string) $response;
+```
+
+## `tap()` と組み合わせる
+
+`tap()` を使うと、レスポンスを返しつつ副作用として保存を挟めます。
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$wav = tap(Voicevox::talk(3, 'ずんだもんなのだ'), function ($response) {
+    $response->storeAs('audio', 'output.wav');
+})->content();
+```
+
+`tap()` の詳細は [tap() ヘルパーと Tappable トレイト](/jp/advanced/tap) を参照してください。
