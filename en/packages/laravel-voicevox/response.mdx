@@ -17,7 +17,7 @@ It wraps WAV binary data and provides helper methods for saving, converting, and
 ```php
 use Revolution\Voicevox\Voicevox;
 
-$response = Voicevox::talk(3, 'ずんだもんなのだ')->generate();
+$response = Voicevox::talk('ずんだもんなのだ')->generate();
 $wav = $response->content(); // WAV binary
 
 return response($wav)->header('Content-Type', 'audio/wav');
@@ -30,7 +30,7 @@ return response($wav)->header('Content-Type', 'audio/wav');
 ```php
 use Revolution\Voicevox\Voicevox;
 
-$response = Voicevox::talk(3, 'ずんだもんなのだ')->generate();
+$response = Voicevox::talk('ずんだもんなのだ')->generate();
 
 // File name only
 $path = $response->storeAs('output.wav');
