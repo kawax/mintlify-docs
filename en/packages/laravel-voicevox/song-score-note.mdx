@@ -1,0 +1,182 @@
+---
+title: "Score and Note Deep Dive - VOICEVOX for Laravel"
+description: "Learn the Score and Note model used for singing synthesis in VOICEVOX for Laravel, including frame-length math and practical JSON workflows."
+sidebarTitle: "Score and Note"
+---
+
+## Goal
+
+This page explains `Score` and `Note` details for song synthesis.
+
+The behavior is based on `Revolution\Voicevox\Song\Note`, `Score`, and `SongAudioQuery`.
+
+## `Note` class
+
+`Note` represents one musical note (or one rest).
+
+```php
+use Revolution\Voicevox\Song\Note;
+
+$note = Note::make(
+    length: 94,
+    lyric: 'ド',
+    key: 60,
+    id: 'intro-1',
+);
+```
+
+### Constructor arguments
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `length` | `int` | Frame length. Integer value based on `seconds × 93.75` |
+| `lyric` | `string` | Lyrics text. Use `''` for rests |
+| `key` | `int\|null` | MIDI note number. Use `null` for rests |
+| `id` | `string\|null` | Optional ID copied to `note_id` in `FrameAudioQuery` generation |
+
+### Frame-length calculation
+
+`length` is in frames. From seconds:
+
+```text
+length = seconds × 93.75
+```
+
+This is not very intuitive, so `Note::len()` is the practical helper for MIDI-oriented workflows.
+
+```php
+Note::len(int $ticks, int $bpm = 125): int
+```
+
+- Uses the common MIDI assumption: quarter note = `480 ticks`
+- Default tempo is `125 BPM`
+- Internally rounds to integer with `round()`, so long songs can accumulate small rounding errors
+
+```php
+Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60);  // quarter note
+Note::make(length: Note::len(960, 120), lyric: 'ミ', key: 64);  // half note
+```
+
+<Warning>
+  `Note::len()` is convenient, but keep cumulative rounding error in mind for long compositions.
+</Warning>
+
+### Rest representation
+
+A rest is expressed as:
+
+```php
+Note::make(length: 15, lyric: '', key: null);
+```
+
+### MIDI note quick table
+
+| Note | MIDI |
+| --- | --- |
+| C4 | 60 |
+| D4 | 62 |
+| E4 | 64 |
+| F4 | 65 |
+| G4 | 67 |
+| A4 | 69 |
+| B4 | 71 |
+| C5 | 72 |
+
+## `Score` class
+
+`Score` is a container for an array of `Note` objects.
+
+```php
+use Revolution\Voicevox\Song\Score;
+
+$score = Score::make([
+    Note::make(length: 15, lyric: '', key: null),
+    Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60),
+]);
+```
+
+### Critical rule
+
+The first note must always be a rest.
+
+### Main API
+
+- `Score::make(array $notes)` to create a score
+- `add(Note $note)` to append one note
+- `toJson()` to serialize
+
+```php
+$score = Score::make([
+    Note::make(length: 15, lyric: '', key: null),
+]);
+
+$score->add(Note::make(length: Note::len(480, 120), lyric: 'ド', key: 60));
+
+$json = $score->toJson(JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+```
+
+<Info>
+  `Score` internally normalizes array input and handles empty-string/null lyric cases, so it stays safe with Laravel's `ConvertEmptyStringsToNull` middleware in form-driven flows.
+</Info>
+
+## Practical pattern: Manage chart data in JSON (recommended)
+
+In production, storing chart data in JSON is usually more maintainable than hardcoding long note arrays in PHP.
+
+1. Save your own chart format as JSON
+2. Load JSON and convert into `Note` / `Score`
+3. Pass it to `Voicevox::song()` for synthesis
+
+### JSON example
+
+```json
+{
+  "teacher": 6000,
+  "speaker": 3001,
+  "bpm": 120,
+  "notes": [
+    { "ticks": 120, "lyric": "", "key": null, "id": "r0" },
+    { "ticks": 480, "lyric": "ド", "key": 60, "id": "n1" },
+    { "ticks": 480, "lyric": "レ", "key": 62, "id": "n2" },
+    { "ticks": 960, "lyric": "ミ", "key": 64, "id": "n3" },
+    { "ticks": 120, "lyric": "", "key": null, "id": "r1" }
+  ]
+}
+```
+
+### Load and synthesize
+
+```php
+use Illuminate\Support\Facades\Storage;
+use Revolution\Voicevox\Song\Note;
+use Revolution\Voicevox\Song\Score;
+use Revolution\Voicevox\Voicevox;
+
+$chart = json_decode(
+    Storage::disk('local')->get('songs/sample.json'),
+    true,
+    flags: JSON_THROW_ON_ERROR,
+);
+
+$score = Score::make(
+    collect($chart['notes'])
+        ->map(fn (array $note) => Note::make(
+            length: Note::len(ticks: $note['ticks'], bpm: $chart['bpm']),
+            lyric: $note['lyric'] ?? '',
+            key: $note['key'],
+            id: $note['id'] ?? null,
+        ))
+        ->all(),
+);
+
+$response = Voicevox::song($score, teacher: $chart['teacher'])
+    ->generate(id: $chart['speaker']);
+
+$response->storeAs('songs', 'sample.wav');
+```
+
+## Related pages
+
+- [Client: Song](/en/packages/laravel-voicevox/client-song)
+- [Native: Song](/en/packages/laravel-voicevox/native-song)
+- [Engine API: Song](/en/packages/laravel-voicevox/engine-song)
