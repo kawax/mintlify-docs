@@ -17,6 +17,7 @@
         "en/advanced/conditionable",
         "en/advanced/forwards-calls",
         "en/advanced/tap",
+        "en/advanced/dumpable",
         "en/advanced/lottery",
         "en/advanced/higher-order-messages",
         "en/advanced/manager",
