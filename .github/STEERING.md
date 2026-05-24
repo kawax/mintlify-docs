@@ -66,3 +66,4 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - VoicevoxResponseのページ。元は複数のResponseクラスに分けてたけど全部同じに統一。
   - 公式VOICEVOXエディターのプロジェクトファイル`.vvproj`ファイルの仕様 https://github.com/invokable/laravel-voicevox/blob/main/docs/develop/vvproj.md 。中身は普通のjsonなのでこれを読み込んでLaravel版でトークやソングの合成が可能。トークはqueryがAudioQueryなのでそのまま使える。ソングはdurationがtickなので`Note::len()`で計算すればいい。公式がTPQN480を使っていることを先に調べてたから`Note::len()`を用意した。
   - Mintlifyは`openapi.json`から自動でページが作られるのでこれは対応不要。
+  - 主なページは作れたので完了。Laravel版エンジンに接続するmacOS用ソング特化アプリも作ったのでこれもいいページのネタになるけど公開予定はない。アプリストアでの公開は大変だし、野良アプリでの配布ももう難しい。GitHubで公開して各自でXcodeでビルドする提供方法しかない。
