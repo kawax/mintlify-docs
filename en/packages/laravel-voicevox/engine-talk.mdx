@@ -40,6 +40,16 @@ php artisan serve --port=50513
 
 Default URL is `http://127.0.0.1:50513`.
 
+### About port 50513
+
+The official VOICEVOX engine uses port 50021 by default. Port 50513 is chosen so you can run the Laravel engine and the official engine at the same time.
+
+You are free to use any other port — just pass a different `--port` value, such as `--port=8000`.
+
+<Info>
+  The official engine automatically picks the next available port (50022, 50023, …) when 50021 is busy. `php artisan serve` does the same when no `--port` is given (8001, 8002, …), but it fails to start if the specified port is already in use. Choose a fixed port that is unlikely to conflict with other services. Port 50513 is one example chosen to avoid collisions with both the official VOICEVOX engine (50021) and common Laravel ports.
+</Info>
+
 ## Generate talk audio
 
 ### 1. Create `audio_query`
@@ -108,6 +118,35 @@ Unsupported endpoints like `cancellable_synthesis` and `multi_synthesis` can fal
 | `GET /speaker_info` | ✅ | ✅ | Requires resource install |
 | `POST /cancellable_synthesis` | ❌ | ✅ | Fallback only |
 | `POST /multi_synthesis` | ❌ | ✅ | Fallback only |
+
+## OpenAI-compatible TTS endpoint
+
+`POST /v1/audio/speech` accepts the same request format as the OpenAI speech API. Changing the Base URL is all you need to connect any OpenAI-compatible tool — including Laravel AI SDK.
+
+```shell
+curl -s -X POST "http://127.0.0.1:50513/v1/audio/speech" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "voicevox",
+    "input": "I love Laravel",
+    "voice": "shimmer"
+  }' \
+  > talk.wav
+```
+
+### Parameters
+
+| Parameter | Description |
+|---|---|
+| `input` | Text to synthesize (max 4096 characters) |
+| `voice` | Style ID (integer), character alias (`ずんだもん`, `四国めたん`, etc.), or OpenAI voice name (`alloy`, `shimmer`, etc.) |
+| `speed` | Playback speed applied as `speedScale` (0.25–4.0, default 1.0) |
+| `response_format` | Always returns wav. The value is ignored |
+| Other parameters | Ignored |
+
+<Info>
+  OpenAI voice names (`alloy`, `shimmer`, etc.) are provisional mappings. There is no authoritative definition of how each OpenAI voice should correspond to a VOICEVOX character, so these are convenience assignments for compatibility. Using VOICEVOX character aliases (`ずんだもん`, `四国めたん/ノーマル`, etc.) is recommended.
+</Info>
 
 ## Next pages
 
