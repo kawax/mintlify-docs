@@ -18,6 +18,7 @@
         "jp/advanced/forwards-calls",
         "jp/advanced/tap",
         "jp/advanced/dumpable",
+        "jp/advanced/support-contracts",
         "jp/advanced/lottery",
         "jp/advanced/higher-order-messages",
         "jp/advanced/collection-deep-dive",
