@@ -53,7 +53,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - 「AI SDK」グループと「スターターキット」の間にVOICEVOXグループを追加。
   - FFIの解説は別ページ。
   - 日本語ページはOK
-- [x] VOICEVOX for Laravel https://github.com/invokable/laravel-voicevox
+- [ ] VOICEVOX for Laravel https://github.com/invokable/laravel-voicevox
   - Laravel版も主要な機能はほぼ完成してきたのでページを作成していく。先に日本語ページから、というかそもそも日本語のTTSなので。
   - README_jp.mdとdocs/jp内が日本語のドキュメント。
   - まずはインストールと設定からモードごとのトークとソングの生成までを説明。
@@ -63,7 +63,10 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - 英語ページはこちらで作るので不要だったのに`docs/en/`に1ファイルだけ作られている。ai-sdk.mdのエイリアス一覧はこちらにも追加。日英両方。
   - laravel-voicevoxのAgentic Workflowsは幻覚の多いドキュメントを作ってしまうのでデイリー実行は停止。以降はこちらメインでドキュメントを作成する。DeepWikiの分析や、コードを直接調査して必要なドキュメントを作る。 https://deepwiki.com/invokable/laravel-voicevox
   - [x] ソング：ScoreとNoteの詳細解説。フレーム長は全く分からないのでMIDIに慣れた人は`Note::len()`ヘルパーを使うのが推奨。現実的なユースケースではPHPでコードを書いて組み立てるより別途jsonファイルに保存するだろう。jsonファイルは独自フォーマットでいいのでjsonを読み込む→ScoreとNoteで組み立てる→音声化。
-  - VoicevoxResponseのページ。元は複数のResponseクラスに分けてたけど全部同じに統一。
-  - 公式VOICEVOXエディターのプロジェクトファイル`.vvproj`ファイルの仕様 https://github.com/invokable/laravel-voicevox/blob/main/docs/develop/vvproj.md 。中身は普通のjsonなのでこれを読み込んでLaravel版でトークやソングの合成が可能。トークはqueryがAudioQueryなのでそのまま使える。ソングはdurationがtickなので`Note::len()`で計算すればいい。公式がTPQN480を使っていることを先に調べてたから`Note::len()`を用意した。
+  - [x] VoicevoxResponseのページ。元は複数のResponseクラスに分けてたけど全部同じに統一。
+  - [x] 公式VOICEVOXエディターのプロジェクトファイル`.vvproj`ファイルの仕様 https://github.com/invokable/laravel-voicevox/blob/main/docs/develop/vvproj.md 。中身は普通のjsonなのでこれを読み込んでLaravel版でトークやソングの合成が可能。トークはqueryがAudioQueryなのでそのまま使える。ソングはdurationがtickなので`Note::len()`で計算すればいい。公式がTPQN480を使っていることを先に調べてたから`Note::len()`を用意した。
   - Mintlifyは`openapi.json`から自動でページが作られるのでこれは対応不要。
-  - 主なページは作れたので完了。Laravel版エンジンに接続するmacOS用ソング特化アプリも作ったのでこれもいいページのネタになるけど公開予定はない。アプリストアでの公開は大変だし、野良アプリでの配布ももう難しい。GitHubで公開して各自でXcodeでビルドする提供方法しかない。
+  - 主なページは作れたので完了。Laravel版エンジンに接続するmacOS用ソング特化アプリも作ったのでこれもいいページのネタになるけど公開予定はない。アプリストアでの公開は大変だし、野良アプリでの配布ももう難しい。GitHubで公開して各自でXcodeでビルドする提供方法しかない。作った直後なのでまだコード非公開のまま。
+  - 閃いたのでもう少しだけ追加。ソングアプリは公開しないけどアプリを作った知見を元に「これからVOICEVOXエンジンAPIを呼び出すアプリを作りたい人」向けのドキュメントを作成できた。これを使ってページを作成。 https://github.com/invokable/laravel-voicevox/blob/main/docs/develop/voicevox-engine-api-app-guide.md
+    - 実際に一通り作ってみないことが多い。PythonからちょっとAPIを呼び出す程度の事例は多いけどこの規模でアプリとして作ってる事例は見ない。他にない情報なので内容を省略せずしっかりページ化。長いページだと省略しがち。
+    - Xcodeに限定してない汎用的な項目＋それぞれXcode向け補足を入れてる構成。
