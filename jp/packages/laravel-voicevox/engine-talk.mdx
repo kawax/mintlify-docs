@@ -40,6 +40,16 @@ php artisan serve --port=50513
 
 デフォルトでは `http://127.0.0.1:50513` で起動します。
 
+### ポート 50513 について
+
+公式 VOICEVOX エンジンのデフォルトポートは 50021 です。Laravel 版エンジンと公式エンジンを同時に起動できるよう、デフォルトポートを 50513 と定めています。
+
+`--port=50513` を付けて起動しているだけなので、`--port=8000` など他のポートを使っても構いません。
+
+<Info>
+  公式エンジンはポートが使用中の場合、50022 以降の空きポートに自動調整して起動します。`php artisan serve` でも `--port` を指定しない場合は 8001 以降に自動調整しますが、`--port` を指定した状態でポートが使用中だと起動に失敗します。他のサービスと衝突しにくいポートを固定で指定することを推奨します。50513 はその一例です。
+</Info>
+
 ## トーク音声を生成する
 
 ### 1. `audio_query` を作成する
@@ -108,6 +118,35 @@ $response->storeAs('engine', 'talk.wav');
 | `GET /speaker_info` | ✅ | ✅ | リソースインストールが必要 |
 | `POST /cancellable_synthesis` | ❌ | ✅ | フォールバックのみ |
 | `POST /multi_synthesis` | ❌ | ✅ | フォールバックのみ |
+
+## OpenAI 互換 TTS エンドポイント
+
+`POST /v1/audio/speech` で OpenAI の音声合成 API と同じリクエスト形式を受け付けます。Base URL を変更するだけで、Laravel AI SDK をはじめ OpenAI API 対応の多くのツールから利用できます。
+
+```shell
+curl -s -X POST "http://127.0.0.1:50513/v1/audio/speech" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "voicevox",
+    "input": "ララベルが好きなのだ",
+    "voice": "ずんだもん"
+  }' \
+  > talk.wav
+```
+
+### パラメータ
+
+| パラメータ | 説明 |
+|---|---|
+| `input` | 読み上げるテキスト（最大 4096 文字） |
+| `voice` | スタイル ID（数値）、エイリアス（`ずんだもん`、`四国めたん` など）、または OpenAI ボイス名（`alloy`、`shimmer` など） |
+| `speed` | 再生速度。`speedScale` として適用（0.25〜4.0、省略時は 1.0） |
+| `response_format` | 常に wav で返します。指定値は無視されます |
+| その他のパラメータ | 無視されます |
+
+<Info>
+  OpenAI ボイス名（`alloy`、`shimmer` など）は仮の割り当てです。OpenAI の各ボイスがどのような声質かを VOICEVOX キャラクターに対応づける定義はないため、互換性のために便宜的にマッピングしています。VOICEVOX キャラクターのエイリアス（`ずんだもん`、`四国めたん/ノーマル` など）の利用を推奨します。
+</Info>
 
 ## 次に読むページ
 
