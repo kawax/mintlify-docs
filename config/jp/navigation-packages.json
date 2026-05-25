@@ -128,6 +128,7 @@
             "jp/packages/laravel-voicevox/response",
             "jp/packages/laravel-voicevox/presets",
             "jp/packages/laravel-voicevox/user-dict",
+            "jp/packages/laravel-voicevox/app-guide",
             "jp/packages/laravel-voicevox/ai-sdk"
           ]
         },
