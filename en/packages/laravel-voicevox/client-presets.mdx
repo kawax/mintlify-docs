@@ -1,0 +1,286 @@
+---
+title: "Client mode - Presets - VOICEVOX for Laravel"
+description: "Manage the official VOICEVOX engine's presets in client mode to save and reuse synthesis parameter sets."
+sidebarTitle: "Client mode - Presets"
+---
+
+Presets let you save and reuse common synthesis parameter combinations on the official VOICEVOX engine. In client mode, presets are managed entirely by the connected official engine — Laravel does not store preset data locally.
+
+## Overview
+
+The client mode presets are operated through the `Voicevox` facade. Internally it sends HTTP requests to the official VOICEVOX engine endpoints `/presets`, `/add_preset`, `/update_preset`, `/delete_preset`, and `/audio_query_from_preset`.
+
+The official engine stores presets in the OS user area as `presets.yaml`. On macOS (VOICEVOX app product build), the default path is:
+
+```text
+~/Library/Application Support/voicevox-engine/presets.yaml
+```
+
+When running the official engine via Docker, data is stored inside the container's user area. Data persists across container restarts as long as you reuse the same container. However, when creating a temporary container each time with `docker run --rm`, presets are lost when the container stops. Use a Docker volume to mount the container's user area if you need persistence.
+
+This is separate from the native mode `storage/voicevox/presets.json`. The Laravel `config('voicevox.core.presets')` setting is not used in client mode.
+
+## Prerequisites
+
+Start the official VOICEVOX engine.
+
+```shell
+docker pull voicevox/voicevox_engine:cpu-latest
+docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+```
+
+The connection URL can be changed with `VOICEVOX_URL`.
+
+```env
+VOICEVOX_URL=http://127.0.0.1:50021
+```
+
+## Preset structure
+
+Presets in client mode use the official engine API schema.
+
+```php
+[
+    'id' => 1,                // Preset ID (integer)
+    'name' => 'Slow',         // Preset name
+    'speaker_uuid' => 'uuid', // Speaker UUID (string)
+    'style_id' => 1,          // Style ID (integer)
+    'speedScale' => 0.8,      // Speech speed
+    'pitchScale' => 0.0,      // Pitch
+    'intonationScale' => 1.0, // Intonation
+    'volumeScale' => 1.0,     // Volume
+    'prePhonemeLength' => 0.1, // Pre-phoneme silence
+    'postPhonemeLength' => 0.1, // Post-phoneme silence
+]
+```
+
+## Basic usage
+
+### Create a preset
+
+Use `Voicevox::addPreset()` to create a preset. Set `id` to `0` for auto-assignment.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$id = Voicevox::addPreset([
+    'id' => 0,
+    'name' => 'Slow and clear',
+    'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
+    'style_id' => 1,
+    'speedScale' => 0.8,
+    'pitchScale' => 0.0,
+    'intonationScale' => 1.2,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.1,
+    'postPhonemeLength' => 0.1,
+]);
+
+echo $id; // e.g. 1
+```
+
+### Get all presets
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$presets = Voicevox::presets();
+
+/*
+[
+    [
+        "id" => 1,
+        "name" => "Slow and clear",
+        "speaker_uuid" => "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff",
+        "style_id" => 1,
+        "speedScale" => 0.8,
+        ...
+    ],
+    ...
+]
+*/
+```
+
+### Update a preset
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$id = Voicevox::updatePreset([
+    'id' => 1,
+    'name' => 'Slow and distinct',
+    'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
+    'style_id' => 1,
+    'speedScale' => 0.7,
+    'pitchScale' => 0.0,
+    'intonationScale' => 1.5,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.1,
+    'postPhonemeLength' => 0.1,
+]);
+```
+
+### Delete a preset
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+Voicevox::deletePreset(1);
+```
+
+## Synthesize with a preset
+
+### talkFromPreset()
+
+`Voicevox::talkFromPreset()` uses the official engine's `/audio_query_from_preset` to create a `TalkAudioQuery` with the preset already applied.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talkFromPreset('Use the preset', presetId: 1)
+    ->generate(id: 1);
+
+$response->storeAs('client', 'preset-talk.wav');
+```
+
+### audioQueryFromPreset()
+
+Use `audioQueryFromPreset()` to retrieve only the audio query array before synthesis.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$audioQuery = Voicevox::audioQueryFromPreset(
+    text: 'Query only from preset',
+    presetId: 1,
+);
+
+$audioQuery['speedScale'] = 1.1;
+```
+
+### Additional adjustment with tap()
+
+A `TalkAudioQuery` created from a preset can be adjusted with `tap()`, just like `Voicevox::talk()`.
+
+```php
+use Revolution\Voicevox\Client\TalkAudioQuery;
+use Revolution\Voicevox\Voicevox;
+
+$response = Voicevox::talkFromPreset('Read a bit faster', presetId: 1)
+    ->tap(function (TalkAudioQuery $talk) {
+        $talk->audioQuery['speedScale'] = 1.2;
+    })
+    ->generate(id: 1);
+```
+
+## Engine API mapping
+
+Each `Voicevox` facade method maps to an official engine API endpoint.
+
+| Laravel | Official engine API |
+|---|---|
+| `Voicevox::presets()` | `GET /presets` |
+| `Voicevox::addPreset()` | `POST /add_preset` |
+| `Voicevox::updatePreset()` | `POST /update_preset` |
+| `Voicevox::deletePreset()` | `POST /delete_preset` |
+| `Voicevox::audioQueryFromPreset()` | `POST /audio_query_from_preset` |
+| `Voicevox::talkFromPreset()` | `POST /audio_query_from_preset` + `POST /synthesis` |
+
+## Differences from native mode
+
+| Item | Client mode | Native mode |
+|---|---|---|
+| API | `Voicevox` facade | `preset()` / `talk()` helpers |
+| Storage format | Official engine `presets.yaml` | Laravel `presets.json` |
+| macOS example | `~/Library/Application Support/voicevox-engine/presets.yaml` | `storage/voicevox/presets.json` |
+| Audio query generation | Official engine `/audio_query_from_preset` | Laravel native implementation |
+| Engine process | Required | Not required (FFI required) |
+
+## Examples
+
+### Narration preset
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+Voicevox::addPreset([
+    'id' => 0,
+    'name' => 'Narration',
+    'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
+    'style_id' => 1,
+    'speedScale' => 1.0,
+    'pitchScale' => -0.05,
+    'intonationScale' => 0.8,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.15,
+    'postPhonemeLength' => 0.15,
+]);
+```
+
+### Fast-talk preset
+
+```php
+Voicevox::addPreset([
+    'id' => 0,
+    'name' => 'Fast talk',
+    'speaker_uuid' => '388f246b-8c41-4ac1-8e2d-5d79f3ff56d9',
+    'style_id' => 3,
+    'speedScale' => 1.5,
+    'pitchScale' => 0.05,
+    'intonationScale' => 1.3,
+    'volumeScale' => 1.0,
+    'prePhonemeLength' => 0.05,
+    'postPhonemeLength' => 0.05,
+]);
+```
+
+## Parameter reference
+
+- `speedScale`: 0.5 to 2.0
+- `pitchScale`: -0.15 to 0.15
+- `intonationScale`: 0.0 to 2.0
+- `volumeScale`: 0.0 to 2.0
+- `prePhonemeLength`: 0.0 to 1.5 seconds
+- `postPhonemeLength`: 0.0 to 1.5 seconds
+
+## Notes
+
+<Warning>
+  In client mode, the official engine's `presets.yaml` is updated. Nothing is stored in your Laravel project's `storage`.
+</Warning>
+
+- With `docker run --rm`, presets are lost when the container exits.
+- Include both `speaker_uuid` and `style_id` in each preset.
+- When calling `generate(id:)` on a query built with `talkFromPreset()`, use the same ID as the preset's `style_id`.
+
+## Troubleshooting
+
+### Presets are not found
+
+1. Confirm the official VOICEVOX engine is running.
+2. Check that `VOICEVOX_URL` points to the correct engine.
+3. Check whether a different Docker container was started.
+
+### Check preset file path
+
+On the macOS product build, check:
+
+```text
+~/Library/Application Support/voicevox-engine/presets.yaml
+```
+
+In Docker, presets are inside the container's user area. Mount that path as a Docker volume if persistence is required.
+
+### speaker_uuid is unknown
+
+You can retrieve the speaker UUID from the speaker list.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$speakers = Voicevox::speakers();
+
+foreach ($speakers as $speaker) {
+    echo $speaker['name'].': '.$speaker['speaker_uuid'].PHP_EOL;
+}
+```

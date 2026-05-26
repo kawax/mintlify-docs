@@ -1,0 +1,201 @@
+---
+title: "Client mode - User Dictionary - VOICEVOX for Laravel"
+description: "Manage the official VOICEVOX engine's user dictionary in client mode to register custom readings for proper nouns and technical terms."
+sidebarTitle: "Client mode - User Dictionary"
+---
+
+The user dictionary lets you register custom readings for proper nouns and technical terms with the official VOICEVOX engine. In client mode, the dictionary is managed entirely by the connected official engine — Laravel does not store dictionary data locally.
+
+## Overview
+
+The client mode user dictionary is operated through the `Voicevox` facade. Internally it sends HTTP requests to the official VOICEVOX engine endpoints `/user_dict`, `/user_dict_word`, and `/import_user_dict`.
+
+The official engine stores dictionary data in the OS user area. On macOS (VOICEVOX app product build), the default path is:
+
+```text
+~/Library/Application Support/voicevox-engine/user_dict.json
+```
+
+When running the official engine via Docker, data is stored inside the container's user area. Data persists across container restarts as long as you reuse the same container. However, when creating a temporary container each time with `docker run --rm`, the dictionary is lost when the container stops. Use a Docker volume to mount the container's user area if you need persistence.
+
+This is separate from the native mode `storage/voicevox/user_dict.json`. The Laravel `config('voicevox.core.user_dict')` setting is not used in client mode.
+
+## Prerequisites
+
+Start the official VOICEVOX engine.
+
+```shell
+docker pull voicevox/voicevox_engine:cpu-latest
+docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
+```
+
+The connection URL can be changed with `VOICEVOX_URL`.
+
+```env
+VOICEVOX_URL=http://127.0.0.1:50021
+```
+
+## Basic usage
+
+### Add a word
+
+Use `Voicevox::addWord()` to register a word.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$uuid = Voicevox::addWord(
+    surface: 'Laravel',
+    pronunciation: 'ララベル',
+    accentType: 0,
+);
+
+// In client mode, a UUID with hyphens is returned
+// e.g. "a1b2c3d4-0000-0000-0000-000000000000"
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `surface` | string | Written form of the word |
+| `pronunciation` | string | Reading in Katakana only |
+| `accentType` | int | Accent type (0 = flat, 1+ = accent position) |
+| `wordType` | string\|null | Part of speech (`COMMON_NOUN`, `PROPER_NOUN`, `VERB`, `ADJECTIVE`, `SUFFIX`) |
+| `priority` | int\|null | Priority |
+
+### Get all words
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$words = Voicevox::userDict();
+
+/*
+[
+    "a1b2c3d4-0000-0000-0000-000000000000" => [
+        "surface" => "Laravel",
+        "pronunciation" => "ララベル",
+        "accent_type" => 0,
+        "word_type" => "COMMON_NOUN",
+        "priority" => 5,
+    ],
+    ...
+]
+*/
+```
+
+### Update a word
+
+Specify the UUID returned when the word was added.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+Voicevox::updateWord(
+    wordUuid: 'a1b2c3d4-0000-0000-0000-000000000000',
+    surface: 'Laravel',
+    pronunciation: 'ラレベル',
+    accentType: 1,
+);
+```
+
+### Delete a word
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+Voicevox::deleteWord('a1b2c3d4-0000-0000-0000-000000000000');
+```
+
+### Import dictionary data
+
+Import an array in the official engine user dictionary format. With `override: false` (default), existing words are kept and imported words are added.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+$words = json_decode(file_get_contents('other_user_dict.json'), true);
+
+Voicevox::importUserDict($words, override: false);
+
+// override: true replaces the existing dictionary
+Voicevox::importUserDict($words, override: true);
+```
+
+To export the dictionary, save the result of `Voicevox::userDict()` as JSON.
+
+```php
+$json = json_encode(Voicevox::userDict(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+file_put_contents('exported_user_dict.json', $json);
+```
+
+## Synthesize after dictionary registration
+
+Words registered in the user dictionary are referenced automatically during synthesis.
+
+```php
+use Revolution\Voicevox\Voicevox;
+
+Voicevox::addWord(
+    surface: 'Laravel',
+    pronunciation: 'ララベル',
+    accentType: 0,
+);
+
+$response = Voicevox::talk('Laravelで開発するのは楽しいです', id: 1)->generate(id: 1);
+
+$response->storeAs('client', 'laravel.wav');
+```
+
+## Engine API mapping
+
+Each `Voicevox` facade method maps to an official engine API endpoint.
+
+| Laravel | Official engine API |
+|---|---|
+| `Voicevox::userDict()` | `GET /user_dict` |
+| `Voicevox::addWord()` | `POST /user_dict_word` |
+| `Voicevox::updateWord()` | `PUT /user_dict_word/{word_uuid}` |
+| `Voicevox::deleteWord()` | `DELETE /user_dict_word/{word_uuid}` |
+| `Voicevox::importUserDict()` | `POST /import_user_dict` |
+
+## Differences from native mode
+
+| Item | Client mode | Native mode |
+|---|---|---|
+| API | `Voicevox` facade | `dict()` helper |
+| Storage | Official engine user area | Laravel `storage/voicevox/user_dict.json` |
+| macOS example | `~/Library/Application Support/voicevox-engine/user_dict.json` | `storage/voicevox/user_dict.json` |
+| UUID format on add | With hyphens | Without hyphens (from Core) |
+| Engine process | Required | Not required (FFI required) |
+
+## Notes
+
+<Warning>
+  Set `pronunciation` in Katakana only. Hiragana and Kanji are not supported.
+</Warning>
+
+- In client mode, the official engine dictionary is updated. Nothing is stored in your Laravel project's `storage`.
+- With `docker run --rm`, the dictionary is lost when the container exits.
+- The UUID returned on add uses the hyphenated format: `a1b2c3d4-0000-0000-0000-000000000000`.
+
+## Troubleshooting
+
+### Word updates are not reflected
+
+1. Confirm the official VOICEVOX engine is running.
+2. Check that `VOICEVOX_URL` points to the correct engine.
+3. Verify that the reading is in Katakana.
+4. Check whether a different Docker container was started.
+
+### Check dictionary file path
+
+On the macOS product build, check:
+
+```text
+~/Library/Application Support/voicevox-engine/user_dict.json
+```
+
+In Docker, the dictionary is inside the container's user area. Mount that path as a Docker volume if persistence is required.
