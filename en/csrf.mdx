@@ -1,0 +1,140 @@
+---
+title: "CSRF protection"
+description: "Understand CSRF attacks and protect Laravel 13 applications with origin verification, CSRF tokens, and secure SPA patterns."
+keywords: ["laravel", "csrf", "security", "origin verification", "sanctum"]
+---
+
+## Introduction
+
+Cross-site request forgery (CSRF) is an attack where a malicious site causes a logged-in user to send unintended requests to your app.
+
+For example, if your app has a `POST /user/email` route, an attacker can host a page that auto-submits a hidden form to that endpoint. If the victim is already authenticated in your app, their email could be changed without their intent.
+
+Laravel 13 protects against this by default in the `web` middleware group.
+
+## Preventing CSRF requests
+
+Laravel's `PreventRequestForgery` middleware uses a two-layer strategy:
+
+1. **Origin verification** using the browser's `Sec-Fetch-Site` header.
+2. **Token verification** using a per-session CSRF token when origin verification is unavailable or fails.
+
+This gives strong protection in modern browsers while maintaining compatibility with older environments.
+
+## Origin verification
+
+Laravel first checks `Sec-Fetch-Site` to determine whether a request is from the same origin. This works best on secure HTTPS connections.
+
+If origin verification passes, the request is accepted immediately. If it does not pass, Laravel falls back to CSRF token validation.
+
+<Warning>
+  `Sec-Fetch-Site` is only reliably sent by browsers over HTTPS. If your app is not served securely, token validation becomes the primary protection.
+</Warning>
+
+### Origin-only mode
+
+If you want to rely only on origin verification, enable `originOnly`.
+
+```php
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Middleware;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->preventRequestForgery(originOnly: true);
+    });
+```
+
+In origin-only mode, requests that fail origin verification return `403` instead of the usual CSRF token mismatch status `419`.
+
+If you must accept same-site requests (such as subdomain-to-root requests), you can allow that explicitly:
+
+```php
+$middleware->preventRequestForgery(allowSameSite: true);
+```
+
+## Token verification
+
+Laravel generates a CSRF token for each active session. You can access it via `csrf_token()` or the session:
+
+```php
+use Illuminate\Http\Request;
+
+Route::get('/token', function (Request $request) {
+    $tokenFromSession = $request->session()->token();
+    $tokenFromHelper = csrf_token();
+});
+```
+
+For every `POST`, `PUT`, `PATCH`, or `DELETE` form in `web` routes, include `@csrf`:
+
+```blade
+<form method="POST" action="/profile">
+    @csrf
+
+    <!-- Equivalent to -->
+    <input type="hidden" name="_token" value="{{ csrf_token() }}" />
+</form>
+```
+
+## Excluding URIs from CSRF protection
+
+For third-party webhooks (for example Stripe), you may need to exclude specific URIs:
+
+```php
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Middleware;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->preventRequestForgery(except: [
+            'stripe/*',
+            'http://example.com/foo/bar',
+            'http://example.com/foo/*',
+        ]);
+    });
+```
+
+<Info>
+  Prefer placing webhook endpoints outside the `web` middleware group when possible. Exclusions should be explicit and minimal.
+</Info>
+
+## X-CSRF-TOKEN header
+
+Besides form `_token`, Laravel also checks the `X-CSRF-TOKEN` request header.
+
+You can expose the token in a meta tag and send it in AJAX requests:
+
+```blade
+<meta name="csrf-token" content="{{ csrf_token() }}">
+```
+
+```js
+$.ajaxSetup({
+    headers: {
+        'X-CSRF-TOKEN': document
+            .querySelector('meta[name="csrf-token"]')
+            .getAttribute('content'),
+    },
+});
+```
+
+## X-XSRF-TOKEN header
+
+Laravel also sends an encrypted `XSRF-TOKEN` cookie. Frameworks such as Axios and Angular automatically read this cookie and send it as `X-XSRF-TOKEN` on same-origin requests.
+
+That means many SPA and AJAX setups get CSRF header handling with little or no manual code.
+
+## SPA considerations
+
+When using Laravel as an API backend for an SPA, read the Sanctum guide and initialize CSRF protection before login:
+
+```js
+await axios.get('/sanctum/csrf-cookie');
+await axios.post('/login', {
+    email: 'user@example.com',
+    password: 'password',
+});
+```
+
+For full SPA auth flow details, see [Sanctum](/en/sanctum).

@@ -110,6 +110,10 @@ $response = Http::withHeaders([
 $response = Http::acceptJson()->get('https://api.example.com/users');
 ```
 
+<Info>
+  For browser-side AJAX requests to your Laravel app (not outbound server-to-server calls), see [CSRF protection](/en/csrf) for `X-CSRF-TOKEN` and `X-XSRF-TOKEN` usage.
+</Info>
+
 ### Authentication
 
 ```php

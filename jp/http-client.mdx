@@ -121,6 +121,10 @@ $response = Http::withHeaders([
 $response = Http::acceptJson()->get('https://api.example.com/users');
 ```
 
+<Info>
+  ブラウザーからLaravelへ送るAJAXリクエストのCSRFヘッダー（`X-CSRF-TOKEN` / `X-XSRF-TOKEN`）については [CSRFプロテクション](/jp/csrf) を参照してください。
+</Info>
+
 ### 認証
 
 **Bearer トークン認証**（最も一般的）:

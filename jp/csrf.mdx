@@ -1,0 +1,142 @@
+---
+title: "CSRFプロテクション"
+description: "CSRF攻撃の仕組みと、Laravel 13のOrigin検証・トークン検証による防御方法を解説します。"
+keywords: ["laravel", "csrf", "セキュリティ", "origin検証", "sanctum"]
+---
+
+## イントロダクション
+
+CSRF（Cross-Site Request Forgery）は、ログイン済みユーザーになりすまして意図しないリクエストを送らせる攻撃です。
+
+例えば、あなたのアプリに `POST /user/email` があり、メールアドレス変更を受け付けているとします。攻撃者が別サイトでこのURLに自動送信するフォームを仕込むと、ユーザーが気づかないうちにメールアドレスが変更される可能性があります。
+
+Laravel 13では、`web` ミドルウェアグループに含まれる仕組みにより、CSRF保護がデフォルトで有効です。
+
+## CSRF攻撃の防止
+
+Laravelの `PreventRequestForgery` ミドルウェアは、次の2層でCSRFを防ぎます。
+
+1. **Origin検証**（`Sec-Fetch-Site` ヘッダー）
+2. **トークン検証**（セッション単位のCSRFトークン）
+
+まずOriginを確認し、判定できない場合や失敗した場合はトークン検証にフォールバックします。
+
+## Origin検証
+
+Laravelは最初に `Sec-Fetch-Site` を確認し、同一Originからのリクエストかどうかを判定します。これはHTTPS環境で特に有効です。
+
+Origin検証が通れば、その時点でリクエストは許可されます。通らない場合は、従来どおりCSRFトークン検証が実行されます。
+
+<Warning>
+  `Sec-Fetch-Site` はHTTPS接続で利用されるのが前提です。HTTP環境ではOrigin検証が機能せず、トークン検証が主な防御になります。
+</Warning>
+
+### Origin-onlyモード
+
+トークン検証へのフォールバックを無効化し、Origin検証のみで判定することもできます。
+
+```php
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Middleware;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->preventRequestForgery(originOnly: true);
+    });
+```
+
+Origin-onlyモードでは、Origin検証に失敗したリクエストは `419` ではなく `403` を返します。
+
+サブドメイン間リクエストなどでsame-siteを許可したい場合は、`allowSameSite` を設定します。
+
+```php
+$middleware->preventRequestForgery(allowSameSite: true);
+```
+
+## トークン検証
+
+LaravelはセッションごとにCSRFトークンを生成します。`csrf_token()` またはセッションから取得できます。
+
+```php
+use Illuminate\Http\Request;
+
+Route::get('/token', function (Request $request) {
+    $tokenFromSession = $request->session()->token();
+    $tokenFromHelper = csrf_token();
+});
+```
+
+`web` ルートで `POST`・`PUT`・`PATCH`・`DELETE` のフォームを作る場合は、必ず `@csrf` を含めます。
+
+```blade
+<form method="POST" action="/profile">
+    @csrf
+
+    <!-- 同等のhidden input -->
+    <input type="hidden" name="_token" value="{{ csrf_token() }}" />
+</form>
+```
+
+## URIの除外
+
+StripeのWebhookのように外部サービスから送られるリクエストでは、特定URIをCSRF保護から除外することがあります。
+
+```php
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Middleware;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->preventRequestForgery(except: [
+            'stripe/*',
+            'http://example.com/foo/bar',
+            'http://example.com/foo/*',
+        ]);
+    });
+```
+
+<Info>
+  可能であればWebhookルートは `web` ミドルウェアグループの外に配置し、除外設定は最小限にしてください。
+</Info>
+
+## X-CSRF-TOKEN ヘッダー
+
+Laravelはフォームの `_token` だけでなく、`X-CSRF-TOKEN` ヘッダーも検証します。
+
+まずトークンをmetaタグに出力します。
+
+```blade
+<meta name="csrf-token" content="{{ csrf_token() }}">
+```
+
+その値をAJAXリクエストヘッダーに付与します。
+
+```js
+$.ajaxSetup({
+    headers: {
+        'X-CSRF-TOKEN': document
+            .querySelector('meta[name="csrf-token"]')
+            .getAttribute('content'),
+    },
+});
+```
+
+## X-XSRF-TOKEN ヘッダー
+
+Laravelは暗号化された `XSRF-TOKEN` Cookieも送信します。AxiosやAngularは、同一Originリクエスト時にこの値を `X-XSRF-TOKEN` ヘッダーへ自動設定できます。
+
+そのため、SPAやAJAXの実装ではヘッダー設定を手動で書かなくてもCSRF対策が有効になるケースがあります。
+
+## SPAでの考慮事項
+
+SPAでLaravelをAPIバックエンドとして使う場合、まずCSRF Cookieを取得してからログインリクエストを送ります。
+
+```js
+await axios.get('/sanctum/csrf-cookie');
+await axios.post('/login', {
+    email: 'user@example.com',
+    password: 'password',
+});
+```
+
+詳細は [Sanctum](/jp/sanctum) を参照してください。
