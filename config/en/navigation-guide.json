@@ -16,6 +16,7 @@
       "pages": [
         "en/authorization",
         "en/verification",
+        "en/csrf",
         "en/passwords",
         "en/hashing",
         "en/sanctum",
