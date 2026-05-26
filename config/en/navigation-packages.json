@@ -120,6 +120,8 @@
             "en/packages/laravel-voicevox/configuration",
             "en/packages/laravel-voicevox/client-talk",
             "en/packages/laravel-voicevox/client-song",
+            "en/packages/laravel-voicevox/client-user-dict",
+            "en/packages/laravel-voicevox/client-presets",
             "en/packages/laravel-voicevox/native-talk",
             "en/packages/laravel-voicevox/native-song",
             "en/packages/laravel-voicevox/engine-talk",
@@ -127,8 +129,8 @@
             "en/packages/laravel-voicevox/song-score-note",
             "en/packages/laravel-voicevox/vvproj",
             "en/packages/laravel-voicevox/response",
-            "en/packages/laravel-voicevox/presets",
-            "en/packages/laravel-voicevox/user-dict",
+            "en/packages/laravel-voicevox/native-presets",
+            "en/packages/laravel-voicevox/native-user-dict",
             "en/packages/laravel-voicevox/app-guide",
             "en/packages/laravel-voicevox/ai-sdk"
           ]

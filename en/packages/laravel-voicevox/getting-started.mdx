@@ -1,6 +1,6 @@
 ---
 title: "Getting started - VOICEVOX for Laravel"
-description: "Learn the package basics, compare the three modes, and run a quick start for VOICEVOX for Laravel."
+description: "Learn the package basics, compare the three modes, and run a quick start (client mode) for VOICEVOX for Laravel."
 sidebarTitle: "Getting started"
 ---
 
@@ -20,19 +20,17 @@ VOICEVOX for Laravel brings VOICEVOX speech synthesis features into Laravel. You
 
 ## Quick start
 
+These steps cover client mode.
+
 <Steps>
   <Step title="Install package(s)">
     ```shell
-    # Client mode only (no FFI)
     composer require revolution/laravel-voicevox
-
-    # Client + native / engine API (FFI required)
-    composer require revolution/laravel-voicevox revolution/voicevox-core
     ```
 
     See [Installation and Configuration](/en/packages/laravel-voicevox/installation) for full setup.
   </Step>
-  <Step title="Start the official engine (client mode)">
+  <Step title="Start the official engine">
     ```shell
     docker pull voicevox/voicevox_engine:cpu-latest
     docker run --rm -p '127.0.0.1:50021:50021' voicevox/voicevox_engine:cpu-latest
@@ -86,17 +84,18 @@ $response = Voicevox::song($score)->generate(id: 3001);
 
 ### User dictionary and presets
 
-```php
-use function Revolution\Voicevox\dict;
-use function Revolution\Voicevox\preset;
+In client mode, use the `Voicevox` facade to manage the user dictionary and presets on the official engine side.
 
-$uuid = dict()->add(
+```php
+use Revolution\Voicevox\Voicevox;
+
+$uuid = Voicevox::addWord(
     surface: 'Laravel',
     pronunciation: 'ララベル',
     accent_type: 3,
 );
 
-$presetId = preset()->add([
+$presetId = Voicevox::addPreset([
     'id' => 0,
     'name' => 'Slow and clear',
     'speaker_uuid' => '7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff',
@@ -127,6 +126,11 @@ $audio->storeAs('output.wav');
 - [Installation and Configuration](/en/packages/laravel-voicevox/installation)
 - [Configuration reference](/en/packages/laravel-voicevox/configuration)
 - [Client Talk](/en/packages/laravel-voicevox/client-talk)
+- [Client Song](/en/packages/laravel-voicevox/client-song)
+- [Client mode - User Dictionary](/en/packages/laravel-voicevox/client-user-dict)
+- [Client mode - Presets](/en/packages/laravel-voicevox/client-presets)
 - [Native Talk](/en/packages/laravel-voicevox/native-talk)
 - [Engine Talk](/en/packages/laravel-voicevox/engine-talk)
+- [Native mode - User Dictionary](/en/packages/laravel-voicevox/native-user-dict)
+- [Native mode - Presets](/en/packages/laravel-voicevox/native-presets)
 - [AI SDK integration](/en/packages/laravel-voicevox/ai-sdk)
