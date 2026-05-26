@@ -16,14 +16,15 @@ HTTP 経由で公式エンジンに接続するクライアントモードと、
 
 ## 機能表
 
-| Feature           | Supported | Description                                                                                |
-|-------------------|-----------|--------------------------------------------------------------------------------------------|
-| VOICEVOX Client   | ✅         | 公式 VOICEVOX エンジン API に HTTP でアクセスします。FFI は不要です。                                            |
-| VOICEVOX Core     | ✅         | [VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) を通して VOICEVOX CORE の動的ライブラリを利用します。 |
-| Laravel style     | ✅         | Facade、ヘルパー、`config/voicevox.php`、`.env` で Laravel らしく扱えます。                                |
-| Laravel AI SDK 統合 | ✅         | Laravel AI SDK の Audio ワークフローからも利用できます。                                                    |
-| VOICEVOX Engine   | ⚠️        | Laravel アプリ内に VOICEVOX 互換 API を内蔵します。未対応部分は公式エンジンへフォールバックします。                              |
-| VOICEVOX Editor   | ⚠️        | macOS用のソング特化アプリを開発しましたがアプリストアで公開・配布する予定はありません。いつかGitHubでコードが公開されたらXcodeでビルドして使用できます。       |
+| Feature                           | Supported | Description                                                                                |
+|-----------------------------------|-----------|--------------------------------------------------------------------------------------------|
+| VOICEVOX Client                   | ✅         | 公式 VOICEVOX エンジン API に HTTP でアクセスします。FFI は不要です。                                            |
+| VOICEVOX Core                     | ✅         | [VOICEVOX Core for PHP](/jp/packages/voicevox-core-php) を通して VOICEVOX CORE の動的ライブラリを利用します。 |
+| Laravel style                     | ✅         | Facade、ヘルパー、`config/voicevox.php`、`.env` で Laravel らしく扱えます。                                |
+| Laravel AI SDK 統合                 | ✅         | Laravel AI SDK の Audio ワークフローからも利用できます。                                                    |
+| VOICEVOX Engine                   | ⚠️        | Laravel アプリ内に VOICEVOX 互換 API を内蔵します。未対応部分は公式エンジンへフォールバックします。                              |
+| VOICEVOX Engine / OpenAI互換TTS API | ✅         | `/v1/audio/speech` voiceはAI SDKと同様にスタイルIDの他に「ずんだもん」などのエイリアスに対応しています。                       |
+| VOICEVOX Editor                   | ⚠️        | macOS用のソング特化アプリを開発しましたがアプリストアで公開・配布する予定はありません。いつかGitHubでコードが公開されたらXcodeでビルドして使用できます。       |
 
 ## 要件
 
