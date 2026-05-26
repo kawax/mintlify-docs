@@ -20,14 +20,15 @@ VOICEVOX is widely used in Japan, and many well-known "Zundamon" voice clips are
 
 ## Feature matrix
 
-| Feature                    | Supported | Description                                                                                                                                                                              |
-|----------------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| VOICEVOX Client            | ✅         | Accesses the official VOICEVOX Engine API over HTTP. No FFI required.                                                                                                                    |
-| VOICEVOX Core              | ✅         | Uses VOICEVOX CORE dynamic libraries through [VOICEVOX Core for PHP](/en/packages/voicevox-core-php).                                                                                    |
-| Laravel style              | ✅         | Uses Facades, helpers, `config/voicevox.php`, and `.env` in a Laravel-friendly way.                                                                                                      |
-| Laravel AI SDK Integration | ✅         | Works with Laravel AI SDK Audio workflows.                                                                                                                                               |
-| VOICEVOX Engine            | ⚠️        | Provides a VOICEVOX-compatible API inside Laravel, with fallback to the official engine for unsupported parts.                                                                           |
-| VOICEVOX Editor            | ⚠️        | I've developed a song-focused app for macOS, but I don't plan to publish or distribute it on the App Store. If the code is ever released on GitHub, you can build and use it with Xcode. |
+| Feature                                     | Supported | Description                                                                                                                                                                              |
+|---------------------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| VOICEVOX Client                             | ✅         | Accesses the official VOICEVOX Engine API over HTTP. No FFI required.                                                                                                                    |
+| VOICEVOX Core                               | ✅         | Uses VOICEVOX CORE dynamic libraries through [VOICEVOX Core for PHP](/en/packages/voicevox-core-php).                                                                                    |
+| Laravel style                               | ✅         | Uses Facades, helpers, `config/voicevox.php`, and `.env` in a Laravel-friendly way.                                                                                                      |
+| Laravel AI SDK Integration                  | ✅         | Works with Laravel AI SDK Audio workflows.                                                                                                                                               |
+| VOICEVOX Engine                             | ⚠️        | Provides a VOICEVOX-compatible API inside Laravel, with fallback to the official engine for unsupported parts.                                                                           |
+| VOICEVOX Engine / OpenAI compatible TTS API | ✅         | `/v1/audio/speech` voice supports aliases such as "ずんだもん" in addition to style IDs, similar to the AI SDK.                                                                               |
+| VOICEVOX Editor                             | ⚠️        | I've developed a song-focused app for macOS, but I don't plan to publish or distribute it on the App Store. If the code is ever released on GitHub, you can build and use it with Xcode. |
 
 ## Requirements
 
