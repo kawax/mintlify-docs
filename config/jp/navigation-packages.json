@@ -154,6 +154,12 @@
           ]
         }
       ]
+    },
+    {
+      "group": "ミドルウェア",
+      "pages": [
+        "jp/packages/laravel-fetch-metadata"
+      ]
     }
   ]
 }
