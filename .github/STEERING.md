@@ -71,7 +71,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
     - 実際に一通り作ってみないことが多い。PythonからちょっとAPIを呼び出す程度の事例は多いけどこの規模でアプリとして作ってる事例は見ない。他にない情報なので内容を省略せずしっかりページ化。長いページだと省略しがち。
     - Xcodeに限定してない汎用的な項目＋それぞれXcode向け補足を入れてる構成。
     - 日本語ページはOK。これの英語ページでVOICEVOX for Laravelは完了。以降は直接イシューを作って対応。
-- [ ] Fetch metadata middleware for Laravel https://github.com/invokable/laravel-fetch-metadata
+- [x] Fetch metadata middleware for Laravel https://github.com/invokable/laravel-fetch-metadata
   - csrfのページが追加されたのでこのパッケージのページを作成。
   - Laravel13のcsrfで`Sec-Fetch-Site`が使われるようになる前に作っていたけどほとんど使ってない。Laravelが`Sec-Fetch-Site`しか使ってないように使い所は限られる。下手に使うと検索エンジンや今ならAIエージェントが読めなくなる。
   - README.mdが英語、src内も少ないシンプルなパッケージなので1ページ。
@@ -80,5 +80,5 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - フィードリーダー向けの「URLからコンテンツを抽出する」パッケージ。
   - Pipelineパターンの実例になる。 advanced/pipeline
   - README.mdとresources/fullfeed/README.mdは英語、resources/fullfeed/README_jp.mdは日本語。
-  - 日本では定番だったLDRFullFeedのjsonデータを使っている。LDRとはLivedoor Readerのことだけど10年以上前にサービス終了していてもはや何も残ってないけど非公式だったFullFeedのデータだけ現代まで残っている。とはいえ古すぎるのでこのパッケージではCSSセレクタの新形式がメイン。
+  - 日本では定番だったLDRFullFeedのjsonデータを使っている。LDRとはLivedoor Readerのことだけど10年以上前にサービス終了していてもはや何も残ってないけど非公式だったFullFeedのデータだけ現代まで残っている。とはいえ古すぎるのでこのパッケージではCSSセレクタの新形式がメイン。LDRFullFeedから新形式に移植してたけど多すぎるので途中で終了している。
   - フィード関連パッケージはもう少しあるので navigation-packages.json はスターターキットとミドルウェアの間に「フィード・RSS」グループを作成。
