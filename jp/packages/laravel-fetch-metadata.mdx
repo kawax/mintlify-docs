@@ -1,0 +1,166 @@
+---
+title: "Laravel Fetch Metadata"
+description: "Sec-Fetch-* ヘッダーを使ったセキュリティミドルウェアで、LaravelアプリをCSRF攻撃やクロスサイトリクエストから保護します。"
+---
+
+## 概要
+
+[revolution/laravel-fetch-metadata](https://github.com/invokable/laravel-fetch-metadata) は、ブラウザが送信する `Sec-Fetch-*` HTTPヘッダーを検証するセキュリティミドルウェアパッケージです。リクエストの発生元・モード・宛先・ユーザー操作の有無に基づいて、許可するリクエストを制御できます。
+
+ブラウザに組み込まれたセキュリティ機能を活用することで、正規ユーザーのエクスペリエンスを損なわずに、不正なオリジンからの悪意あるリクエストを防止できます。
+
+<Info>
+  Laravel 13では、CSRFプロテクションのOrigin検証に `Sec-Fetch-Site` ヘッダーが使われるようになりました。詳細は[CSRFプロテクション](/jp/csrf)を参照してください。
+</Info>
+
+詳細なFetch Metadataの仕様については、[MDN ドキュメント](https://developer.mozilla.org/en-US/docs/Glossary/Fetch_metadata_request_header)を参照してください。
+
+## インストール
+
+```bash
+composer require revolution/laravel-fetch-metadata
+```
+
+### ミドルウェアエイリアスの登録
+
+`bootstrap/app.php` にミドルウェアのエイリアスを登録します。
+
+```php
+use Illuminate\Foundation\Configuration\Middleware;
+use Revolution\FetchMetadata\Middleware\SecFetchSite;
+use Revolution\FetchMetadata\Middleware\SecFetchMode;
+use Revolution\FetchMetadata\Middleware\SecFetchDest;
+use Revolution\FetchMetadata\Middleware\SecFetchUser;
+
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->alias([
+        'sec-fetch-site' => SecFetchSite::class,
+        'sec-fetch-mode' => SecFetchMode::class,
+        'sec-fetch-dest' => SecFetchDest::class,
+        'sec-fetch-user' => SecFetchUser::class,
+    ]);
+})
+```
+
+一部のミドルウェアだけを使うこともできます。エイリアス名は任意に変更できます。
+
+## ミドルウェアの説明
+
+### SecFetchSite
+
+`Sec-Fetch-Site` ヘッダーは、リクエストの発生元とターゲットのオリジンの関係を示します。デフォルトでは `same-origin` と `none`（直接アクセス）のみを許可します。
+
+| 値 | 説明 |
+|----|------|
+| `same-origin` | 同一オリジンからのリクエスト |
+| `same-site` | サブドメインなど同一サイトからのリクエスト |
+| `cross-site` | 異なるサイトからのリクエスト |
+| `none` | ユーザーが直接URLを入力するなど、ナビゲーション起点のリクエスト |
+
+詳細は[MDN ドキュメント](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site)を参照してください。
+
+### SecFetchMode
+
+`Sec-Fetch-Mode` ヘッダーは、リクエストのモードを示します。デフォルトでは `navigate` と `cors` を許可します。
+
+| 値 | 説明 |
+|----|------|
+| `navigate` | リンククリックやフォーム送信などのナビゲーションリクエスト |
+| `cors` | CORSリクエスト |
+| `no-cors` | no-corsリクエスト |
+| `same-origin` | 同一オリジンリクエスト |
+| `websocket` | WebSocket接続リクエスト |
+
+詳細は[MDN ドキュメント](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Mode)を参照してください。
+
+### SecFetchDest
+
+`Sec-Fetch-Dest` ヘッダーは、リクエストの宛先リソースタイプを示します。
+
+詳細は[MDN ドキュメント](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Dest)を参照してください。
+
+### SecFetchUser
+
+`Sec-Fetch-User` ヘッダーは、リクエストがユーザーの操作によって開始されたかどうかを示します。値は `?1`（ユーザー操作あり）のみです。
+
+<Warning>
+  `SecFetchUser` ミドルウェアを使用すると、検索エンジンのクローラーやAIエージェントもブロックされます。インデックスが必要な公開ページには使用しないでください。
+</Warning>
+
+## ルーティングでの使用例
+
+### 基本的な使用
+
+```php
+use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+
+Route::post('user/update-password', function (Request $request) {
+    //
+})->middleware('sec-fetch-site');
+```
+
+### パラメータで許可する値を指定する
+
+```php
+Route::post('user/update-password', function (Request $request) {
+    //
+})->middleware('sec-fetch-site:cross-site');
+```
+
+### 複数のパラメータを指定する
+
+```php
+Route::post('user/update-password', function (Request $request) {
+    //
+})->middleware('sec-fetch-site:same-origin,cross-site');
+```
+
+### エイリアスを使わない場合
+
+```php
+use Revolution\FetchMetadata\Middleware\SecFetchSite;
+
+Route::post('user/update-password', function (Request $request) {
+    //
+})->middleware(SecFetchSite::class.':same-origin,cross-site');
+```
+
+### 複数のミドルウェアを組み合わせる
+
+```php
+Route::post('user/update-profile', function (Request $request) {
+    //
+})->middleware(['sec-fetch-site:same-origin', 'sec-fetch-mode:navigate']);
+```
+
+## エラーハンドリング
+
+`Sec-Fetch-*` ヘッダーの値が不正な場合、`Symfony\Component\HttpKernel\Exception\BadRequestHttpException` がスローされます。
+
+`bootstrap/app.php` でレスポンスをカスタマイズできます。
+
+```php
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+
+->withExceptions(function (Exceptions $exceptions) {
+    $exceptions->render(function (BadRequestHttpException $e, Request $request) {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 400);
+        }
+    });
+})
+```
+
+## CSRFプロテクションとの関係
+
+Laravel 13では、`PreventRequestForgery` ミドルウェアがCSRF保護の最初のステップとして `Sec-Fetch-Site` ヘッダーによるOrigin検証を行うようになりました。このパッケージはさらに細かい粒度でFetch Metadataヘッダーを活用し、アプリケーションのセキュリティを強化できます。
+
+詳細は[CSRFプロテクション](/jp/csrf)を参照してください。
+
+<Info>
+  最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-fetch-metadata) を参照してください。
+</Info>

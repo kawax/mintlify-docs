@@ -1,0 +1,166 @@
+---
+title: "Laravel Fetch Metadata"
+description: "Security middleware using Sec-Fetch-* headers to protect Laravel applications from CSRF attacks and unwanted cross-site requests."
+---
+
+## Overview
+
+[revolution/laravel-fetch-metadata](https://github.com/invokable/laravel-fetch-metadata) is a security-focused middleware package that validates `Sec-Fetch-*` HTTP headers sent by browsers. It allows you to control which requests are permitted based on their origin relationship, mode, destination resource type, and user interaction status.
+
+By leveraging the browser's built-in security features, this package helps prevent malicious requests from unauthorized origins while maintaining a seamless experience for legitimate users.
+
+<Info>
+  In Laravel 13, the CSRF protection now uses the `Sec-Fetch-Site` header for origin verification. See [CSRF Protection](/en/csrf) for details.
+</Info>
+
+For detailed specifications on Fetch Metadata, see the [MDN documentation](https://developer.mozilla.org/en-US/docs/Glossary/Fetch_metadata_request_header).
+
+## Installation
+
+```bash
+composer require revolution/laravel-fetch-metadata
+```
+
+### Register middleware aliases
+
+Register middleware aliases in `bootstrap/app.php`.
+
+```php
+use Illuminate\Foundation\Configuration\Middleware;
+use Revolution\FetchMetadata\Middleware\SecFetchSite;
+use Revolution\FetchMetadata\Middleware\SecFetchMode;
+use Revolution\FetchMetadata\Middleware\SecFetchDest;
+use Revolution\FetchMetadata\Middleware\SecFetchUser;
+
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->alias([
+        'sec-fetch-site' => SecFetchSite::class,
+        'sec-fetch-mode' => SecFetchMode::class,
+        'sec-fetch-dest' => SecFetchDest::class,
+        'sec-fetch-user' => SecFetchUser::class,
+    ]);
+})
+```
+
+You can use only some of the middleware. Alias names are arbitrary.
+
+## Middleware classes
+
+### SecFetchSite
+
+The `Sec-Fetch-Site` header indicates the relationship between the request initiator's origin and the target's origin. By default, this middleware allows `same-origin` and `none` (direct navigation).
+
+| Value | Description |
+|-------|-------------|
+| `same-origin` | Request from the same origin |
+| `same-site` | Request from the same site, e.g. a subdomain |
+| `cross-site` | Request from a different site |
+| `none` | User-initiated navigation, e.g. typing a URL directly |
+
+See the [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site) for details.
+
+### SecFetchMode
+
+The `Sec-Fetch-Mode` header indicates the mode of the request. By default, this middleware allows `navigate` and `cors`.
+
+| Value | Description |
+|-------|-------------|
+| `navigate` | Navigation request such as clicking a link or submitting a form |
+| `cors` | CORS request |
+| `no-cors` | No-CORS request |
+| `same-origin` | Same-origin request |
+| `websocket` | WebSocket connection request |
+
+See the [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Mode) for details.
+
+### SecFetchDest
+
+The `Sec-Fetch-Dest` header indicates the destination resource type of the request.
+
+See the [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Dest) for details.
+
+### SecFetchUser
+
+The `Sec-Fetch-User` header indicates whether the request was initiated by user interaction. The only value is `?1` (user-activated).
+
+<Warning>
+  Using `SecFetchUser` will also block search engine crawlers and AI agents. Do not use it on public pages that need to be indexed.
+</Warning>
+
+## Usage in routing
+
+### Basic usage
+
+```php
+use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+
+Route::post('user/update-password', function (Request $request) {
+    //
+})->middleware('sec-fetch-site');
+```
+
+### Specify allowed values via parameters
+
+```php
+Route::post('user/update-password', function (Request $request) {
+    //
+})->middleware('sec-fetch-site:cross-site');
+```
+
+### Specify multiple parameters
+
+```php
+Route::post('user/update-password', function (Request $request) {
+    //
+})->middleware('sec-fetch-site:same-origin,cross-site');
+```
+
+### Without an alias
+
+```php
+use Revolution\FetchMetadata\Middleware\SecFetchSite;
+
+Route::post('user/update-password', function (Request $request) {
+    //
+})->middleware(SecFetchSite::class.':same-origin,cross-site');
+```
+
+### Combining multiple middleware
+
+```php
+Route::post('user/update-profile', function (Request $request) {
+    //
+})->middleware(['sec-fetch-site:same-origin', 'sec-fetch-mode:navigate']);
+```
+
+## Error handling
+
+When a `Sec-Fetch-*` header value is invalid, `Symfony\Component\HttpKernel\Exception\BadRequestHttpException` is thrown.
+
+You can customize the response in `bootstrap/app.php`.
+
+```php
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+
+->withExceptions(function (Exceptions $exceptions) {
+    $exceptions->render(function (BadRequestHttpException $e, Request $request) {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 400);
+        }
+    });
+})
+```
+
+## Relationship with CSRF protection
+
+In Laravel 13, the `PreventRequestForgery` middleware now performs origin verification using the `Sec-Fetch-Site` header as the first step of CSRF protection. This package allows you to leverage fetch metadata headers at a finer granularity to further strengthen your application's security.
+
+See [CSRF Protection](/en/csrf) for details.
+
+<Info>
+  For the latest information, see the [GitHub repository](https://github.com/invokable/laravel-fetch-metadata).
+</Info>
