@@ -27,16 +27,19 @@ Laravel 13 では、PHP中心で進める方法と、React・Vue・Svelte など
 ```mermaid
 flowchart TD
     A["Laravel アプリケーション"] --> B{"どこでUIを組み立てる?"}
+    A --> G["Vite でアセットをビルド"]
     B --> C["Blade"]
     B --> D["Livewire + Alpine.js"]
     B --> E["Inertia + React / Vue / Svelte"]
     B --> F["API + 独立したSPA"]
-    A --> G["Vite"]
     C --> C1["サーバーでHTMLを返す"]
     D --> D1["PHP主導で動的UIを作る"]
     E --> E1["1つのリポジトリでSPA風の体験を作る"]
     F --> F1["別フロントエンドやモバイルアプリと連携する"]
-    G --> G1["CSS / JavaScript をビルドする"]
+    G --> C1
+    G --> D1
+    G --> E1
+    G --> F1
 ```
 
 ## PHPで進める

@@ -26,16 +26,19 @@ To choose the right approach, focus on three questions:
 ```mermaid
 flowchart TD
     A["Laravel application"] --> B{"Where do you want to build UI?"}
+    A --> G["Build assets with Vite"]
     B --> C["Blade"]
     B --> D["Livewire + Alpine.js"]
     B --> E["Inertia + React / Vue / Svelte"]
     B --> F["API + standalone SPA"]
-    A --> G["Vite"]
     C --> C1["Server returns HTML"]
     D --> D1["PHP-first dynamic UI"]
     E --> E1["Single-repository SPA-like experience"]
     F --> F1["Separate frontend or mobile clients"]
-    G --> G1["Build CSS / JavaScript assets"]
+    G --> C1
+    G --> D1
+    G --> E1
+    G --> F1
 ```
 
 ## Using PHP
