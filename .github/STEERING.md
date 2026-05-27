@@ -43,9 +43,6 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - [x] chisel-introduction。moatはLaravelとは直接関係ないのでページは不要。
 
 ## packages ページ案
-- [x] Laravel Notification for Discord(Webhook)
-- [x] Socialite for Discord
-- [x] LINE SDK for Laravel
 - [x] VOICEVOX Core for PHP
 - [x] VOICEVOX for Laravel
 - [x] Fetch metadata middleware for Laravel https://github.com/invokable/laravel-fetch-metadata
