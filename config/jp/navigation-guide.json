@@ -131,6 +131,7 @@
     {
       "group": "フロントエンド",
       "pages": [
+        "jp/frontend",
         "jp/vite",
         "jp/folio"
       ]

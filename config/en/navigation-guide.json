@@ -86,6 +86,7 @@
     {
       "group": "Frontend",
       "pages": [
+        "en/frontend",
         "en/vite",
         "en/folio"
       ]
