@@ -6,6 +6,10 @@ sidebarTitle: "App Development Guide"
 
 # Guide to Building Apps with VOICEVOX Engine API
 
+<Frame caption="Song app">
+    <img src="/images/laravel-voicevox/song-app-1.png" alt="VOICEVOX Song" />
+</Frame>
+
 <Info>
   **What is VOICEVOX?** VOICEVOX is a free, open-source Japanese text-to-speech (TTS) and singing voice synthesis software. It features a collection of fictional characters, each with a unique voice. The most famous character is **Zundamon** (ずんだもん) — a green soybean-themed mascot whose voice has been used in countless YouTube videos, games, and other content in Japan. VOICEVOX provides both an official desktop editor and an HTTP API engine, making it accessible to developers building external applications.
 </Info>
@@ -19,6 +23,10 @@ General design principles are presented first, with Xcode/Swift-specific notes a
 </Info>
 
 ## 1. Register Engines by URL First
+
+<Frame caption="Engine settings screen">
+    <img src="/images/laravel-voicevox/song-app-2.png" alt="VOICEVOX Song" />
+</Frame>
 
 The official VOICEVOX editor launches engine executables directly, managing them through `engine_manifest.json` and engine-specific configuration. For an external client application, the simpler and more robust approach is to register the URL of an **already-running HTTP API server**.
 

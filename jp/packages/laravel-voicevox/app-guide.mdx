@@ -6,6 +6,10 @@ sidebarTitle: "アプリ開発ガイド"
 
 # VOICEVOXエンジンAPI連携アプリ開発ガイド
 
+<Frame caption="ソングアプリ">
+    <img src="/images/laravel-voicevox/song-app-1.png" alt="VOICEVOX Song" />
+</Frame>
+
 VOICEVOXエンジンAPIを呼び出すクライアントアプリを作るときの実装メモ。  
 macOS用ソングアプリの実装記録をもとに、公式VOICEVOXエディターの内部構成をそのまま移植するのではなく、外部アプリとして安定してエンジンAPIを使うための項目を整理する。
 
@@ -16,6 +20,10 @@ Xcode/Swift以外の環境でも使えるように汎用方針を先に書き、
 </Info>
 
 ## 1. 最初にエンジンをURLで登録する
+
+<Frame caption="エンジン接続設定">
+    <img src="/images/laravel-voicevox/song-app-2.png" alt="VOICEVOX Song" />
+</Frame>
 
 公式VOICEVOXエディターは、同梱または指定されたエンジン実行ファイルをアプリ側から起動し、エンジン設定や `engine_manifest.json` を前提に管理する。一方、外部クライアントアプリでは、まず「起動済みのHTTP APIサーバーのURL」を登録する方式にした方が扱いやすい。
 
