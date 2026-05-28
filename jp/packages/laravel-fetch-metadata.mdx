@@ -13,7 +13,7 @@ description: "Sec-Fetch-* ヘッダーを使ったセキュリティミドルウ
   Laravel 13では、CSRFプロテクションのOrigin検証に `Sec-Fetch-Site` ヘッダーが使われるようになりました。詳細は[CSRFプロテクション](/jp/csrf)を参照してください。
 </Info>
 
-詳細なFetch Metadataの仕様については、[MDN ドキュメント](https://developer.mozilla.org/en-US/docs/Glossary/Fetch_metadata_request_header)を参照してください。
+詳細なFetch Metadataの仕様については、[MDN ドキュメント](https://developer.mozilla.org/ja/docs/Glossary/Fetch_metadata_request_header)を参照してください。
 
 ## インストール
 
@@ -57,7 +57,7 @@ use Revolution\FetchMetadata\Middleware\SecFetchUser;
 | `cross-site` | 異なるサイトからのリクエスト |
 | `none` | ユーザーが直接URLを入力するなど、ナビゲーション起点のリクエスト |
 
-詳細は[MDN ドキュメント](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site)を参照してください。
+詳細は[MDN ドキュメント](https://developer.mozilla.org/ja/docs/Web/HTTP/Headers/Sec-Fetch-Site)を参照してください。
 
 ### SecFetchMode
 
@@ -71,13 +71,13 @@ use Revolution\FetchMetadata\Middleware\SecFetchUser;
 | `same-origin` | 同一オリジンリクエスト |
 | `websocket` | WebSocket接続リクエスト |
 
-詳細は[MDN ドキュメント](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Mode)を参照してください。
+詳細は[MDN ドキュメント](https://developer.mozilla.org/ja/docs/Web/HTTP/Headers/Sec-Fetch-Mode)を参照してください。
 
 ### SecFetchDest
 
 `Sec-Fetch-Dest` ヘッダーは、リクエストの宛先リソースタイプを示します。
 
-詳細は[MDN ドキュメント](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Dest)を参照してください。
+詳細は[MDN ドキュメント](https://developer.mozilla.org/ja/docs/Web/HTTP/Headers/Sec-Fetch-Dest)を参照してください。
 
 ### SecFetchUser
 
