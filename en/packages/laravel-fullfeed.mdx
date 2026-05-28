@@ -1,0 +1,177 @@
+---
+title: "Laravel FullFeed"
+description: "A Laravel package that extracts the main content from web pages for feed readers, built around Laravel's Pipeline pattern."
+---
+
+## Overview
+
+[revolution/laravel-fullfeed](https://github.com/invokable/laravel-fullfeed) is a Laravel package that extracts the main content from web pages for feed readers.  
+It uses site-specific JSON rules so you can reliably pull article content from different domains.
+
+<Info>
+  This package was extracted from a private feed reader app and released as a standalone package.
+</Info>
+
+## Requirements
+
+- PHP >= 8.4 (uses `Dom\HTMLDocument`)
+- Laravel >= 12.x
+
+## Installation
+
+```bash
+composer require revolution/laravel-fullfeed
+```
+
+If you want the latest development version:
+
+```bash
+composer require revolution/laravel-fullfeed:dev-main
+```
+
+## Publish config and site rule files
+
+```bash
+php artisan vendor:publish --tag=fullfeed
+```
+
+This creates:
+
+- `config/fullfeed.php`
+- `resources/fullfeed`
+
+## Auto update site rules via composer post-update-cmd
+
+To republish site rules automatically after `composer update`, add this to `composer.json`:
+
+```json
+{
+  "scripts": {
+    "post-update-cmd": [
+      "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+      "@php artisan vendor:publish --tag=fullfeed-site --ansi --force"
+    ]
+  }
+}
+```
+
+## Basic usage
+
+```php
+use Revolution\Fullfeed\Facades\FullFeed;
+
+$html = FullFeed::get($url);
+```
+
+## Testing
+
+Use `FullFeed::expects()` to fake facade behavior in tests.
+
+```php
+use Revolution\Fullfeed\Facades\FullFeed;
+
+FullFeed::expects('get')
+    ->with('https://example.com/article/1')
+    ->andReturn('<div>Main content</div>');
+```
+
+## Site rule files
+
+### items_all.json
+
+`items_all.json` is based on the LDRFullFeed (wedata) rule format used widely for full-text extraction.  
+Livedoor Reader, once a very popular feed reader service in Japan, has ended, but this rule data still exists and remains useful today.
+
+### plus.json
+
+`plus.json` is a sample file for adding your own rules.
+
+```json
+{
+  "name": "note",
+  "data": {
+    "url": "^https://note\\.com/",
+    "selector": "div[data-name=\"body\"]",
+    "xpath": "//div[@data-name=\"body\"]",
+    "enc": "UTF-8",
+    "callable": "App\\FullFeed\\CustomExtractor"
+  }
+}
+```
+
+## Rule fields
+
+- `url`: Regular expression for target URLs
+- `selector`: CSS selector (takes priority over `xpath`)
+- `xpath`: XPath expression
+- `enc`: Character encoding for non-UTF-8 pages
+- `callable`: Custom extractor class(es) executed before built-in extraction
+- `after_callable`: Custom extractor class(es) executed at the end
+
+## Extractor order as a Pipeline pattern example
+
+FullFeed is a practical example of Laravel's **Pipeline pattern**.  
+Extractors run in this order:
+
+1. Classes in `callable`
+2. `XPathExtractor`
+3. `SelectorExtractor`
+4. Classes in `after_callable`
+
+This makes it easy to insert custom processing before and after default extraction for site-specific adjustments.
+
+## Built-in extractors
+
+### RemoveElements
+
+Removes elements matched by selectors.
+
+```json
+{
+  "after_callable": ["Revolution\\Fullfeed\\Extractor\\RemoveElements"],
+  "remove": ["svg", "button", "script"]
+}
+```
+
+### ReplaceMatches
+
+Replaces text matched by regular expressions (processed as an HTML string).
+
+```json
+{
+  "after_callable": ["Revolution\\Fullfeed\\Extractor\\ReplaceMatches"],
+  "replace": [
+    {
+      "pattern": "/ data-(h-)?index=\"[0-9]+\"/",
+      "replace": ""
+    }
+  ]
+}
+```
+
+### StripTags
+
+Removes tags using behavior equivalent to `strip_tags()`.
+
+```json
+{
+  "after_callable": ["Revolution\\Fullfeed\\Extractor\\StripTags:a,img"]
+}
+```
+
+### Squish
+
+Removes extra whitespace with `Str::squish()`.
+
+```json
+{
+  "after_callable": ["Revolution\\Fullfeed\\Extractor\\Squish"]
+}
+```
+
+## Adding custom rules
+
+1. Create a JSON file in `resources/fullfeed`
+2. Add that file to `paths` in `config/fullfeed.php`
+
+The first matching `data.url` rule is used, so put custom files near the beginning of `paths`.
