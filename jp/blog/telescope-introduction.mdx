@@ -1,254 +1,17 @@
 ---
-title: "Laravel Telescope 入門"
-description: "Laravel開発の必需品、Telescope。HTTPリクエストからN+1問題の発見まで、開発効率を大きく変えるデバッグ・モニタリングツールの使い方を解説します。"
+title: "Laravel Telescope 実践テクニック"
+description: "Telescopeをローカル開発で最大限に活かす実践的なパターンを紹介します。N+1検出、タグを使った追跡、カスタムウォッチャー、Dumpウォッチャーの活用など、公式ドキュメントだけでは分からないノウハウをまとめました。"
 ---
 
-## Laravel Telescopeとは
+基本的なインストールと設定は[ガイドページ](/jp/telescope)を参照してください。このページでは公式ドキュメントには載っていない、ローカル開発での実践的な活用パターンを紹介します。
 
-[Laravel Telescope](https://github.com/laravel/telescope) は、Laravelアプリケーションの動作をリアルタイムで観察できるデバッグ・モニタリングツールです。ブラウザから `/telescope` にアクセスするだけで、HTTPリクエスト、SQLクエリ、例外、キュージョブ、メールなど、アプリケーション内で起きていることを一覧できます。
-
-<Warning>
-  Telescopeは**開発環境専用**のツールです。本番環境への誤インストールを防ぐために、必ず `--dev` フラグを使ってインストールしてください。
-</Warning>
-
-`dd()` や `Log::info()` を散りばめてデバッグする時代から、Telescopeを使うとどう変わるか。この記事ではインストールから主要機能の活用まで、実際の開発シナリオを交えて紹介します。
+Telescopeは**ローカル開発専用**ツールです。本番環境の監視には [Laravel Pulse](/jp/pulse) や [Laravel Nightwatch](/jp/blog/nightwatch-introduction) を使ってください。
 
 ---
 
-## インストール
+## N+1問題を体系的に発見する
 
-### 開発依存としてインストールする
-
-```shell
-composer require laravel/telescope --dev
-```
-
-`--dev` を付けることで `composer.json` の `require-dev` に追加され、本番環境では `composer install --no-dev` を実行した際にインストールされません。
-
-続けてアセットとマイグレーションを公開します。
-
-```shell
-php artisan telescope:install
-
-php artisan migrate
-```
-
-`telescope:install` によって以下が作成されます。
-
-- `config/telescope.php` — ウォッチャーの設定ファイル
-- `app/Providers/TelescopeServiceProvider.php` — 認可ゲートやフィルタリングの設定
-- `public/vendor/telescope/` — ダッシュボードのアセット
-
-マイグレーション後は `/telescope` にアクセスするとダッシュボードが表示されます。
-
-### ローカル環境専用の設定
-
-`--dev` でインストールした場合、`TelescopeServiceProvider` が自動検出されないよう追加の設定が必要です。
-
-まず `bootstrap/providers.php` から自動登録を削除し、代わりに `AppServiceProvider` の `register` メソッドで手動登録します。
-
-```php
-// app/Providers/AppServiceProvider.php
-
-public function register(): void
-{
-    if ($this->app->environment('local') && class_exists(\Laravel\Telescope\TelescopeServiceProvider::class)) {
-        $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);
-        $this->app->register(TelescopeServiceProvider::class);
-    }
-}
-```
-
-さらに `composer.json` でオートディスカバリーから除外します。
-
-```json
-"extra": {
-    "laravel": {
-        "dont-discover": [
-            "laravel/telescope"
-        ]
-    }
-}
-```
-
-この設定により、Telescopeは `local` 環境でのみ動作し、本番環境のコードパスには影響しません。
-
----
-
-## ダッシュボードの全体像
-
-インストール後、`/telescope` にアクセスすると以下のようなダッシュボードが表示されます。
-
-```mermaid
-graph TD
-    A["/telescope ダッシュボード"] --> B["Requests<br>HTTPリクエスト"]
-    A --> C["Commands<br>Artisanコマンド"]
-    A --> D["Schedule<br>スケジュール"]
-    A --> E["Jobs<br>キュージョブ"]
-    A --> F["Exceptions<br>例外"]
-    A --> G["Logs<br>ログ"]
-    A --> H["Queries<br>SQLクエリ"]
-    A --> I["Mail<br>メール"]
-    A --> J["Events<br>イベント"]
-    A --> K["Cache<br>キャッシュ"]
-    A --> L["その他<br>Gate / Dump / Model など"]
-```
-
-各ウォッチャーはサイドバーから選択でき、エントリーをクリックすると詳細情報が表示されます。
-
----
-
-## 主要ウォッチャーの紹介
-
-### Requests — HTTPリクエストの全記録
-
-リクエストのURL、HTTPメソッド、レスポンスステータス、実行時間、ペイロード、セッション、認証ユーザー情報まですべて記録されます。
-
-「なぜこのリクエストが500を返すのか」という調査をするとき、Requestsウォッチャーを開けば、そのリクエスト中に実行されたSQLクエリや発生した例外も同時に確認できます。
-
-### Queries — SQLクエリとN+1問題の発見
-
-クエリウォッチャーはすべてのSQLクエリを記録します。実行時間の長いクエリはハイライト表示されます。
-
-<Tip>
-  `config/telescope.php` でスロークエリのしきい値（デフォルト100ms）を変更できます。
-
-  ```php
-  'watchers' => [
-      Watchers\QueryWatcher::class => [
-          'enabled' => env('TELESCOPE_QUERY_WATCHER', true),
-          'slow' => 100,
-      ],
-  ],
-  ```
-</Tip>
-
-N+1問題を発見する典型的なシナリオを考えます。投稿一覧ページで投稿ごとにユーザー名を表示する場合、`with('user')` を忘れると投稿の数だけ追加のSQLが発行されます。Telescopeのダッシュボードでこのリクエストを見ると、似たようなSELECT文が大量に並ぶため、すぐに気づけます。
-
-```php
-// N+1が発生するコード
-$posts = Post::all(); // 1クエリ
-foreach ($posts as $post) {
-    echo $post->user->name; // 投稿の数だけ追加クエリ
-}
-
-// Eager Loadingで解決
-$posts = Post::with('user')->get(); // 2クエリで完結
-```
-
-### Exceptions — スタックトレースの記録
-
-発生した例外を自動的に記録し、スタックトレース全体をダッシュボードで確認できます。ローカルで例外が起きたとき、ターミナルに戻らずブラウザで確認できるのは地味に便利です。
-
-### Mail — 送信メールのプレビュー
-
-開発中にメールが正しく送信されているか確認したいとき、Mailウォッチャーを使えばブラウザ上でメールの内容をプレビューできます。`.eml` ファイルとしてダウンロードすることも可能です。
-
-<Info>
-  [Mailpit](https://mailpit.axllent.org/) などのローカルSMTPサーバーと組み合わせることで、メール送信の確認がより快適になります。
-</Info>
-
-### Jobs — キュージョブの処理状況
-
-ジョブのディスパッチ、処理、失敗の状態をリアルタイムで追跡できます。失敗したジョブはスタックトレース付きで記録されます。非同期処理のデバッグに特に役立ちます。
-
-### Cache — キャッシュのヒット/ミス
-
-キャッシュへのアクセス（ヒット、ミス、書き込み、削除）をすべて記録します。「キャッシュが効いているはずなのに毎回DBを叩いている」といった問題の発見に使えます。
-
-### Commands / Schedule — Artisanとスケジュールの実行履歴
-
-Artisanコマンドの引数、オプション、終了コード、出力が記録されます。スケジュールされたタスクの実行結果も確認できます。
-
-### Events — イベントとリスナーの追跡
-
-ディスパッチされたイベントとそのリスナーが記録されます。イベントが発火しているか、どのリスナーが呼ばれているかをすぐに確認できます。
-
----
-
-## フィルタリングの設定
-
-`TelescopeServiceProvider` の `register` メソッド内の `filter` クロージャで、記録するエントリーを絞り込めます。デフォルトの設定はローカル環境では全エントリーを記録し、それ以外の環境では例外・失敗ジョブ・スケジュールタスク・スロークエリのみを記録します。
-
-```php
-use Laravel\Telescope\IncomingEntry;
-use Laravel\Telescope\Telescope;
-
-public function register(): void
-{
-    $this->hideSensitiveRequestDetails();
-
-    Telescope::filter(function (IncomingEntry $entry) {
-        if ($this->app->environment('local')) {
-            return true;
-        }
-
-        return $entry->isReportableException() ||
-            $entry->isFailedJob() ||
-            $entry->isScheduledTask() ||
-            $entry->isSlowQuery() ||
-            $entry->hasMonitoredTag();
-    });
-}
-```
-
-記録量が多くなりすぎる場合は、不要なウォッチャーを無効化することもできます。
-
-```php
-// config/telescope.php
-'watchers' => [
-    Watchers\CacheWatcher::class => false, // 無効化
-    Watchers\QueryWatcher::class => true,
-    // ...
-],
-```
-
----
-
-## データのプルーニング
-
-`telescope_entries` テーブルはデータが急速に蓄積されます。定期的に古いデータを削除するため、スケジュールに `telescope:prune` を追加してください。
-
-```php
-use Illuminate\Support\Facades\Schedule;
-
-Schedule::command('telescope:prune')->daily();
-```
-
-デフォルトでは24時間以上前のデータが削除されます。保持期間を変更するには `--hours` オプションを使います。
-
-```php
-Schedule::command('telescope:prune --hours=48')->daily();
-```
-
----
-
-## 本番環境での注意点
-
-Telescopeのダッシュボードはデフォルトで `local` 環境のみアクセス可能です。本番環境や staging 環境でアクセスを許可する場合は、`TelescopeServiceProvider` の `gate` メソッドで認可ゲートを設定します。
-
-```php
-use App\Models\User;
-
-protected function gate(): void
-{
-    Gate::define('viewTelescope', function (User $user) {
-        return in_array($user->email, [
-            'developer@example.com',
-        ]);
-    });
-}
-```
-
-<Warning>
-  本番環境の `.env` で `APP_ENV=production` が設定されていることを確認してください。`local` のままだとTelescopeダッシュボードが公開状態になります。
-</Warning>
-
----
-
-## 実践シナリオ：N+1問題を発見して修正する
-
-Telescopeを使ったデバッグの具体的な流れを見てみましょう。
+Telescopeを使ったN+1デバッグの実践的な流れを解説します。単に「同じSELECTが繰り返されている」と気づくだけでなく、修正後の確認まで一連のワークフローとして行えます。
 
 ```mermaid
 sequenceDiagram
@@ -264,7 +27,7 @@ sequenceDiagram
     end
     Laravel-->>ブラウザ: レスポンス
     Laravel-->>Telescope: クエリ履歴を記録
-    Note over Telescope: 同じSELECT文がN回<br>スロークエリとしてフラグ
+    Note over Telescope: 同じSELECT文がN回<br>slowタグが付く
 ```
 
 <Steps>
@@ -279,26 +42,178 @@ sequenceDiagram
   </Step>
 </Steps>
 
-この一連の流れを、デバッグ用の `dd()` やログ出力なしで完結できます。
+```php
+// N+1が発生するコード
+$posts = Post::all();
+foreach ($posts as $post) {
+    echo $post->user->name; // 投稿の数だけ追加クエリ
+}
+
+// Eager Loadingで解決
+$posts = Post::with('user')->get();
+```
+
+デバッグ用の `dd()` やログをコードに追加することなく、この一連の流れをブラウザ上で完結できます。
+
+---
+
+## タグを使った特定リクエストの追跡
+
+Telescopeには**タグ**機能があります。`Telescope::tag()` でエントリに任意のタグを付けると、ダッシュボードのフィルターでそのタグのエントリだけを素早く絞り込めます。
+
+特定のユーザーIDや注文IDに関連する処理だけを追跡したいケースで非常に有効です。
+
+```php
+use Laravel\Telescope\IncomingEntry;
+use Laravel\Telescope\Telescope;
+
+// TelescopeServiceProvider の tags メソッドをオーバーライドする
+Telescope::tag(function (IncomingEntry $entry) {
+    if ($entry->type === 'request') {
+        return array_filter([
+            'status:' . $entry->content['response_status'],
+            auth()->check() ? 'user:' . auth()->id() : null,
+        ]);
+    }
+
+    return [];
+});
+```
+
+これで `/telescope/requests` 画面のSearchに `user:42` と入力するだけで、ユーザーID=42のリクエストだけを一覧できます。
+
+### モデルにタグを自動付与する
+
+`TelescopeServiceProvider` の `tags` メソッドで、特定のモデルIDをすべてのエントリに付与できます。
+
+```php
+// TelescopeServiceProvider
+Telescope::tag(function (IncomingEntry $entry) {
+    return $entry->tags();
+});
+```
+
+さらに `HasTags` コントラクトをモデルに実装することで、そのモデルが記録されるとき自動的にタグが付きます。
+
+```php
+use Laravel\Telescope\Contracts\EntriesRepository;
+
+class Order extends Model implements \Laravel\Telescope\Contracts\HasTags
+{
+    public function telescopeTags(): array
+    {
+        return ['order:' . $this->id];
+    }
+}
+```
+
+---
+
+## Dumpウォッチャーの活用
+
+`dump()` を使うとHTMLレスポンスに出力が混入してしまい、APIのデバッグが難しくなることがあります。TelescopeのDumpウォッチャーを使うと、`dump()` の出力をブラウザのレスポンスから切り離してダッシュボードに記録できます。
+
+使い方はシンプルです。`/telescope` の「Dump」タブを開いた状態で `dump()` を呼び出すだけです。
+
+```php
+// コントローラー
+public function index()
+{
+    $users = User::with('posts')->get();
+    dump($users->first()->toArray()); // Telescopeのdumpタブに表示される
+    return response()->json($users);
+}
+```
+
+ページを開いた状態でのみキャプチャされるため、必要なときだけ監視できます。`dd()` とは違いアプリの実行を止めないので、連続したリクエストを流しながらデバッグする場合に便利です。
+
+---
+
+## Mailpit連携でメールデバッグを快適にする
+
+MailウォッチャーとローカルSMTPサーバーの [Mailpit](https://mailpit.axllent.org/) を組み合わせることで、メール開発のフローが大幅に改善します。
+
+```ini
+# .env
+MAIL_MAILER=smtp
+MAIL_HOST=127.0.0.1
+MAIL_PORT=1025
+```
+
+TelescopeのMailタブでは送信メールのHTML/テキスト両方をプレビューできます。Mailpitでは受信したメールをブラウザで確認でき、さらに添付ファイルの確認やスパムスコアの確認も可能です。
+
+<Tip>
+  テスト中に誤って外部にメールを送らないよう、ローカルでは必ずMailpitやMailhogなどのローカルSMTPを使いましょう。
+</Tip>
+
+---
+
+## イベントとリスナーのデバッグ
+
+イベントドリブンな実装のデバッグはしばしば難しくなります。「イベントは発火しているのか」「どのリスナーが呼ばれているのか」をログを見ながら追うのは面倒です。
+
+TelescopeのEventsウォッチャーを使うと、発行されたイベントとそのリスナーが一覧で確認できます。
+
+リスナーが呼ばれない場合、Eventsタブでイベントのエントリを確認します。
+
+- イベントは発行されているがリスナーが表示されない → リスナーが登録されていない（`EventServiceProvider` の確認）
+- イベント自体が発行されていない → `event()` の呼び出し箇所の確認
+
+```php
+// テスト代わりにローカルで確認する流れ
+event(new OrderShipped($order));
+// → /telescope/events で OrderShipped が表示されるか確認
+// → リスナー SendShippingConfirmation が呼ばれているか確認
+```
+
+---
+
+## キュージョブのデバッグ
+
+非同期処理のデバッグはログを見るだけでは原因特定が難しいです。TelescopeのJobsウォッチャーは、ジョブのディスパッチから実行結果まで記録します。
+
+失敗したジョブのエントリをクリックすると、スタックトレースと例外メッセージが確認できます。`queue:failed` テーブルとは別に、Telescopeでも確認できるため、失敗の原因調査が素早く行えます。
+
+```php
+// ジョブのデバッグ時はsyncドライバーで同期実行すると追跡しやすい
+// .env
+QUEUE_CONNECTION=sync
+```
+
+syncドライバーにすることで、ジョブがリクエスト内で同期実行され、Requestsウォッチャーにジョブの実行結果も含まれます。
+
+---
+
+## HTTPクライアントのデバッグ
+
+外部APIとの通信をデバッグする際、HTTP Client Watcherが役立ちます。`Http::` ファサードで行われたリクエストと、そのレスポンスが記録されます。
+
+```php
+$response = Http::get('https://api.example.com/users');
+// → /telescope/client-requests で確認できる
+```
+
+レスポンスの内容、ステータスコード、実行時間が一目でわかります。`dd($response->json())` を書かなくてもダッシュボードで確認できます。
 
 ---
 
 ## まとめ
 
-| ウォッチャー | 主な用途 |
-|-------------|---------|
-| Requests | HTTPリクエスト・レスポンスの詳細確認 |
-| Queries | N+1問題の発見、スロークエリの特定 |
-| Exceptions | 例外とスタックトレースの記録 |
-| Mail | 送信メールのプレビュー |
-| Jobs | キュージョブの処理状況と失敗の追跡 |
-| Cache | キャッシュのヒット/ミスの確認 |
-| Commands | Artisanコマンドの実行履歴 |
-| Events | イベントとリスナーの追跡 |
-| Schedule | スケジュールタスクの実行確認 |
+| テクニック | 効果 |
+|---------|------|
+| N+1ワークフロー | dd()不要でクエリ問題を体系的に発見・修正 |
+| タグ付け | 特定ユーザー・モデルの記録をすぐに絞り込み |
+| Dumpウォッチャー | APIレスポンスを汚さずにdump出力を確認 |
+| Mailpit連携 | ローカルメール開発の快適化 |
+| Eventsウォッチャー | イベント/リスナーの発火を視覚的に確認 |
+| Jobs + sync | 非同期処理を同期実行してデバッグ |
+| HTTPクライアント | 外部API通信の記録と確認 |
 
-Telescopeは `dd()` やログをコードに書かなくてもアプリケーションの動作を観察できるツールです。特にSQLクエリとリクエストの関係を視覚的に把握できるため、パフォーマンス問題の調査効率が大きく上がります。開発環境では常に有効にしておくことをおすすめします。
-
-<Card title="Laravel Telescope公式ドキュメント" icon="book-open" href="https://laravel.com/docs/telescope">
-  フィルタリング、タギング、全ウォッチャーの設定オプションについては公式ドキュメントを参照してください。
-</Card>
+<Columns cols={2}>
+  <Card title="Laravel Telescope ガイド" icon="telescope" href="/jp/telescope">
+    インストールとウォッチャー設定の詳細はガイドページを参照してください。
+  </Card>
+  <Card title="Laravel Nightwatch" icon="moon" href="/jp/blog/nightwatch-introduction">
+    本番環境の監視はNightwatchで行います。
+  </Card>
+</Columns>

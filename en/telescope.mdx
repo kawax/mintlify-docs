@@ -1,6 +1,6 @@
 ---
 title: "Laravel Telescope"
-description: "Install and operate Laravel Telescope for local debugging and production-safe monitoring. Includes local-only setup, authorization, pruning, filtering, and watcher roles."
+description: "Install Laravel Telescope for local debugging. Includes local-only setup and watcher reference."
 ---
 
 ## What is Laravel Telescope?
@@ -8,7 +8,7 @@ description: "Install and operate Laravel Telescope for local debugging and prod
 [Laravel Telescope](https://github.com/laravel/telescope) is an official debugging and introspection tool for Laravel applications.
 It records detailed entries for requests, exceptions, queries, jobs, logs, mail, notifications, cache operations, scheduled tasks, and more.
 
-Use Telescope for deep debugging of individual requests and events, especially in local and staging environments.
+Telescope is a **local development tool**. For production monitoring, use [Laravel Pulse](/en/pulse) or [Laravel Nightwatch](/en/blog/nightwatch-introduction).
 
 ### Monitoring layers
 
@@ -50,8 +50,7 @@ After installation, open the dashboard at `/telescope`.
 ## Local-only installation (recommended)
 
 <Info>
-  If your primary goal is local debugging, install Telescope with `--dev` and register providers only in `local` environment.
-  This avoids exposing debugging tooling in production by mistake.
+  If your primary goal is local debugging, install Telescope with `--dev` and register providers only in the `local` environment.
 </Info>
 
 ```shell
@@ -86,100 +85,6 @@ Also disable package auto-discovery in `composer.json`:
     }
   }
 }
-```
-
----
-
-## Dashboard authorization
-
-The Telescope dashboard is available at `/telescope`.
-By default, Telescope is only accessible in `local`. For non-local environments, control access in `app/Providers/TelescopeServiceProvider.php` via the `viewTelescope` gate:
-
-```php
-use App\Models\User;
-use Illuminate\Support\Facades\Gate;
-
-protected function gate(): void
-{
-    Gate::define('viewTelescope', function (User $user) {
-        return in_array($user->email, [
-            'admin@example.com',
-        ]);
-    });
-}
-```
-
-<Warning>
-  In production, set `APP_ENV=production` correctly.  
-  If production keeps `APP_ENV=local`, your Telescope dashboard can become publicly accessible.
-</Warning>
-
----
-
-## Data pruning
-
-Telescope entries can grow quickly.
-Schedule daily pruning with `telescope:prune`:
-
-```php
-use Illuminate\Support\Facades\Schedule;
-
-Schedule::command('telescope:prune')->daily();
-```
-
-Default retention is 24 hours.
-Use `--hours` to keep data longer:
-
-```php
-Schedule::command('telescope:prune --hours=48')->daily();
-```
-
----
-
-## Filtering in production
-
-Telescope should usually record everything in local, but only important entries in production.
-Configure this in `App\Providers\TelescopeServiceProvider`.
-
-### Entry-level filtering
-
-```php
-use Laravel\Telescope\IncomingEntry;
-use Laravel\Telescope\Telescope;
-
-Telescope::filter(function (IncomingEntry $entry) {
-    if ($this->app->environment('local')) {
-        return true;
-    }
-
-    return $entry->isReportableException() ||
-        $entry->isFailedJob() ||
-        $entry->isScheduledTask() ||
-        $entry->isSlowQuery() ||
-        $entry->hasMonitoredTag();
-});
-```
-
-### Batch-level filtering
-
-```php
-use Illuminate\Support\Collection;
-use Laravel\Telescope\IncomingEntry;
-use Laravel\Telescope\Telescope;
-
-Telescope::filterBatch(function (Collection $entries) {
-    if ($this->app->environment('local')) {
-        return true;
-    }
-
-    return $entries->contains(function (IncomingEntry $entry) {
-        return $entry->isReportableException() ||
-            $entry->isFailedJob() ||
-            $entry->isScheduledTask() ||
-            $entry->isSlowQuery() ||
-            $entry->hasMonitoredTag();
-    });
-});
 ```
 
 ---
@@ -279,9 +184,17 @@ Configure them in `config/telescope.php`.
 
 | Task | Recommendation |
 | --- | --- |
-| Install in most projects | `composer require laravel/telescope --dev` |
-| Prevent accidental production exposure | Manual local-only provider registration + `dont-discover` |
-| Secure dashboard access | Configure `viewTelescope` gate and verify `APP_ENV=production` |
-| Control storage growth | Schedule `telescope:prune` daily |
-| Reduce production noise | Use `Telescope::filter` / `filterBatch` for important entries only |
+| Install | `composer require laravel/telescope --dev` |
+| Ensure local-only isolation | Manual provider registration + `dont-discover` |
 | Find DB bottlenecks quickly | Use Query Watcher slow-query tags (default 100ms) |
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Laravel Pulse" icon="chart-line" href="/en/pulse">
+    Add a performance metrics dashboard for production.
+  </Card>
+  <Card title="Laravel Nightwatch" icon="moon" href="/en/blog/nightwatch-introduction">
+    Use Nightwatch for real-time production monitoring.
+  </Card>
+</Columns>
