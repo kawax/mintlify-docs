@@ -109,7 +109,8 @@
         "jp/error-handling",
         "jp/logging",
         "jp/pulse",
-        "jp/pennant"
+        "jp/pennant",
+        "jp/telescope"
       ]
     },
     {
