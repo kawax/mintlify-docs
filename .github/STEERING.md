@@ -50,7 +50,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - Laravel13のcsrfで`Sec-Fetch-Site`が使われるようになる前に作っていたけどほとんど使ってない。Laravelが`Sec-Fetch-Site`しか使ってないように使い所は限られる。下手に使うと検索エンジンや今ならAIエージェントが読めなくなる。
   - README.mdが英語、src内も少ないシンプルなパッケージなので1ページ。
   - navigation-packages.json はスターターキットよりも下の最後に「ミドルウェア」グループを作って追加。
-- [ ] Laravel FullFeed https://github.com/invokable/laravel-fullfeed
+- [x] Laravel FullFeed https://github.com/invokable/laravel-fullfeed
   - フィードリーダー向けの「URLからコンテンツを抽出する」パッケージ。
   - Pipelineパターンの実例になる。 advanced/pipeline
   - README.mdとresources/fullfeed/README.mdは英語、resources/fullfeed/README_jp.mdは日本語。
