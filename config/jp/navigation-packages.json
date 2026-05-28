@@ -156,6 +156,12 @@
       ]
     },
     {
+      "group": "フィード・RSS",
+      "pages": [
+        "jp/packages/laravel-fullfeed"
+      ]
+    },
+    {
       "group": "ミドルウェア",
       "pages": [
         "jp/packages/laravel-fetch-metadata"

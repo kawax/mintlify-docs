@@ -157,6 +157,12 @@
       ]
     },
     {
+      "group": "Feed & RSS",
+      "pages": [
+        "en/packages/laravel-fullfeed"
+      ]
+    },
+    {
       "group": "Middleware",
       "pages": [
         "en/packages/laravel-fetch-metadata"

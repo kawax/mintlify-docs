@@ -1,0 +1,176 @@
+---
+title: "Laravel FullFeed"
+description: "フィードリーダー向けにWebページのメインコンテンツを抽出するLaravelパッケージ。LaravelのPipelineパターンを活用。"
+---
+
+## 概要
+
+[revolution/laravel-fullfeed](https://github.com/invokable/laravel-fullfeed) は、フィードリーダー向けにWebページから本文を抽出するLaravelパッケージです。  
+サイトごとのルール(JSON)を使って、記事ごとに必要なコンテンツを取り出します。
+
+<Info>
+  もともとはプライベートなフィードリーダーアプリで使われていた機能が切り出され、公開パッケージ化されています。
+</Info>
+
+## 要件
+
+- PHP >= 8.4（`Dom\HTMLDocument` を利用）
+- Laravel >= 12.x
+
+## インストール
+
+```bash
+composer require revolution/laravel-fullfeed
+```
+
+開発版を使う場合:
+
+```bash
+composer require revolution/laravel-fullfeed:dev-main
+```
+
+## 設定ファイルとサイト定義の公開
+
+```bash
+php artisan vendor:publish --tag=fullfeed
+```
+
+このコマンドで、以下が作成されます。
+
+- `config/fullfeed.php`
+- `resources/fullfeed`
+
+## 定義ファイルの自動更新（composer post-update-cmd）
+
+`composer update` 時にサイト定義を自動で再公開したい場合は、`composer.json` に以下を追加します。
+
+```json
+{
+  "scripts": {
+    "post-update-cmd": [
+      "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+      "@php artisan vendor:publish --tag=fullfeed-site --ansi --force"
+    ]
+  }
+}
+```
+
+## 基本的な使い方
+
+```php
+use Revolution\Fullfeed\Facades\FullFeed;
+
+$html = FullFeed::get($url);
+```
+
+## テスト
+
+`FullFeed::expects()` でFacadeをスタブできます。
+
+```php
+use Revolution\Fullfeed\Facades\FullFeed;
+
+FullFeed::expects('get')
+    ->with('https://example.com/article/1')
+    ->andReturn('<div>Main content</div>');
+```
+
+## サイトルールファイル
+
+### items_all.json
+
+`items_all.json` は、LDRFullFeed（wedata）形式のルールを取り込むためのベースです。  
+Livedoor Reader は日本で有名なサービスでしたが、サービス自体は終了し、現在はルールデータが主に資産として残っています。FullFeed はこの歴史的なデータ形式を活用します。
+
+### plus.json
+
+`plus.json` は独自ルール追加用のサンプルです。
+
+```json
+{
+  "name": "note",
+  "data": {
+    "url": "^https://note\\.com/",
+    "selector": "div[data-name=\"body\"]",
+    "xpath": "//div[@data-name=\"body\"]",
+    "enc": "UTF-8",
+    "callable": "App\\FullFeed\\CustomExtractor"
+  }
+}
+```
+
+## ルール設定フィールド
+
+- `url`: 対象URLにマッチさせる正規表現
+- `selector`: CSSセレクタ（`xpath` より優先）
+- `xpath`: XPath指定
+- `enc`: 文字コード変換が必要な場合のエンコーディング指定
+- `callable`: 前処理として実行する独自Extractorクラス（単体/配列）
+- `after_callable`: 後処理として最後に実行するExtractorクラス
+
+## PipelineパターンとしてのExtractor実行順
+
+FullFeed は Laravel の **Pipelineパターン** で、Extractorを順番に流します。
+
+1. `callable` で指定したクラス
+2. `XPathExtractor`
+3. `SelectorExtractor`
+4. `after_callable` で指定したクラス
+
+単純なXPath/CSS抽出の前後に独自処理を差し込めるため、サイトごとの癖に対応しやすい設計です。
+
+## 組み込みExtractor
+
+### RemoveElements
+
+指定したセレクタの要素を削除します。
+
+```json
+{
+  "after_callable": ["Revolution\\Fullfeed\\Extractor\\RemoveElements"],
+  "remove": ["svg", "button", "script"]
+}
+```
+
+### ReplaceMatches
+
+正規表現で一致した文字列を置換します（HTML文字列に対して処理）。
+
+```json
+{
+  "after_callable": ["Revolution\\Fullfeed\\Extractor\\ReplaceMatches"],
+  "replace": [
+    {
+      "pattern": "/ data-(h-)?index=\"[0-9]+\"/",
+      "replace": ""
+    }
+  ]
+}
+```
+
+### StripTags
+
+`strip_tags()` 相当でタグを除去します。
+
+```json
+{
+  "after_callable": ["Revolution\\Fullfeed\\Extractor\\StripTags:a,img"]
+}
+```
+
+### Squish
+
+`Str::squish()` で余分な空白を削除します。
+
+```json
+{
+  "after_callable": ["Revolution\\Fullfeed\\Extractor\\Squish"]
+}
+```
+
+## 独自ルールの追加
+
+1. `resources/fullfeed` にJSONファイルを追加
+2. `config/fullfeed.php` の `paths` に追加
+
+`data.url` に最初にマッチしたルールが使われるため、追加ファイルは `paths` の先頭に置くのがおすすめです。
