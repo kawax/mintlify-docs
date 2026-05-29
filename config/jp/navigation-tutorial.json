@@ -65,6 +65,7 @@
         "jp/http-tests",
         "jp/database-testing",
         "jp/mocking",
+        "jp/console-tests",
         "jp/deployment"
       ]
     },
