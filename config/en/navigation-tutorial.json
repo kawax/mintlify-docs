@@ -58,6 +58,7 @@
       "pages": [
         "en/testing",
         "en/http-tests",
+        "en/database-testing",
         "en/mocking",
         "en/deployment"
       ]
