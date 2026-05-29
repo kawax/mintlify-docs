@@ -60,6 +60,7 @@
         "en/http-tests",
         "en/database-testing",
         "en/mocking",
+        "en/console-tests",
         "en/deployment"
       ]
     },
