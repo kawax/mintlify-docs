@@ -67,3 +67,4 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - ドキュメントはほとんどない。[README.md](https://github.com/invokable/feedable/blob/main/README.md) が英語、[README_jp.md](https://github.com/invokable/feedable/blob/main/README_jp.md) が日本語。[copilot-instructions.md)](https://github.com/invokable/feedable-core/blob/main/.github/copilot-instructions.md) や[create-driver/SKILL.md](https://github.com/invokable/feedable-core/blob/main/.github/skills/create-driver/SKILL.md) もあった。
   - index.mdx:README相当の概要。core.mdx:コアの[src/Core](https://github.com/invokable/feedable-core/tree/main/src/Core)の説明と独自ドライバーの作り方。drivers.mdx:対応サイトリスト。元のドキュメントが少ないので先に日本語ページから作って管理者が修正を入れる。
   - 独自ドライバーの作り方：スターターキットで普通の`routes/web.php`とコントローラーとして作る。パッケージ化は任意(共有したい場合のみ)。`Driver::about()`はドライバーの登録だけどスターターキットの対応サイトに表示されるだけなので登録しなくても動作はする。Httpクライアントでhtml取得→Dom\HTMLDocumentでパース→FeedItemの配列として返す→最終的にResponseFactoryを返せば出力フォーマットをrssとjsonで切り替えられる。
+  - 日本語ページはOK
