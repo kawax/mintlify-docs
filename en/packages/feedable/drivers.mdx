@@ -1,0 +1,55 @@
+---
+title: "Supported sites - Feedable"
+description: "Built-in drivers currently available in Feedable"
+sidebarTitle: "Supported sites"
+---
+
+## Built-in drivers
+
+`feedable-core` currently includes the following drivers in `src/Drivers/`:
+
+- Asahi
+- ComicDays
+- Famitsu
+- Fate
+- JsonFeed
+- JumpPlus
+- Laravel
+- MagazinePocket
+- Mirror
+- Nicovideo
+- Nintendo
+- Note
+- Yomiuri
+
+## JsonFeed driver
+
+`JsonFeed` is a special driver.  
+It receives an existing RSS/Atom feed URL and converts it to JSON Feed.
+
+- Example: `/jsonfeed?url=https://example.com/feed.xml`
+- Item limit: use the `limit` query parameter (example: `&limit=20`)
+
+## URL patterns on the sample site
+
+Common examples available on the [public sample site](https://feedable-rss.vercel.app/):
+
+- Asahi: `/asahi/news.{format}`
+- Comic Days original: `/comic-days/original.{format}`
+- Famitsu: `/famitsu/category/{category}.{format}`
+- FGO: `/fgo/{category}.{format}`
+- Laravel Blog: `/laravel/blog.{format}`
+- Magazine Pocket: `/shonenmagazine/pocket.{format}`
+- Nico Nico Seiga manga: `/nicovideo/manga/{category}.{format}`
+- Nintendo Direct: `/nintendo/direct.{format}`
+- Nintendo IR: `/nintendo/ir/news.{format}`
+- note featured posts: `/note/index.{format}`
+- Shonen Jump+: `/shonenjumpplus/daily.{format}`
+- Yomiuri: `/yomiuri/news.{format}`
+- JSON Feed conversion: `/jsonfeed?url={encoded-feed-url}`
+
+`{format}` is mainly `rss` or `json`.
+
+<Card title="Need another site?" icon="message-circle" href="https://github.com/orgs/invokable/discussions/25">
+  Send your support request with the target URL in GitHub Discussions.
+</Card>

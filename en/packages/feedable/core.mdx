@@ -1,0 +1,133 @@
+---
+title: "Core package and custom drivers - Feedable"
+description: "How feedable-core works and how to add your own drivers"
+sidebarTitle: "Core & custom drivers"
+---
+
+## Feedable Core overview
+
+`feedable-core` is a Composer package that separates Feedable's core helpers and built-in drivers.  
+Install it in a new Laravel project to reuse the same foundation as the Feedable starter kit.
+
+- Core package: [invokable/feedable-core](https://github.com/invokable/feedable-core)
+- Starter kit: [invokable/feedable](https://github.com/invokable/feedable)
+
+## Response classes
+
+Use `Rss2Response` and `JsonFeedResponse` to fix output format.  
+Use `ResponseFactory` when users should choose format (`rss` or `json`).
+
+```php
+use Revolution\Feedable\Core\Response\Rss2Response;
+
+return new Rss2Response(
+    title: $title,
+    items: $items,
+);
+```
+
+```php
+use Revolution\Feedable\Core\Enums\Format;
+use Revolution\Feedable\Core\Response\ResponseFactory;
+
+Route::get('feed.{format?}', function (Format $format = Format::RSS) use ($title, $items) {
+    return ResponseFactory::format($format)->make(
+        title: $title,
+        items: $items,
+    );
+});
+```
+
+## FeedItem / Author
+
+`FeedItem` is a shared item object for RSS/JSON Feed.  
+Use `Author::make()` for the `authors` field.
+
+```php
+use Revolution\Feedable\Core\Elements\Author;
+use Revolution\Feedable\Core\Elements\FeedItem;
+
+$item = new FeedItem(
+    id: $url,
+    url: $url,
+    title: $title,
+    summary: $summary,
+    authors: [Author::make(name: $authorName)->toArray()],
+);
+```
+
+## Support helpers
+
+### AbsoluteUri::resolve()
+
+```php
+use Revolution\Feedable\Core\Support\AbsoluteUri;
+
+$absolute = AbsoluteUri::resolve('https://example.com/', '/images/sample.jpg');
+```
+
+### RSS::filterLinks()
+
+```php
+use Revolution\Feedable\Core\Support\RSS;
+
+$xml = RSS::filterLinks($rss, $links);
+```
+
+### RSS::each()
+
+```php
+use DOMElement;
+use Revolution\Feedable\Core\Support\RSS;
+
+$xml = RSS::each($rss, function (DOMElement $item) {
+    $title = $item->getElementsByTagName('title')->item(0);
+
+    if ($title && str_contains($title->textContent, 'NG keyword')) {
+        $item->parentNode?->removeChild($item);
+    }
+});
+```
+
+## How to add custom drivers
+
+<Steps>
+  <Step title="Add directly to the starter kit">
+    Since the starter kit is a normal Laravel app, add routes in `routes/web.php` and implement your controller (or invokable class).
+
+    ```php
+    use App\Http\Controllers\CustomFeedController;
+    use Revolution\Feedable\Core\Enums\Format;
+
+    Route::get('/custom/site.{format?}', CustomFeedController::class)
+        ->whereIn('format', array_column(Format::cases(), 'value'));
+    ```
+  </Step>
+  <Step title="Package your driver for reuse">
+    If you want to reuse across multiple projects, register routes in a Service Provider.
+
+    ```php
+    use Illuminate\Support\Facades\Route;
+    use Illuminate\Support\ServiceProvider;
+
+    class CustomDriverServiceProvider extends ServiceProvider
+    {
+        public function boot(): void
+        {
+            Route::middleware('web')->group(__DIR__.'/../routes/web.php');
+        }
+    }
+    ```
+  </Step>
+  <Step title="(Optional) Register metadata with Driver::about()">
+    `Driver::about()` is used to show driver metadata in the supported-sites list. Your driver can still work without it.
+  </Step>
+</Steps>
+
+<Info>
+  `Format` route binding requires `web` middleware.
+</Info>
+
+## Reference: Laravel blog driver
+
+- [LaravelBlogDriver.php](https://github.com/invokable/feedable-core/blob/main/src/Drivers/Laravel/LaravelBlogDriver.php)
