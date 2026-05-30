@@ -56,7 +56,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - README.mdとresources/fullfeed/README.mdは英語、resources/fullfeed/README_jp.mdは日本語。
   - 日本では定番だったLDRFullFeedのjsonデータを使っている。LDRとはLivedoor Readerのことだけど10年以上前にサービス終了していてもはや何も残ってないけど非公式だったFullFeedのデータだけ現代まで残っている。とはいえ古すぎるのでこのパッケージではCSSセレクタの新形式がメイン。LDRFullFeedから新形式に移植してたけど多すぎるので途中で終了している。
   - フィード関連パッケージはもう少しあるので navigation-packages.json はスターターキットとミドルウェアの間に「フィード・RSS」グループを作成。
-- [ ] Feedable
+- [x] Feedable
   - スターターキット https://github.com/invokable/feedable と更新しやすいように分離したコアパッケージ https://github.com/invokable/feedable-core
   - RSSのないウェブサイトからRSSを生成するサービス
   - [RSSHub](https://github.com/DIYgod/RSSHub) を見つけて各サイトをルーティングで定義してるような作りだったのでLaravelでも同じものが作れそうなので作ったパッケージ。RSSHubに日本語サイトは少なそうなので日本語中心。
