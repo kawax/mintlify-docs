@@ -158,7 +158,16 @@
     {
       "group": "フィード・RSS",
       "pages": [
-        "jp/packages/laravel-fullfeed"
+        "jp/packages/laravel-fullfeed",
+        {
+          "group": "Feedable",
+          "expanded": false,
+          "pages": [
+            "jp/packages/feedable/index",
+            "jp/packages/feedable/core",
+            "jp/packages/feedable/drivers"
+          ]
+        }
       ]
     },
     {
