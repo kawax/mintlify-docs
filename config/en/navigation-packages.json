@@ -159,7 +159,16 @@
     {
       "group": "Feed & RSS",
       "pages": [
-        "en/packages/laravel-fullfeed"
+        "en/packages/laravel-fullfeed",
+        {
+          "group": "Feedable",
+          "expanded": false,
+          "pages": [
+            "en/packages/feedable/index",
+            "en/packages/feedable/core",
+            "en/packages/feedable/drivers"
+          ]
+        }
       ]
     },
     {
