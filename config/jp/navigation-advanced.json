@@ -38,7 +38,8 @@
         "jp/advanced/package-testing",
         "jp/advanced/package-workbench",
         "jp/advanced/generator-command",
-        "jp/advanced/starter-kit-creation"
+        "jp/advanced/starter-kit-creation",
+        "jp/advanced/package-static-analysis"
       ]
     },
     {
