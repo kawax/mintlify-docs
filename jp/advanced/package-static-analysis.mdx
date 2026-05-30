@@ -1,0 +1,346 @@
+---
+title: "パッケージの静的解析（PHPStan / Larastan）"
+description: "PHPStan と Larastan を使って Laravel パッケージの型安全性と保守性を高めるためのセットアップ、設定、型注釈、CI 自動実行を解説します。"
+---
+
+Laravel パッケージは一度リリースして終わりではありません。Laravel 本体、PHP、依存パッケージの更新に追従しながら年単位でメンテナンスするには、テストに加えて静的解析も継続的に回す必要があります。
+
+<Info>
+  このページは [Laravelパッケージ開発](/jp/advanced/package-development)、[Orchestra TestbenchでLaravelパッケージをテストする](/jp/advanced/package-testing)、[パッケージのバージョン互換性管理](/jp/advanced/package-versioning) の補助ガイドです。実装・テスト・バージョン戦略に静的解析を追加すると、長期保守しやすいパッケージになります。
+</Info>
+
+## 静的解析とは
+
+静的解析は、コードを実行せずに型の不整合や潜在的なバグを検出する手法です。Laravel パッケージでは、サービスコンテナ、Facade、Eloquent など動的な仕組みが多いため、動作確認だけでは見落としやすい問題を早い段階で拾えます。
+
+静的解析を導入すると、特に次の効果があります。
+
+- **型安全性の向上** — 間違った引数や戻り値をレビュー前に検出できる
+- **バグの早期発見** — 存在しないメソッド呼び出しや nullable の見落としをテスト前に把握できる
+- **IDE 補完の改善** — PHPDoc と Generics を整えることで補完精度が上がる
+- **長期保守の安定化** — Laravel や PHP のアップグレード時に壊れた箇所を洗い出しやすい
+
+## PHPStan のセットアップ
+
+まずは PHPStan 単体で解析基盤を用意します。PHPStan 2.x は `mixed` や nullable の扱いが以前より厳密なので、パッケージの公開 API を整えるきっかけにもなります。
+
+<Steps>
+  <Step title="PHPStan を開発依存に追加する">
+    ```bash
+    composer require --dev phpstan/phpstan:^2.0
+    ```
+  </Step>
+  <Step title="まずは対象ディレクトリを直接解析する">
+    パッケージでは `src` と `tests` を最初の対象にすることが多いです。
+
+    ```bash
+    vendor/bin/phpstan analyse src tests
+    ```
+  </Step>
+  <Step title="Composer script に固定する">
+    CI とローカルで同じコマンドを使えるように、`composer.json` に script を定義しておくと運用しやすくなります。
+
+    ```json
+    {
+        "scripts": {
+            "analyse": "phpstan analyse"
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Larastan のセットアップ
+
+Laravel パッケージでは PHPStan だけだと、コンテナ解決、Facade、Eloquent リレーションなど Laravel 固有の仕組みを十分に理解できません。そこで PHPStan の Laravel 拡張である Larastan を併用します。
+
+<Steps>
+  <Step title="Larastan を追加する">
+    現在のパッケージ名は `larastan/larastan` です。古い記事では `nunomaduro/larastan` が出てくることがあります。
+
+    ```bash
+    composer require --dev larastan/larastan:^3.0
+    ```
+  </Step>
+  <Step title="パッケージ開発なら Testbench も入れておく">
+    Larastan は Laravel アプリケーションコンテナを起動して型を解決します。Laravel パッケージを単体解析する場合は、`orchestra/testbench` が必要になることがあります。
+
+    ```bash
+    composer require --dev orchestra/testbench
+    ```
+  </Step>
+  <Step title="extension.neon を読み込む">
+    `phpstan.neon` で Larastan の設定を include します。
+
+    ```neon
+    includes:
+        - vendor/larastan/larastan/extension.neon
+    ```
+  </Step>
+</Steps>
+
+## phpstan.neon の設定
+
+`phpstan.neon` は解析レベル、対象パス、除外パス、例外ルールをまとめる中心設定です。Laravel パッケージなら最初から 100 点を目指すより、継続的に上げられる設定にしておく方が現実的です。
+
+以下は `phpstan.neon` の例です。
+
+```neon
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+
+    paths:
+        - src
+        - tests
+
+    excludePaths:
+        analyse:
+            - vendor
+            - workbench
+            - bootstrap/cache/*
+
+    ignoreErrors:
+        -
+            message: '#Call to an undefined method Illuminate\\Support\\HigherOrderCollectionProxy::#'
+            path: tests/Fixtures/*
+```
+
+### レベル 0〜9 の選び方
+
+PHPStan は段階的に導入できます。まずは現在のコードベースを回しきれるレベルから始めて、修正が進んだら上げていく運用が安全です。
+
+| レベル | 向いている段階 |
+|--------|----------------|
+| 0〜3 | まず未知のクラス・関数・メソッド呼び出しを減らしたい段階 |
+| 4〜6 | 公開 API の引数・戻り値・プロパティ型を整えたい段階 |
+| 7〜9 | nullable、union、`mixed` を厳密に扱いたい長期保守フェーズ |
+
+<Tip>
+  PHPStan 2.x には level 10 もありますが、Laravel パッケージではまず 5〜7 を安定させてから 8〜9 に進めると現実的です。新規パッケージなら最初から高めのレベルで始める方が後戻りが少なくなります。
+</Tip>
+
+### `paths`
+
+`paths` には解析したいディレクトリを明示します。パッケージでは `src` だけでなく、型の崩れやすい `tests` も含めると効果的です。
+
+### `excludePaths`
+
+生成ファイル、キャッシュ、検証用の Workbench など、静的解析の価値が低い場所だけを除外します。広く除外しすぎると、本来検出したいエラーまで見えなくなります。
+
+### `ignoreErrors`
+
+`ignoreErrors` は最後の手段です。メッセージを正規表現で絞り、`path` も併用して影響範囲を限定してください。将来 Laravel や Larastan が改善されたときに戻しやすくなります。
+
+## よく使う型アノテーション
+
+PHPStan と Larastan の精度は、PHPDoc の書き方で大きく変わります。Laravel パッケージでは特に `@param`、`@return`、`@var`、Generics (`@template`) を揃える価値が高いです。
+
+```php
+<?php
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+
+/**
+ * @template TModel of Model
+ */
+final class ModelRepository
+{
+    /**
+     * @param class-string<TModel> $modelClass
+     */
+    public function __construct(private string $modelClass)
+    {
+    }
+
+    /**
+     * @return TModel|null
+     */
+    public function find(int $id): ?Model
+    {
+        return $this->modelClass::query()->find($id);
+    }
+
+    /**
+     * @return Collection<int, TModel>
+     */
+    public function all(): Collection
+    {
+        /** @var Collection<int, TModel> $models */
+        $models = $this->modelClass::query()->get();
+
+        return $models;
+    }
+}
+```
+
+この例では、次の情報を PHPStan に渡しています。
+
+- `@param class-string<TModel>` — 文字列が任意の文字列ではなく Model クラス名であることを示す
+- `@return TModel|null` — `find()` が具体的なモデル型を返すことを伝える
+- `@var Collection<int, TModel>` — コレクションの key / value 型を明示する
+- `@template TModel of Model` — 再利用可能な generic repository を表現する
+
+## Laravel に特化した注意点
+
+Laravel の「便利な magic」は、そのままだと静的解析に伝わりません。パッケージ側で型情報を足して、解析器が理解できる形に寄せる必要があります。
+
+### Facade
+
+カスタム Facade は、利用者が呼ぶメソッドを PHPDoc で補足すると IDE と静的解析の両方に効きます。
+
+```php
+<?php
+
+namespace Vendor\Package\Facades;
+
+use Illuminate\Support\Facades\Facade;
+
+/**
+ * @method static string issueToken(int $userId)
+ */
+class Tokenizer extends Facade
+{
+    protected static function getFacadeAccessor(): string
+    {
+        return 'package.tokenizer';
+    }
+}
+```
+
+### マジックメソッド
+
+`__call()` や Macroable に依存した API は便利ですが、型が崩れやすい場所です。公開 API にするなら、戻り値や引数が分かるラッパーメソッドを追加する方が安全です。
+
+<Warning>
+  静的解析のためだけに `ignoreErrors` を増やし続けると、Facade や Macro の本当の壊れ方を隠してしまいます。まずは明示的なメソッド、型付き value object、PHPDoc 追加で解決できないかを優先してください。
+</Warning>
+
+### Eloquent モデルの型指定
+
+Eloquent リレーションや動的プロパティには、`@property` と relation の Generics を組み合わせると効果的です。
+
+```php
+<?php
+
+namespace Vendor\Package\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * @property-read Team $team
+ */
+class Member extends Model
+{
+    /**
+     * @return BelongsTo<Team, self>
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
+    }
+}
+```
+
+## CI での自動実行
+
+静的解析はローカルだけでなく CI でも必ず実行してください。特に複数 Laravel バージョンをサポートするパッケージでは、[パッケージのバージョン互換性管理](/jp/advanced/package-versioning) の test matrix と同じ考え方で回すと、互換性と型安全性を同時に監視できます。
+
+以下は `.github/workflows/static-analysis.yml` の例です。
+
+```yaml
+name: Static analysis
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [8.2, 8.3, 8.4]
+        laravel: ["^12.0", "^13.0"]
+        include:
+          - laravel: "^13.0"
+            testbench: "^10.0"
+          - laravel: "^12.0"
+            testbench: "^9.0"
+
+    name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }} - PHPStan
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "laravel/framework:${{ matrix.laravel }}" \
+                           "orchestra/testbench:${{ matrix.testbench }}" \
+                           --no-interaction --no-update
+          composer update --prefer-dist --no-interaction
+
+      - name: Run static analysis
+        run: vendor/bin/phpstan analyse --error-format=github
+```
+
+この例ではテスト matrix と同じ Laravel / Testbench の対応表を使っています。テストと静的解析の両方で同じ組み合わせを監視すると、「実行は通るが型が壊れている」状態を見逃しにくくなります。
+
+## よくある誤検知と対処法
+
+静的解析の警告は、まず「型情報が不足していないか」を疑ってください。誤検知に見えても、実際には PHPDoc が足りないだけのことがよくあります。
+
+### `@phpstan-ignore-next-line`
+
+一時的な回避としては使えますが、理由を自分で説明できる行だけに限定してください。
+
+```php
+// @phpstan-ignore-next-line Laravel の macro が実行時に登録されるため
+$builder->whereLike('name', $keyword);
+```
+
+### `ignoreErrors`
+
+同じエラーが複数箇所に出るときだけ検討します。必ず path を絞り、雑な正規表現で全体を握りつぶさないでください。
+
+```neon
+parameters:
+    ignoreErrors:
+        -
+            message: '#Call to an undefined method Illuminate\\Database\\Eloquent\\Builder::whereLike\(\)#'
+            path: tests/Fixtures/*
+```
+
+### まず優先するべき対処
+
+1. PHPDoc を足す
+2. Facade や relation の戻り値型を明示する
+3. `mixed` を具体的な型に置き換える
+4. それでも説明できる誤検知だけ ignore する
+
+## 関連ページ
+
+<Columns cols={3}>
+  <Card title="Laravelパッケージ開発" icon="box" href="/jp/advanced/package-development">
+    サービスプロバイダーや公開リソースを含むパッケージ実装の基礎を確認します。
+  </Card>
+  <Card title="Orchestra TestbenchでLaravelパッケージをテストする" icon="flask-conical" href="/jp/advanced/package-testing">
+    静的解析と合わせて運用したいパッケージ向けテスト基盤を解説します。
+  </Card>
+  <Card title="パッケージのバージョン互換性管理" icon="git-branch" href="/jp/advanced/package-versioning">
+    Laravel / PHP の対応表と GitHub Actions の matrix 戦略を確認します。
+  </Card>
+</Columns>
