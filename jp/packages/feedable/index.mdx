@@ -1,0 +1,41 @@
+---
+title: "Feedable"
+description: "RSSフィードを提供していないサイトからRSSを生成するLaravelスターターキット"
+---
+
+## Feedableとは
+
+Feedable は、RSS を提供していないサイトから RSS/JSON Feed を生成する Laravel 製のサービスです。  
+[RSSHub](https://github.com/DIYgod/RSSHub) の考え方を参考にしています。
+
+## スターターキットとコアパッケージ
+
+- スターターキット: [invokable/feedable](https://github.com/invokable/feedable)
+  - すぐにデプロイして使えるアプリケーション本体です。
+- コアパッケージ: [invokable/feedable-core](https://github.com/invokable/feedable-core)
+  - ドライバーとヘルパーを切り出した Composer パッケージです。
+
+スターターキットは `feedable-core` を利用しており、独自ドライバーを追加して運用できます。
+
+## サンプルサイト
+
+- 公開サンプル: https://feedable-rss.vercel.app/
+- Issue 記載の例: `https://feedablerss.vercel.app/redacted`
+
+## デプロイ
+
+フォークして Vercel にデプロイする構成が推奨されています。無料プランでも動作します。
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Finvokable%2Ffeedable&env=APP_NAME,APP_KEY&envDefaults=%7B%22APP_NAME%22%3A%22Feedable%22%7D&envDescription=APP_KEY%20can%20be%20generated%20using%20the%20artisan%20command.&envLink=https%3A%2F%2Fgithub.com%2Finvokable%2Flaravel-vercel-installer%3Ftab%3Dreadme-ov-file%23env&demo-title=Feedable&demo-url=https%3A%2F%2Ffeedable-rss.vercel.app%2F&skippable-integrations=1)
+
+Playwright が必要な特殊なドライバーを使う場合は、Laravel Forge など通常のサーバー環境での運用を検討してください。
+
+## 利用規約
+
+- 個人による私的利用の範囲でのみ使用してください。
+- RSS リーダーで読む用途を想定しています。
+
+## GitHubリポジトリ
+
+- [invokable/feedable](https://github.com/invokable/feedable)
+- [invokable/feedable-core](https://github.com/invokable/feedable-core)

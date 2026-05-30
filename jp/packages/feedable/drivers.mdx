@@ -1,0 +1,52 @@
+---
+title: "対応サイトリスト - Feedable"
+description: "Feedableが対応しているサイトの一覧"
+sidebarTitle: "対応サイト"
+---
+
+## 内蔵ドライバー一覧
+
+`feedable-core` の `src/Drivers/` には以下のドライバーが含まれます。
+
+- Asahi
+- ComicDays
+- Famitsu
+- Fate
+- JsonFeed
+- JumpPlus
+- Laravel
+- MagazinePocket
+- Mirror
+- Nicovideo
+- Nintendo
+- Note
+- Yomiuri
+
+## JsonFeed ドライバー
+
+`JsonFeed` は特殊ドライバーです。  
+既存の RSS/Atom フィード URL を受け取り、JSON Feed 形式に変換して返します。
+
+- 例: `/jsonfeed?url=https://example.com/feed.xml`
+- 件数制限: `limit` クエリ（例: `&limit=20`）
+
+## サンプルサイトのURLパターン
+
+公開サンプル（`https://feedable-rss.vercel.app/`）で確認できる代表的なパターンです。  
+Issue 記載例: `https://feedablerss.vercel.app/redacted`
+
+- 朝日新聞: `/asahi/news.{format}`
+- ComicDays: `/comic-days/original.{format}`
+- ファミ通: `/famitsu/category/{category}.{format}`
+- FGO: `/fgo/{category}.{format}`
+- Laravel Blog: `/laravel/blog.{format}`
+- マガポケ: `/shonenmagazine/pocket.{format}`
+- ニコニコ静画: `/nicovideo/manga/{category}.{format}`
+- 任天堂ダイレクト: `/nintendo/direct.{format}`
+- 任天堂IR: `/nintendo/ir/news.{format}`
+- note: `/note/index.{format}`
+- 少年ジャンプ＋: `/shonenjumpplus/daily.{format}`
+- 読売新聞: `/yomiuri/news.{format}`
+- JSON Feed 変換: `/jsonfeed?url={encoded-feed-url}`
+
+`{format}` は主に `rss` または `json` を指定します。

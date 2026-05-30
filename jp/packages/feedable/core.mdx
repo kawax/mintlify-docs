@@ -1,0 +1,132 @@
+---
+title: "コアパッケージと独自ドライバー - Feedable"
+description: "feedable-core パッケージのコアヘルパーと独自ドライバーの作り方"
+sidebarTitle: "コアと独自ドライバー"
+---
+
+## Feedable Core の概要
+
+`feedable-core` は Feedable のコアヘルパーと内蔵ドライバーを分離した Composer パッケージです。  
+新規 Laravel プロジェクトへ導入すると、スターターキットと同等の基盤を再利用できます。
+
+- パッケージ: [invokable/feedable-core](https://github.com/invokable/feedable-core)
+- スターターキット: [invokable/feedable](https://github.com/invokable/feedable)
+
+## Response クラス
+
+`Rss2Response` と `JsonFeedResponse` で出力フォーマットを固定できます。  
+ユーザーがフォーマットを選ぶ構成では `ResponseFactory` を使います。
+
+```php
+use Revolution\Feedable\Core\Response\Rss2Response;
+
+return new Rss2Response(
+    title: $title,
+    items: $items,
+);
+```
+
+```php
+use Revolution\Feedable\Core\Enums\Format;
+use Revolution\Feedable\Core\Response\ResponseFactory;
+
+Route::get('feed.{format?}', function (Format $format = Format::RSS) use ($title, $items) {
+    return ResponseFactory::format($format)->make(
+        title: $title,
+        items: $items,
+    );
+});
+```
+
+## FeedItem / Author
+
+`FeedItem` は RSS/JSON Feed で共通化されたアイテムオブジェクトです。  
+`Author` は `authors` フィールド用のオブジェクトで、`Author::make()` を使って作成します。
+
+```php
+use Revolution\Feedable\Core\Elements\Author;
+use Revolution\Feedable\Core\Elements\FeedItem;
+
+$item = new FeedItem(
+    id: $url,
+    url: $url,
+    title: $title,
+    summary: $summary,
+    authors: [Author::make(name: $authorName)->toArray()],
+);
+```
+
+## Support ヘルパー
+
+### AbsoluteUri::resolve()
+
+```php
+use Revolution\Feedable\Core\Support\AbsoluteUri;
+
+$absolute = AbsoluteUri::resolve('https://example.com/', '/images/sample.jpg');
+```
+
+### RSS::filterLinks()
+
+```php
+use Revolution\Feedable\Core\Support\RSS;
+
+$xml = RSS::filterLinks($rss, $links);
+```
+
+### RSS::each()
+
+```php
+use DOMElement;
+use Revolution\Feedable\Core\Support\RSS;
+
+$xml = RSS::each($rss, function (DOMElement $item) {
+    $title = $item->getElementsByTagName('title')->item(0);
+
+    if ($title && str_contains($title->textContent, 'NGワード')) {
+        $item->parentNode?->removeChild($item);
+    }
+});
+```
+
+## カスタムドライバーの作り方
+
+### 1) スターターキットへ直接追加する
+
+スターターキットは通常の Laravel アプリなので、`routes/web.php` にルート追加し、コントローラー（または invokable クラス）で実装できます。
+
+```php
+use App\Http\Controllers\CustomFeedController;
+use Revolution\Feedable\Core\Enums\Format;
+
+Route::get('/custom/site.{format?}', CustomFeedController::class)
+    ->whereIn('format', array_column(Format::cases(), 'value'));
+```
+
+### 2) Composer パッケージとして追加する
+
+複数プロジェクトで再利用する場合は、ServiceProvider でルートを登録する構成が扱いやすくなります。
+
+```php
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
+
+class CustomDriverServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        Route::middleware('web')->group(__DIR__.'/../routes/web.php');
+    }
+}
+```
+
+### 3) Driver::about() で情報を登録する（オプション）
+
+`Driver::about()` の登録は対応サイト一覧に表示するためのメタデータです。  
+未登録でもドライバー自体は動作します。
+
+## 参考: Laravel ブログドライバー
+
+実装例として Laravel 公式ブログ向けドライバーを参照してください。
+
+- [LaravelBlogDriver.php](https://github.com/invokable/feedable-core/blob/main/src/Drivers/Laravel/LaravelBlogDriver.php)
