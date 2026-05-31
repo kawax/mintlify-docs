@@ -36,6 +36,7 @@
         "en/advanced/package-versioning",
         "en/advanced/package-changelog",
         "en/advanced/package-testing",
+        "en/advanced/package-static-analysis",
         "en/advanced/package-workbench",
         "en/advanced/generator-command",
         "en/advanced/starter-kit-creation"

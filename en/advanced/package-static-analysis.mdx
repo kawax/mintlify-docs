@@ -1,0 +1,346 @@
+---
+title: "Package Static Analysis (PHPStan / Larastan)"
+description: "A guide to setting up PHPStan and Larastan for Laravel packages, covering configuration, type annotations, and CI automation to improve type safety and long-term maintainability."
+---
+
+Laravel packages are not a one-time release. To keep up with updates to Laravel itself, PHP, and dependent packages over years of maintenance, you need to run static analysis continuously alongside tests.
+
+<Info>
+  This page is a companion guide to [Laravel Package Development](/en/advanced/package-development), [Testing Laravel Packages with Orchestra Testbench](/en/advanced/package-testing), and [Package Version Compatibility Management](/en/advanced/package-versioning). Adding static analysis to your implementation, testing, and versioning strategy makes packages easier to maintain in the long run.
+</Info>
+
+## What Is Static Analysis?
+
+Static analysis is a technique that detects type mismatches and potential bugs without executing code. Laravel packages make heavy use of dynamic mechanisms such as the service container, Facades, and Eloquent, so static analysis lets you catch issues early that are easy to miss with runtime testing alone.
+
+Introducing static analysis brings the following benefits in particular:
+
+- **Improved type safety** — Detect incorrect arguments and return values before code review
+- **Early bug detection** — Catch calls to non-existent methods and overlooked nullables before tests run
+- **Better IDE autocompletion** — Aligning PHPDoc and Generics improves completion accuracy
+- **Stable long-term maintenance** — Easier to identify breakages when upgrading Laravel or PHP
+
+## Setting Up PHPStan
+
+Start by setting up the analysis foundation with PHPStan alone. PHPStan 2.x is stricter about `mixed` and nullable handling than previous versions, which makes it a good opportunity to clean up the public API of your package.
+
+<Steps>
+  <Step title="Add PHPStan as a dev dependency">
+    ```bash
+    composer require --dev phpstan/phpstan:^2.0
+    ```
+  </Step>
+  <Step title="Run analysis against target directories directly">
+    For packages, `src` and `tests` are common starting targets.
+
+    ```bash
+    vendor/bin/phpstan analyse src tests
+    ```
+  </Step>
+  <Step title="Pin the command in a Composer script">
+    Define a script in `composer.json` so CI and local environments always use the same command.
+
+    ```json
+    {
+        "scripts": {
+            "analyse": "phpstan analyse"
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Setting Up Larastan
+
+PHPStan alone cannot fully understand Laravel-specific mechanisms such as container resolution, Facades, and Eloquent relations. That is why you should pair it with Larastan, the Laravel extension for PHPStan.
+
+<Steps>
+  <Step title="Add Larastan">
+    The current package name is `larastan/larastan`. Older articles may reference `nunomaduro/larastan`.
+
+    ```bash
+    composer require --dev larastan/larastan:^3.0
+    ```
+  </Step>
+  <Step title="Include Testbench for package development">
+    Larastan boots a Laravel application container to resolve types. When analysing a Laravel package in isolation, `orchestra/testbench` may be required.
+
+    ```bash
+    composer require --dev orchestra/testbench
+    ```
+  </Step>
+  <Step title="Load the extension.neon">
+    Include the Larastan configuration in your `phpstan.neon`.
+
+    ```neon
+    includes:
+        - vendor/larastan/larastan/extension.neon
+    ```
+  </Step>
+</Steps>
+
+## Configuring phpstan.neon
+
+`phpstan.neon` is the central configuration file for analysis level, target paths, excluded paths, and ignore rules. For a Laravel package, it is more practical to start with a configuration you can incrementally raise rather than aiming for perfection from day one.
+
+Below is an example `phpstan.neon`:
+
+```neon
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+
+    paths:
+        - src
+        - tests
+
+    excludePaths:
+        analyse:
+            - vendor
+            - workbench
+            - bootstrap/cache/*
+
+    ignoreErrors:
+        -
+            message: '#Call to an undefined method Illuminate\\Support\\HigherOrderCollectionProxy::#'
+            path: tests/Fixtures/*
+```
+
+### Choosing a Level from 0 to 9
+
+PHPStan can be introduced gradually. It is safer to start at a level where the current codebase passes and raise it as fixes are made.
+
+| Level | Suitable stage |
+|-------|----------------|
+| 0–3 | Reducing calls to unknown classes, functions, and methods |
+| 4–6 | Aligning argument types, return types, and property types on the public API |
+| 7–9 | Strictly handling nullables, unions, and `mixed` in a long-term maintenance phase |
+
+<Tip>
+  PHPStan 2.x also has level 10, but for Laravel packages it is more realistic to stabilise levels 5–7 before moving to 8–9. For new packages, starting at a higher level from the beginning avoids technical debt later.
+</Tip>
+
+### `paths`
+
+Specify the directories to analyse explicitly in `paths`. Including `tests` alongside `src` is effective because types tend to drift in test code.
+
+### `excludePaths`
+
+Exclude only generated files, caches, and Workbench directories where static analysis adds little value. Over-excluding can hide errors you actually want to detect.
+
+### `ignoreErrors`
+
+`ignoreErrors` should be a last resort. Use regular expressions to narrow down the message, and combine with `path` to limit the scope. This makes it easier to revert entries when Laravel or Larastan improves.
+
+## Commonly Used Type Annotations
+
+The accuracy of PHPStan and Larastan depends heavily on how PHPDoc is written. In Laravel packages, it is particularly valuable to align `@param`, `@return`, `@var`, and Generics (`@template`).
+
+```php
+<?php
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+
+/**
+ * @template TModel of Model
+ */
+final class ModelRepository
+{
+    /**
+     * @param class-string<TModel> $modelClass
+     */
+    public function __construct(private string $modelClass)
+    {
+    }
+
+    /**
+     * @return TModel|null
+     */
+    public function find(int $id): ?Model
+    {
+        return $this->modelClass::query()->find($id);
+    }
+
+    /**
+     * @return Collection<int, TModel>
+     */
+    public function all(): Collection
+    {
+        /** @var Collection<int, TModel> $models */
+        $models = $this->modelClass::query()->get();
+
+        return $models;
+    }
+}
+```
+
+This example passes the following information to PHPStan:
+
+- `@param class-string<TModel>` — indicates the string is a Model class name, not an arbitrary string
+- `@return TModel|null` — tells PHPStan that `find()` returns a concrete model type
+- `@var Collection<int, TModel>` — explicitly states the key/value types of the collection
+- `@template TModel of Model` — expresses a reusable generic repository
+
+## Laravel-Specific Considerations
+
+Laravel's "convenient magic" is not understood by static analysis without additional type information. You need to add type information on the package side so the analyser can understand it.
+
+### Facades
+
+For custom Facades, annotating the methods callers use with PHPDoc benefits both IDE support and static analysis.
+
+```php
+<?php
+
+namespace Vendor\Package\Facades;
+
+use Illuminate\Support\Facades\Facade;
+
+/**
+ * @method static string issueToken(int $userId)
+ */
+class Tokenizer extends Facade
+{
+    protected static function getFacadeAccessor(): string
+    {
+        return 'package.tokenizer';
+    }
+}
+```
+
+### Magic Methods
+
+APIs that rely on `__call()` or Macroable are convenient but prone to type drift. If you expose them as a public API, it is safer to add wrapper methods with clear return types and arguments.
+
+<Warning>
+  Continuously adding `ignoreErrors` just for static analysis will hide real breakages in Facades and Macros. Prioritise explicit methods, typed value objects, and added PHPDoc before resorting to ignoring errors.
+</Warning>
+
+### Typing Eloquent Models
+
+Combining `@property` with Generics on relation methods is effective for Eloquent relations and dynamic properties.
+
+```php
+<?php
+
+namespace Vendor\Package\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * @property-read Team $team
+ */
+class Member extends Model
+{
+    /**
+     * @return BelongsTo<Team, self>
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
+    }
+}
+```
+
+## Running in CI
+
+Always run static analysis in CI, not just locally. For packages that support multiple Laravel versions, running it with the same test matrix used in [Package Version Compatibility Management](/en/advanced/package-versioning) lets you monitor both compatibility and type safety at the same time.
+
+Below is an example `.github/workflows/static-analysis.yml`:
+
+```yaml
+name: Static analysis
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [8.2, 8.3, 8.4]
+        laravel: ["^12.0", "^13.0"]
+        include:
+          - laravel: "^13.0"
+            testbench: "^10.0"
+          - laravel: "^12.0"
+            testbench: "^9.0"
+
+    name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }} - PHPStan
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "laravel/framework:${{ matrix.laravel }}" \
+                           "orchestra/testbench:${{ matrix.testbench }}" \
+                           --no-interaction --no-update
+          composer update --prefer-dist --no-interaction
+
+      - name: Run static analysis
+        run: vendor/bin/phpstan analyse --error-format=github
+```
+
+This example uses the same Laravel/Testbench compatibility matrix as the test workflow. Monitoring the same combinations in both tests and static analysis makes it harder to miss situations where tests pass but types are broken.
+
+## Common False Positives and How to Handle Them
+
+When you see static analysis warnings, first ask whether type information is missing. What looks like a false positive is often just insufficient PHPDoc.
+
+### `@phpstan-ignore-next-line`
+
+This can be used as a temporary workaround, but limit it to lines where you can explain the reason yourself.
+
+```php
+// @phpstan-ignore-next-line Laravel macro registered at runtime
+$builder->whereLike('name', $keyword);
+```
+
+### `ignoreErrors`
+
+Only consider this when the same error appears in multiple locations. Always narrow the path and avoid broad regular expressions that suppress the entire codebase.
+
+```neon
+parameters:
+    ignoreErrors:
+        -
+            message: '#Call to an undefined method Illuminate\\Database\\Eloquent\\Builder::whereLike\(\)#'
+            path: tests/Fixtures/*
+```
+
+### Recommended Order of Fixes
+
+1. Add PHPDoc
+2. Explicitly type Facade and relation return values
+3. Replace `mixed` with concrete types
+4. Only then, ignore errors that are genuinely explainable false positives
+
+## Related Pages
+
+<Columns cols={3}>
+  <Card title="Laravel Package Development" icon="box" href="/en/advanced/package-development">
+    Review the fundamentals of package implementation including service providers and publishable resources.
+  </Card>
+  <Card title="Testing Laravel Packages with Orchestra Testbench" icon="flask-conical" href="/en/advanced/package-testing">
+    Explore the package testing foundation you will want to run alongside static analysis.
+  </Card>
+  <Card title="Package Version Compatibility Management" icon="git-branch" href="/en/advanced/package-versioning">
+    Review the Laravel/PHP compatibility matrix and GitHub Actions matrix strategy.
+  </Card>
+</Columns>
