@@ -1,0 +1,109 @@
+---
+title: "Plugin Directories"
+description: "スキル・フック・MCP・カスタムエージェントなどをまとめて読み込む Plugin Directory の使い方を説明します。"
+---
+
+## Plugin Directories
+
+Plugin Directory は、スキル、フック、MCP サーバー、カスタムエージェント、LSP 設定などを 1 つのディレクトリにまとめて読み込む仕組みです。再利用可能な機能セットをアプリやリポジトリに同梱したい場合に使います。
+
+Laravel 版では `SessionConfig` または `ResumeSessionConfig` の `pluginDirectories` で指定できます。
+
+## 使いどころ
+
+- 複数の拡張機能を 1 つの能力パックとして配布する
+- リポジトリにプラグインを同梱し、全員が同じ設定を使えるようにする
+- Marketplace 公開前のプラグインをローカルで開発・検証する
+- インストール済みプラグインをローカル checkout で一時的に上書きする
+
+MCP サーバー 1 つ、フック 1 つ、カスタムエージェント 1 つだけなら、`mcpServers`、`hooks`、`customAgents` へ直接指定するほうが単純です。Plugin Directory は、関連する複数機能をまとめて配布したい場合に向いています。
+
+## ディレクトリ構成
+
+Copilot CLI は各プラグインディレクトリから `plugin.json` またはルート直下の `SKILL.md` を探します。
+
+```text
+my-plugin/
+├── plugin.json
+├── SKILL.md
+├── hooks.json
+├── .mcp.json
+├── agents/
+│   └── code-reviewer.md
+└── skills/
+    └── lint-fix/
+        └── SKILL.md
+```
+
+`plugin.json` は `.github/plugin.json` や `.github/plugin/plugin.json` にも配置できます。スキル、フック、MCP、エージェントなどはそれぞれ独立したローダーを持つため、必要なものだけ含めれば十分です。
+
+## Laravel から読み込む
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+
+Copilot::start(function (CopilotSession $session): void {
+    $response = $session->sendAndWait(
+        prompt: 'この変更をプラグインのレビュー方針で確認して',
+    );
+
+    dump($response->content());
+}, config: new SessionConfig(
+    pluginDirectories: [
+        base_path('plugins/code-reviewer'),
+        base_path('plugins/lint-fix'),
+    ],
+));
+```
+
+配列形式でも指定できます。
+
+```php
+Copilot::run(
+    prompt: 'READMEを改善して',
+    config: [
+        'pluginDirectories' => [
+            base_path('plugins/docs-writer'),
+        ],
+    ],
+);
+```
+
+## `cli_args` との違い
+
+公式 SDK ではランタイム起動時の `--plugin-dir` 引数として説明される場合があります。Laravel 版ではセッション設定の `pluginDirectories` を使うのが基本です。
+
+一方で、CLI プロセス起動そのものに引数を渡したい場合は `config/copilot.php` の `cli_args` または `Copilot::useStdio()` の `cli_args` を使えます。ただし `cli_args` は stdio で SDK が CLI を起動する場合だけ有効で、`useTcp()` など外部 runtime 接続時は無視されます。
+
+```php
+$stdioConfig = config('copilot');
+$stdioConfig['cli_args'] = [
+    '--plugin-dir',
+    base_path('plugins/code-reviewer'),
+];
+
+Copilot::useStdio($stdioConfig)->start(fn (CopilotSession $session) => ...);
+```
+
+通常は `pluginDirectories` を優先してください。セッション単位で明示でき、他の `SessionConfig` 設定と同じ場所で管理できます。
+
+## 再現性のための運用
+
+- 相対パスより `base_path()` などで絶対パス化する
+- リポジトリに同梱するプラグインはバージョン管理する
+- Marketplace や外部配布のプラグインを使う場合は、利用バージョンをドキュメント化する
+- 本番環境では、ユーザー入力から任意のプラグインパスを直接指定させない
+
+## 参考
+
+- [SessionConfig](/jp/packages/laravel-copilot-sdk/session-config)
+- [カスタムエージェント](/jp/packages/laravel-copilot-sdk/custom-agents)
+- [MCP](/jp/packages/laravel-copilot-sdk/mcp)
+- [Hooks](/jp/packages/laravel-copilot-sdk/hooks)
+- [Skills](/jp/packages/laravel-copilot-sdk/skills)
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>

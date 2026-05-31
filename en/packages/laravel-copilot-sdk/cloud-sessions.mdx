@@ -1,0 +1,129 @@
+---
+title: "Cloud Sessions"
+description: "Run Copilot sessions on GitHub-hosted infrastructure instead of the local Copilot CLI with Cloud Sessions."
+---
+
+## Cloud Sessions
+
+Cloud Sessions run a session on GitHub-hosted infrastructure instead of a local Copilot CLI process. A task is reserved in Mission Control, and a cloud-side `copilot-agent` connects and drives the work.
+
+Regular Remote Sessions make a locally running session visible from GitHub web and mobile. When you want the execution location itself to be GitHub-hosted infrastructure, use Cloud Sessions.
+
+## Prerequisites
+
+- The user has Copilot permissions to use the Cloud Agent
+- You can authenticate with a GitHub token or a logged-in Copilot CLI user
+- Associate GitHub repository information when possible
+- Cloud execution and remote viewing are allowed by org policy
+
+## Basic usage
+
+Set `CloudSessionOptions` on the `cloud` field of `SessionConfig`. The repository information is optional in the SDK type, but it is recommended to provide it so Mission Control and the cloud agent have context.
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Support\PermissionHandler;
+use Revolution\Copilot\Types\CloudSessionOptions;
+use Revolution\Copilot\Types\CloudSessionRepository;
+use Revolution\Copilot\Types\SessionConfig;
+
+Copilot::start(function (CopilotSession $session): void {
+    $session->sendAndWait(prompt: 'Summarize the README');
+}, config: new SessionConfig(
+    onPermissionRequest: PermissionHandler::approveSafety(),
+    cloud: new CloudSessionOptions(
+        repository: new CloudSessionRepository(
+            owner: 'myorg',
+            name: 'myrepo',
+            branch: 'main',
+        ),
+    ),
+));
+```
+
+You can also use arrays.
+
+```php
+Copilot::run(
+    prompt: 'Check the testing strategy of this repository',
+    config: [
+        'cloud' => [
+            'repository' => [
+                'owner' => 'myorg',
+                'name' => 'myrepo',
+                'branch' => 'main',
+            ],
+        ],
+    ],
+);
+```
+
+## When to send the first prompt
+
+A Cloud Session initializes in two stages. `session.create` returns once the task is reserved in Mission Control, but there is a short delay before the cloud-side `copilot-agent` connects and emits `session.start`.
+
+To reliably deliver the first prompt, subscribe to events first and send after confirming a `session.start` whose `producer` is `copilot-agent`.
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Enums\SessionEventType;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Support\PermissionHandler;
+use Revolution\Copilot\Types\CloudSessionOptions;
+use Revolution\Copilot\Types\CloudSessionRepository;
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    streaming: true,
+    onPermissionRequest: PermissionHandler::approveSafety(),
+    cloud: new CloudSessionOptions(
+        repository: new CloudSessionRepository(owner: 'myorg', name: 'myrepo'),
+    ),
+);
+
+Copilot::start(function (CopilotSession $session): void {
+    $cloudAgentStarted = false;
+
+    foreach ($session->stream(timeout: 30.0) as $event) {
+        if (
+            $event->is(SessionEventType::SESSION_START)
+            && $event->data('producer') === 'copilot-agent'
+        ) {
+            $cloudAgentStarted = true;
+            break;
+        }
+    }
+
+    if (! $cloudAgentStarted) {
+        throw new RuntimeException('Cloud session did not become ready.');
+    }
+
+    $session->sendAndWait(prompt: 'Summarize the README');
+}, config: $config);
+```
+
+In a real application, it is easier to send the prompt from a queue or asynchronous process after confirming `session.start`.
+
+## Difference from Remote Sessions
+
+| Feature | Execution location | Main use |
+|---|---|---|
+| Remote Sessions | Local or your own server | View and operate an existing session from web/mobile |
+| Cloud Sessions | GitHub-hosted infrastructure | Run work without running the Copilot CLI on a user device or your own server |
+
+## Notes
+
+- Cloud Sessions are affected by permissions and org policy
+- With `streaming: true` you can receive real-time events such as `assistant.message_delta`
+- Permission requests behave the same as a regular session. Through the Laravel facade the default is deny-all, so specify `PermissionHandler::approveSafety()` and similar as needed
+
+## Related docs
+
+- [Remote Sessions](/en/packages/laravel-copilot-sdk/remote-sessions)
+- [Session config](/en/packages/laravel-copilot-sdk/session-config)
+- [Streaming events](/en/packages/laravel-copilot-sdk/streaming-events)
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

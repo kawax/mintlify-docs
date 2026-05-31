@@ -8,6 +8,8 @@ description: "Define task-specific sub-agents with SessionConfig customAgents in
 Custom agents let you split responsibilities by role and run sub-agents for specific tasks.
 In Laravel, configure them with `SessionConfig` `customAgents`.
 
+For orchestrating multiple sub-agents in parallel, see [Fleet Mode](/en/packages/laravel-copilot-sdk/fleet-mode).
+
 ## Basic usage
 
 ```php
@@ -173,5 +175,6 @@ Copilot::start(function (CopilotSession $session) {
 
 - [Session config](/en/packages/laravel-copilot-sdk/session-config)
 - [SessionEvent](/en/packages/laravel-copilot-sdk/session-event)
+- [Fleet Mode](/en/packages/laravel-copilot-sdk/fleet-mode)
 - [MCP](/en/packages/laravel-copilot-sdk/mcp)
 - [Tools](/en/packages/laravel-copilot-sdk/tools)

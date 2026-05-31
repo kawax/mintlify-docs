@@ -159,6 +159,11 @@ Tool call explicitly requested by user.
 
 ## Session lifecycle events
 
+### `session.start`
+Session start. For Cloud Sessions, it is safest to send the first prompt after confirming a `session.start` whose `producer` is `copilot-agent`.
+
+- `producer` (optional)
+
 ### `session.idle` (ephemeral)
 Processing finished. Waiting for next input.
 
@@ -194,6 +199,17 @@ Working context changed.
 
 - `cwd` (required)
 - `gitRoot` / `repository` / `branch` (optional)
+
+### `session.info`
+Session information such as a remote URL.
+
+- `infoType` (required)
+- `url` (optional, e.g. when `infoType` is `remote`)
+
+### `session.remote_steerable_changed`
+Indicates that remote steerability from Mission Control has changed.
+
+- `remoteSteerable` (optional)
 
 ### `session.usage_info` (ephemeral)
 Context window usage status.
@@ -359,6 +375,7 @@ session.idle (ephemeral)
 
 | Event Type | Ephemeral | Category |
 |---|---|---|
+| `session.start` |  | Session |
 | `assistant.turn_start` |  | Assistant |
 | `assistant.intent` | ✅ | Assistant |
 | `assistant.reasoning` |  | Assistant |
@@ -379,6 +396,8 @@ session.idle (ephemeral)
 | `session.compaction_complete` |  | Session |
 | `session.title_changed` | ✅ | Session |
 | `session.context_changed` |  | Session |
+| `session.info` |  | Session |
+| `session.remote_steerable_changed` |  | Session |
 | `session.usage_info` | ✅ | Session |
 | `session.task_complete` |  | Session |
 | `session.shutdown` |  | Session |

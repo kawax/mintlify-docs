@@ -8,6 +8,8 @@ description: "Enable remote sessions in Laravel Copilot SDK to access the same s
 Remote sessions let you access the same Copilot session from GitHub web and mobile via Mission Control.
 When enabled, the SDK connects each session to Mission Control and issues a URL that can be shared as a link or QR code.
 
+To run the session itself on GitHub-hosted infrastructure instead of locally or on your own server, use [Cloud Sessions](/en/packages/laravel-copilot-sdk/cloud-sessions).
+
 ## Prerequisites
 
 - The user must be authenticated (GitHub token or logged-in user)
@@ -98,6 +100,7 @@ $svg = $writer->writeString($result->url ?? '');
 
 ## See also
 
+- [Cloud Sessions](/en/packages/laravel-copilot-sdk/cloud-sessions)
 - [RPC](/en/packages/laravel-copilot-sdk/rpc)
 - [TCP mode](/en/packages/laravel-copilot-sdk/tcp-mode)
 

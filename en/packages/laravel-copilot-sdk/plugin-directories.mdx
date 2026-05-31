@@ -1,0 +1,109 @@
+---
+title: "Plugin Directories"
+description: "Load skills, hooks, MCP servers, and custom agents together from plugin directories in Laravel Copilot SDK."
+---
+
+## Plugin Directories
+
+A plugin directory loads skills, hooks, MCP servers, custom agents, LSP settings, and more from a single directory. Use it when you want to bundle a reusable set of features into an app or repository.
+
+In Laravel, you specify them with `pluginDirectories` on `SessionConfig` or `ResumeSessionConfig`.
+
+## When to use it
+
+- Distribute multiple extensions as one capability pack
+- Bundle plugins in a repository so everyone uses the same configuration
+- Develop and validate a plugin locally before publishing to the Marketplace
+- Temporarily override an installed plugin with a local checkout
+
+If you only need one MCP server, one hook, or one custom agent, specifying them directly via `mcpServers`, `hooks`, or `customAgents` is simpler. Plugin directories are best when you want to distribute several related features together.
+
+## Directory layout
+
+The Copilot CLI looks for `plugin.json` or a top-level `SKILL.md` in each plugin directory.
+
+```text
+my-plugin/
+├── plugin.json
+├── SKILL.md
+├── hooks.json
+├── .mcp.json
+├── agents/
+│   └── code-reviewer.md
+└── skills/
+    └── lint-fix/
+        └── SKILL.md
+```
+
+`plugin.json` can also be placed at `.github/plugin.json` or `.github/plugin/plugin.json`. Skills, hooks, MCP, and agents each have their own loader, so include only what you need.
+
+## Load from Laravel
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\SessionConfig;
+
+Copilot::start(function (CopilotSession $session): void {
+    $response = $session->sendAndWait(
+        prompt: 'Review this change with the plugin review policy',
+    );
+
+    dump($response->content());
+}, config: new SessionConfig(
+    pluginDirectories: [
+        base_path('plugins/code-reviewer'),
+        base_path('plugins/lint-fix'),
+    ],
+));
+```
+
+You can also use the array form.
+
+```php
+Copilot::run(
+    prompt: 'Improve the README',
+    config: [
+        'pluginDirectories' => [
+            base_path('plugins/docs-writer'),
+        ],
+    ],
+);
+```
+
+## Difference from `cli_args`
+
+The official SDK sometimes describes this as the `--plugin-dir` argument at runtime startup. In Laravel, using the `pluginDirectories` session setting is the default.
+
+On the other hand, when you want to pass arguments to the CLI process startup itself, you can use `cli_args` in `config/copilot.php` or `cli_args` of `Copilot::useStdio()`. Note that `cli_args` only takes effect when the SDK starts the CLI over stdio; it is ignored when connecting to an external runtime such as `useTcp()`.
+
+```php
+$stdioConfig = config('copilot');
+$stdioConfig['cli_args'] = [
+    '--plugin-dir',
+    base_path('plugins/code-reviewer'),
+];
+
+Copilot::useStdio($stdioConfig)->start(fn (CopilotSession $session) => ...);
+```
+
+Usually prefer `pluginDirectories`. It can be specified per session and is managed in the same place as other `SessionConfig` settings.
+
+## Practices for reproducibility
+
+- Use absolute paths with `base_path()` rather than relative paths
+- Version-control plugins bundled in the repository
+- When using Marketplace or externally distributed plugins, document the version you use
+- In production, do not let arbitrary plugin paths be specified directly from user input
+
+## Related docs
+
+- [Session config](/en/packages/laravel-copilot-sdk/session-config)
+- [Custom agents](/en/packages/laravel-copilot-sdk/custom-agents)
+- [MCP](/en/packages/laravel-copilot-sdk/mcp)
+- [Hooks](/en/packages/laravel-copilot-sdk/hooks)
+- [Skills](/en/packages/laravel-copilot-sdk/skills)
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>

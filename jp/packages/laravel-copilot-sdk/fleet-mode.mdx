@@ -1,0 +1,97 @@
+---
+title: "Fleet Mode"
+description: "1 つの親セッションから複数のサブエージェントを並列に動かす Fleet Mode の使い方を説明します。"
+---
+
+## Fleet Mode
+
+Fleet Mode は、1 つの親セッションから複数のサブエージェントを並列に動かすための実験的なオーケストレーション機能です。作業を独立した単位に分割できる場合に、親セッションが担当範囲を割り当て、各サブエージェントの結果を集約します。
+
+Laravel 版では typed RPC layer から `session.fleet.start` を呼び出せます。
+
+## 向いている用途
+
+- ファイル、パッケージ、言語 SDK ごとに分けられるリファクタリング
+- 複数モジュールを別々に調べる調査タスク
+- 差分、アラート、ドキュメントページ単位のレビュー
+- 移行作業のように、各担当範囲を独立して検証できるタスク
+
+逆に、前のステップの具体的な結果が次のステップに必須な処理、同じファイルを複数ワーカーが編集する処理、小さな単発タスクには向きません。
+
+## Fleet Mode を開始する
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\Rpc\FleetStartRequest;
+
+Copilot::start(function (CopilotSession $session): void {
+    $result = $session->rpc()->fleet()->start(
+        new FleetStartRequest(
+            prompt: 'docs/jpの各ページを独立して確認し、必要な更新だけ報告して',
+        ),
+    );
+
+    if ($result->started) {
+        info('Fleet mode started');
+    }
+});
+```
+
+配列でも指定できます。
+
+```php
+$result = $session->rpc()->fleet()->start([
+    'prompt' => '各パッケージを独立してレビューし、最後にリスクをまとめて',
+]);
+```
+
+`prompt` は任意です。省略するとランタイム側の Fleet Mode 指示だけで開始します。
+
+## Plan Mode から開始する
+
+Plan Mode UI を自前で扱っている場合は、`onExitPlanModeRequest` で `autopilot_fleet` を選ぶことで、承認済みプランから Fleet Mode へ進められます。
+
+```php
+use Revolution\Copilot\Types\ExitPlanModeRequest;
+use Revolution\Copilot\Types\ExitPlanModeResult;
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    onExitPlanModeRequest: function (ExitPlanModeRequest $request): ExitPlanModeResult {
+        return new ExitPlanModeResult(
+            approved: true,
+            selectedAction: 'autopilot_fleet',
+        );
+    },
+);
+```
+
+`autopilot` は単一の自律ワーカー、`interactive` はユーザーが継続的に関与する運用、`autopilot_fleet` は独立した作業単位を並列に進める運用に使います。
+
+## サブエージェントの協調
+
+Fleet Mode は暗黙の共有メモリではなく、明示的な作業単位で協調します。親セッションがタスクを分割し、各サブエージェントは自分の担当範囲だけを処理し、完了またはブロック状態を返します。
+
+作業単位を設計するときは以下を明確にしてください。
+
+- 1 ワーカーが担当する範囲
+- そのワーカーが編集してよいファイルやディレクトリ
+- 完了時に返すべき成果物や検証結果
+- 他タスクとの依存関係
+
+## 注意点
+
+- Fleet RPC は生成 RPC 層の実験的な機能です。利用する場合は Copilot CLI と SDK のバージョンを合わせてください
+- 競合しやすいファイル編集は避け、担当範囲を明確に分けてください
+- 親セッション側で結果を集約する前提で、各ワーカーの報告形式をプロンプトに含めると扱いやすくなります
+
+## 参考
+
+- [カスタムエージェント](/jp/packages/laravel-copilot-sdk/custom-agents)
+- [RPC](/jp/packages/laravel-copilot-sdk/rpc)
+- [ストリーミングイベント](/jp/packages/laravel-copilot-sdk/streaming-events)
+
+<Info>
+最新情報は [GitHub リポジトリ](https://github.com/invokable/laravel-copilot-sdk) を参照してください。
+</Info>
