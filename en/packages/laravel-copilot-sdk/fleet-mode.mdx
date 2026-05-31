@@ -1,0 +1,97 @@
+---
+title: "Fleet Mode"
+description: "Run multiple sub-agents in parallel from a single parent session with Fleet Mode in Laravel Copilot SDK."
+---
+
+## Fleet Mode
+
+Fleet Mode is an experimental orchestration feature that runs multiple sub-agents in parallel from a single parent session. When work can be split into independent units, the parent session assigns scopes and aggregates the results of each sub-agent.
+
+In Laravel, you can call `session.fleet.start` from the typed RPC layer.
+
+## Good use cases
+
+- Refactoring that can be split per file, package, or language SDK
+- Investigation tasks that examine multiple modules separately
+- Reviews scoped per diff, alert, or documentation page
+- Migration-style tasks where each scope can be verified independently
+
+Conversely, it is not suited for work where a later step strictly depends on a previous step's concrete result, where multiple workers edit the same file, or for small one-off tasks.
+
+## Start Fleet Mode
+
+```php
+use Revolution\Copilot\Contracts\CopilotSession;
+use Revolution\Copilot\Facades\Copilot;
+use Revolution\Copilot\Types\Rpc\FleetStartRequest;
+
+Copilot::start(function (CopilotSession $session): void {
+    $result = $session->rpc()->fleet()->start(
+        new FleetStartRequest(
+            prompt: 'Review each page under docs/jp independently and report only the updates needed',
+        ),
+    );
+
+    if ($result->started) {
+        info('Fleet mode started');
+    }
+});
+```
+
+You can also use arrays.
+
+```php
+$result = $session->rpc()->fleet()->start([
+    'prompt' => 'Review each package independently and summarize the risks at the end',
+]);
+```
+
+`prompt` is optional. If omitted, it starts with only the runtime-side Fleet Mode instructions.
+
+## Start from Plan Mode
+
+If you handle the Plan Mode UI yourself, you can advance from an approved plan into Fleet Mode by selecting `autopilot_fleet` in `onExitPlanModeRequest`.
+
+```php
+use Revolution\Copilot\Types\ExitPlanModeRequest;
+use Revolution\Copilot\Types\ExitPlanModeResult;
+use Revolution\Copilot\Types\SessionConfig;
+
+$config = new SessionConfig(
+    onExitPlanModeRequest: function (ExitPlanModeRequest $request): ExitPlanModeResult {
+        return new ExitPlanModeResult(
+            approved: true,
+            selectedAction: 'autopilot_fleet',
+        );
+    },
+);
+```
+
+Use `autopilot` for a single autonomous worker, `interactive` for an operation where the user stays continuously involved, and `autopilot_fleet` for running independent work units in parallel.
+
+## Sub-agent coordination
+
+Fleet Mode coordinates through explicit work units rather than implicit shared memory. The parent session splits the task, each sub-agent processes only its own scope, and returns a completed or blocked state.
+
+When designing work units, make the following clear:
+
+- The scope a single worker is responsible for
+- Which files or directories that worker may edit
+- The deliverable or verification result to return on completion
+- Dependencies on other tasks
+
+## Notes
+
+- Fleet RPC is an experimental feature of the generated RPC layer. When using it, match the versions of the Copilot CLI and the SDK
+- Avoid conflict-prone file edits and clearly separate scopes
+- Assuming the parent session aggregates the results, including each worker's report format in the prompt makes it easier to handle
+
+## Related docs
+
+- [Custom agents](/en/packages/laravel-copilot-sdk/custom-agents)
+- [RPC](/en/packages/laravel-copilot-sdk/rpc)
+- [Streaming events](/en/packages/laravel-copilot-sdk/streaming-events)
+
+<Info>
+For the latest updates, see the [GitHub repository](https://github.com/invokable/laravel-copilot-sdk).
+</Info>
