@@ -16,7 +16,8 @@
       "pages": [
         "jp/database",
         "jp/query-builder",
-        "jp/pagination"
+        "jp/pagination",
+        "jp/mongodb"
       ]
     },
     {
