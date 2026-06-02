@@ -36,9 +36,47 @@ Laravel Cloudは、Laravelの実運用で使う機能をダッシュボード中
 
 [Scheduled Tasks](https://cloud.laravel.com/docs/scheduled-tasks) で、AppクラスタまたはWorkerクラスタに **Scheduler** を有効化するだけで `schedule:run` が毎分実行されます。
 
-### バックグラウンドプロセス（Queue Worker）
+### Managed Queues（マネージドキュー）
 
-[Queues](https://cloud.laravel.com/docs/queues) にある通り、Cloudでは `queue:work` やカスタムワーカーをクラスタ設定から管理できます。デプロイ時の再起動管理もCloud側で扱われます。
+[Queues](https://cloud.laravel.com/docs/queues) では、**Managed Queues** が推奨されています。Laravel Cloud がキューのプロビジョニング、ワーカーの起動、スケーリングを自動で処理し、ジョブがない時はワーカー数がゼロまで下がるため、処理中だけ課金されます。
+
+| 選択肢 | 向いている用途 | スケーリング | 料金の考え方 |
+|---|---|---|---|
+| **Managed Queues** | 本番・プレビュー・開発環境全般。まず最初に選ぶ構成 | キューの滞留状況に応じて自動。アイドル時はゼロまで縮退 | ワーカー稼働秒数 + キュー操作 |
+| **Worker cluster** | `queue:work` を自前管理したい、大きめのバックグラウンド処理 | CPU / メモリベース | Worker cluster の通常料金 |
+| **App cluster のバックグラウンドプロセス** | 小規模開発や低頻度ジョブ | CPU / メモリベース | App cluster に含まれる |
+
+Managed Queues は、Webトラフィックとジョブ処理を分離しつつ、失敗ジョブのダッシュボードも使えます。  
+一方で `database` や `redis` など別ドライバを自前管理したいなら Worker cluster、アプリと同じコンピュートで十分なら App cluster のバックグラウンドプロセスを使います。
+
+<Steps>
+  <Step title="Managed Queue を作成する">
+    環境のインフラキャンバスダッシュボードで **New Managed Queue** をクリックします。
+  </Step>
+  <Step title="キュー名とワーカー設定を決める">
+    キュー名、インスタンスサイズ、ポーリング間隔、最大ワーカー数などを設定します。
+  </Step>
+  <Step title="保存してデプロイする">
+    設定を保存して再デプロイすると、Laravel Cloud がキューとワーカープールを自動で用意します。
+  </Step>
+</Steps>
+
+<Tip>
+  ジョブがない時は Managed Queues のワーカーがゼロまで下がるため、後述の Scale to Zero と組み合わせた構成と相性が良いです。App cluster 側を眠らせても、キュー処理だけ必要な時に自動で起動できます。
+</Tip>
+
+### Scale to Zero（Flex コンピュート）
+
+[Compute](https://cloud.laravel.com/docs/compute#scale-to-zero) にある **Flex** は、低コストで柔軟に使える compute class です。新しい **Scale to Zero** は、この Flex コンピュートを旧 Hibernation から発展させた仕組みです。新しい **Flex コンピュート** では、HTTP リクエスト到着時の起動が **500ms 未満** まで短縮され、従来の 5〜20 秒待つ前提ではなくなりました。
+
+有効化は App cluster の設定画面で **Scale to Zero** トグルをオンにし、保存後に再デプロイするだけです。
+
+さらに、Scale to Zero が有効な環境では、スリープ中でも Scheduled Tasks とキュー処理のために環境が自動起動します。  
+App cluster 上で `schedule:run` を回しつつ、ジョブ処理は Managed Queues に任せる構成が、現在の公式ドキュメントでも最も扱いやすい組み合わせです。
+
+<Info>
+  App cluster 上の自前 `queue:work` は sleep timeout をまたぐと中断される可能性があります。キュー処理を確実に続けたいなら、公式ドキュメント通り Managed Queues を優先してください。
+</Info>
 
 ### Laravel Octane
 
@@ -64,11 +102,12 @@ Laravel Cloudは、Laravelの実運用で使う機能をダッシュボード中
 Laravel Cloudの料金は、基本的に**プラン料金 + 使用量課金**です。  
 詳細は常に [Pricing](https://cloud.laravel.com/docs/pricing) を確認してください。
 
-- **Starter**: 月額ベース料金 `$0`（Pay per usage）
-- **Growth**: `$20/mo + usage`
-- **Business**: `$200/mo + usage`
+- **Starter**: 月額 `$5`。毎月 `$5` 分の使用クレジット付き。新規サインアップは初月無料
+- **Growth**: `$20/mo + usage`、毎月 `$5` 分の使用クレジット付き
+- **Business**: `$200/mo + usage`、毎月 `$5` 分の使用クレジット付き
 
-また、[Free trial](https://cloud.laravel.com/docs/free-trial) では**クレジットカード不要で \$5 クレジット**が提供され、実際のインフラで試せます。
+以前よりも **Starter** で小規模プロジェクトを始めやすくなりました。  
+Scale to Zero と Managed Queues を組み合わせると、待機時間が長い個人開発や社内ツールでもコストを読みやすくなります。
 
 ---
 
