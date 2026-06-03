@@ -6,7 +6,7 @@ description: "How Laravel Cloud hibernation works, how to enable it, its limitat
 ## What is hibernation
 
 Laravel Cloud **hibernation** is the legacy behavior that puts your environment into a dormant state when no HTTP requests arrive within a timeout window.  
-On modern Flex compute, the faster **Scale to Zero** model is now the successor.
+On modern Flex compute, this has been succeeded by the faster **Scale to Zero** model.
 
 Legacy Flex hibernation can still reduce compute cost while dormant, but wake-up from HTTP requests typically takes 5–20 seconds. The new Scale to Zero starts in **under 500ms** and can also auto-start for scheduled tasks and queue processing while the app is sleeping.
 
@@ -39,7 +39,7 @@ With Scale to Zero on new Flex compute, major limitations of legacy hibernation 
 | Recommended use | Cost-saving in legacy Flex setups | Current default architecture |
 
 <Info>
-  Legacy hibernation pauses scheduler and queue processing while asleep. Scale to Zero resolves this in most cases, and queue processing is most reliable when combined with Managed Queues so app sleep does not block job handling.
+  Legacy hibernation pauses scheduler and queue processing while asleep. Scale to Zero resolves this in most cases; queue processing is most reliable when combined with Managed Queues to ensure app sleep does not block job handling.
 </Info>
 
 ## Enabling legacy hibernation

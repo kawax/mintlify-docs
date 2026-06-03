@@ -67,15 +67,15 @@ If you need to self-manage drivers like `database` or `redis`, use a Worker clus
 
 ### Scale to Zero (Flex compute)
 
-[Compute](https://cloud.laravel.com/docs/compute#scale-to-zero) explains that **Flex** is the low-cost, flexible compute class. The new **Scale to Zero** evolved from legacy hibernation on Flex compute. With the new **Flex compute**, cold starts on HTTP requests are now **under 500ms**, instead of the older 5–20 second behavior.
+[Compute](https://cloud.laravel.com/docs/compute#scale-to-zero) explains that **Flex** is the low-cost, flexible compute class. The new **Scale to Zero** feature evolved from legacy hibernation. On Flex compute, cold starts on HTTP requests are now **under 500ms**, instead of the older 5–20 second behavior.
 
 Enable it by turning on **Scale to Zero** in your App cluster settings, then saving and redeploying.
 
 When Scale to Zero is enabled, the environment can also auto-start while sleeping for Scheduled Tasks and queue processing.  
-Running `schedule:run` on the App cluster while delegating jobs to Managed Queues is now the most practical default architecture in the official docs.
+Running `schedule:run` on the App cluster while delegating jobs to Managed Queues is now the most practical default architecture recommended in Laravel Cloud's official documentation.
 
 <Info>
-  A self-managed `queue:work` process on the App cluster can still be interrupted across sleep timeouts. If reliable queue continuity matters, prefer Managed Queues as documented.
+  A self-managed `queue:work` process on the App cluster can still be terminated when the cluster sleeps. If reliable queue continuity matters, prefer Managed Queues as documented.
 </Info>
 
 ### Laravel Octane
