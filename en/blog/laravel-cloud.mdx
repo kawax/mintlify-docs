@@ -36,9 +36,47 @@ Laravel Cloud makes common Laravel production features easy to enable from the d
 
 With [Scheduled Tasks](https://cloud.laravel.com/docs/scheduled-tasks), enabling **Scheduler** on an app or worker cluster runs `schedule:run` every minute.
 
-### Background workers (queues)
+### Managed Queues
 
-As documented in [Queues](https://cloud.laravel.com/docs/queues), Cloud lets you manage `queue:work` and custom workers from cluster settings, including restart behavior during deploys.
+In [Queues](https://cloud.laravel.com/docs/queues), **Managed Queues** are now the recommended default. Laravel Cloud handles queue provisioning, worker startup, and scaling automatically. When no jobs are pending, workers can scale down to zero so you are billed only while jobs are processed.
+
+| Option | Best for | Scaling model | Cost model |
+|---|---|---|---|
+| **Managed Queues** | Most production, preview, and development environments | Automatic based on queue backlog. Can scale to zero when idle | Worker runtime seconds + queue operations |
+| **Worker cluster** | Larger background workloads where you want to manage `queue:work` directly | CPU / memory-based | Standard Worker cluster pricing |
+| **App cluster background processes** | Small development use cases and low-frequency jobs | CPU / memory-based | Included in App cluster compute |
+
+Managed Queues separate web traffic from job processing and provide failed job visibility in the dashboard.  
+If you need to self-manage drivers like `database` or `redis`, use a Worker cluster. If sharing compute with your app is enough, use App cluster background processes.
+
+<Steps>
+  <Step title="Create a Managed Queue">
+    In your environment's infrastructure canvas dashboard, click **New Managed Queue**.
+  </Step>
+  <Step title="Configure queue and worker settings">
+    Set queue name, instance size, polling interval, and max workers.
+  </Step>
+  <Step title="Save and redeploy">
+    Save settings and redeploy. Laravel Cloud provisions the queue and worker pool automatically.
+  </Step>
+</Steps>
+
+<Tip>
+  Managed Queues can scale workers down to zero when no jobs exist, which pairs well with Scale to Zero. Even if your App cluster sleeps, queue processing can still auto-start when required.
+</Tip>
+
+### Scale to Zero (Flex compute)
+
+[Compute](https://cloud.laravel.com/docs/compute#scale-to-zero) explains that **Flex** is the low-cost, flexible compute class. The new **Scale to Zero** evolved from legacy hibernation on Flex compute. With the new **Flex compute**, cold starts on HTTP requests are now **under 500ms**, instead of the older 5–20 second behavior.
+
+Enable it by turning on **Scale to Zero** in your App cluster settings, then saving and redeploying.
+
+When Scale to Zero is enabled, the environment can also auto-start while sleeping for Scheduled Tasks and queue processing.  
+Running `schedule:run` on the App cluster while delegating jobs to Managed Queues is now the most practical default architecture in the official docs.
+
+<Info>
+  A self-managed `queue:work` process on the App cluster can still be interrupted across sleep timeouts. If reliable queue continuity matters, prefer Managed Queues as documented.
+</Info>
 
 ### Laravel Octane
 
@@ -66,11 +104,14 @@ If you need manual setup, see [nightwatch-on-cloud](https://cloud.laravel.com/do
 Laravel Cloud pricing is generally **plan fee + usage**.  
 Always verify current details in [Pricing](https://cloud.laravel.com/docs/pricing).
 
-- **Starter**: `$0` base (pay-per-usage)
-- **Growth**: `$20/mo + usage`
-- **Business**: `$200/mo + usage`
+- **Starter**: `$5/mo`, includes `$5` monthly usage credits, and first month free for new signups
+- **Growth**: `$20/mo + usage`, includes `$5` monthly usage credits
+- **Business**: `$200/mo + usage`, includes `$5` monthly usage credits
 
 [Free trial](https://cloud.laravel.com/docs/free-trial) includes **$5 in credits with no credit card required**, so you can test on real infrastructure.
+
+Starter is now easier to adopt for small projects.  
+Combining Scale to Zero with Managed Queues makes costs more predictable for personal projects and internal tools with long idle periods.
 
 ---
 
