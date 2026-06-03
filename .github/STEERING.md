@@ -41,7 +41,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - [x] agent-detector PAOで使っているからこれも一緒に公式に移行されたのかも。
   - [x] pao-introduction
   - [x] chisel-introduction。moatはLaravelとは直接関係ないのでページは不要。
-- [ ] Laravel CloudにManaged QueuesとScale to Zeroな新しいFlex コンピュートが追加 https://cloud.laravel.com/docs/changelog.md
+- [x] Laravel CloudにManaged QueuesとScale to Zeroな新しいFlex コンピュートが追加 https://cloud.laravel.com/docs/changelog.md
   - これまでLaravel Cloudで若干不便だった休止中はタスクスケジュールやキューが動かない問題がScale to Zeroで解決したのでページを更新。blog/laravel-cloud、blog/laravel-cloud-hibernation
   - Managed Queuesはキューの実行頻度が低いなら得、5分ごとに実行するならAppコンピュートで動かす方が得、なはずだけどScale to Zeroと組み合わせるなら常にManaged Queuesを使うのが公式には推奨。
   - 料金プランも少し変わってスターターでも月5ドルで5ドル分のクレジット付き。5ドル以上使ってるなら変化はない。
