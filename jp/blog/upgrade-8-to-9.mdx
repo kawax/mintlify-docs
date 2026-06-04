@@ -1,0 +1,409 @@
+---
+title: "Laravel 8 から 9 へのアップグレード"
+description: "Laravel 8.x から 9.x へのアップグレード手順と主要な変更点の解説"
+---
+
+## はじめに
+
+Laravel 9 は 2022年2月8日にリリースされました。このガイドでは Laravel 8.x から 9.x へのアップグレード手順と、影響が大きい変更点を整理します。
+
+<Info>
+  アップグレードに必要な推定時間は **約30分** です。ただし、メール送信・ファイルストレージ・独自キャスト・フレームワークのコアクラスのオーバーライド状況によって作業量は増える場合があります。
+</Info>
+
+### Laravel Shift を使った自動アップグレード
+
+[Laravel Shift](https://laravelshift.com/) を使ってアップグレードを自動化することもできます。Shift は `composer.json` や設定ファイルの更新を補助してくれるため、差分確認の出発点として便利です。
+
+---
+
+## 影響度別の変更点
+
+### 影響度: 高
+
+- 依存関係の更新
+- Flysystem 3.x への移行
+- Symfony Mailer への移行
+
+### 影響度: 中
+
+- `BelongsToMany` の `firstOrNew` / `firstOrCreate` / `updateOrCreate` メソッド
+- Custom Casts と `null` の挙動
+- HTTP クライアントのデフォルトタイムアウト
+- PHP Return Types の追加
+- Postgres の `schema` 設定名変更
+- `assertDeleted` メソッドの廃止
+- `lang` ディレクトリの移動
+- パスワードルールの変更
+- `when` / `unless` メソッドの変更
+- バリデーションでの未検証配列キーの扱い
+
+---
+
+## アップグレード手順
+
+### 依存関係の更新
+
+**影響度: 高**
+
+Laravel 9 では **PHP 8.0.2 以上** が必要です。まず `composer.json` の依存関係を見直してください。
+
+```json
+{
+  "require": {
+    "php": "^8.0.2",
+    "laravel/framework": "^9.0",
+    "spatie/laravel-ignition": "^1.0"
+  },
+  "require-dev": {
+    "nunomaduro/collision": "^6.1"
+  }
+}
+```
+
+追加で、該当するアプリケーションでは次の更新も必要です。
+
+- `facade/ignition` を削除し、`spatie/laravel-ignition:^1.0` に置き換える
+- `pusher/pusher-php-server` を使っている場合は `^5.0` へ更新する
+- 利用中のサードパーティパッケージが Laravel 9 対応版か確認する
+- Vonage 通知チャンネルを使っている場合は個別のアップグレードガイドも確認する
+
+更新後は依存関係をインストールします。
+
+```shell
+composer update
+```
+
+---
+
+## PHPバージョン要件
+
+**影響度: 高**
+
+Laravel 9 では PHP 8.0.2 以上が必須です。CI、ローカル開発環境、本番環境のすべてで PHP バージョンをそろえてからアップグレードを進めてください。
+
+---
+
+### Symfony Mailer への移行
+
+**影響度: 高**
+
+Laravel 9 の大きな変更のひとつは、2021年12月でメンテナンス終了となった SwiftMailer から Symfony Mailer への移行です。通常の `Mail::to()->send()` だけを使っているアプリケーションは影響が少ない一方で、SwiftMailer の低レベル API を直接触っている場合は確認が必要です。
+
+#### ドライバー依存関係
+
+```shell
+# Mailgun を使う場合のみ追加
+composer require symfony/mailgun-mailer symfony/http-client
+
+# Postmark を使う場合は SwiftMailer 向けパッケージを削除して置き換える
+composer remove wildbit/swiftmailer-postmark
+composer require symfony/postmark-mailer symfony/http-client
+```
+
+#### `withSwiftMessage` から `withSymfonyMessage` へ
+
+```php
+// Laravel 8.x: SwiftMailer ベース
+$this->withSwiftMessage(function ($message) {
+    $message->getHeaders()->addTextHeader('Custom-Header', 'Header Value');
+});
+
+// Laravel 9.x: Symfony Mailer ベース
+use Symfony\Component\Mime\Email;
+
+$this->withSymfonyMessage(function (Email $message) {
+    $message->getHeaders()->addTextHeader('Custom-Header', 'Header Value');
+});
+```
+
+`Illuminate\Mail\Mailer` の `send`、`html`、`raw`、`plain` は `void` ではなく `Illuminate\Mail\SentMessage` を返すようになりました。また、`MessageSent` イベントの `message` プロパティには `Swift_Message` ではなく `Symfony\Component\Mime\Email` が入ります。
+
+#### SMTP 設定の見直し
+
+Symfony Mailer では SMTP の `stream` オプションが廃止され、サポートされる設定はトップレベルに移動します。
+
+```php
+return [
+    'mailers' => [
+        'smtp' => [
+            // Laravel 8.x の設定
+            'stream' => [
+                'ssl' => [
+                    'verify_peer' => false,
+                ],
+            ],
+
+            // Laravel 9.x の設定
+            'verify_peer' => false,
+        ],
+    ],
+];
+```
+
+`auth_mode` の明示設定も不要になりました。無効なメールアドレスを送信後に回収するのではなく、送信前にバリデーションする運用へ寄せるのが安全です。
+
+---
+
+### Flysystem 3.x への移行
+
+**影響度: 高**
+
+Laravel 9 は `Storage` ファサードの内部実装を Flysystem 1.x から 3.x へ更新しました。ファイル操作メソッドはできるだけ互換性を保っていますが、例外・戻り値・アダプター登録周りに差分があります。
+
+#### ドライバーの追加インストール
+
+```shell
+# Amazon S3 ドライバー
+composer require -W league/flysystem-aws-s3-v3 "^3.0"
+
+# FTP ドライバー
+composer require league/flysystem-ftp "^3.0"
+
+# SFTP ドライバー
+composer require league/flysystem-sftp-v3 "^3.0"
+```
+
+#### `Storage` の主な挙動変更
+
+- `put` / `write` / `writeStream` は既存ファイルをデフォルトで上書きする
+- 書き込み失敗時は例外ではなく `false` を返す
+- 存在しないファイルの読み込みは例外ではなく `null` を返す
+- 存在しないファイルの `delete` は `true` を返す
+- cached adapter は削除されたため、`disk` 設定内の `cache` キーを削除できる
+
+以前のように書き込み失敗時に例外を使いたい場合は、`throw` オプションを設定してください。
+
+```php
+return [
+    'disks' => [
+        'public' => [
+            'driver' => 'local',
+            // 書き込み失敗時に例外を投げたい場合だけ有効にする
+            'throw' => true,
+        ],
+    ],
+];
+```
+
+独自の filesystem ドライバーを登録している場合は、`Storage::extend()` のコールバックが `Illuminate\Filesystem\FilesystemAdapter` を直接返す実装へ調整してください。
+
+---
+
+### `BelongsToMany` の `firstOrNew` / `firstOrCreate` / `updateOrCreate`
+
+**影響度: 中**
+
+Laravel 8 では、これらのメソッドに渡した第1引数の属性配列が中間テーブルと比較されていました。Laravel 9 では、関連モデルのテーブルと比較されます。
+
+```php
+// 関連モデルのテーブルに対して name を検索・更新する
+$user->roles()->updateOrCreate([
+    'name' => 'Administrator',
+]);
+```
+
+また、`firstOrCreate` は第2引数の `$values` を受け取れるようになり、他のリレーションと挙動がそろいました。
+
+```php
+// 新規作成時だけ created_by をマージする
+$user->roles()->firstOrCreate([
+    'name' => 'Administrator',
+], [
+    'created_by' => $user->id,
+]);
+```
+
+---
+
+### Custom Casts と `null`
+
+**影響度: 中**
+
+Laravel 9 では、キャスト対象に `null` を代入した場合でも custom cast の `set` メソッドが呼ばれます。`null` を想定していない cast はアップグレード後に例外を出す可能性があります。
+
+```php
+public function set($model, $key, $value, $attributes)
+{
+    // Laravel 9 では null が渡される可能性がある
+    if ($value === null) {
+        return [
+            'address_line_one' => null,
+            'address_line_two' => null,
+        ];
+    }
+
+    if (! $value instanceof AddressModel) {
+        throw new InvalidArgumentException('AddressModel を渡してください。');
+    }
+
+    return [
+        'address_line_one' => $value->lineOne,
+        'address_line_two' => $value->lineTwo,
+    ];
+}
+```
+
+---
+
+### HTTP クライアントのデフォルトタイムアウト
+
+**影響度: 中**
+
+HTTP クライアントのデフォルトタイムアウトは 30 秒になりました。以前は無制限で待ち続けることがありました。
+
+```php
+use Illuminate\Support\Facades\Http;
+
+// 長めの API 呼び出しだけ個別にタイムアウトを延長する
+$response = Http::timeout(120)->get('https://example.com/api/status');
+```
+
+---
+
+### PHP Return Types の追加
+
+**影響度: 中**
+
+Laravel 9 では、PHP 本体や Symfony の要件に合わせて各種コアクラスへ戻り値型が追加されました。Laravel のコアクラスを継承して `offsetGet`、`offsetSet`、`jsonSerialize`、`open`、`read` などをオーバーライドしている場合は、自前の実装にも同じ戻り値型を追加してください。
+
+```php
+// コアクラスをオーバーライドしている場合は戻り値型を合わせる
+public function offsetGet($key): mixed
+{
+    return parent::offsetGet($key);
+}
+```
+
+---
+
+### Postgres の `schema` 設定名変更
+
+**影響度: 中**
+
+Postgres 接続で検索パスを設定している場合、`config/database.php` のキー名を `schema` から `search_path` へ変更してください。
+
+```php
+return [
+    'pgsql' => [
+        // Laravel 8.x
+        'schema' => 'public',
+
+        // Laravel 9.x
+        'search_path' => 'public',
+    ],
+];
+```
+
+---
+
+### `assertDeleted` から `assertModelMissing` へ
+
+**影響度: 中**
+
+モデルの削除確認に使っていた `assertDeleted` は `assertModelMissing` へ置き換えてください。
+
+```php
+// 変更前
+$this->assertDeleted($user);
+
+// 変更後
+$this->assertModelMissing($user);
+```
+
+---
+
+### `lang` ディレクトリの移動
+
+**影響度: 中**
+
+新規 Laravel 9 アプリケーションでは、言語ファイルの配置先が `resources/lang` ではなくプロジェクトルートの `lang` になりました。既存アプリをそのまま動かすだけなら大きな影響は少ないですが、新しいスケルトンへ寄せる場合やパッケージで翻訳ファイルを公開している場合は見直してください。
+
+```php
+// 固定パスではなく langPath() を使って公開先を決める
+$this->publishes([
+    __DIR__.'/../lang' => app()->langPath('vendor/package-name'),
+]);
+```
+
+---
+
+### パスワードルールの変更
+
+**影響度: 中**
+
+現在ログイン中ユーザーのパスワードと一致することを検証する `password` ルールは、`current_password` にリネームされました。
+
+```php
+// 変更前
+'password' => ['required', 'password'],
+
+// 変更後
+'password' => ['required', 'current_password'],
+```
+
+---
+
+### `when` / `unless` メソッドの変更
+
+**影響度: 中**
+
+Laravel 8 では、`when` や `unless` にクロージャを渡すと、そのクロージャ自体が truthy と評価されるため意図せず条件分岐が実行されることがありました。Laravel 9 ではクロージャが実行され、その戻り値が条件として使われます。
+
+```php
+$collection->when(function ($collection) {
+    // ここで返した値が条件式として評価される
+    return false;
+}, function ($collection) {
+    // false が返ったのでこの処理は実行されない
+    $collection->merge([1, 2, 3]);
+});
+```
+
+---
+
+### 未検証配列キーの扱い
+
+**影響度: 中**
+
+Laravel 9 では、`validated()` が返す配列から未検証の配列キーが常に除外されます。Laravel 8 の互換挙動を維持したい場合だけ、`includeUnvalidatedArrayKeys()` を明示的に呼び出してください。
+
+```php
+use Illuminate\Support\Facades\Validator;
+
+public function boot()
+{
+    // Laravel 8 と同じ挙動に戻したい場合のみ有効にする
+    Validator::includeUnvalidatedArrayKeys();
+}
+```
+
+---
+
+## まとめ
+
+Laravel 8 から 9 へのアップグレードでは、PHP 8.0.2 への更新、Symfony Mailer への移行、Flysystem 3.x への対応が中心です。メール送信・ストレージ・独自キャスト・テストヘルパーを先に点検すると、アップグレード後の不具合を減らせます。
+
+| 変更点 | 影響度 | 対応 |
+|--------|--------|------|
+| PHP 8.0.2 / `laravel/framework:^9.0` | 高 | `composer.json` と実行環境を更新 |
+| Symfony Mailer への移行 | 高 | SwiftMailer 系 API と mail 設定を確認 |
+| Flysystem 3.x | 高 | `Storage` の戻り値・例外・ドライバー依存関係を確認 |
+| `BelongsToMany` の upsert 系メソッド | 中 | 検索対象が関連モデルのテーブルになった点を確認 |
+| Custom Casts と `null` | 中 | `set()` が `null` を受けても壊れないよう修正 |
+| HTTP クライアントの 30 秒タイムアウト | 中 | 必要なリクエストだけ `timeout()` を明示 |
+| `assertDeleted` 廃止 | 中 | `assertModelMissing()` に置き換え |
+| `lang` ディレクトリ移動 | 中 | 固定パス参照を `app()->langPath()` に変更 |
+| `password` ルール変更 | 中 | `current_password` へ更新 |
+| 未検証配列キーの除外 | 中 | 必要時のみ `includeUnvalidatedArrayKeys()` を利用 |
+
+---
+
+## 参考資料
+
+- [公式アップグレードガイド (英語)](https://laravel.com/docs/9.x/upgrade)
+- [laravel/docs 9.x `upgrade.md`](https://github.com/laravel/docs/blob/9.x/upgrade.md)
+- [laravel/laravel リポジトリの差分 (8.x → 9.x)](https://github.com/laravel/laravel/compare/8.x...9.x)
+- [Laravel Shift](https://laravelshift.com) — アップグレードを自動化するコミュニティサービス
+- [Symfony Mailer ドキュメント](https://symfony.com/doc/6.0/mailer.html)
+- [Flysystem 3 ドキュメント](https://flysystem.thephpleague.com/v3/docs/)
