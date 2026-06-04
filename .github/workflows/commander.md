@@ -31,7 +31,6 @@ network:
 safe-outputs:
   create-pull-request:
     max: 1
-    title-prefix: "[Commander] "
     labels: [commander]
     fallback-as-issue: true
     fallback-labels: [commander]
