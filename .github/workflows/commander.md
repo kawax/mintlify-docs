@@ -4,11 +4,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: daily around 5:00 utc+9
-    #- cron: daily around 17:00 utc+9
 
 engine:
   id: copilot
-  #model: claude-haiku-4.5
 
 permissions:
   contents: read
