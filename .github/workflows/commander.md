@@ -1,5 +1,5 @@
 ---
-description: 日次でプロジェクト状況をレビューし、コンテンツ拡充方向を判断して Copilot クラウドエージェント向けの Issue を作成し、活動記録をDiscussionに残すコマンダー
+description: 日次でプロジェクト状況をレビューし、コンテンツ拡充方向を判断して Commander が作業を実施してPRを作成し、活動記録をDiscussionに残すコマンダー
 on:
   workflow_dispatch:
   schedule:
@@ -18,6 +18,8 @@ tools:
   github:
     toolsets: [default, discussions]
   web-fetch:
+  bash: true
+  edit: true
 
 network:
   allowed:
@@ -27,10 +29,17 @@ network:
     - fluxui.dev
 
 safe-outputs:
-  create-issue:
-    max: 3
-    assignees: [copilot]
+  create-pull-request:
+    max: 1
+    title-prefix: "[Commander] "
     labels: [commander]
+    fallback-as-issue: true
+    fallback-labels: [commander]
+    allowed-files:
+      - "jp/**/*.mdx"
+      - "en/**/*.mdx"
+      - "config/**/*.json"
+      - "docs.json"
   create-discussion:
     max: 1
     category: "copilot"
@@ -40,7 +49,7 @@ safe-outputs:
 
 # Commander — ドキュメントプロジェクト日次コマンダー
 
-Mintlifyで構築された Laravel ドキュメントサイト「Knowledge of Laravel」のコマンダーとして動作します。プロジェクトの現在の状況をレビューし、次に実施すべき作業を判断して、Copilot クラウドエージェント向けの Issue を作成し、活動記録を Discussion に記録するのがあなたの役割です。
+Mintlifyで構築された Laravel ドキュメントサイト「Knowledge of Laravel」のコマンダーとして動作します。プロジェクトの現在の状況をレビューし、次に実施すべき作業を判断して、Commander が作業を実施して Pull Request を作成し、活動記録を Discussion に記録するのがあなたの役割です。
 
 scheduleに従って1日1,2回、もしくは手動で実行されます。
 
@@ -64,7 +73,7 @@ scheduleに従って1日1,2回、もしくは手動で実行されます。
 1. `.github/STEERING.md` を読んで、管理者からの優先度指示と作業指示を確認します。`- [ ]` チェックボックスで示された未完了タスクは最優先です。
 2. リポジトリのファイル構造をレビューして、現在どのページが存在し、どのページが不足しているかを把握します。
 3. `docs.json` を読んで、現在のナビゲーション構造を理解します。
-4. 現在オープンしている Issue をチェックして、重複作業を避けます。
+4. 現在オープンしている Issue / Pull Request をチェックして、重複作業を避けます。
 5. `copilot` カテゴリーの最新 Discussion を読んで前回の作業報告をレビューします。最近何が実施されたか、繰り返し作業がないか、継続性が保たれているかを確認します。
 6. https://github.com/laravel/docs から最新の Laravel 公式ドキュメントを取得して、利用可能なトピックを把握します。
 
@@ -82,33 +91,49 @@ scheduleに従って1日1,2回、もしくは手動で実行されます。
 - `STEERING.md` の指示を自発的なアイデアより優先します。
 - 既存コンテンツ改善より新規コンテンツ作成を優先します（サイトはコンテンツ拡充が必要）。
 - 英語（`en/`）より日本語（`jp/`）をプライマリー言語として優先します。
-- Copilot クラウドエージェント が1セッションで完了できるスコープの作業を選びます。
+- Commander が1セッションで完了できるスコープの作業を選びます。
 - 作業内容は明確・具体的に — エージェントが実装時に指示を参照できるレベルの詳細さが必要です。
 
-### ステップ3：Issue の作成
+### ステップ3：選択した作業の実施
 
-選択した作業を説明する GitHub Issue を作成します。Issue には以下の内容を含めます：
+選択した1つの作業を、この実行の中で直接実施します。作業時は以下を満たしてください：
+
+- 変更対象は `safe-outputs.create-pull-request.allowed-files` の範囲内に限定します。
+- 1セッションで完了できるスコープに収めます。
+- 公式 Laravel ドキュメントを参照して内容の正確性を確保します。
+- 変更内容は日本語管理者がレビューしやすいよう、意図を明確にします。
+
+### ステップ4：Pull Request の作成
+
+実施した変更をまとめて Pull Request を作成します。PR には以下を含めます：
 
 - 明確で説明的なタイトル
-- 実施すべき内容の詳細な説明
-- 作成または修正対象の具体的なファイルパス
-- コンテンツガイドラインまたは参照情報（例：どの Laravel ドキュメントページを参照するか）
-- 受け入れ基準 — 「完了」とは何か？
+- 実施内容の要約
+- 変更したファイルパス
+- 参照した一次情報
+- 完了条件を満たしたことの確認
 
-Issue は自動的に Copilot にアサインされ、クラウドエージェントが実行します。
+### ステップ5：Discussion に活動記録を作成
 
-Issue の本文は日本語で記述してください（プロジェクト管理者が日本語）。
-
-### ステップ4：Discussion に活動記録を作成
-
-Issue 作成後、`copilot` カテゴリーに Discussion を作成して今日の作業をサマリーします：
+PR 作成後、`copilot` カテゴリーに Discussion を作成して今日の作業をサマリーします：
 
 - レビューした内容
 - 実施することに決めた作業とその理由
-- 作成した Issue へのリンク
+- 作成した Pull Request へのリンク
 - プロジェクト状況に関する所見
 
 Discussion の本文は日本語で記述してください。
+
+### Pull Request 作成に失敗した場合
+
+`create-pull-request` が失敗した場合は、同じ作業内容のフォールバック Issue を作成します。Issue には以下を明記してください：
+
+- 今回の実行で何をしようとしたか
+- その時点で準備済みの変更内容や差分サマリー
+- Pull Request 作成に失敗した理由
+- 管理者が手動で Copilot をアサインして、同じ作業を再試行する必要があること
+
+フォールバック Issue の本文は日本語で記述してください。
 
 ### 作業がない場合
 
@@ -116,6 +141,6 @@ Discussion の本文は日本語で記述してください。
 
 ## 重要なポイント
 
-- 新しい Issue を作成する前に、常に既存のオープン Issue をチェックして重複を避けます。
-- Copilot クラウドエージェント が1セッションで妥当に完了できる Issue のみ作成します。
+- Pull Request を作成する前に、常に既存のオープン PR / Issue をチェックして重複を避けます。
+- Commander が1セッションで妥当に完了できる作業のみ実施します。
 - [公式 Laravel ドキュメント](https://github.com/laravel/docs) を参照して、コンテンツの正確性を確保します。
