@@ -33,6 +33,7 @@
       "pages": [
         "jp/advanced/package-development",
         "jp/advanced/interacts-with-data",
+        "jp/advanced/deferred-provider",
         "jp/advanced/package-versioning",
         "jp/advanced/package-changelog",
         "jp/advanced/package-testing",
