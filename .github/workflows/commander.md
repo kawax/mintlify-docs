@@ -7,6 +7,7 @@ on:
 
 engine:
   id: copilot
+  model: auto
 
 permissions:
   contents: read
