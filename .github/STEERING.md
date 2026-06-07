@@ -6,8 +6,6 @@
 
 公式ドキュメントを元にしたページは揃ってきた感じなので独自コンテンツを増やしていける段階。
 
-Agentic Workflowsを「issueを作ってCopilotをアサイン」から「AWが直接作業してPRを作成」に変更している。複数issueで並行作業する想定だったけどページが増えてきて毎日1issueしか作ってないので直接で十分。
-
 ## 継続対応
 
 - 新規ページ追加、翻訳ページ追加、既存ページの再レビュー・改修のタスクをバランスよくやっていく。`laravel/docs`はちょくちょく変更されてる。
@@ -43,15 +41,10 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - [x] agent-detector PAOで使っているからこれも一緒に公式に移行されたのかも。
   - [x] pao-introduction
   - [x] chisel-introduction。moatはLaravelとは直接関係ないのでページは不要。
-- [x] Laravel CloudにManaged QueuesとScale to Zeroな新しいFlex コンピュートが追加 https://cloud.laravel.com/docs/changelog.md
-  - これまでLaravel Cloudで若干不便だった休止中はタスクスケジュールやキューが動かない問題がScale to Zeroで解決したのでページを更新。blog/laravel-cloud、blog/laravel-cloud-hibernation
-  - Managed Queuesはキューの実行頻度が低いなら得、5分ごとに実行するならAppコンピュートで動かす方が得、なはずだけどScale to Zeroと組み合わせるなら常にManaged Queuesを使うのが公式には推奨。
-  - 料金プランも少し変わってスターターでも月5ドルで5ドル分のクレジット付き。5ドル以上使ってるなら変化はない。
-  - 小規模なLaravelプロジェクトに多い、タスクスケジュールとキューで何らかの処理を自動実行している用途で使いやすくなった。
-  - https://laravel.com/blog/your-laravel-cloud-stack-now-scales-to-zero
-  - https://cloud.laravel.com/docs/scheduled-tasks.md
-  - https://cloud.laravel.com/docs/queues.md
-  - 日本語ページは修正完了
+  - [ ] Laravel LSP https://github.com/laravel/lsp
+    - READMEが書かれたのでこれで初期調査ページを作成。
+    - READMEにないCopilot CLI用の設定方法も記載。 https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/add-lsp-servers
+    - Laravel LSPをグローバルにインストールするならCopilotでも`~/.copilot/lsp-config.json`で設定した方がいいはず。`initializationOptions`にも対応しているのでREADMEに書かれてる設定も可能。
 
 ## packages ページ案
 - [x] VOICEVOX Core for PHP
