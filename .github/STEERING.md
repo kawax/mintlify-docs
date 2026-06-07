@@ -4,8 +4,6 @@
 対応が終わったら`[x]`で完了。
 完了したタスクは削除。
 
-このファイルはAWからは変更できないのでプルリクには含めない。
-
 公式ドキュメントを元にしたページは揃ってきた感じなので独自コンテンツを増やしていける段階。
 
 ## 継続対応
@@ -43,7 +41,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - [x] agent-detector PAOで使っているからこれも一緒に公式に移行されたのかも。
   - [x] pao-introduction
   - [x] chisel-introduction。moatはLaravelとは直接関係ないのでページは不要。
-  - [ ] Laravel LSP https://github.com/laravel/lsp
+  - [x] Laravel LSP https://github.com/laravel/lsp
     - READMEが書かれたのでこれで初期調査ページを作成。 https://raw.githubusercontent.com/laravel/lsp/refs/heads/main/README.md
     - コードは多いので調査不要。v0.0.19、packagist登録前で`composer global require laravel/lsp`がまだ動作しない段階なので調査しても変わる。READMEの使い方部分は大きく変わらないだろうからここだけ参照する。
     - READMEにないCopilot CLI用の設定方法も記載。 https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/add-lsp-servers

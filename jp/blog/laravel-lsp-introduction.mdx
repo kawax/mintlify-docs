@@ -1,0 +1,254 @@
+---
+title: "Laravel LSP — Language Server Protocol による IDE 機能拡張"
+description: "Laravel 公式の Language Server Protocol 実装。エディタに Framework 認識の補完やホバー機能を提供。"
+---
+
+## Laravel LSP とは
+
+**Laravel LSP**(Language Server Protocol)は、Laravel フレームワークを認識した IDE 機能をエディタに提供する公式ツールです。[Language Server Protocol](https://microsoft.github.io/language-server-protocol/) は LSP クライアント(エディタなど)と LSP サーバー(Laravel LSP)の間で通信する標準プロトコルで、これにより複数のエディタで統一された開発体験が実現します。
+
+Laravel LSP が提供する機能：
+
+- **補完** — ルート、ビュー、設定キー、翻訳キー、Livewire コンポーネント等の自動補完
+- **ホバー情報** — カーソルを重ねると説明やドキュメント、コンテキスト情報を表示
+- **診断** — コード上の問題をリアルタイム検出
+- **ドキュメントリンク** — ファイルやリソース間のリンク機能
+- **クイックフィックス** — 一般的な問題の自動修正提案
+- **定義へのジャンプ** — シンボルの定義位置への移動
+
+## なぜ必要か
+
+エディタ標準の PHP 補完では、Laravel Framework の抽象化レイヤーを理解できません。例えば：
+
+- `Route::get()` の第一引数に URI パターンを入力しても補完がない
+- `view('users.index')` のビュー名を入力しても、実際のビューファイル名が補完されない
+- 設定ファイルのキー(`config('app.name')`)や翻訳キー(`trans('messages.welcome')`)は補完の対象外
+- Blade テンプレート内での補完や検証もエディタ標準では対応していない
+
+Laravel LSP はこれらの「Framework 固有のコンテキスト」を理解し、正確な補完や診断を提供します。
+
+## インストール
+
+### グローバルインストール
+
+Composer を使ってグローバルにインストール：
+
+```bash
+composer global require laravel/lsp
+```
+
+Composer の global bin ディレクトリが `PATH` に含まれていることを確認し、以下のコマンドで起動できます：
+
+```bash
+laravel-lsp
+```
+
+### ソースからのインストール
+
+開発版を使う場合は、リポジトリをクローンして実行できます：
+
+```bash
+gh repo clone laravel/lsp
+cd lsp
+composer install
+php server
+```
+
+シェルエイリアスを設定して `laravel-lsp` コマンドを使用できるようにします：
+
+```bash
+# Zsh の場合
+echo 'alias laravel-lsp="php /path/to/lsp/server"' >> ~/.zshrc
+source ~/.zshrc
+
+# Bash の場合
+echo 'alias laravel-lsp="php /path/to/lsp/server"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+## エディタ別設定ガイド
+
+Laravel LSP はスタンダードな LSP プロトコルを使用しているため、LSP をサポートするあらゆるエディタで動作します。主なエディタの設定方法を紹介します。
+
+### Sublime Text
+
+[LSP パッケージ](https://packagecontrol.io/packages/LSP) をインストールしてから、`Preferences: LSP Settings` でクライアント設定を追加：
+
+```json
+{
+    "clients": {
+        "laravel-lsp": {
+            "enabled": true,
+            "command": ["laravel-lsp"],
+            "selector": "embedding.php | text.html.blade"
+        }
+    }
+}
+```
+
+### Neovim
+
+Neovim 0.11 以上では、カスタム LSP 設定を直接追加できます：
+
+```lua
+vim.lsp.config("laravel_lsp", {
+    cmd = { "laravel-lsp" },
+    filetypes = { "php", "blade" },
+    root_markers = { "artisan", "composer.json", ".git" },
+})
+
+vim.lsp.enable("laravel_lsp")
+```
+
+`nvim-lspconfig` を使う場合は、以下のように登録：
+
+```lua
+local lspconfig = require("lspconfig")
+local configs = require("lspconfig.configs")
+
+if not configs.laravel_lsp then
+    configs.laravel_lsp = {
+        default_config = {
+            cmd = { "laravel-lsp" },
+            filetypes = { "php", "blade" },
+            root_dir = lspconfig.util.root_pattern("artisan", "composer.json", ".git"),
+        },
+    }
+end
+
+lspconfig.laravel_lsp.setup({})
+```
+
+### Cursor
+
+Cursor は VS Code 拡張機能をサポートしているため、Laravel 拡張機能がインストール済みなら自動で対応しています。ローカル開発には VS Code 互換の LSP クライアントを使い、コマンドを指定：
+
+```sh
+laravel-lsp
+```
+
+### VS Code
+
+VS Code も同様に LSP クライアント機能を持つため、拡張機能で設定できます。
+
+### OpenCode
+
+`opencode.json` で LSP サポートを有効化し、Laravel LSP をカスタムサーバーとして設定：
+
+```json
+{
+    "$schema": "https://opencode.ai/config.json",
+    "lsp": {
+        "laravel-lsp": {
+            "command": ["laravel-lsp"],
+            "extensions": [".php", ".blade.php"]
+        }
+    }
+}
+```
+
+## GitHub Copilot CLI での設定
+
+GitHub Copilot CLI を使用している場合は、`~/.copilot/lsp-config.json` でグローバル設定できます。別途のエディタ設定は不要です：
+
+```json
+{
+  "lspServers": {
+    "laravel-lsp": {
+      "command": "laravel-lsp",
+      "fileExtensions": {
+        ".php": "php",
+        ".blade.php": "blade"
+      }
+    }
+  }
+}
+```
+
+Copilot CLI の LSP サーバー設定は `initializationOptions` にも対応しているため、後述の詳細設定をすべて使用できます。
+
+## 設定オプション
+
+LSP クライアントは `initializationOptions` 経由で詳細設定を Laravel LSP に渡せます。
+
+### PHP 環境検出
+
+`phpEnvironment` オプションで、プロジェクトデータのインデックス作成に使用する PHP コマンドを制御します。既定は `auto` で自動検出：
+
+| 値 | PHP コマンドの動作 |
+| - | - |
+| `auto` | Herd → Valet → Sail → Lando → DDEV → ローカル PHP の順で検出 |
+| `herd` | `herd which-php` を使用 |
+| `valet` | `valet which-php` を使用 |
+| `sail` | Sail 実行中に `./vendor/bin/sail php` を使用 |
+| `lando` | `lando php` を使用 |
+| `ddev` | `ddev php` を使用 |
+| `local` | ローカルの PHP バイナリを直接使用 |
+
+検出に失敗したか不正な値が渡された場合は、`php` にフォールバックします。
+
+### 基本設定例
+
+```json
+{
+    "phpEnvironment": "auto",
+    "phpCommand": ["php"],
+    "definitionProvider": false
+}
+```
+
+### 機能ごとの設定
+
+各機能は個別に有効/無効を切り替えられます。接尾辞は `Completion`、`Diagnostics`、`Hover`、`Link` など：
+
+```json
+{
+    "routeCompletion": true,
+    "routeDiagnostics": true,
+    "viewDiagnostics": false,
+    "translationHover": true,
+    "configLink": true,
+    "envCompletion": true,
+    "bladeComponentLink": true
+}
+```
+
+## 提供される機能一覧
+
+| 機能領域 | 補完 | ホバー | 診断 | リンク | クイックフィックス |
+| - | - | - | - | - | - |
+| ルート | ✓ | ✓ | ✓ | ✓ | - |
+| ビュー & Blade | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 翻訳 | ✓ | ✓ | - | - | - |
+| 設定 | ✓ | ✓ | ✓ | ✓ | - |
+| 環境変数 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| アセット & Mix | ✓ | ✓ | ✓ | ✓ | - |
+| Middleware | ✓ | ✓ | ✓ | ✓ | - |
+| Inertia | ✓ | - | ✓ | ✓ | - |
+| Livewire | ✓ | ✓ | - | ✓ | - |
+| Auth & Policies | ✓ | ✓ | ✓ | ✓ | - |
+| Container Bindings | ✓ | ✓ | ✓ | ✓ | - |
+| Validation | ✓ | - | - | - | - |
+| Controller Actions | ✓ | - | ✓ | ✓ | - |
+| Eloquent | ✓ | - | - | - | - |
+
+## クイックスタート
+
+1. **インストール** — `composer global require laravel/lsp`
+2. **エディタ設定** — 上記のエディタ別ガイドを参照
+3. **Laravel プロジェクトを開く** — サーバーがルートから routes、views、translations、config などのプロジェクトデータをインデックス化します
+4. **補完を使用** — PHP ファイルや Blade テンプレート内で、Framework 認識の補完が自動で動作します
+
+## まとめ
+
+Laravel LSP は、開発者体験を大きく向上させるツールです。エディタの標準機能では対応できない Framework 固有のコンテキストを理解し、より正確で有益な補完・診断を提供します。
+
+**必要要件:**
+- PHP 8.2 以上
+- Composer
+- LSP 対応エディタ (Sublime Text、Neovim、Cursor、VS Code 等)
+
+**参考資料:**
+- [Laravel LSP GitHub リポジトリ](https://github.com/laravel/lsp)
+- [Language Server Protocol 公式](https://microsoft.github.io/language-server-protocol/)
+- [GitHub Copilot CLI LSP 設定ガイド](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/add-lsp-servers)
