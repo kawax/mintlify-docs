@@ -7,7 +7,7 @@ on:
 
 engine:
   id: copilot
-  model: small
+  model: haiku
 
 permissions:
   contents: read
@@ -33,6 +33,7 @@ safe-outputs:
   create-pull-request:
     max: 1
     labels: [commander]
+    reviewers: [kawax]
     fallback-as-issue: true
     fallback-labels: [commander]
     allowed-files:
