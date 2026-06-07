@@ -36,11 +36,6 @@ safe-outputs:
     reviewers: [kawax]
     fallback-as-issue: true
     fallback-labels: [commander]
-    allowed-files:
-      - "jp/**/*.mdx"
-      - "en/**/*.mdx"
-      - "config/**/*.json"
-      - "docs.json"
   create-discussion:
     max: 1
     category: "copilot"
@@ -99,7 +94,6 @@ scheduleに従って1日1,2回、もしくは手動で実行されます。
 
 選択した1つの作業を、この実行の中で直接実施します。作業時は以下を満たしてください：
 
-- 変更対象は `safe-outputs.create-pull-request.allowed-files` の範囲内に限定します。
 - 1セッションで完了できるスコープに収めます。
 - 公式 Laravel ドキュメントを参照して内容の正確性を確保します。
 - 変更内容は日本語管理者がレビューしやすいよう、意図を明確にします。
