@@ -1,0 +1,254 @@
+---
+title: "Laravel LSP — IDE Features with Language Server Protocol"
+description: "Laravel's official Language Server Protocol implementation. Provides Framework-aware completions, hovers, and diagnostics in your editor."
+---
+
+## What is Laravel LSP?
+
+**Laravel LSP** (Language Server Protocol) is the official tool from Laravel that brings Framework-aware IDE features to your editor. The [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) is a standard communication protocol between LSP clients (like your editor) and an LSP server (Laravel LSP), enabling a unified development experience across multiple editors.
+
+### Features Provided by Laravel LSP
+
+- **Completions** — Auto-complete for routes, views, configuration keys, translation keys, Livewire components, and more
+- **Hover Information** — Display documentation and context information when hovering over code
+- **Diagnostics** — Real-time detection of code issues and problems
+- **Document Links** — Navigate between related files and resources
+- **Quick Fixes** — Automatic suggestions to resolve common issues
+- **Definition Jumping** — Navigate to symbol definitions
+
+## Why You Need It
+
+Standard PHP editor completions can't understand Laravel's abstraction layers. For example:
+
+- Typing a URI pattern in `Route::get()` gets no completion suggestions
+- Using `view('users.index')` provides no completion for view file names
+- Configuration keys like `config('app.name')` and translation keys like `trans('messages.welcome')` aren't recognized
+- Blade template completions and validation aren't available in standard editors
+
+Laravel LSP understands these "Framework-specific contexts" and provides accurate completions, diagnostics, and intelligent navigation.
+
+## Installation
+
+### Global Installation
+
+Install globally using Composer:
+
+```bash
+composer global require laravel/lsp
+```
+
+Make sure Composer's global vendor bin directory is on your `PATH`, then start the server:
+
+```bash
+laravel-lsp
+```
+
+### From Source
+
+For development or using unreleased versions, clone and run from the repository:
+
+```bash
+gh repo clone laravel/lsp
+cd lsp
+composer install
+php server
+```
+
+Set up a shell alias to use `laravel-lsp` from anywhere:
+
+```bash
+# For Zsh
+echo 'alias laravel-lsp="php /path/to/lsp/server"' >> ~/.zshrc
+source ~/.zshrc
+
+# For Bash
+echo 'alias laravel-lsp="php /path/to/lsp/server"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+## Editor Setup Guide
+
+Laravel LSP uses the standard LSP protocol, so it works with any LSP-compatible editor. Here's how to configure the most popular ones.
+
+### Sublime Text
+
+Install the [LSP package](https://packagecontrol.io/packages/LSP), then add the client configuration in `Preferences: LSP Settings`:
+
+```json
+{
+    "clients": {
+        "laravel-lsp": {
+            "enabled": true,
+            "command": ["laravel-lsp"],
+            "selector": "embedding.php | text.html.blade"
+        }
+    }
+}
+```
+
+### Neovim
+
+With Neovim 0.11+, add a custom LSP configuration:
+
+```lua
+vim.lsp.config("laravel_lsp", {
+    cmd = { "laravel-lsp" },
+    filetypes = { "php", "blade" },
+    root_markers = { "artisan", "composer.json", ".git" },
+})
+
+vim.lsp.enable("laravel_lsp")
+```
+
+Or with `nvim-lspconfig`:
+
+```lua
+local lspconfig = require("lspconfig")
+local configs = require("lspconfig.configs")
+
+if not configs.laravel_lsp then
+    configs.laravel_lsp = {
+        default_config = {
+            cmd = { "laravel-lsp" },
+            filetypes = { "php", "blade" },
+            root_dir = lspconfig.util.root_pattern("artisan", "composer.json", ".git"),
+        },
+    }
+end
+
+lspconfig.laravel_lsp.setup({})
+```
+
+### Cursor
+
+Cursor supports VS Code extensions, so if you have a Laravel extension installed, it should work automatically. For local development, use a VS Code-compatible LSP client and point it to:
+
+```sh
+laravel-lsp
+```
+
+### VS Code
+
+VS Code has built-in LSP client support and can be configured similarly through extensions.
+
+### OpenCode
+
+Enable LSP support in `opencode.json` and add Laravel LSP as a custom server:
+
+```json
+{
+    "$schema": "https://opencode.ai/config.json",
+    "lsp": {
+        "laravel-lsp": {
+            "command": ["laravel-lsp"],
+            "extensions": [".php", ".blade.php"]
+        }
+    }
+}
+```
+
+## GitHub Copilot CLI Configuration
+
+If you're using GitHub Copilot CLI, you can configure Laravel LSP globally in `~/.copilot/lsp-config.json` without additional editor configuration:
+
+```json
+{
+  "lspServers": {
+    "laravel-lsp": {
+      "command": "laravel-lsp",
+      "fileExtensions": {
+        ".php": "php",
+        ".blade.php": "blade"
+      }
+    }
+  }
+}
+```
+
+Copilot CLI's LSP configuration also supports `initializationOptions`, allowing you to use all the advanced options described below.
+
+## Configuration Options
+
+LSP clients can pass detailed configuration to Laravel LSP through `initializationOptions`.
+
+### PHP Environment Detection
+
+The `phpEnvironment` option controls which PHP command is used when indexing project data. Default is `auto` for automatic detection:
+
+| Value | PHP Command Behavior |
+| - | - |
+| `auto` | Auto-detect in order: Herd → Valet → Sail → Lando → DDEV → local PHP |
+| `herd` | Use `herd which-php` |
+| `valet` | Use `valet which-php` |
+| `sail` | Use `./vendor/bin/sail php` when Sail is running |
+| `lando` | Use `lando php` when available |
+| `ddev` | Use `ddev php` when available |
+| `local` | Use the local PHP binary directly |
+
+If detection fails or an unknown value is provided, the server falls back to `php`.
+
+### Basic Configuration Example
+
+```json
+{
+    "phpEnvironment": "auto",
+    "phpCommand": ["php"],
+    "definitionProvider": false
+}
+```
+
+### Per-Feature Configuration
+
+Individual features can be enabled or disabled. Common suffixes are `Completion`, `Diagnostics`, `Hover`, and `Link`:
+
+```json
+{
+    "routeCompletion": true,
+    "routeDiagnostics": true,
+    "viewDiagnostics": false,
+    "translationHover": true,
+    "configLink": true,
+    "envCompletion": true,
+    "bladeComponentLink": true
+}
+```
+
+## Features by Area
+
+| Area | Completion | Hover | Diagnostics | Links | Quick Fixes |
+| - | - | - | - | - | - |
+| Routes | ✓ | ✓ | ✓ | ✓ | - |
+| Views & Blade | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Translations | ✓ | ✓ | - | - | - |
+| Configuration | ✓ | ✓ | ✓ | ✓ | - |
+| Environment Variables | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Assets & Mix | ✓ | ✓ | ✓ | ✓ | - |
+| Middleware | ✓ | ✓ | ✓ | ✓ | - |
+| Inertia | ✓ | - | ✓ | ✓ | - |
+| Livewire Components | ✓ | ✓ | - | ✓ | - |
+| Auth & Policies | ✓ | ✓ | ✓ | ✓ | - |
+| Container Bindings | ✓ | ✓ | ✓ | ✓ | - |
+| Validation Rules | ✓ | - | - | - | - |
+| Controller Actions | ✓ | - | ✓ | ✓ | - |
+| Eloquent | ✓ | - | - | - | - |
+
+## Quick Start
+
+1. **Install** — Run `composer global require laravel/lsp`
+2. **Configure Your Editor** — Follow the editor-specific guide above
+3. **Open a Laravel Project** — The server indexes routes, views, translations, configuration, and other project data from your project root
+4. **Start Coding** — Framework-aware completions and diagnostics activate automatically in PHP and Blade files
+
+## Summary
+
+Laravel LSP significantly enhances your development experience by understanding Laravel's Framework-specific contexts that standard editors can't recognize. It provides intelligent completions, accurate diagnostics, and powerful navigation features tailored to Laravel development.
+
+**Requirements:**
+- PHP 8.2 or higher
+- Composer
+- LSP-compatible editor (Sublime Text, Neovim, Cursor, VS Code, etc.)
+
+**Resources:**
+- [Laravel LSP GitHub Repository](https://github.com/laravel/lsp)
+- [Language Server Protocol Official Documentation](https://microsoft.github.io/language-server-protocol/)
+- [GitHub Copilot CLI LSP Configuration Guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/add-lsp-servers)
