@@ -41,6 +41,35 @@ use App\Http\Controllers\UserController;
 Route::get('/user', [UserController::class, 'index']);
 ```
 
+### APIルート
+
+アプリケーションがステートレス API を提供する場合、`install:api` Artisanコマンドで API ルーティングを有効にできます。
+
+```shell
+php artisan install:api
+```
+
+`install:api` コマンドは [Laravel Sanctum](/jp/sanctum) をインストールし、`routes/api.php` ファイルを作成します。
+Sanctumはサードパーティの API コンシューマ、SPA、モバイルアプリケーション向けのシンプルで堅牢な API トークン認証ガードを提供します。
+
+```php
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');
+```
+
+`routes/api.php` のルートはステートレスで `api` [ミドルウェアグループ](/jp/middleware)が適用されます。
+また、すべてのルートに自動的に `/api` URI プレフィックスが適用されるため、手動で付与する必要はありません。
+プレフィックスを変更する場合は、アプリケーションの `bootstrap/app.php` ファイルを編集します。
+
+```php
+->withRouting(
+    api: __DIR__.'/../routes/api.php',
+    apiPrefix: 'api/admin',
+    // ...
+)
+```
+
 ### 利用可能なHTTPメソッド
 
 ルーターはすべてのHTTPメソッドに対応したルートを登録できます。
