@@ -38,6 +38,34 @@ use App\Http\Controllers\UserController;
 Route::get('/user', [UserController::class, 'index']);
 ```
 
+### API Routes
+
+If your application will also offer a stateless API, you may enable API routing using the `install:api` Artisan command:
+
+```shell
+php artisan install:api
+```
+
+The `install:api` command installs [Laravel Sanctum](/en/sanctum), which provides a robust, yet simple API token authentication guard which can be used to authenticate third-party API consumers, SPAs, or mobile applications. In addition, the `install:api` command creates the `routes/api.php` file:
+
+```php
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');
+```
+
+Of course, you are free to omit the `auth:sanctum` middleware on routes that should be publicly accessible.
+
+The routes in `routes/api.php` are stateless and are assigned to the `api` [middleware group](/en/middleware#laravels-default-middleware-groups). Additionally, the `/api` URI prefix is automatically applied to these routes, so you do not need to manually apply it to every route in the file. You may change the prefix by modifying your application's `bootstrap/app.php` file:
+
+```php
+->withRouting(
+    api: __DIR__.'/../routes/api.php',
+    apiPrefix: 'api/admin',
+    // ...
+)
+```
+
 ### Available HTTP methods
 
 The router can register routes that respond to any HTTP verb:
