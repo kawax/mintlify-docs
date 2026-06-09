@@ -61,6 +61,7 @@
         "en/database",
         "en/query-builder",
         "en/pagination",
+        "en/mongodb",
         "en/eloquent-resources"
       ]
     },
