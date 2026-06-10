@@ -1,0 +1,409 @@
+---
+title: "Upgrading From Laravel 8 to 9"
+description: "Learn how to upgrade from Laravel 8.x to 9.x with this comprehensive guide covering major changes and migration steps"
+---
+
+## Introduction
+
+Laravel 9 was released on February 8, 2022. This guide walks you through the upgrade process from Laravel 8.x to 9.x and explains the major breaking changes.
+
+<Info>
+  The estimated time required for the upgrade is **approximately 30 minutes**. However, the actual time may vary depending on your application's usage of email sending, file storage, custom casts, and framework core class overrides.
+</Info>
+
+### Using Laravel Shift for Automatic Upgrades
+
+You can also automate the upgrade process using [Laravel Shift](https://laravelshift.com/). Shift helps with updating `composer.json` and configuration files, making it a convenient starting point for reviewing differences.
+
+---
+
+## Breaking Changes Overview
+
+### High-Impact Changes
+
+- Dependency updates
+- Migration to Flysystem 3.x
+- Migration to Symfony Mailer
+
+### Medium-Impact Changes
+
+- `BelongsToMany` `firstOrNew` / `firstOrCreate` / `updateOrCreate` methods
+- Custom Casts and `null` handling
+- HTTP client default timeout
+- PHP Return Types additions
+- PostgreSQL `schema` configuration rename
+- `assertDeleted` method deprecation
+- `lang` directory relocation
+- Password rule changes
+- `when` / `unless` method behavior changes
+- Unvalidated array keys in validation
+
+---
+
+## Upgrade Steps
+
+### Updating Dependencies
+
+**Impact Level: High**
+
+Laravel 9 requires **PHP 8.0.2 or higher**. First, review the dependencies in your `composer.json`:
+
+```json
+{
+  "require": {
+    "php": "^8.0.2",
+    "laravel/framework": "^9.0",
+    "spatie/laravel-ignition": "^1.0"
+  },
+  "require-dev": {
+    "nunomaduro/collision": "^6.1"
+  }
+}
+```
+
+Additionally, make these updates for affected applications:
+
+- Replace `facade/ignition` with `spatie/laravel-ignition:^1.0`
+- Update `pusher/pusher-php-server` to `^5.0` if using Pusher
+- Verify third-party packages support Laravel 9
+- Check Vonage notification channel upgrade guide if applicable
+
+After updating, install the dependencies:
+
+```shell
+composer update
+```
+
+---
+
+## PHP Version Requirements
+
+**Impact Level: High**
+
+Laravel 9 requires PHP 8.0.2 or higher. Ensure your CI/CD pipeline, local development environment, and production servers all run the same PHP version before upgrading.
+
+---
+
+### Migration to Symfony Mailer
+
+**Impact Level: High**
+
+A major change in Laravel 9 is the migration from SwiftMailer (maintenance ended December 2021) to Symfony Mailer. Applications using only standard `Mail::to()->send()` will see minimal impact, but those directly accessing SwiftMailer's low-level APIs will need adjustments.
+
+#### Driver Dependencies
+
+```shell
+# Only if using Mailgun
+composer require symfony/mailgun-mailer symfony/http-client
+
+# If using Postmark, remove SwiftMailer package and install Symfony version
+composer remove wildbit/swiftmailer-postmark
+composer require symfony/postmark-mailer symfony/http-client
+```
+
+#### Transitioning from `withSwiftMessage` to `withSymfonyMessage`
+
+```php
+// Laravel 8.x: SwiftMailer-based
+$this->withSwiftMessage(function ($message) {
+    $message->getHeaders()->addTextHeader('Custom-Header', 'Header Value');
+});
+
+// Laravel 9.x: Symfony Mailer-based
+use Symfony\Component\Mime\Email;
+
+$this->withSymfonyMessage(function (Email $message) {
+    $message->getHeaders()->addTextHeader('Custom-Header', 'Header Value');
+});
+```
+
+The `send`, `html`, `raw`, and `plain` methods on `Illuminate\Mail\Mailer` now return `Illuminate\Mail\SentMessage` instead of `void`. Additionally, the `message` property of the `MessageSent` event now contains `Symfony\Component\Mime\Email` instead of `Swift_Message`.
+
+#### Reviewing SMTP Configuration
+
+Symfony Mailer removes the SMTP `stream` option, with supported configurations moving to the top level:
+
+```php
+return [
+    'mailers' => [
+        'smtp' => [
+            // Laravel 8.x configuration
+            'stream' => [
+                'ssl' => [
+                    'verify_peer' => false,
+                ],
+            ],
+
+            // Laravel 9.x configuration
+            'verify_peer' => false,
+        ],
+    ],
+];
+```
+
+The `auth_mode` setting no longer requires explicit configuration. It's safer to validate email addresses before sending rather than collecting invalid addresses afterward.
+
+---
+
+### Migration to Flysystem 3.x
+
+**Impact Level: High**
+
+Laravel 9 updates the internal implementation of the `Storage` facade from Flysystem 1.x to 3.x. File operation methods maintain backward compatibility as much as possible, but there are differences in exceptions, return values, and adapter registration.
+
+#### Installing Additional Drivers
+
+```shell
+# Amazon S3 driver
+composer require -W league/flysystem-aws-s3-v3 "^3.0"
+
+# FTP driver
+composer require league/flysystem-ftp "^3.0"
+
+# SFTP driver
+composer require league/flysystem-sftp-v3 "^3.0"
+```
+
+#### Major `Storage` Behavior Changes
+
+- `put` / `write` / `writeStream` overwrite existing files by default
+- Write failures return `false` instead of throwing exceptions
+- Reading non-existent files returns `null` instead of throwing exceptions
+- Deleting non-existent files returns `true`
+- The cached adapter was removed; remove `cache` keys from `disk` configurations
+
+If you prefer exceptions on write failures, configure the `throw` option:
+
+```php
+return [
+    'disks' => [
+        'public' => [
+            'driver' => 'local',
+            // Enable only if you want exceptions on write failures
+            'throw' => true,
+        ],
+    ],
+];
+```
+
+If you've registered custom filesystem drivers, update the `Storage::extend()` callback to directly return `Illuminate\Filesystem\FilesystemAdapter`.
+
+---
+
+### `BelongsToMany` `firstOrNew` / `firstOrCreate` / `updateOrCreate`
+
+**Impact Level: Medium**
+
+In Laravel 8, the first argument's attributes were compared against the pivot table. In Laravel 9, they're compared against the related model's table:
+
+```php
+// Searches and updates against the related model's table
+$user->roles()->updateOrCreate([
+    'name' => 'Administrator',
+]);
+```
+
+Additionally, `firstOrCreate` now accepts a second `$values` argument, aligning its behavior with other relationships:
+
+```php
+// Merges created_by only when creating new records
+$user->roles()->firstOrCreate([
+    'name' => 'Administrator',
+], [
+    'created_by' => $user->id,
+]);
+```
+
+---
+
+### Custom Casts and `null`
+
+**Impact Level: Medium**
+
+In Laravel 9, the custom cast's `set` method is called even when `null` is assigned to a cast attribute. Custom casts that don't account for `null` may throw exceptions after upgrading:
+
+```php
+public function set($model, $key, $value, $attributes)
+{
+    // Laravel 9 may pass null
+    if ($value === null) {
+        return [
+            'address_line_one' => null,
+            'address_line_two' => null,
+        ];
+    }
+
+    if (! $value instanceof AddressModel) {
+        throw new InvalidArgumentException('Please provide an AddressModel instance.');
+    }
+
+    return [
+        'address_line_one' => $value->lineOne,
+        'address_line_two' => $value->lineTwo,
+    ];
+}
+```
+
+---
+
+### HTTP Client Default Timeout
+
+**Impact Level: Medium**
+
+The HTTP client's default timeout is now 30 seconds. Previously, it could wait indefinitely:
+
+```php
+use Illuminate\Support\Facades\Http;
+
+// Extend timeout only for long-running API calls
+$response = Http::timeout(120)->get('https://example.com/api/status');
+```
+
+---
+
+### PHP Return Types
+
+**Impact Level: Medium**
+
+Laravel 9 adds return type hints to core classes to match PHP and Symfony requirements. If your application extends Laravel core classes and overrides methods like `offsetGet`, `offsetSet`, `jsonSerialize`, `open`, or `read`, add matching return types:
+
+```php
+// Add return types when overriding core class methods
+public function offsetGet($key): mixed
+{
+    return parent::offsetGet($key);
+}
+```
+
+---
+
+### PostgreSQL `schema` Configuration Rename
+
+**Impact Level: Medium**
+
+If you're using PostgreSQL with a search path configuration, update your `config/database.php` key from `schema` to `search_path`:
+
+```php
+return [
+    'pgsql' => [
+        // Laravel 8.x
+        'schema' => 'public',
+
+        // Laravel 9.x
+        'search_path' => 'public',
+    ],
+];
+```
+
+---
+
+### `assertDeleted` to `assertModelMissing`
+
+**Impact Level: Medium**
+
+Replace the deprecated `assertDeleted` method with `assertModelMissing` in your tests:
+
+```php
+// Before
+$this->assertDeleted($user);
+
+// After
+$this->assertModelMissing($user);
+```
+
+---
+
+### `lang` Directory Relocation
+
+**Impact Level: Medium**
+
+In new Laravel 9 applications, language files are located at the project root in `lang` instead of `resources/lang`. While existing applications continue to work, consider aligning with the new structure, especially when publishing package language files:
+
+```php
+// Use langPath() instead of hardcoded paths
+$this->publishes([
+    __DIR__.'/../lang' => app()->langPath('vendor/package-name'),
+]);
+```
+
+---
+
+### Password Rule Rename
+
+**Impact Level: Medium**
+
+The `password` validation rule that checks against the currently authenticated user's password has been renamed to `current_password`:
+
+```php
+// Before
+'password' => ['required', 'password'],
+
+// After
+'password' => ['required', 'current_password'],
+```
+
+---
+
+### `when` / `unless` Method Changes
+
+**Impact Level: Medium**
+
+In Laravel 8, passing a closure to `when` or `unless` would evaluate the closure itself as truthy, potentially causing unintended behavior. In Laravel 9, the closure is executed and its return value is used as the condition:
+
+```php
+$collection->when(function ($collection) {
+    // The returned value is evaluated as the condition
+    return false;
+}, function ($collection) {
+    // This block won't execute because false was returned
+    $collection->merge([1, 2, 3]);
+});
+```
+
+---
+
+### Unvalidated Array Keys Exclusion
+
+**Impact Level: Medium**
+
+In Laravel 9, `validated()` always excludes unvalidated array keys from the returned array. To maintain Laravel 8's behavior, explicitly call `includeUnvalidatedArrayKeys()`:
+
+```php
+use Illuminate\Support\Facades\Validator;
+
+public function boot()
+{
+    // Only enable if you need Laravel 8 behavior
+    Validator::includeUnvalidatedArrayKeys();
+}
+```
+
+---
+
+## Summary
+
+Upgrading from Laravel 8 to 9 focuses on updating to PHP 8.0.2, migrating to Symfony Mailer, and handling Flysystem 3.x changes. Pre-upgrade audits of email sending, file storage, custom casts, and test helpers reduce post-upgrade issues.
+
+| Breaking Change | Impact | Action |
+|-----------------|--------|--------|
+| PHP 8.0.2 / `laravel/framework:^9.0` | High | Update `composer.json` and runtime environment |
+| Symfony Mailer migration | High | Review SwiftMailer APIs and mail configuration |
+| Flysystem 3.x | High | Test `Storage` return values, exceptions, and driver dependencies |
+| `BelongsToMany` upsert methods | Medium | Verify search targets the related model table |
+| Custom Casts and `null` | Medium | Handle `null` in `set()` method |
+| HTTP client 30-second timeout | Medium | Explicitly set `timeout()` for long-running requests |
+| `assertDeleted` deprecation | Medium | Use `assertModelMissing()` instead |
+| `lang` directory relocation | Medium | Use `app()->langPath()` instead of hardcoded paths |
+| `password` rule rename | Medium | Update to `current_password` |
+| Unvalidated array keys exclusion | Medium | Use `includeUnvalidatedArrayKeys()` only if needed |
+
+---
+
+## References
+
+- [Official Upgrade Guide (English)](https://laravel.com/docs/9.x/upgrade)
+- [laravel/docs 9.x `upgrade.md`](https://github.com/laravel/docs/blob/9.x/upgrade.md)
+- [laravel/laravel Repository Differences (8.x → 9.x)](https://github.com/laravel/laravel/compare/8.x...9.x)
+- [Laravel Shift](https://laravelshift.com) — Community service for automated upgrades
+- [Symfony Mailer Documentation](https://symfony.com/doc/6.0/mailer.html)
+- [Flysystem 3 Documentation](https://flysystem.thephpleague.com/v3/docs/)
