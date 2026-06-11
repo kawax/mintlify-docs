@@ -31,6 +31,12 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
 - [x] Reflectionの解説
 - [x] Laravel Chiselページで少し出てきたのでPHP AST（抽象構文木）の解説
 - [x] FFIの解説
+- [ ] パッケージ開発グループにGitHub Actionsのピン留めページを追加
+  - サプライチェーン攻撃対策
+  - 最近、Laravel公式でも行っているのでパッケージ開発者も追従すべきだろう。
+  - 1、プロジェクトにdependabot.ymlを追加。Laravelと同じファイルをそのままコピーでいい。 https://github.com/laravel/laravel/blob/13.x/.github/dependabot.yml
+  - 2、初回のピン留めはpinactなどのツールを使用する。 https://github.com/suzuki-shunsuke/pinact
+  - dependabotはピン留めしてなければバージョンで更新、ピン留めしていればSHAで更新する。最初に設定さえ済ませば自動で更新のPRが作られる。
 
 ## blog ページ案
 
@@ -43,11 +49,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
   - [x] agent-detector PAOで使っているからこれも一緒に公式に移行されたのかも。
   - [x] pao-introduction
   - [x] chisel-introduction。moatはLaravelとは直接関係ないのでページは不要。
-  - [x] Laravel LSP https://github.com/laravel/lsp
-    - READMEが書かれたのでこれで初期調査ページを作成。 https://raw.githubusercontent.com/laravel/lsp/refs/heads/main/README.md
-    - コードは多いので調査不要。v0.0.19、packagist登録前で`composer global require laravel/lsp`がまだ動作しない段階なので調査しても変わる。READMEの使い方部分は大きく変わらないだろうからここだけ参照する。
-    - READMEにないCopilot CLI用の設定方法も記載。 https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/add-lsp-servers
-    - Laravel LSPをグローバルにインストールするならCopilotでも`~/.copilot/lsp-config.json`で設定した方がいいはず。`initializationOptions`にも対応しているのでREADMEに書かれてる設定も可能。
+  - [x] Laravel LSP
 
 ## packages ページ案
 - [x] VOICEVOX Core for PHP
