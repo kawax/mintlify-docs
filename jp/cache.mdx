@@ -270,6 +270,24 @@ $value = Cache::rememberForever('users', function () {
 });
 ```
 
+キャッシュが「ヒット」したのか、クロージャで新しく取得されたのかを知りたい場合は `rememberWithWarmth()` メソッドを使用します。このメソッドはキャッシュ値とそれが新鮮（キャッシュから取得）かどうかを示す真偽値を配列で返します。
+
+```php
+[$value, $warm] = Cache::rememberWithWarmth('users', 3600, function () {
+    return DB::table('users')->get();
+});
+
+if ($warm) {
+    // キャッシュからのデータ
+} else {
+    // クロージャで新しく取得したデータ
+}
+```
+
+<Tip>
+  `rememberWithWarmth()` はキャッシュの効率性を監視したい場合に便利です。$warm が `false` の場合が多い場合は、キャッシュの有効期限（TTL）を調整することで改善できるかもしれません。
+</Tip>
+
 #### Stale While Revalidate（柔軟なキャッシュ更新）
 
 `Cache::flexible()` はキャッシュが「新鮮な期間」と「古くなっても使える期間」を配列で指定します。
