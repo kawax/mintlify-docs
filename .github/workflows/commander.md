@@ -7,7 +7,7 @@ on:
 
 engine:
   id: copilot
-  model: small
+  model: claude-haiku-4.5
 
 permissions:
   contents: read
