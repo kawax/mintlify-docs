@@ -82,6 +82,21 @@ class Post extends Model
 php artisan queue:work redis --queue=scout
 ```
 
+### ユニークなジョブの使用
+
+書き込みの多いアプリケーションでは、同じモデルレコードに対する重複したキュージョブがキューに登録されるのを防ぎたい場合があります。`config/scout.php` で `MakeSearchableUniquely` と `RemoveFromSearchUniquely` ジョブクラスを登録することで、ユニークなインデックスジョブを使用できます。通常、これはサービスプロバイダーの `boot` メソッドで設定します。
+
+```php
+use Laravel\Scout\Jobs\MakeSearchableUniquely;
+use Laravel\Scout\Jobs\RemoveFromSearchUniquely;
+use Laravel\Scout\Scout;
+
+Scout::makeSearchableUsing(MakeSearchableUniquely::class);
+Scout::removeFromSearchUsing(RemoveFromSearchUniquely::class);
+```
+
+これらのジョブは Laravel の[ユニークなジョブロック](/jp/queues#unique-jobs)を使用して、既にキューに登録されている同じモデルレコードの重複したインデックス操作をディスパッチするのを防ぎます。
+
 ## ドライバーの前提条件
 
 ### Algolia
