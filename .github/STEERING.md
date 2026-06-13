@@ -60,6 +60,7 @@ STEERING.mdのタスクがない時はまだページが増えてるのでここ
 - [ ] Google Sheets API for Laravel https://github.com/invokable/laravel-google-sheets
   - 10年前に作った初期のパッケージ
   - 「SDK」グループに複数ページで作成。
+  - READMEとdocs内に英語のドキュメントがあるのでこれを参照
   - Google APIを初めて使う時に難しいのは認証なので [Service Account](https://raw.githubusercontent.com/invokable/laravel-google-sheets/refs/heads/main/docs/service-account.md) と[OAuth](https://raw.githubusercontent.com/invokable/laravel-google-sheets/refs/heads/main/docs/oauth.md) をそれぞれ個別ページで説明。
   - [GoogleSheetsトレイト](https://github.com/invokable/laravel-google-sheets/blob/main/src/Traits/GoogleSheets.php) はその後もよく使っている定番パターン。
   - 10年分なのでデモプロジェクトもLaravel5.5から13まで更新し続けている。 https://github.com/invokable/google-sheets-project
